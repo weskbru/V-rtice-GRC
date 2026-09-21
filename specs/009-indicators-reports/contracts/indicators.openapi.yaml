@@ -1,0 +1,659 @@
+openapi: 3.1.0
+info:
+  title: PharosGRC - Indicator Management API
+  version: 1.0.0
+  summary: >-
+    Cross-domain, read-mostly indicator catalog: current values computed live per caller scope,
+    optional threshold configuration, and an organization-wide immutable history.
+  description: |
+    Draft contract for `009-indicators-reports` (spec.md, data-model.md). Written before
+    implementation - unlike this project's later-phase contracts, nothing below has yet been
+    verified against running code, and every citation is to the specification, not to a file and
+    line of shipped source.
+
+    **Every operation is subject to two independent server-side checks**, the same pattern every
+    business module in this platform already follows: the caller's `indicator:*` permission, and
+    (except where noted) the caller's resolved organizational scope, applied as a mandatory
+    predicate on every read of a scoped source table.
+
+    **`IndicatorMetricKey` is a closed catalog, never a free string.** Eleven values ship in v1
+    (data-model.md §3), one or more per already-implemented business domain (Risk, Control,
+    Compliance, Audit Engagement, Finding, Asset, Process, Action, Incident, Problem). An unknown
+    key is `404`, exactly like an unknown record id elsewhere in this API - the catalog itself is
+    the "record" being looked up.
+
+    **An `IndicatorDefinition` is optional configuration for a key, never a prerequisite to read
+    it.** `GET /indicators/{metricKey}/current` works whether or not anyone has ever created a
+    definition for that key (spec.md FR-001). A definition adds a name, an owner, and an optional
+    threshold - and `metricKey` is unique across definitions (data-model.md §1): at most one
+    definition exists per key.
+
+    **A double permission gate on every metric read.** Reading a metric's current value or history
+    requires `indicator:view` **and** the read permission of that metric's own source domain
+    (`risk:view` for Risk-sourced keys, `compliance:view` for Compliance-sourced keys, and so on -
+    `sourcePermission` in the catalog, data-model.md §3). Missing the first is `403` before the key
+    is even looked up; missing the second is `403` naming the missing permission.
+
+    **Compliance-sourced metrics carry no organizational-unit scope.** `COMPLIANCE_PERCENTAGE` is
+    the one key in the catalog whose source table (`requirements`) has no `org_unit_id` column
+    (research.md D-8) - every response names this explicitly via `scopeApplicability`, rather than
+    silently applying no filter and leaving the caller to guess whether that was deliberate.
+
+    **History is organization-wide only.** Creating or reading an `IndicatorMeasurement` requires
+    the caller's resolved scope to be `GLOBAL` (research.md D-6) - never `UNIT`, regardless of how
+    much of the org-unit tree that `UNIT` grant happens to cover today. A caller with `UNIT` scope
+    gets `403` on both the write and the read of this sub-resource, never a partial or zeroed
+    history.
+
+    **No update, no delete, anywhere in this contract.** `IndicatorDefinition` is edited (name,
+    owner, threshold) but never deleted - deactivated instead (`isActive: false`).
+    `IndicatorMeasurement` has no update path of any kind: once created, a point is permanent
+    (spec.md SC-002).
+
+    **Paginated list envelope is `{data, meta}`, matching every other paginated operation in this
+    platform's contracts (specs 001, 003, 004, 005, 006, 008 - `data` appears 23 times, `items`
+    never, before this document).** `listIndicatorDefinitions` and `listIndicatorMeasurements`
+    below were drafted against `008-incidents-problems`'s two contracts before those contracts'
+    own `{items, meta}` divergence was corrected (fixed same-day, commit `13949a1`): this document
+    measured against real code exactly as instructed and copied a defect that had not yet been
+    fixed at the source. Corrected here before this specification was ever committed. The
+    unpaginated `listIndicatorMetricKeys` below follows the platform's separate, older precedent
+    for an unpaginated list - a bare array, wrapped in neither `{data}` nor `{items}` - the same
+    shape `008-incidents-problems/contracts/incidents.openapi.yaml`'s own link-list operations
+    (e.g. `listIncidentRiskLinks`) already use.
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Indicator Catalog
+    description: The closed set of measurable metrics (`IndicatorMetricKey`) and their optional
+      definitions (US1).
+  - name: Indicator Current Value
+    description: Live, per-caller-scope computation of a metric's value right now (US1).
+  - name: Indicator History
+    description: Organization-wide, immutable, append-only measurement points (US2, US3).
+security:
+  - sessionCookie: []
+paths:
+  /indicators/metric-keys:
+    get:
+      operationId: listIndicatorMetricKeys
+      tags: [Indicator Catalog]
+      summary: List the closed catalog of measurable metrics, with their default label and source
+        characteristics.
+      description: >-
+        Requires `indicator:view`. Every key in the response exists regardless of whether an
+        `IndicatorDefinition` has been created for it - this operation is the platform's own
+        catalog, not a list of user-created rows.
+      responses:
+        '200':
+          description: >-
+            The eleven (or more, additively) catalog entries, as a bare array - unpaginated (the
+            catalog is closed and small), matching how every other unpaginated list operation in
+            this platform's contracts already responds (e.g. `listIncidentRiskLinks` in
+            `008-incidents-problems/contracts/incidents.openapi.yaml`): a bare JSON array, never an
+            object wrapping one, and never the paginated `{data, meta}` envelope, which exists only
+            where `meta` (page/pageSize/total/totalPages) actually applies.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IndicatorMetricCatalogEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /indicators:
+    get:
+      operationId: listIndicatorDefinitions
+      tags: [Indicator Catalog]
+      summary: List indicator definitions (configured metrics) in the platform.
+      description: >-
+        Requires `indicator:view`. Unlike the metric-key catalog above, this lists only keys that
+        someone has actually configured (name, owner, optional threshold) - a key with no
+        definition simply does not appear here, though it remains readable via
+        `GET /indicators/{metricKey}/current`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated list of definitions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IndicatorDefinition'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createIndicatorDefinition
+      tags: [Indicator Catalog]
+      summary: Create (configure) an indicator definition for a catalog key.
+      description: >-
+        Requires `indicator:create`. `code` is never client-supplied - assigned by the server with
+        the `IND-` prefix (data-model.md §1). `metricKey` must be unique across definitions: a
+        second attempt against an already-configured key is rejected with `422`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIndicatorDefinitionRequest'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: >-
+            Unknown `metricKey`; `metricKey` already has a definition; or exactly one of
+            `thresholdComparator`/`thresholdValue` was supplied without the other (Invariant T1).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /indicators/{definitionId}:
+    parameters:
+      - name: definitionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getIndicatorDefinition
+      tags: [Indicator Catalog]
+      summary: Fetch one indicator definition by id.
+      description: Requires `indicator:view`.
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateIndicatorDefinition
+      tags: [Indicator Catalog]
+      summary: Edit name, description, owner, or threshold. Never `metricKey`.
+      description: >-
+        Requires `indicator:edit`. `metricKey` is immutable once created - rejected as an unknown
+        property if supplied (matches the "unknown property" rejection every other PATCH in this
+        platform already applies to its own immutable fields).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIndicatorDefinitionRequest'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Exactly one of `thresholdComparator`/`thresholdValue` supplied without the other.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /indicators/{metricKey}/current:
+    parameters:
+      - name: metricKey
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+    get:
+      operationId: getIndicatorCurrentValue
+      tags: [Indicator Current Value]
+      summary: Compute this metric's value right now, under the caller's own resolved scope.
+      description: >-
+        Requires `indicator:view` **and** the source domain's own read permission
+        (`sourcePermission` in the catalog - e.g. `risk:view` for `RISK_TOTAL_BY_LEVEL`). Never
+        stored - recomputed on every call (spec.md FR-005, research.md D-2), the same guarantee
+        `GET /dashboard` already gives for Risk. Works even when no `IndicatorDefinition` exists for
+        this key.
+      responses:
+        '200':
+          description: >-
+            The computed value. `scopeApplicability` names whether an organizational-unit
+            predicate was applied (`ORGANIZATIONAL_UNIT`) or the source has none
+            (`ORGANIZATION_WIDE` - `COMPLIANCE_PERCENTAGE` only, research.md D-8).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorCurrentValue'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            Missing `indicator:view`, or missing the source domain's own read permission for this
+            key.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Unknown `metricKey` - not a member of the closed catalog.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /indicators/{metricKey}/measurements:
+    parameters:
+      - name: metricKey
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+    get:
+      operationId: listIndicatorMeasurements
+      tags: [Indicator History]
+      summary: Read the organization-wide historical series for this metric.
+      description: >-
+        Requires `indicator:view` **and** the caller's resolved scope to be `GLOBAL` - a `UNIT`
+        scope is refused with `403` even if it happens to cover every unit in today's tree
+        (research.md D-6). History exists independently of any `IndicatorDefinition` for the key.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Paginated, chronological (oldest first) series.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IndicatorMeasurement'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing `indicator:view`, or the caller's resolved scope is not `GLOBAL`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Unknown `metricKey`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      operationId: createIndicatorMeasurement
+      tags: [Indicator History]
+      summary: Compute and permanently record one historical point for this metric.
+      description: >-
+        Requires `indicator:edit` **and** the caller's resolved scope to be `GLOBAL` (research.md
+        D-6) - refused with `403` before any source table is read. The value is always computed by
+        the same calculator `GET .../current` uses (spec.md FR-011) - the request body carries no
+        value field of any kind. When a definition exists for this key with a threshold configured
+        and the computed value breaches it, exactly one notification is sent to the definition's
+        owner (spec.md FR-017, US3) - this operation never creates an `Action`.
+
+        **No update or delete operation exists for this resource, anywhere in this contract**
+        (spec.md SC-002) - a point, once created, is permanent.
+      requestBody:
+        required: false
+        description: Empty body - nothing about the value is client-supplied.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndicatorMeasurement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing `indicator:edit`, or the caller's resolved scope is not `GLOBAL`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Unknown `metricKey`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    IndicatorMetricKey:
+      type: string
+      description: The closed catalog of measurable metrics (data-model.md §3).
+      enum:
+        - RISK_TOTAL_BY_LEVEL
+        - RISK_TREATMENT_OVERDUE_COUNT
+        - CONTROL_INACTIVE_COUNT
+        - COMPLIANCE_PERCENTAGE
+        - AUDIT_ENGAGEMENT_OPEN_COUNT
+        - FINDING_OPEN_COUNT_BY_SEVERITY
+        - ASSET_INACTIVE_COUNT
+        - PROCESS_INACTIVE_COUNT
+        - ACTION_OVERDUE_COUNT
+        - INCIDENT_OPEN_COUNT_BY_SEVERITY
+        - PROBLEM_OPEN_COUNT_BY_SEVERITY
+    IndicatorMetricShape:
+      type: string
+      enum: [SINGLE_VALUE, BY_BUCKET]
+    IndicatorScopeApplicability:
+      type: string
+      enum: [ORGANIZATIONAL_UNIT, ORGANIZATION_WIDE]
+    IndicatorThresholdComparator:
+      type: string
+      enum: [GTE, GT, LTE, LT]
+    IndicatorMetricCatalogEntry:
+      type: object
+      required: [metricKey, defaultLabel, sourcePermission, scopeApplicability, shape]
+      properties:
+        metricKey:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+        defaultLabel:
+          type: string
+          description: pt-BR label from the centralized message catalog, used when no
+            `IndicatorDefinition` exists for this key yet.
+        sourcePermission:
+          type: string
+          description: The source domain's own read permission required alongside `indicator:view`.
+        scopeApplicability:
+          $ref: '#/components/schemas/IndicatorScopeApplicability'
+        shape:
+          $ref: '#/components/schemas/IndicatorMetricShape'
+        hasDefinition:
+          type: boolean
+          description: Whether an `IndicatorDefinition` has been configured for this key.
+    IndicatorDefinition:
+      type: object
+      required:
+        - id
+        - code
+        - metricKey
+        - name
+        - description
+        - owner
+        - isActive
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: Server-assigned, `IND-YYYY-NNNN` (research.md D-9).
+        metricKey:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          $ref: '#/components/schemas/UserRef'
+        thresholdComparator:
+          oneOf:
+            - $ref: '#/components/schemas/IndicatorThresholdComparator'
+            - type: 'null'
+        thresholdValue:
+          type: [number, 'null']
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateIndicatorDefinitionRequest:
+      type: object
+      additionalProperties: false
+      required: [metricKey, name, description, ownerUserId]
+      properties:
+        metricKey:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        ownerUserId:
+          type: string
+          format: uuid
+        thresholdComparator:
+          $ref: '#/components/schemas/IndicatorThresholdComparator'
+        thresholdValue:
+          type: number
+    UpdateIndicatorDefinitionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        ownerUserId:
+          type: string
+          format: uuid
+        thresholdComparator:
+          oneOf:
+            - $ref: '#/components/schemas/IndicatorThresholdComparator'
+            - type: 'null'
+        thresholdValue:
+          type: [number, 'null']
+        isActive:
+          type: boolean
+    IndicatorCurrentValue:
+      type: object
+      required: [metricKey, shape, scopeApplicability, computedAt]
+      properties:
+        metricKey:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+        shape:
+          $ref: '#/components/schemas/IndicatorMetricShape'
+        scopeApplicability:
+          $ref: '#/components/schemas/IndicatorScopeApplicability'
+        value:
+          type: [number, 'null']
+          description: Present when `shape` is `SINGLE_VALUE`. `null` when the source has no data
+            to measure yet (e.g. no published `FrameworkVersion`) - never `0` or `100` in that case
+            (spec.md Edge Cases).
+        valueByBucket:
+          type: [object, 'null']
+          description: Present when `shape` is `BY_BUCKET` - one key per value of the underlying
+            domain enum (e.g. every `RiskLevel`), zero-filled (data-model.md §2).
+          additionalProperties:
+            type: integer
+        definition:
+          oneOf:
+            - $ref: '#/components/schemas/IndicatorDefinition'
+            - type: 'null'
+          description: The configured definition for this key, if one exists; `null` otherwise.
+        computedAt:
+          type: string
+          format: date-time
+    IndicatorMeasurement:
+      type: object
+      required: [id, metricKey, breached, computedAt, computedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        metricKey:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+        value:
+          type: [number, 'null']
+        valueByBucket:
+          type: [object, 'null']
+          additionalProperties:
+            type: integer
+        breached:
+          type: boolean
+          description: Whether this point breached the threshold configured on the key's
+            definition at the moment it was computed. Always `false` when no definition, or no
+            threshold, existed at that moment (spec.md FR-019).
+        computedAt:
+          type: string
+          format: date-time
+        computedBy:
+          $ref: '#/components/schemas/UserRef'
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    PageMeta:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: The request is malformed, or carries unknown properties.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: >-
+        The caller lacks the permission for this specific action, or the request failed the
+        cross-site request forgery origin check.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: No such indicator definition.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pharos_session

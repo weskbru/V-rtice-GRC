@@ -1,0 +1,55 @@
+.artwork {
+  --hero-mountain: #86ace2;
+  --hero-stone-light: #d5e8ff;
+  --hero-stone: #92b8e7;
+  --hero-shadow: #628cc4;
+  --hero-detail: #456b9f;
+  --hero-light: #fffcef;
+  background: radial-gradient(ellipse at 69% 43%, #dcecff80, transparent 72%);
+  mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 84%, transparent);
+  overflow: hidden;
+}
+:global(.dark) .artwork {
+  --hero-mountain: #456386;
+  --hero-stone-light: #8daac9;
+  --hero-stone: #58799f;
+  --hero-shadow: #345577;
+  --hero-detail: #a4bdd7;
+  --hero-light: #d9e5e9;
+  background: radial-gradient(ellipse at 69% 43%, #29456338, transparent 72%);
+}
+.landscape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mask-image: linear-gradient(to right, transparent, #00000012 23%, #00000075 48%, #000 68%);
+}
+.lighthouse {
+  position: absolute;
+  width: 680px;
+  height: 170px;
+  max-width: none;
+  bottom: -3px;
+  left: calc(68% - 473.3px);
+}
+@media (max-width: 1279px) {
+  .lighthouse {
+    display: none;
+  }
+  .landscape {
+    opacity: 0.55;
+  }
+}
+@media (max-width: 639px) {
+  .landscape {
+    opacity: 0.3;
+  }
+  .artwork {
+    background: none;
+  }
+}
+
+:global(.dark) .beam {
+  opacity: 0.42;
+}

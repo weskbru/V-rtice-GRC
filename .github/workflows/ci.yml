@@ -1,0 +1,1371 @@
+name: CI
+
+# T013 — runs on every push and every pull request. Jobs run in this order,
+# with parallelism where the dependency graph allows it:
+#   install -> lint, format:check, typecheck, test:unit, audit (parallel)
+#           -> test:integration, test:contract, test:e2e (need the static/unit gates)
+#   build runs alongside the static gates (no database dependency).
+# Action versions are pinned to specific tags, never a floating major or a
+# branch, per the working rules for this task.
+#
+# test-e2e (F-33, docs/deferred-findings.md): runs the real Playwright
+# browser suite — before this job existed, CI had ZERO end-to-end coverage
+# and all eleven specs (including the 22-scenario accessibility suite) only
+# ran when a person remembered to run them by hand. Chromium only, on every
+# push/PR — see that job's own header comment for the full scoping
+# rationale (F-4, F-16, F-17). test-e2e-firefox and test-e2e-webkit run only
+# on a manual `workflow_dispatch`, deliberately not on every push — see
+# test-e2e-webkit's header comment for the full rationale, including why
+# they are two separate jobs rather than one job running both projects.
+#
+# audit (T204): `pnpm audit --audit-level=high` fails the build only on a
+# HIGH or CRITICAL advisory. LOW/MODERATE findings are still printed (no
+# `--audit-level` filter on read, only on the pass/fail gate) but do not fail
+# the job. Rationale: this project has already been bitten by a gate that
+# looked like it was protecting something and was not (F-3 in
+# docs/deferred-findings.md, and the fact that this very CI workflow had
+# never once run until it was pushed) — a threshold that fails on every
+# low-severity advisory in a transitive dev dependency gets routinely
+# ignored or the job gets routinely skipped/disabled, and an ignored gate is
+# worse than no gate. HIGH/CRITICAL is the bar this project actually wants
+# enforced automatically; LOW/MODERATE findings remain visible in the job
+# log for a human to triage on the next dependency touch.
+
+on:
+  push:
+  pull_request:
+  # Lets a human (or this pass's own verification) trigger
+  # test-e2e-firefox/test-e2e-webkit on demand, without putting Firefox/
+  # WebKit on every push. See test-e2e-webkit's header comment.
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.34.5"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # install: primes the pnpm store cache so every downstream job's
+  # `pnpm install --frozen-lockfile` is a fast cache hit rather than a fresh
+  # download. GitHub Actions jobs do not share a filesystem, so each
+  # downstream job still runs its own install step against the warmed cache.
+  # ---------------------------------------------------------------------------
+  install:
+    name: install (pnpm cache)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+  # ---------------------------------------------------------------------------
+  # Static gates + unit tests — parallel, no database or cache dependency.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: lint
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # @prisma/client's generated output is not committed; every job that
+      # compiles or lints apps/api needs the client generated first (it
+      # exports generated types such as enums and Prisma.InputJsonValue).
+      - run: pnpm --filter @pharos/api exec prisma generate
+      # Includes the core/ vs modules/ import boundary rules (ADR-011).
+      - run: pnpm run lint
+
+  format-check:
+    name: format:check
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run format:check
+
+  typecheck:
+    name: typecheck
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # @prisma/client's generated output is not committed; every job that
+      # compiles or lints apps/api needs the client generated first (it
+      # exports generated types such as enums and Prisma.InputJsonValue).
+      - run: pnpm --filter @pharos/api exec prisma generate
+      - run: pnpm run typecheck
+
+  test-unit:
+    name: test:unit
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # @prisma/client's generated output is not committed; this suite
+      # imports it (directly and via PrismaService) and needs it generated
+      # first, exactly like the other apps/api jobs.
+      - run: pnpm --filter @pharos/api exec prisma generate
+      # @pharos/web imports the BUILT design system (its dist/ is gitignored),
+      # so the package must be compiled before this suite can resolve it.
+      - run: pnpm --filter @pharos/design-system run build
+      # 007-implementation-remediation, T030/FR-016/SC-004 — found by this
+      # job failing for real: apps/api's own
+      # test/unit/api-types-dist-resolution.spec.ts resolves
+      # `@pharos/api-types` through plain Node module resolution
+      # (package.json "main"/"exports" -> dist/), deliberately never through
+      # the TypeScript path alias every other consumer uses — so, exactly
+      # like design-system above, its dist/ (also gitignored) must exist
+      # before this suite runs, on a fresh checkout where nothing has built
+      # it yet.
+      - run: pnpm --filter @pharos/api-types run build
+      # Pure domain, no I/O: risk scoring matrix/band boundaries, lifecycle
+      # transition table, SoD rule, password policy, scope-set resolution.
+      - run: pnpm run test:unit
+
+  audit:
+    name: audit
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # See the header comment above for why --audit-level=high (not the
+      # default `low`): this is the bar this project wants enforced
+      # automatically. --ignore-registry-errors keeps an unrelated npm
+      # registry outage from failing every PR's audit gate; it does not
+      # suppress a real advisory once the registry responds.
+      - run: pnpm audit --audit-level=high --ignore-registry-errors
+
+  build:
+    name: build
+    needs: install
+    runs-on: ubuntu-latest
+    env:
+      # apps/web's next.config.ts imports src/lib/env.ts (T048), which
+      # validates these two at module load and throws synchronously if
+      # either is missing — `next build` fails before compiling anything.
+      # No database or Redis is needed for this job, so these are the only
+      # two env vars it requires; values mirror the other jobs' placeholders.
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # @prisma/client's generated output is not committed; every job that
+      # compiles or lints apps/api needs the client generated first (it
+      # exports generated types such as enums and Prisma.InputJsonValue).
+      - run: pnpm --filter @pharos/api exec prisma generate
+      - run: pnpm run build
+
+  # ---------------------------------------------------------------------------
+  # openapi-check (T025): regenerates apps/api/openapi.json in-process
+  # (scripts/check-openapi.ts) and fails if it differs from the committed
+  # file — the contract can never silently drift from what @nestjs/swagger
+  # actually generates from the decorators. Boots the full Nest application
+  # context (no HTTP listener), so it needs a reachable PostgreSQL the same
+  # way test-integration/test-contract below do; REDIS_URL is left empty
+  # (NODE_ENV=test) so the CacheModule picks the in-memory adapter and no
+  # Redis service is required for this job.
+  # ---------------------------------------------------------------------------
+  openapi-check:
+    name: openapi:check
+    needs: install
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_only
+          POSTGRES_DB: pharos_grc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pharos_grc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres_ci_only
+      POSTGRES_DB: pharos_grc
+      POSTGRES_OWNER_USER: pharos_owner
+      POSTGRES_OWNER_PASSWORD: pharos_owner_ci
+      POSTGRES_APP_USER: pharos_app
+      POSTGRES_APP_PASSWORD: pharos_app_ci
+      NODE_ENV: test
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc?schema=public
+      DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc?schema=public
+      TEST_DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc?schema=public
+      TEST_DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc?schema=public
+      REDIS_URL: ""
+      SESSION_COOKIE_NAME: pgrc_session
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SAMESITE: lax
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+      PASSWORD_MIN_LENGTH: "12"
+      PASSWORD_REQUIRE_COMPLEXITY: "true"
+      ARGON2_MEMORY_COST: "19456"
+      ARGON2_TIME_COST: "2"
+      ARGON2_PARALLELISM: "1"
+      LOG_LEVEL: info
+      LOG_PRETTY: "false"
+      THROTTLE_TTL_SECONDS: "60"
+      THROTTLE_LIMIT: "100"
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "5"
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "20"
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+      AUTH_LOCKOUT_MINUTES: "15"
+      ATTACHMENT_STORAGE_DRIVER: local
+      ATTACHMENT_STORAGE_PATH: ./storage/attachments
+      ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+      ATTACHMENT_ALLOWED_MIME_TYPES: application/pdf,image/png,image/jpeg,text/plain
+      SEED_DEV_FIXTURES: "false"
+      SEED_ADMIN_EMAIL: admin@example.local
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision the two ADR-005 database roles
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -f docker/postgres/init/01-roles.sql
+
+      - run: pnpm --filter @pharos/api exec prisma generate
+      - run: pnpm --filter @pharos/api run openapi:check
+
+  # ---------------------------------------------------------------------------
+  # api-types-check (T029/FR-015, 007-implementation-remediation, research.md
+  # D-8): regenerates `packages/api-types/src` from the ten hand-authored
+  # contracts and fails if that leaves the working tree dirty. Nothing in
+  # this pipeline did this before this job existed — the committed generated
+  # output could (and did: spec.md's own measured baseline found four files
+  # already stale) drift from the contracts it claims to describe with every
+  # other gate staying green, since neither `openapi:check` (route-level
+  # only, F-3) nor `contract-coverage.spec.ts` (operation presence only,
+  # F-31) reads generated TypeScript output at all.
+  # ---------------------------------------------------------------------------
+  api-types-check:
+    name: api-types:check
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @pharos/api-types run generate
+      - name: Fail if generation left the working tree dirty
+        run: |
+          if ! git diff --exit-code --quiet -- packages/api-types/src; then
+            echo "::error::packages/api-types/src is stale against the twelve *.openapi.yaml contracts." >&2
+            echo "Run 'pnpm --filter @pharos/api-types run generate' locally and commit the result." >&2
+            git diff -- packages/api-types/src
+            exit 1
+          fi
+      - run: pnpm --filter @pharos/api-types run build
+      - run: pnpm --filter @pharos/api-types run typecheck
+
+  # ---------------------------------------------------------------------------
+  # Database-backed suites — run only after the static gates and unit tests
+  # pass. Each provisions PostgreSQL 17 + Redis 7 as service containers and
+  # bootstraps the two ADR-005 roles by running docker/postgres/init/01-roles.sql
+  # with psql, since GitHub-hosted service containers cannot mount an
+  # /docker-entrypoint-initdb.d directory the way docker-compose.yml does.
+  # ---------------------------------------------------------------------------
+  test-integration:
+    name: test:integration
+    needs: [lint, format-check, typecheck, test-unit, audit]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_only
+          POSTGRES_DB: pharos_grc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pharos_grc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres_ci_only
+      POSTGRES_DB: pharos_grc_test
+      POSTGRES_OWNER_USER: pharos_owner
+      POSTGRES_OWNER_PASSWORD: pharos_owner_ci
+      POSTGRES_APP_USER: pharos_app
+      POSTGRES_APP_PASSWORD: pharos_app_ci
+      NODE_ENV: test
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+      # This job provisions a single PostgreSQL service database
+      # (pharos_grc_test) — there is no separate "dev" database to keep
+      # DATABASE_URL/DATABASE_MIGRATION_URL apart from here, unlike a real
+      # environment (docs/local-environment.md D-4). Pointing all four at
+      # the same test database is safe in this job specifically because
+      # nothing else runs against it; the T031/T032 harness's own
+      # `TEST_DATABASE_URL`-must-end-in-"_test" guard (test/integration/
+      # support/env.ts) still holds, and DATABASE_URL still uses the
+      # restricted pharos_app role while DATABASE_MIGRATION_URL uses
+      # pharos_owner, so ADR-005's role split is exercised exactly as in
+      # production.
+      DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_test?schema=public
+      DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_test?schema=public
+      TEST_DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_test?schema=public
+      TEST_DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      # `seed-permission-cache-invalidation.spec.ts` drives the real
+      # `seedPlatform`, which refuses to bootstrap an administrator without a
+      # password. Locally the value comes from apps/api/.env; CI has no such
+      # file, so the spec passed on developer machines and failed here. The
+      # seed genuinely requires this, exactly as it requires DATABASE_URL —
+      # so the environment supplies it rather than the test defaulting it,
+      # which would hide a missing variable instead of reporting one.
+      SEED_ADMIN_PASSWORD: Ci-Integration-Only-P4ssw0rd!
+      SESSION_COOKIE_NAME: pgrc_session
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SAMESITE: lax
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+      PASSWORD_MIN_LENGTH: "12"
+      PASSWORD_REQUIRE_COMPLEXITY: "true"
+      ARGON2_MEMORY_COST: "19456"
+      ARGON2_TIME_COST: "2"
+      ARGON2_PARALLELISM: "1"
+      LOG_LEVEL: info
+      LOG_PRETTY: "false"
+      THROTTLE_TTL_SECONDS: "60"
+      THROTTLE_LIMIT: "100"
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "5"
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "20"
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+      AUTH_LOCKOUT_MINUTES: "15"
+      ATTACHMENT_STORAGE_DRIVER: local
+      ATTACHMENT_STORAGE_PATH: ./storage/attachments
+      ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+      ATTACHMENT_ALLOWED_MIME_TYPES: application/pdf,image/png,image/jpeg,text/plain
+      SEED_DEV_FIXTURES: "false"
+      SEED_ADMIN_EMAIL: admin@example.local
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision the two ADR-005 database roles
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -f docker/postgres/init/01-roles.sql
+
+      # @prisma/client's generated output is not committed; every job that
+      # imports it (directly or via PrismaService) must generate it first,
+      # exactly like openapi-check above.
+      - run: pnpm --filter @pharos/api exec prisma generate
+
+      # Must prove: an audit row is written in the same transaction as every
+      # audited change and is absent when that transaction rolls back;
+      # assessment history survives repeated reassessment; an
+      # optimistic-locking conflict returns 409; direct UPDATE/DELETE on
+      # audit_event is rejected by the database. test/integration/support/
+      # global-setup.ts applies pending migrations (idempotent — a no-op
+      # here since prisma generate does not migrate) and resets mutable
+      # tables before any spec file runs.
+      - run: pnpm run test:integration
+
+  test-contract:
+    name: test:contract
+    needs: [lint, format-check, typecheck, test-unit, audit]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_only
+          POSTGRES_DB: pharos_grc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pharos_grc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres_ci_only
+      POSTGRES_DB: pharos_grc_test
+      POSTGRES_OWNER_USER: pharos_owner
+      POSTGRES_OWNER_PASSWORD: pharos_owner_ci
+      POSTGRES_APP_USER: pharos_app
+      POSTGRES_APP_PASSWORD: pharos_app_ci
+      TEST_DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_test?schema=public
+      TEST_DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+      # This job provisions a single PostgreSQL service database
+      # (pharos_grc_test) — there is no separate "dev" database to keep
+      # DATABASE_URL/DATABASE_MIGRATION_URL apart from here, unlike a real
+      # environment (docs/local-environment.md D-4). Pointing all four at
+      # the same test database is safe in this job specifically because
+      # nothing else runs against it; the T031/T032 harness's own
+      # `TEST_DATABASE_URL`-must-end-in-"_test" guard (test/integration/
+      # support/env.ts) still holds, and DATABASE_URL still uses the
+      # restricted pharos_app role while DATABASE_MIGRATION_URL uses
+      # pharos_owner, so ADR-005's role split is exercised exactly as in
+      # production.
+      DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_test?schema=public
+      DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_test?schema=public
+      SESSION_COOKIE_NAME: pgrc_session
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SAMESITE: lax
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+      PASSWORD_MIN_LENGTH: "12"
+      PASSWORD_REQUIRE_COMPLEXITY: "true"
+      ARGON2_MEMORY_COST: "19456"
+      ARGON2_TIME_COST: "2"
+      ARGON2_PARALLELISM: "1"
+      LOG_LEVEL: info
+      LOG_PRETTY: "false"
+      THROTTLE_TTL_SECONDS: "60"
+      THROTTLE_LIMIT: "100"
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "5"
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "20"
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+      AUTH_LOCKOUT_MINUTES: "15"
+      ATTACHMENT_STORAGE_DRIVER: local
+      ATTACHMENT_STORAGE_PATH: ./storage/attachments
+      ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+      ATTACHMENT_ALLOWED_MIME_TYPES: application/pdf,image/png,image/jpeg,text/plain
+      SEED_DEV_FIXTURES: "false"
+      SEED_ADMIN_EMAIL: admin@example.local
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision the two ADR-005 database roles
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -f docker/postgres/init/01-roles.sql
+
+      # @prisma/client's generated output is not committed; the contract
+      # specs and the shared globalSetup migration runner both import it,
+      # exactly like test-integration above.
+      - run: pnpm --filter @pharos/api exec prisma generate
+
+      # Must prove: every endpoint rejects unauthenticated calls and callers
+      # lacking the required permission; every risk endpoint rejects
+      # out-of-scope organizational access; every error response conforms to
+      # application/problem+json and leaks nothing.
+      - run: pnpm run test:contract
+
+  # ---------------------------------------------------------------------------
+  # test-e2e (F-33, docs/deferred-findings.md): the real browser suite,
+  # against a fully migrated + seeded PostgreSQL/Redis pair and the actual
+  # built API and web app -- not a mock, not static markup.
+  #
+  # ## Scoping decisions
+  #
+  # Chromium only, on every push. F-4 found WebKit unable to sign in at all
+  # on the Windows development machine, and Firefox flaking under parallel
+  # load; both are re-verified from scratch on the Linux runner by
+  # test-e2e-firefox/test-e2e-webkit below rather than assumed to transfer.
+  # Chromium is the one browser this project has verified reliably signs in
+  # everywhere it has been tried, and F-16's own worker-pool fix is what
+  # makes even Chromium safe to run with more than one worker. Running all
+  # three browsers on every push would roughly triple this job's runtime
+  # for coverage this project cannot yet vouch for on two of the three
+  # engines -- exactly the "a slow job that gets disabled protects nothing"
+  # trap this workflow's own audit job comment already names. Firefox and
+  # WebKit instead run on workflow_dispatch, each its own job
+  # (test-e2e-firefox, test-e2e-webkit), so they are exercised deliberately
+  # rather than never, and with their own resource isolation rather than
+  # sharing one backend between them (see test-e2e-webkit's header comment
+  # for why that split exists).
+  #
+  # Every spec, not a curated subset. Once the stack is up (the expensive
+  # part -- build, migrate, seed, boot both apps), running all eleven spec
+  # files costs little extra relative to running a handful, and a curated
+  # subset would reintroduce exactly the kind of "looks covered, is not"
+  # gap F-33 itself is about.
+  #
+  # Workers stay pinned by playwright.config.ts to E2E_ACCOUNTS_PER_PROJECT
+  # (4), not overridden here. F-16: the suite only passes concurrently
+  # because every spec signs in as one of a pool of dedicated per-worker
+  # accounts (fixture-e2e-worker-N@pharosgrc.local, platform.seed.ts's
+  # seedE2EWorkerAdminPool) rather than one shared account whose
+  # password-rotation the workers would race over. That pool has
+  # E2E_WORKER_ADMIN_POOL_SIZE (12) accounts specifically so three browser
+  # projects can each get their own disjoint 4-account block; this job only
+  # runs one project (chromium, block offset 0), but seeding still runs the
+  # SAME SEED_DEV_FIXTURES=true seed the multi-browser job below uses, so
+  # the pool this job's 4 chromium workers draw from already exists and
+  # only the slice that project's own block needs is exercised.
+  #
+  # ## Why the API and web app are started directly, not via
+  # playwright.config.ts's own webServer
+  #
+  # That block only knows how to start apps/web (pnpm dev) -- it has no way
+  # to also start apps/api, and every spec here signs in, which needs both.
+  # This job instead builds and starts both applications itself (production
+  # builds -- next start / node dist/src/main.js, not next dev / nest start
+  # --watch: faster, and what the specs will actually run against in a real
+  # deployment) and sets PLAYWRIGHT_SKIP_WEB_SERVER=true so Playwright
+  # targets them directly instead of trying to spawn a third, conflicting
+  # server on the same port.
+  # ---------------------------------------------------------------------------
+  test-e2e:
+    name: "test:e2e (chromium)"
+    needs: [lint, format-check, typecheck, test-unit, audit]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_only
+          POSTGRES_DB: pharos_grc_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pharos_grc_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres_ci_only
+      POSTGRES_DB: pharos_grc_e2e
+      POSTGRES_OWNER_USER: pharos_owner
+      POSTGRES_OWNER_PASSWORD: pharos_owner_ci
+      POSTGRES_APP_USER: pharos_app
+      POSTGRES_APP_PASSWORD: pharos_app_ci
+      NODE_ENV: test
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_e2e?schema=public
+      DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_e2e?schema=public
+      # env.schema.ts requires these two unconditionally (the vitest
+      # integration harness's own env.ts, not exercised by this job, is
+      # what enforces the "_test" suffix) -- pointed at the same database
+      # this job actually runs the application against.
+      TEST_DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_e2e?schema=public
+      TEST_DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_e2e?schema=public
+      REDIS_URL: redis://localhost:6379
+      SESSION_COOKIE_NAME: pgrc_session
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SAMESITE: lax
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+      PASSWORD_MIN_LENGTH: "12"
+      PASSWORD_REQUIRE_COMPLEXITY: "true"
+      ARGON2_MEMORY_COST: "19456"
+      ARGON2_TIME_COST: "2"
+      ARGON2_PARALLELISM: "1"
+      LOG_LEVEL: info
+      LOG_PRETTY: "false"
+      THROTTLE_TTL_SECONDS: "60"
+      THROTTLE_LIMIT: "100"
+      # Raised well above the other jobs' "5"/"20" defaults, CI-job-local
+      # only (never a production value): F-16's worker-admin pool means
+      # `signInAsWorkerAdmin`/`signInAsSeededUser` legitimately makes ONE
+      # guaranteed failed attempt (the stale pre-rotation password, tried
+      # first, by design) on every call after an account's very first
+      # sign-in in this database -- and a single worker's account is
+      # reused across many spec files plus Playwright's own CI retries.
+      # Left at the real default, worker-0's own account was observed
+      # locking ITSELF out (`AUTH_LOCKOUT_MINUTES`) well before this run
+      # finished, purely from its own legitimate, expected traffic. All
+      # workers also share this runner's one loopback IP, so the
+      # per-origin dimension needs the same headroom, multiplied by the
+      # worker-pool size.
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "200"
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "1000"
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+      AUTH_LOCKOUT_MINUTES: "15"
+      ATTACHMENT_STORAGE_DRIVER: local
+      ATTACHMENT_STORAGE_PATH: ./storage/attachments
+      ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+      ATTACHMENT_ALLOWED_MIME_TYPES: application/pdf,image/png,image/jpeg,text/plain
+      # SEED_DEV_FIXTURES=true (unlike every job above): the specs sign in
+      # as the seeded bootstrap administrator AND, per F-16, as the
+      # fixture-e2e-worker-N pool this flag is what creates.
+      SEED_DEV_FIXTURES: "true"
+      SEED_ADMIN_EMAIL: admin@example.local
+      # CI-only value, never a real secret (CLAUDE.md Sec.12) -- satisfies
+      # PASSWORD_MIN_LENGTH=12 and all four complexity classes above.
+      SEED_ADMIN_PASSWORD: "E2E-CI-Only-P4ssw0rd!"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision the two ADR-005 database roles
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -f docker/postgres/init/01-roles.sql
+
+      # @prisma/client's generated output is not committed, exactly like
+      # every other job that imports it.
+      - run: pnpm --filter @pharos/api exec prisma generate
+
+      # @pharos/web imports the BUILT design system (its dist/ is
+      # gitignored) and apps/api must be compiled to dist/ before it can be
+      # started with `node dist/src/main.js` below -- pnpm's recursive
+      # commands run in dependency (topological) order, so this one
+      # `pnpm run build` covers @pharos/design-system, @pharos/api-types,
+      # @pharos/api and @pharos/web in the order each needs its
+      # dependencies already built, exactly like the build job above.
+      - run: pnpm run build
+
+      # Playwright's own browser build, matched to the exact
+      # @playwright/test version pnpm install --frozen-lockfile just
+      # installed (1.63.0, apps/web/package.json) -- never a separately
+      # floating version. Chromium only (see this job's scoping comment
+      # above); --with-deps installs the OS-level libraries the browser
+      # binary needs on a bare runner image.
+      - run: pnpm --filter @pharos/web exec playwright install --with-deps chromium
+
+      # Never `migrate dev` (docs/local-environment.md D-1..D-16).
+      - run: pnpm --filter @pharos/api exec prisma migrate deploy
+
+      # Seeds the bootstrap administrator, permissions/roles, the root
+      # organizational unit and -- because SEED_DEV_FIXTURES=true above --
+      # the dev-fixture users and the F-16 E2E-worker-admin pool every
+      # authenticated spec depends on.
+      - run: pnpm --filter @pharos/api exec prisma db seed
+
+      - name: Start the API and web app, wait for both to report ready
+        run: |
+          set -e
+          nohup node apps/api/dist/src/main.js > api.log 2>&1 &
+          nohup pnpm --filter @pharos/web exec next start -p "$WEB_PORT" > web.log 2>&1 &
+
+          echo "Waiting for the API ($API_INTERNAL_URL/api/v1/health/ready)..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$API_INTERNAL_URL/api/v1/health/ready" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "API did not become ready in time." >&2
+            cat api.log
+            exit 1
+          fi
+          echo "API is ready."
+
+          echo "Waiting for the web app ($APP_ORIGIN/login)..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$APP_ORIGIN/login" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "Web app did not become ready in time." >&2
+            cat web.log
+            exit 1
+          fi
+          echo "Web app is ready."
+
+      # Must prove: the real browser suite runs, including the 22-scenario
+      # WCAG audit -- not "0 failed" because the suite quietly skipped
+      # itself (F-33). PLAYWRIGHT_SKIP_WEB_SERVER=true because both
+      # applications are already running, started explicitly above.
+      - name: Run Playwright (chromium)
+        env:
+          PLAYWRIGHT_SKIP_WEB_SERVER: "true"
+        run: pnpm --filter @pharos/web exec playwright test --project=chromium
+
+      - name: Dump API/web server logs on failure
+        if: failure()
+        run: |
+          echo "----- apps/api log -----"
+          cat api.log || true
+          echo "----- apps/web log -----"
+          cat web.log || true
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: playwright-report-chromium
+          path: apps/web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # test-e2e-firefox / test-e2e-webkit: one job per non-Chromium engine, run
+  # deliberately (gh workflow run, or the Actions UI "Run workflow" button),
+  # never on a push or PR.
+  #
+  # F-4 found WebKit unable to sign in at all on the Windows development
+  # machine and Firefox flaking under parallel load THERE -- both findings
+  # were about that machine, not proven to transfer to this Linux runner.
+  # These two jobs are how that gets checked, deliberately and repeatably,
+  # without paying the cost (and the F-4/F-17 flake risk) on every single
+  # push. If a run comes back clean on both engines often enough to trust,
+  # promoting them to run automatically (e.g. on a schedule, or folding them
+  # into test-e2e above) is the natural next step -- not done here because
+  # that is a decision that needs evidence from actually running them first.
+  #
+  # ## Two jobs, not one job running two Playwright projects
+  #
+  # This USED to be a single `test-e2e-cross-browser` job running
+  # `playwright test --project=firefox --project=webkit` against one shared
+  # backend, mirroring `test-e2e` above except for which browsers it
+  # installed. Diagnosed against CI run `34594939253` (19 failed, 6 flaky,
+  # against `test-e2e`'s zero) and confirmed by a second run (`34603016921`)
+  # after an unrelated shared-credential race in the E2E harness itself was
+  # fixed and the SAME failure shape persisted: sixty-four `no response was
+  # ever received` timeouts, almost entirely on whichever engine was
+  # running in the back half of the job, while `test-e2e` (Chromium, same
+  # commit, same rotated-account code path) had none. The two runs' own
+  # control is what settles this -- the difference is not the harness and
+  # not the browsers individually, it is two full browser suites' worth of
+  # traffic sharing ONE backend process, ONE Postgres, and ONE Redis for
+  # 20+ minutes, something `test-e2e` never does even with three times the
+  # workers pointed at a single project.
+  #
+  # Splitting each engine into its own job, each with its OWN service
+  # containers and its OWN backend process -- exactly `test-e2e`'s own
+  # shape, copied rather than reinvented -- gives Firefox and WebKit the
+  # same resource isolation Chromium already had. This is deliberately NOT
+  # "the same one job with fewer workers": reducing parallelism would have
+  # masked the capacity problem the same way splitting at the same time as
+  # the credential-race fix would have masked which change fixed what one
+  # variable at a time is why the two problems were distinguishable at all.
+  # ---------------------------------------------------------------------------
+  test-e2e-firefox:
+    name: "test:e2e (firefox)"
+    if: github.event_name == 'workflow_dispatch'
+    needs: [lint, format-check, typecheck, test-unit, audit]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_only
+          POSTGRES_DB: pharos_grc_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pharos_grc_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres_ci_only
+      POSTGRES_DB: pharos_grc_e2e
+      POSTGRES_OWNER_USER: pharos_owner
+      POSTGRES_OWNER_PASSWORD: pharos_owner_ci
+      POSTGRES_APP_USER: pharos_app
+      POSTGRES_APP_PASSWORD: pharos_app_ci
+      NODE_ENV: test
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_e2e?schema=public
+      DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_e2e?schema=public
+      # env.schema.ts requires these two unconditionally (the vitest
+      # integration harness's own env.ts, not exercised by this job, is
+      # what enforces the "_test" suffix) -- pointed at the same database
+      # this job actually runs the application against.
+      TEST_DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_e2e?schema=public
+      TEST_DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_e2e?schema=public
+      REDIS_URL: redis://localhost:6379
+      SESSION_COOKIE_NAME: pgrc_session
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SAMESITE: lax
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+      PASSWORD_MIN_LENGTH: "12"
+      PASSWORD_REQUIRE_COMPLEXITY: "true"
+      ARGON2_MEMORY_COST: "19456"
+      ARGON2_TIME_COST: "2"
+      ARGON2_PARALLELISM: "1"
+      LOG_LEVEL: info
+      LOG_PRETTY: "false"
+      THROTTLE_TTL_SECONDS: "60"
+      THROTTLE_LIMIT: "100"
+      # See test-e2e's identical block above for why these two are raised
+      # well past the other jobs' "5"/"20" defaults (F-16 worker-pool
+      # reuse + the sign-in helper's guaranteed one-stale-attempt design).
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "200"
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "1000"
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+      AUTH_LOCKOUT_MINUTES: "15"
+      ATTACHMENT_STORAGE_DRIVER: local
+      ATTACHMENT_STORAGE_PATH: ./storage/attachments
+      ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+      ATTACHMENT_ALLOWED_MIME_TYPES: application/pdf,image/png,image/jpeg,text/plain
+      SEED_DEV_FIXTURES: "true"
+      SEED_ADMIN_EMAIL: admin@example.local
+      SEED_ADMIN_PASSWORD: "E2E-CI-Only-P4ssw0rd!"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision the two ADR-005 database roles
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -f docker/postgres/init/01-roles.sql
+
+      - run: pnpm --filter @pharos/api exec prisma generate
+      - run: pnpm run build
+      - run: pnpm --filter @pharos/web exec playwright install --with-deps firefox
+      - run: pnpm --filter @pharos/api exec prisma migrate deploy
+      - run: pnpm --filter @pharos/api exec prisma db seed
+
+      - name: Start the API and web app, wait for both to report ready
+        run: |
+          set -e
+          nohup node apps/api/dist/src/main.js > api.log 2>&1 &
+          nohup pnpm --filter @pharos/web exec next start -p "$WEB_PORT" > web.log 2>&1 &
+
+          echo "Waiting for the API ($API_INTERNAL_URL/api/v1/health/ready)..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$API_INTERNAL_URL/api/v1/health/ready" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "API did not become ready in time." >&2
+            cat api.log
+            exit 1
+          fi
+          echo "API is ready."
+
+          echo "Waiting for the web app ($APP_ORIGIN/login)..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$APP_ORIGIN/login" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "Web app did not become ready in time." >&2
+            cat web.log
+            exit 1
+          fi
+          echo "Web app is ready."
+
+      - name: Run Playwright (firefox)
+        env:
+          PLAYWRIGHT_SKIP_WEB_SERVER: "true"
+        run: pnpm --filter @pharos/web exec playwright test --project=firefox
+
+      - name: Dump API/web server logs on failure
+        if: failure()
+        run: |
+          echo "----- apps/api log -----"
+          cat api.log || true
+          echo "----- apps/web log -----"
+          cat web.log || true
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: playwright-report-firefox
+          path: apps/web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+  test-e2e-webkit:
+    name: "test:e2e (webkit)"
+    if: github.event_name == 'workflow_dispatch'
+    needs: [lint, format-check, typecheck, test-unit, audit]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_only
+          POSTGRES_DB: pharos_grc_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pharos_grc_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres_ci_only
+      POSTGRES_DB: pharos_grc_e2e
+      POSTGRES_OWNER_USER: pharos_owner
+      POSTGRES_OWNER_PASSWORD: pharos_owner_ci
+      POSTGRES_APP_USER: pharos_app
+      POSTGRES_APP_PASSWORD: pharos_app_ci
+      NODE_ENV: test
+      API_PORT: "3001"
+      WEB_PORT: "3000"
+      API_INTERNAL_URL: http://localhost:3001
+      APP_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_e2e?schema=public
+      DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_e2e?schema=public
+      # env.schema.ts requires these two unconditionally (the vitest
+      # integration harness's own env.ts, not exercised by this job, is
+      # what enforces the "_test" suffix) -- pointed at the same database
+      # this job actually runs the application against.
+      TEST_DATABASE_URL: postgresql://pharos_app:pharos_app_ci@localhost:5432/pharos_grc_e2e?schema=public
+      TEST_DATABASE_MIGRATION_URL: postgresql://pharos_owner:pharos_owner_ci@localhost:5432/pharos_grc_e2e?schema=public
+      REDIS_URL: redis://localhost:6379
+      SESSION_COOKIE_NAME: pgrc_session
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_SAMESITE: lax
+      SESSION_IDLE_TIMEOUT_MINUTES: "30"
+      SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+      PASSWORD_MIN_LENGTH: "12"
+      PASSWORD_REQUIRE_COMPLEXITY: "true"
+      ARGON2_MEMORY_COST: "19456"
+      ARGON2_TIME_COST: "2"
+      ARGON2_PARALLELISM: "1"
+      LOG_LEVEL: info
+      LOG_PRETTY: "false"
+      THROTTLE_TTL_SECONDS: "60"
+      THROTTLE_LIMIT: "100"
+      # See test-e2e's identical block above for why these two are raised
+      # well past the other jobs' "5"/"20" defaults (F-16 worker-pool
+      # reuse + the sign-in helper's guaranteed one-stale-attempt design).
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "200"
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "1000"
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+      AUTH_LOCKOUT_MINUTES: "15"
+      ATTACHMENT_STORAGE_DRIVER: local
+      ATTACHMENT_STORAGE_PATH: ./storage/attachments
+      ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+      ATTACHMENT_ALLOWED_MIME_TYPES: application/pdf,image/png,image/jpeg,text/plain
+      SEED_DEV_FIXTURES: "true"
+      SEED_ADMIN_EMAIL: admin@example.local
+      SEED_ADMIN_PASSWORD: "E2E-CI-Only-P4ssw0rd!"
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Provision the two ADR-005 database roles
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          psql -v ON_ERROR_STOP=1 -d "$POSTGRES_DB" -f docker/postgres/init/01-roles.sql
+
+      - run: pnpm --filter @pharos/api exec prisma generate
+      - run: pnpm run build
+      - run: pnpm --filter @pharos/web exec playwright install --with-deps webkit
+      - run: pnpm --filter @pharos/api exec prisma migrate deploy
+      - run: pnpm --filter @pharos/api exec prisma db seed
+
+      - name: Start the API and web app, wait for both to report ready
+        run: |
+          set -e
+          nohup node apps/api/dist/src/main.js > api.log 2>&1 &
+          nohup pnpm --filter @pharos/web exec next start -p "$WEB_PORT" > web.log 2>&1 &
+
+          echo "Waiting for the API ($API_INTERNAL_URL/api/v1/health/ready)..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$API_INTERNAL_URL/api/v1/health/ready" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "API did not become ready in time." >&2
+            cat api.log
+            exit 1
+          fi
+          echo "API is ready."
+
+          echo "Waiting for the web app ($APP_ORIGIN/login)..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf "$APP_ORIGIN/login" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != "true" ]; then
+            echo "Web app did not become ready in time." >&2
+            cat web.log
+            exit 1
+          fi
+          echo "Web app is ready."
+
+      - name: Run Playwright (webkit)
+        env:
+          PLAYWRIGHT_SKIP_WEB_SERVER: "true"
+        # TEMPORARY, diagnostic-only (staged for review, not to be dispatched
+        # without explicit sign-off): run `34617754814` found WebKit crashing
+        # mid-run (10 "Target page, context or browser has been closed"
+        # instances) badly enough that Playwright abandoned the rest of its
+        # plan (91 of 115 tests never ran) — confirmed to be a real bail-out,
+        # not `maxFailures` (grepped this file and playwright.config.ts;
+        # neither sets it, so the config default of unlimited applies and
+        # cannot explain the shortfall). `--workers=1` overrides
+        # playwright.config.ts's shared `workers: 4` for THIS invocation only
+        # (chromium/firefox untouched) to test whether the instability is
+        # concurrency-driven (one worker changes the outcome) or the engine
+        # is simply unstable under this application over a long run
+        # regardless (one worker does not). Revert this line once that
+        # question is answered, in either direction — it is not a proposed
+        # permanent setting.
+        #
+        # ---- Reviewed 2026-09-14 (F-72). KEPT, and here is the reasoning ----
+        #
+        # The question this flag was staged to answer is still open, and the
+        # evidence that arrived since points AT concurrency rather than away
+        # from it:
+        #
+        # - F-59 gives a mechanism that predicts exactly this shape. The global
+        #   `ThrottlerGuard` (`THROTTLE_LIMIT=100` per 60s, counted per client
+        #   IP) is shared by every Playwright worker on one runner. Phase 7
+        #   measured the four-worker Chromium suite getting 429 on `/auth/login`
+        #   itself. A 429 on `GET /auth/session` mid-journey produces navigation
+        #   timeouts and dead pages, which is what "target page has been closed"
+        #   looks like from the other end.
+        # - "The roles specs now pass on all three engines" is TRUE and does not
+        #   answer this: that measurement was 15/15 + 14/14 on WebKit at ONE
+        #   worker, on two files, on a developer machine. It says nothing about
+        #   115 tests at four workers on a shared-IP runner.
+        #
+        # So removing `--workers=1` today would delete the only concurrency
+        # limit CI has, on the engine that already bailed out once, to answer a
+        # question nobody has dispatched. The risk of removing it is a red
+        # WebKit job whose failures are indistinguishable from product defects
+        # — the exact confusion F-72 exists to end.
+        #
+        # What DID change is that a dispatch will now answer it properly.
+        # `execution-ledger-reporter` (playwright.config.ts) prints
+        # DISCOVERED / EXECUTED / PASSED / FAILED / SKIPPED / NOT RUN for every
+        # job and NAMES each test that never ran, and it fails the run when any
+        # discovered test did not execute. The "91 of 115 never ran" that this
+        # flag was a reaction to would today be an explicit, itemised NOT RUN
+        # list rather than a shortfall somebody had to notice by subtraction.
+        # The recommended next step is one `workflow_dispatch` with this line
+        # as-is and one with it removed, comparing the two ledgers — not a
+        # silent revert in either direction.
+        #
+        # ---- Reviewed 2026-09-19 (rodada 023, reconciliação de documentação
+        # paralela). KEPT — this is a dated, justified decision, not an
+        # oversight ----
+        #
+        # F-59 (docs/deferred-findings.md) closed this same round: the global
+        # ThrottlerGuard under local E2E concurrency now has a documented,
+        # verified mitigation (--workers=1 for a full local battery against a
+        # long-lived dev database). That closure does not answer the question
+        # this flag exists to answer — F-59 is about a LOCAL workstation's
+        # accumulated dev database, this flag is about the WebKit job on a
+        # SHARED-IP CI runner, and F-59's own mechanism (ThrottlerGuard,
+        # counted per client IP) is exactly why the two are not
+        # interchangeable evidence for each other.
+        #
+        # What DOES block answering it: F-58 (docs/deferred-findings.md)
+        # records that remote CI is blocked by GitHub billing on this
+        # account, so the workflow_dispatch comparison recommended above
+        # cannot be run today, by anyone, regardless of local findings
+        # closing. This line stays exactly as-is — not "temporary and
+        # forgotten," but "kept until F-58 clears, then revisited with the
+        # comparison dispatch this comment already specifies." Whoever
+        # restores remote CI access is the owner of that next dispatch.
+        run: pnpm --filter @pharos/web exec playwright test --project=webkit --workers=1
+
+      - name: Dump API/web server logs on failure
+        if: failure()
+        run: |
+          echo "----- apps/api log -----"
+          cat api.log || true
+          echo "----- apps/web log -----"
+          cat web.log || true
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: playwright-report-webkit
+          path: apps/web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # ci-required (T053/T054, D-18, F-64, 007-implementation-remediation):
+  # `test-integration`, `test-contract`, `test-e2e`, `test-e2e-firefox` and
+  # `test-e2e-webkit` all declare the SAME five `needs`
+  # (`lint`, `format-check`, `typecheck`, `test-unit`, `audit`). If any one
+  # of those five goes red, GitHub reports the downstream jobs `skipped` —
+  # never `failed` — and a branch-protection rule that requires only those
+  # four by name would show a clean, mergeable PR. F-33 and F-52 already hid
+  # exactly this way once each; F-50 is the concrete precedent (the `audit`
+  # gate went red over advisories and silently took every test job down
+  # with it). This job is the single required check that closes the
+  # structural hole: it runs unconditionally (`if: always()`), depends on
+  # EVERY other job in this workflow, and fails the instant any of them is
+  # anything other than `success` — `skipped` included. Branch protection
+  # should name only this job, never the individual gates it aggregates.
+  #
+  # `test-e2e-firefox`/`test-e2e-webkit` are deliberately exempt from the
+  # blanket "skipped is failure" rule: their own `if: github.event_name ==
+  # 'workflow_dispatch'` means they are EXPECTED to report `skipped` on
+  # every ordinary push/PR (F-4/F-19's own documented scoping, not a gap) —
+  # this job would otherwise fail every normal push for jobs that were
+  # never supposed to run on it. They are still required to be `success` on
+  # the one trigger where they do run.
+  # ---------------------------------------------------------------------------
+  ci-required:
+    name: CI required checks
+    if: always()
+    needs:
+      - install
+      - lint
+      - format-check
+      - typecheck
+      - test-unit
+      - audit
+      - build
+      - openapi-check
+      - api-types-check
+      - test-integration
+      - test-contract
+      - test-e2e
+      - test-e2e-firefox
+      - test-e2e-webkit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job except test-e2e-firefox/test-e2e-webkit must be success
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed=$(echo "$NEEDS_JSON" | jq -r '
+            to_entries
+            | map(select(.key != "test-e2e-firefox" and .key != "test-e2e-webkit"))
+            | map(select(.value.result != "success"))
+            | map("\(.key): \(.value.result)")
+            | .[]
+          ')
+          if [ -n "$failed" ]; then
+            echo "::error::The following required jobs did not succeed (skipped counts as a failure here):"
+            echo "$failed"
+            exit 1
+          fi
+          echo "All required jobs succeeded."
+
+      - name: test-e2e-firefox/test-e2e-webkit must be success WHEN expected to run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          FIREFOX_RESULT: ${{ needs.test-e2e-firefox.result }}
+          WEBKIT_RESULT: ${{ needs.test-e2e-webkit.result }}
+        run: |
+          failed=false
+          if [ "$FIREFOX_RESULT" != "success" ]; then
+            echo "::error::test-e2e-firefox was dispatched on this run and reported '$FIREFOX_RESULT', not success."
+            failed=true
+          fi
+          if [ "$WEBKIT_RESULT" != "success" ]; then
+            echo "::error::test-e2e-webkit was dispatched on this run and reported '$WEBKIT_RESULT', not success."
+            failed=true
+          fi
+          if [ "$failed" = "true" ]; then
+            exit 1
+          fi
+          echo "test-e2e-firefox and test-e2e-webkit both succeeded on this dispatched run."

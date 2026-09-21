@@ -1,0 +1,418 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ApiError } from '@/lib/api-client';
+import { AuthProvider } from '@/lib/auth-context';
+import { buildTestSession } from '@/lib/test-fixtures/session';
+
+import { RiskDetailView } from './risk-detail-view';
+
+import type { RiskDetail, RiskLifecycleState } from '@/features/risks/types';
+
+/**
+ * Component-mount evidence for the risk detail screen's two-level
+ * navigation, executive summary, contextual aside and deep-link resolution
+ * (016-risk-detail-experience, FR-093, FR-094, FR-030). Central assertions:
+ *
+ *   - all five groups/fifteen leaf sections are reachable, section
+ *     visibility is by OMISSION (FR-030/FR-094), never disabling;
+ *   - `?section=<id>` lands directly on the right group/leaf, and an
+ *     unknown/unauthorized id falls back silently to "Visão geral";
+ *   - exactly two requests fire on mount (`getRisk`, `getLifecycle`).
+ *
+ * `next/navigation` is mocked the same way `use-register-state.test.ts`
+ * already does — `currentSearch` stands in for "the URL right now".
+ *
+ * `useRouter` stays mocked (023-detail-nav-performance did NOT remove it —
+ * `useDetailSection` itself no longer imports `useRouter` at all, see that
+ * hook's own header comment for why `router.replace()` was the 467ms this
+ * fix removed, but `RiskEditPanel`'s `RiskForm` reaches `useRouter`
+ * transitively through `useNavigate()`, `@/components/shell/navigation-
+ * pending`, for actual screen-to-screen navigation, unrelated to this
+ * fix). `window.history.replaceState` is swapped for a `vi.fn()` below,
+ * mirroring `use-detail-section.test.ts`'s own mocking pattern, to assert
+ * on the mechanism `useDetailSection` uses now.
+ */
+
+const { routerMock } = vi.hoisted(() => ({
+  routerMock: {
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  },
+}));
+let currentSearch = new URLSearchParams();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => routerMock,
+  usePathname: () => '/risks/risk-1',
+  useSearchParams: () => currentSearch,
+}));
+
+const originalReplaceState = window.history.replaceState.bind(window.history);
+let replaceStateMock: ReturnType<typeof vi.fn<typeof window.history.replaceState>>;
+
+const {
+  getRiskMock,
+  getLifecycleMock,
+  getActiveMethodologyMock,
+  listAssessmentsMock,
+  listTreatmentActionsMock,
+  listUsersMock,
+  listCategoriesMock,
+  listTypesMock,
+  listOriginsMock,
+  listOrgUnitsMock,
+  searchUsersMock,
+  listHistoryMock,
+  listAuditEventsMock,
+} = vi.hoisted(() => ({
+  getRiskMock: vi.fn(),
+  getLifecycleMock: vi.fn(),
+  getActiveMethodologyMock: vi.fn(),
+  listAssessmentsMock: vi.fn(),
+  listTreatmentActionsMock: vi.fn(),
+  listUsersMock: vi.fn(),
+  listCategoriesMock: vi.fn(),
+  listTypesMock: vi.fn(),
+  listOriginsMock: vi.fn(),
+  listOrgUnitsMock: vi.fn(),
+  searchUsersMock: vi.fn(),
+  listHistoryMock: vi.fn(),
+  listAuditEventsMock: vi.fn(),
+}));
+
+vi.mock('@/features/risks/api', () => ({
+  risksApi: {
+    getRisk: getRiskMock,
+    getLifecycle: getLifecycleMock,
+    // Assessment tab content — not exercised by this suite (its own
+    // component tests cover it); never resolving is fine, mirroring the
+    // pre-016 suite's own convention.
+    getActiveMethodology: getActiveMethodologyMock,
+    listAssessments: listAssessmentsMock,
+    listTreatmentActions: listTreatmentActionsMock,
+    listUsers: listUsersMock,
+    // `RiskForm` (mode="edit", inside the edit panel) — never interacted
+    // with beyond opening the panel, so never resolving is fine.
+    listCategories: listCategoriesMock,
+    listTypes: listTypesMock,
+    listOrigins: listOriginsMock,
+    listOrgUnits: listOrgUnitsMock,
+    searchUsers: searchUsersMock,
+    // "Registro" › Histórico/Auditoria — reached by the deep-link tests
+    // below; never resolving is fine, mirroring every other section this
+    // suite does not examine the content of.
+    listHistory: listHistoryMock,
+    listAuditEvents: listAuditEventsMock,
+  },
+}));
+
+const baseRisk: RiskDetail = {
+  id: 'risk-1',
+  code: 'RSK-2026-0001',
+  title: 'Falha no fornecedor crítico',
+  descriptionExcerpt: 'Descrição completa do risco.',
+  description: 'Descrição completa do risco.',
+  status: 'IDENTIFIED',
+  type: null,
+  origin: null,
+  orgUnit: { id: 'org-1', code: 'ROOT', name: 'PharosGRC' },
+  owner: { id: 'user-1', fullName: 'Ana Souza' },
+  overdueReview: false,
+  overdueTreatment: false,
+  pendingApproval: false,
+  version: 2,
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  causes: [],
+  consequences: [],
+  currentAssessment: null,
+  currentTreatment: null,
+  controls: [],
+  processes: [],
+  assets: [],
+  treatmentActionSummary: { total: 0, open: 0, overdue: 0 },
+  identifiedOn: '2026-01-01',
+  archivedAt: null,
+  createdAt: '2026-01-01T00:00:00.000Z',
+};
+
+const baseLifecycle: RiskLifecycleState = {
+  status: 'IDENTIFIED',
+  pendingApproval: null,
+  availableTransitions: [],
+  traversedStatuses: ['DRAFT', 'IDENTIFIED'],
+};
+
+function renderView(permissions: readonly string[]): void {
+  render(
+    <AuthProvider initialSession={buildTestSession({ permissions })}>
+      <RiskDetailView riskId="risk-1" />
+    </AuthProvider>,
+  );
+}
+
+/**
+ * Selects a leaf tab by name, driving Radix's "activate on focus" behaviour
+ * explicitly — mirrors the pre-016 suite's own helper inline.
+ *
+ * `.focus()` is wrapped in `act()` explicitly (023-detail-nav-performance):
+ * `useDetailSection`'s selection now updates local React state synchronously
+ * on this same activation, and a bare `tab.focus()` — a raw DOM call, not
+ * one of Testing Library's own `fireEvent.*` helpers — schedules that update
+ * outside of Testing Library's own batching, so a query run immediately
+ * afterward could observe React's pre-update DOM. `fireEvent.click(tab)`
+ * right after contributes no additional selection of its own (Radix's
+ * `Trigger` wires activation to `onMouseDown`/`onFocus`, never `onClick` —
+ * confirmed by reading the installed `@radix-ui/react-tabs` source), it
+ * exists only for parity with the pre-016 helper's own two-event shape.
+ */
+function selectTab(name: string): void {
+  const tab = screen.getByRole('tab', { name });
+  act(() => {
+    tab.focus();
+  });
+  fireEvent.click(tab);
+}
+
+describe('RiskDetailView', () => {
+  beforeEach(() => {
+    currentSearch = new URLSearchParams();
+    replaceStateMock = vi.fn<typeof window.history.replaceState>();
+    window.history.replaceState = replaceStateMock;
+    getRiskMock.mockReset();
+    getLifecycleMock.mockReset();
+    getActiveMethodologyMock.mockReset();
+    listAssessmentsMock.mockReset();
+    listTreatmentActionsMock.mockReset();
+    listUsersMock.mockReset();
+    listCategoriesMock.mockReset();
+    listTypesMock.mockReset();
+    listOriginsMock.mockReset();
+    listOrgUnitsMock.mockReset();
+    searchUsersMock.mockReset();
+    listHistoryMock.mockReset();
+    listAuditEventsMock.mockReset();
+
+    getLifecycleMock.mockResolvedValue(baseLifecycle);
+    getActiveMethodologyMock.mockImplementation(() => new Promise(() => undefined));
+    listAssessmentsMock.mockImplementation(() => new Promise(() => undefined));
+    listTreatmentActionsMock.mockResolvedValue({
+      data: [],
+      meta: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
+    });
+    listUsersMock.mockResolvedValue([]);
+    listCategoriesMock.mockImplementation(() => new Promise(() => undefined));
+    listTypesMock.mockImplementation(() => new Promise(() => undefined));
+    listOriginsMock.mockImplementation(() => new Promise(() => undefined));
+    listOrgUnitsMock.mockImplementation(() => new Promise(() => undefined));
+    searchUsersMock.mockImplementation(() => new Promise(() => undefined));
+    listHistoryMock.mockImplementation(() => new Promise(() => undefined));
+    listAuditEventsMock.mockImplementation(() => new Promise(() => undefined));
+  });
+
+  afterEach(() => {
+    window.history.replaceState = originalReplaceState;
+  });
+
+  it('fires exactly the two requests the page has always fired on mount — GET risk and GET lifecycle, nothing more (§4.9)', async () => {
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    await waitFor(() => expect(getLifecycleMock).toHaveBeenCalledTimes(1));
+    expect(getRiskMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the breadcrumb, code, title and the five top-level groups', async () => {
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Riscos' })).toHaveAttribute('href', '/risks');
+    expect(screen.getAllByText('RSK-2026-0001').length).toBeGreaterThan(0);
+
+    for (const label of ['Visão geral', 'Análise', 'Resposta', 'Relacionamentos', 'Registro']) {
+      expect(screen.getByRole('tab', { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it('shows "Não avaliado" only in the executive summary row — the level cards moved off Visão geral', async () => {
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+
+    expect(screen.getAllByText('Não avaliado')).toHaveLength(2);
+    expect(screen.getByText('Detalhes do risco')).toBeInTheDocument();
+  });
+
+  it('clicking a top-level group commits ?section= to its first visible leaf (URL-driven navigation, §4.4)', async () => {
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+
+    // 023-detail-nav-performance: `useDetailSection` now holds a local,
+    // synchronous mirror of the section, so — unlike the old
+    // `router.replace()`-only mechanism this comment used to describe — the
+    // resulting tab selection is provable in THIS SAME test, with no
+    // `currentSearch` mutation required to simulate "having arrived there".
+    selectTab('Análise');
+    expect(screen.getByRole('tab', { name: 'Avaliação', selected: true })).toBeInTheDocument();
+    // The durable, deep-linkable URL is still written, via the native
+    // History API rather than `router.replace()` (see `useDetailSection`'s
+    // own header comment for why that distinction is the entire fix).
+    expect(replaceStateMock).toHaveBeenCalledWith(null, '', '/risks/risk-1?section=assessment');
+  });
+
+  it('deep-links to "Análise" showing BOTH its leaves, with the real Causas e Consequências content active', async () => {
+    currentSearch = new URLSearchParams('section=causes-consequences');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByRole('tab', { name: 'Avaliação' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Causas e Consequências' })).toBeInTheDocument();
+    expect(await screen.findByText('Nenhuma causa registrada ainda.')).toBeInTheDocument();
+  });
+
+  it('clicking a sibling leaf tab commits ?section= to that leaf', async () => {
+    currentSearch = new URLSearchParams('section=causes-consequences');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+
+    selectTab('Avaliação');
+    expect(screen.getByRole('tab', { name: 'Avaliação', selected: true })).toBeInTheDocument();
+    expect(replaceStateMock).toHaveBeenCalledWith(null, '', '/risks/risk-1?section=assessment');
+  });
+
+  it('deep-links to "Resposta" › Controles showing all three Resposta leaves, Controles content WITHOUT Processos/Ativos (R-6)', async () => {
+    currentSearch = new URLSearchParams('section=controls');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByRole('tab', { name: 'Tratamento' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Controles' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Planos de Ação' })).toBeInTheDocument();
+
+    expect(await screen.findByText('Nenhum controle vinculado a este risco.')).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum processo vinculado a este risco.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nenhum ativo vinculado a este risco.')).not.toBeInTheDocument();
+  });
+
+  it('deep-links to "Resposta" › Planos de Ação showing the real content, never the old placeholder', async () => {
+    currentSearch = new URLSearchParams('section=action-plans');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(
+      await screen.findByText('Nenhuma ação de tratamento registrada ainda.'),
+    ).toBeInTheDocument();
+  });
+
+  it('deep-links to "Relacionamentos" › Processos e Ativos, both families and NO Controles (R-6), and omits Evidência/Achados without permission', async () => {
+    currentSearch = new URLSearchParams('section=processes-assets');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByRole('tab', { name: 'Incidentes' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Problemas' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Processos e Ativos' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Evidência' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Achados' })).not.toBeInTheDocument();
+
+    expect(await screen.findByText('Nenhum processo vinculado a este risco.')).toBeInTheDocument();
+    expect(screen.getByText('Nenhum ativo vinculado a este risco.')).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum controle vinculado a este risco.')).not.toBeInTheDocument();
+  });
+
+  it('shows Evidência/Achados under Relacionamentos for a caller who holds the view permission', async () => {
+    currentSearch = new URLSearchParams('section=processes-assets');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view', 'evidence:view', 'finding:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByRole('tab', { name: 'Evidência' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Achados' })).toBeInTheDocument();
+  });
+
+  it('deep-links to "Registro" › Histórico and omits Auditoria entirely for a caller without audit:view (FR-030, FR-094)', async () => {
+    currentSearch = new URLSearchParams('section=history');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByRole('tab', { name: 'Histórico' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Anexos' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comentários' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Auditoria' })).not.toBeInTheDocument();
+  });
+
+  it('deep-links straight to "Registro" › Auditoria for a caller who holds audit:view', async () => {
+    currentSearch = new URLSearchParams('section=audit');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view', 'audit:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByRole('tab', { name: 'Auditoria', selected: true })).toBeInTheDocument();
+  });
+
+  it('falls back to Visão geral, without error, for an unknown ?section= id', async () => {
+    currentSearch = new URLSearchParams('section=does-not-exist');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Detalhes do risco')).toBeInTheDocument();
+  });
+
+  it('falls back to Visão geral for a ?section= naming a leaf the caller has no permission for (FR-030)', async () => {
+    currentSearch = new URLSearchParams('section=audit');
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.getByText('Detalhes do risco')).toBeInTheDocument();
+  });
+
+  it('shows an honest not-found message on 404 — never distinguishing "does not exist" from "out of scope" (FR-030)', async () => {
+    getRiskMock.mockRejectedValueOnce(new ApiError({ title: 'Não encontrado', status: 404 }));
+    renderView(['risk:view']);
+
+    await waitFor(() => expect(screen.getByText('Risco não encontrado')).toBeInTheDocument());
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  it('hides the Editar action for a caller without risk:edit (advisory gating, FR-042)', async () => {
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view']);
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+  });
+
+  it('opens the edit panel (Sheet + RiskForm) for a caller who holds risk:edit, page underneath unchanged (§4.8)', async () => {
+    getRiskMock.mockResolvedValueOnce({ risk: baseRisk, etag: '"2"' });
+    renderView(['risk:view', 'risk:edit']);
+    await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    // Radix marks the rest of the page `aria-hidden` while the modal Sheet
+    // is open (same behaviour `risk-controls-section.test.tsx` already
+    // documents for its own confirm dialog) — so this only asserts the
+    // panel itself, not that the read-only page underneath is still in the
+    // accessibility tree, which it deliberately is not while the overlay is
+    // open.
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByText('Editar risco').length).toBeGreaterThan(0);
+  });
+});

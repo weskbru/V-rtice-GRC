@@ -1,0 +1,1553 @@
+openapi: 3.1.0
+info:
+  title: PharosGRC - Administration API
+  version: 1.0.0
+  summary: Users, roles, permissions, organizational units and organizational scope grants.
+  description: |
+    Administration of the platform's own control environment (FR-021 to FR-028, US8).
+
+    Two lookup endpoints - `GET /users` and `GET /org-units` - sit outside `/admin` because they
+    are needed by ordinary risk work (choosing an owner, choosing an organizational unit) and
+    therefore must not require an administrative permission. They return a deliberately reduced
+    representation and, for organizational units, only those within the caller's resolved scope.
+
+    Administrative resources are not organizationally scoped records, so a missing permission is
+    reported as `403`. The `404`-instead-of-`403` rule (FR-030) applies to organizationally scoped
+    records and is documented in `risks.openapi.yaml`.
+
+    Every mutation in this document is audited with actor, timestamp, previous and new values
+    (FR-032, FR-033). Role and scope changes bump the caller-independent `permissionsVersion`, so
+    they take effect on the affected users' next request without re-authentication (FR-028).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Users
+    description: User administration (FR-021, FR-023, FR-011, FR-017).
+  - name: Roles
+    description: Roles and their permission composition (FR-022, FR-023).
+  - name: Permissions
+    description: The seeded permission catalogue (FR-022).
+  - name: Organizational Units
+    description: The organizational unit tree used to scope access (FR-024).
+  - name: Organizational Scope
+    description: Unit and global scope grants held by a user (FR-025a, FR-025b).
+  - name: Directory
+    description: Reduced, non-administrative lookups used by business forms.
+security:
+  - session: []
+paths:
+  /users:
+    get:
+      operationId: listDirectoryUsers
+      summary: Look up users for assignment
+      tags: [Directory]
+      description: |
+        Requires an authenticated session; no administrative permission. Returns the reduced
+        directory representation needed to assign a risk owner, responsible person or treatment
+        action responsible (FR-058). Activation status, roles, scope grants and login history are
+        not exposed here - use `GET /admin/users` for those.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          description: Case-insensitive match on full name or email.
+          schema:
+            type: string
+            maxLength: 200
+        - name: assignableForOrgUnitId
+          in: query
+          description: |
+            Switches the listing from the browse rule above to the assignment rule for this unit -
+            "who may be made responsible for a record belonging to unit U" rather than "whom may
+            this actor look up". The returned set is the unit's assignment line (its ancestors, the
+            unit itself, and its descendants) plus active users with no primary organizational unit
+            at all. Asking about a unit outside the caller's authorized organizational scope is
+            refused with `404`, deliberately indistinguishable from asking about a unit that does
+            not exist (FR-030-style non-disclosure).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: A page of directory entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserRef'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /org-units:
+    get:
+      operationId: listOrgUnitsInScope
+      summary: List the organizational units within the caller's scope
+      tags: [Directory]
+      description: |
+        Requires an authenticated session; no administrative permission. Returns only units inside
+        the caller's resolved organizational scope, so a risk can only be created or reassigned
+        into a unit the caller is authorized for (FR-025b, FR-025c). A caller holding a `GLOBAL`
+        grant receives the whole tree.
+      parameters:
+        - name: status
+          in: query
+          description: Filter by activation status. Defaults to `ACTIVE`.
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+            default: ACTIVE
+      responses:
+        '200':
+          description: Units in scope, ordered by materialized path so the tree can be rendered directly.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrgUnitNode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /admin/users:
+    get:
+      operationId: listUsers
+      summary: List users
+      tags: [Users]
+      description: Requires `user:administer`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          description: Case-insensitive match on full name or email.
+          schema:
+            type: string
+            maxLength: 200
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+        - name: orgUnitId
+          in: query
+          description: Filter by the user's primary organizational unit.
+          schema:
+            type: string
+            format: uuid
+        - name: roleId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [fullName, email, status, lastLoginAt]
+            default: fullName
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: A page of users.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createUser
+      summary: Provision a user
+      tags: [Users]
+      description: |
+        Requires `user:administer`. Creates an internal platform identity (FR-001) with a local
+        credential flagged for mandatory change on first sign-in. Roles and organizational scope
+        grants may be supplied at creation so the user can exercise exactly the granted permissions
+        on first sign-in (US8 AS1). Self-service registration is out of scope.
+
+        The initial password is transported in this request only, never stored in reversible form
+        and never returned, logged or audited (FR-005, FR-035).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The email address is already in use.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /admin/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      operationId: getUser
+      summary: Retrieve a user
+      tags: [Users]
+      description: Requires `user:administer`. Includes assigned roles and organizational scope grants.
+      responses:
+        '200':
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateUser
+      summary: Update a user's profile attributes
+      tags: [Users]
+      description: |
+        Requires `user:administer`. Changes name, job title, contact identifier or primary
+        organizational unit. Roles, scope and activation status have their own endpoints so each
+        change is audited as a distinct, meaningful action (FR-032).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The email address is already in use.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /admin/users/{userId}/status:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      operationId: setUserStatus
+      summary: Activate or deactivate a user
+      tags: [Users]
+      description: |
+        Requires `user:administer`. Setting `INACTIVE` prevents further authentication (FR-011) and
+        revokes every session the user holds, with reason `USER_DEACTIVATED`, so in-flight requests
+        presenting them are refused (FR-017, FR-015). The user row is never deleted - audit
+        entries, assessments and decisions reference it permanently (FR-102).
+
+        A caller may not deactivate their own account; that is refused with `422`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetUserStatusRequest'
+      responses:
+        '200':
+          description: Updated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: |
+            Refused by a domain rule - for example a caller attempting to deactivate their own
+            account.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/users/{userId}/password:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      operationId: resetUserPassword
+      summary: Reset a user's local password
+      tags: [Users]
+      description: |
+        Requires `user:administer`. Administrative reset, since self-service email recovery is out
+        of scope for this release. The new credential is flagged for mandatory change on next
+        sign-in and every session the user holds is revoked with reason `PASSWORD_CHANGED`
+        (FR-017). The password value is never returned, logged or audited (FR-005, FR-035); the
+        reset action itself is audited (FR-032).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetUserPasswordRequest'
+      responses:
+        '204':
+          description: Password reset; the user's sessions are revoked.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The new password violates the configured password policy (FR-006).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/users/{userId}/roles:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      operationId: replaceUserRoles
+      summary: Replace the roles assigned to a user
+      tags: [Users]
+      description: |
+        Requires `role:administer`. Replaces the complete set, so the audit entry carries the
+        previous and new role sets as a single comprehensible change (FR-023, FR-033). Takes effect
+        on the user's next request without re-authentication (FR-028).
+
+        This is the only `/admin/users**` operation not gated by `user:administer`, and
+        `role:administer` does not imply it (015-roles-permissions-surface FR-019). The response is
+        therefore `UserRoleAssignment` and not `UserDetail` (F-73): the subject identifier and the
+        resulting role set, never the administrative user record. `GET /admin/users/{userId}`
+        remains the way to read that, behind `user:administer`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceUserRolesRequest'
+      responses:
+        '200':
+          description: The user's resulting role set. Minimized — carries no personal data (F-73).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRoleAssignment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: One or more role identifiers do not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/users/{userId}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      operationId: revokeUserSessions
+      summary: Revoke all of a user's sessions
+      tags: [Users]
+      description: |
+        Requires `user:administer`. Revokes every active session for the user with reason
+        `ADMIN_REVOKED`; subsequent requests presenting them are refused (FR-015). The revocation
+        is audited (FR-018). Idempotent.
+      responses:
+        '204':
+          description: All sessions for the user are revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/users/{userId}/scope-grants:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      operationId: listUserScopeGrants
+      summary: List a user's organizational scope grants
+      tags: [Organizational Scope]
+      description: Requires `user:administer`.
+      responses:
+        '200':
+          description: The grants held by the user.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrgScopeGrant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: grantUserScope
+      summary: Grant a user organizational scope
+      tags: [Organizational Scope]
+      description: |
+        Requires `user:administer`. A `UNIT` grant confers access to that unit and all its
+        descendants (FR-025b). A `GLOBAL` grant confers access across all units and is recorded as
+        an explicit, audited assignment - it is never an implicit default of any role (FR-025a).
+        Takes effect on the affected user's next request (FR-028).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantOrgScopeRequest'
+      responses:
+        '201':
+          description: Grant created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgScopeGrant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: An identical grant already exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: |
+            `scopeType` and `orgUnitId` are inconsistent - a `UNIT` grant requires a unit, a
+            `GLOBAL` grant forbids one - or the unit does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/users/{userId}/scope-grants/{grantId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+      - name: grantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: revokeUserScope
+      summary: Revoke an organizational scope grant
+      tags: [Organizational Scope]
+      description: |
+        Requires `user:administer`. Records are not affected; only the user's reach over them is.
+        Risks that fall outside the remaining scope become unlistable and unretrievable for that
+        user on their next request (FR-025, FR-030). Audited (FR-032).
+      responses:
+        '204':
+          description: Grant revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/roles:
+    get:
+      operationId: listRoles
+      summary: List roles
+      tags: [Roles]
+      description: Requires `role:administer`. Roles are a bounded set; the page size cap still applies.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of roles with their permission sets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Role'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createRole
+      summary: Create a role
+      tags: [Roles]
+      description: |
+        Requires `role:administer`. A role is an arbitrary set of seeded permissions (FR-023).
+        Created roles are never system roles.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteRoleRequest'
+      responses:
+        '201':
+          description: Role created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: A role with that name already exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: One or more permission identifiers do not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  # 2026-09-13 (specs/015-roles-permissions-surface/, FR-039 to FR-043,
+  # R-008): declared HERE, alongside the roles operations it belongs with,
+  # rather than in a contract document of its own. A second file for one
+  # read-only operation would split a single API surface across two
+  # documents and force a change to `contract-coverage.spec.ts`'s
+  # `CONTRACT_SOURCES`, `openapi-documents.ts`'s `CONTRACT_DOCUMENTS` and
+  # `packages/api-types`' own `DOCUMENTS` — three independent lists whose
+  # disagreement that test file's own header already names as a hazard.
+  #
+  # Declared BEFORE `/admin/roles/{roleId}`, and it must stay there: the
+  # contract suite's response validator matches a live request against the
+  # FIRST path template it satisfies (`openapi-documents.ts`'s
+  # `matchOperationForRequest`), and `/admin/roles/{roleId}` would otherwise
+  # swallow `/admin/roles/summary` and validate its body against the `Role`
+  # schema. The application has the mirror-image constraint in its own
+  # handler declaration order — see `AdminRolesController.summary`.
+  /admin/roles/summary:
+    get:
+      operationId: getRolesSummary
+      summary: Platform-wide role and assignment counts
+      tags: [Roles]
+      description: |
+        Requires `role:administer`. Read-only aggregate for the roles administration screen: how
+        many roles exist, how many are system roles, how many were created by the organization,
+        and how many DISTINCT people hold at least one role.
+
+        `usersWithRoles` is a distinct count over role assignments, never the sum of each role's
+        `assignedUserCount` — a person holding two roles counts once. The three role counts are
+        independent aggregates, so `totalRoles` equals `systemRoles + customRoles`.
+
+        Introduces no entity, no scope dimension and no privilege concept: roles are platform-wide
+        administrative records, so this operation is not organizationally scoped, exactly like
+        `listRoles` and `getRole`.
+      responses:
+        '200':
+          description: The four counts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolesSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/RoleId'
+    get:
+      operationId: getRole
+      summary: Retrieve a role
+      tags: [Roles]
+      description: Requires `role:administer`.
+      responses:
+        '200':
+          description: The role and its permissions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateRole
+      summary: Update a custom role's name, description or permission set
+      tags: [Roles]
+      description: |
+        Requires `role:administer`. Supplying `permissions` replaces the whole set, so the audit
+        entry records the previous and new permission sets (US8 AS2, FR-033). The change applies to
+        affected users' subsequent requests (FR-028).
+
+        A role with `isSystem: true` is owned by the platform as a whole: `name`, `description`
+        and `permissionIdentifiers` are all declared by the platform seed and none of them may be
+        written through this operation. Any request naming one or more of the three for a system
+        role is refused with `422`, whatever the values are — including values identical to the
+        stored ones. A system role's definition changes only by an explicit migration/seed change.
+        (F-68, decided 2026-09-14: before that, `description` was accepted here while the seed
+        reconciled it on every run, so the field had two writers and the audit trail recorded an
+        edit the database did not keep.)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        '200':
+          description: Updated role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Another role already carries that name.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: >-
+            The request tried to write `name`, `description` or `permissionIdentifiers` on a
+            system role, or a permission identifier does not exist. The two causes are
+            distinguishable by the problem body's `detail`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      operationId: deleteRole
+      summary: Delete a role
+      tags: [Roles]
+      description: |
+        Requires `role:administer`. Only a non-system role with no current assignments may be
+        deleted; otherwise the request is refused with `422` and the role is left intact. Audited
+        (FR-032).
+      responses:
+        '204':
+          description: Role deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The role is a system role or is still assigned to at least one user.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/permissions:
+    get:
+      operationId: listPermissions
+      summary: List the permission catalogue
+      tags: [Permissions]
+      description: |
+        Requires `role:administer`. Returns the seeded `resource:action` permissions available for
+        role composition (FR-022, ADR-003). The catalogue is read-only over the API; a future
+        module contributes its own permissions through the seed registry, not through this
+        endpoint.
+      parameters:
+        - name: resource
+          in: query
+          description: Filter to one resource, for example `risk`.
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        '200':
+          description: The permission catalogue.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Permission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/org-units:
+    get:
+      operationId: listOrgUnits
+      summary: List the full organizational unit tree
+      tags: [Organizational Units]
+      description: |
+        Requires `org_unit:administer`. Returns every unit regardless of the caller's scope, for
+        administration purposes. Ordinary callers use `GET /org-units`, which is scope filtered.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+      responses:
+        '200':
+          description: Units ordered by materialized path.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrgUnitNode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createOrgUnit
+      summary: Create an organizational unit
+      tags: [Organizational Units]
+      description: |
+        Requires `org_unit:administer`. The materialized path and depth are derived by the server
+        from `parentId` and are read-only (ADR-004). Omitting `parentId` creates a root unit. The
+        creation is audited and access scoping reflects the new structure immediately (US8 AS4).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrgUnitRequest'
+      responses:
+        '201':
+          description: Unit created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgUnitNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: The unit code is already in use.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The parent unit does not exist or is inactive.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/org-units/{orgUnitId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgUnitId'
+    get:
+      operationId: getOrgUnit
+      summary: Retrieve an organizational unit
+      tags: [Organizational Units]
+      description: Requires `org_unit:administer`.
+      responses:
+        '200':
+          description: The unit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgUnitNode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateOrgUnit
+      summary: Rename or reparent an organizational unit
+      tags: [Organizational Units]
+      description: |
+        Requires `org_unit:administer`. Reparenting rewrites the materialized path of the unit and
+        its whole subtree inside one transaction and is audited (ADR-004). A reparent that would
+        create a cycle - moving a unit beneath one of its own descendants - is refused with `422`
+        and nothing changes. Resolved scopes are recomputed, so risks may move in or out of a
+        user's reach on their next request (FR-025b).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrgUnitRequest'
+      responses:
+        '200':
+          description: Updated unit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgUnitNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The unit code is already in use.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The reparent would create a cycle, or the parent does not exist.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /admin/org-units/{orgUnitId}/status:
+    parameters:
+      - $ref: '#/components/parameters/OrgUnitId'
+    put:
+      operationId: setOrgUnitStatus
+      summary: Activate or deactivate an organizational unit
+      tags: [Organizational Units]
+      description: |
+        Requires `org_unit:administer`. Units are never deleted - a unit carrying risks, users or
+        scope grants is deactivated so that history and referential integrity survive (FR-060,
+        FR-102). A deactivated unit cannot be selected for new or reassigned risks. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetOrgUnitStatusRequest'
+      responses:
+        '200':
+          description: Updated unit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgUnitNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: An active descendant unit prevents deactivation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: pgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set (FR-086).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrgUnitId:
+      name: orgUnitId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: |
+            Never contains a stack trace, SQL fragment or internal identifier (FR-107).
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+          description: Total rows matching the request, so the client can show a count and jump to a page.
+        totalPages:
+          type: integer
+          minimum: 0
+    UserRef:
+      type: object
+      description: Reduced directory representation.
+      required: [id, fullName, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fullName:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        jobTitle:
+          type: [string, 'null']
+          readOnly: true
+        primaryOrgUnit:
+          oneOf:
+            - $ref: '#/components/schemas/OrgUnitRef'
+            - type: 'null'
+          readOnly: true
+    OrgUnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    RoleRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    User:
+      type: object
+      description: Administrative user representation. Carries no credential material (FR-005).
+      required: [id, email, fullName, status, roles, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        jobTitle:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          readOnly: true
+          description: Changed only through `PUT /admin/users/{userId}/status`.
+        primaryOrgUnit:
+          oneOf:
+            - $ref: '#/components/schemas/OrgUnitRef'
+            - type: 'null'
+        roles:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/RoleRef'
+        authenticationMethods:
+          type: array
+          readOnly: true
+          description: Methods associated with this identity (FR-002). `LOCAL` only in this release.
+          items:
+            type: string
+            enum: [LOCAL, LDAP, ACTIVE_DIRECTORY, OIDC, SAML]
+        lastLoginAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    UserDetail:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            scopeGrants:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/OrgScopeGrant'
+    CreateUserRequest:
+      type: object
+      required: [email, fullName, initialPassword]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        jobTitle:
+          type: [string, 'null']
+          maxLength: 200
+        primaryOrgUnitId:
+          type: [string, 'null']
+          format: uuid
+        initialPassword:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 12
+          maxLength: 256
+          description: |
+            Validated against the configured password policy (FR-006) and stored only as an
+            argon2id hash (FR-005). The credential is flagged for mandatory change on first use.
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        scopeGrants:
+          type: array
+          description: Optional initial organizational scope, applied atomically with the user.
+          items:
+            $ref: '#/components/schemas/GrantOrgScopeRequest'
+    UpdateUserRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        jobTitle:
+          type: [string, 'null']
+          maxLength: 200
+        primaryOrgUnitId:
+          type: [string, 'null']
+          format: uuid
+    SetUserStatusRequest:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        reason:
+          type: string
+          maxLength: 500
+          description: Recorded in the audit entry as operation context (FR-033).
+    ResetUserPasswordRequest:
+      type: object
+      required: [newPassword]
+      additionalProperties: false
+      properties:
+        newPassword:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 12
+          maxLength: 256
+    UserRoleAssignment:
+      type: object
+      description: |
+        The result of `PUT /admin/users/{userId}/roles`, and the only `/admin/users**`
+        representation reachable with `role:administer` alone. Deliberately NOT `UserDetail`
+        (F-73): it carries the subject identifier the caller already supplied in the path, and the
+        role set the user now holds — role identity being something `role:administer` already
+        reads in full from `GET /admin/roles`. No name, e-mail, job title, status, organizational
+        unit or scope grant, because `role:administer` does not imply `user:administer`
+        (015-roles-permissions-surface FR-018/FR-019/FR-020).
+      required: [userId, roles]
+      additionalProperties: false
+      properties:
+        userId:
+          type: string
+          format: uuid
+          readOnly: true
+        roles:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/RoleRef'
+    ReplaceUserRolesRequest:
+      type: object
+      required: [roleIds]
+      additionalProperties: false
+      properties:
+        roleIds:
+          type: array
+          description: The complete set of roles the user is to hold. An empty array removes all roles.
+          items:
+            type: string
+            format: uuid
+    Role:
+      type: object
+      required: [id, name, description, isSystem, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: string
+        isSystem:
+          type: boolean
+          readOnly: true
+          description: System roles are seeded and cannot be deleted or renamed.
+        permissions:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/Permission'
+        assignedUserCount:
+          type: integer
+          readOnly: true
+          minimum: 0
+    # 2026-09-13 (specs/015-roles-permissions-surface/, FR-039/FR-040).
+    # `additionalProperties: false` deliberately: this is a closed aggregate
+    # answering four questions, and a client rendering four indicator cards
+    # must not silently start receiving a fifth number nobody contracted.
+    RolesSummary:
+      type: object
+      required: [totalRoles, systemRoles, customRoles, usersWithRoles]
+      additionalProperties: false
+      properties:
+        totalRoles:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Every role, system and organization-created alike.
+        systemRoles:
+          type: integer
+          minimum: 0
+          readOnly: true
+          # Quoted: an unquoted plain scalar containing "`isSystem: true`"
+          # parses as a nested mapping and breaks the whole document for a
+          # real YAML parser (the contract suite's response validator uses
+          # one, even though `contract-coverage.spec.ts`'s line scanner does
+          # not). Same reason `WriteRoleRequest.permissionIdentifiers`'
+          # description above is quoted.
+          description: 'Roles with `isSystem: true` - seeded, never created through this API.'
+        customRoles:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: 'Roles with `isSystem: false`. `totalRoles` equals `systemRoles` + `customRoles`.'
+        usersWithRoles:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: |
+            Distinct users holding at least one role. A person holding two roles counts once, so
+            this is never the sum of every role's `assignedUserCount`.
+    WriteRoleRequest:
+      type: object
+      required: [name, description, permissionIdentifiers]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        permissionIdentifiers:
+          type: array
+          description: '`resource:action` identifiers from `GET /admin/permissions`.'
+          items:
+            type: string
+    UpdateRoleRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        permissionIdentifiers:
+          type: array
+          description: When present, replaces the role's entire permission set.
+          items:
+            type: string
+    Permission:
+      type: object
+      required: [identifier, resource, action, description]
+      properties:
+        identifier:
+          type: string
+          description: Stable `resource:action` string, for example `risk:approve` (ADR-003).
+          readOnly: true
+        resource:
+          type: string
+          readOnly: true
+        action:
+          type: string
+          # 2026-09-11, Finding C (007-implementation-remediation): this
+          # enum mirrored only the nine `PermissionAction` values that
+          # existed when this schema was first authored
+          # (specs/001-grc-platform-foundation). `LINK` and `CLOSE` were
+          # added later, by migration `20260907085000_
+          # permission_action_add_grc_foundation` (002-shared-grc-
+          # foundation, ADR-008: "closed platform enums grow by reviewed
+          # migration") — the schema was never updated to match. Verified
+          # against the actual, authoritative source, `enum
+          # PermissionAction` in apps/api/prisma/schema.prisma: these
+          # eleven are the complete, current set. A later phase adding
+          # another verb must extend this enum in the same migration that
+          # extends `PermissionAction`, not as an afterthought.
+          enum:
+            [
+              VIEW,
+              CREATE,
+              EDIT,
+              DELETE,
+              APPROVE,
+              ADMINISTER,
+              ASSESS,
+              TREAT,
+              TRANSITION,
+              LINK,
+              CLOSE,
+            ]
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+    OrgUnitNode:
+      type: object
+      required: [id, code, name, depth, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+        name:
+          type: string
+        parentId:
+          type: [string, 'null']
+          format: uuid
+        depth:
+          type: integer
+          minimum: 0
+          readOnly: true
+          description: Derived from the materialized path; never supplied by a client (ADR-004).
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          readOnly: true
+        childCount:
+          type: integer
+          minimum: 0
+          readOnly: true
+    CreateOrgUnitRequest:
+      type: object
+      required: [code, name]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        parentId:
+          type: [string, 'null']
+          format: uuid
+          description: Omit or null to create a root unit.
+    UpdateOrgUnitRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        parentId:
+          type: [string, 'null']
+          format: uuid
+          description: Reparents the unit and its subtree.
+    SetOrgUnitStatusRequest:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+    OrgScopeGrant:
+      type: object
+      required: [id, scopeType, grantedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        scopeType:
+          type: string
+          enum: [UNIT, GLOBAL]
+        orgUnit:
+          oneOf:
+            - $ref: '#/components/schemas/OrgUnitRef'
+            - type: 'null'
+          description: Present for a `UNIT` grant, null for `GLOBAL`.
+        grantedBy:
+          $ref: '#/components/schemas/UserRef'
+        grantedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    GrantOrgScopeRequest:
+      type: object
+      required: [scopeType]
+      additionalProperties: false
+      properties:
+        scopeType:
+          type: string
+          enum: [UNIT, GLOBAL]
+        orgUnitId:
+          type: [string, 'null']
+          format: uuid
+          description: Required for `UNIT`, must be absent or null for `GLOBAL` (FR-025a).
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties, or fails a structural constraint
+        (FR-106).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked (FR-015).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The caller lacks the required permission, or the request failed the cross-site request
+        forgery origin check (FR-026, ADR-002). Refusals are audited where security relevant
+        (FR-037).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: No such resource.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: The request is well formed but violates a domain rule.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

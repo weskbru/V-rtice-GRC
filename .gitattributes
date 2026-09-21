@@ -1,0 +1,24 @@
+# Line endings are LF everywhere, in the repository AND in the working tree.
+#
+# Without this, a Windows checkout with core.autocrlf=true rewrites files to
+# CRLF on the way out, while .prettierrc demands `endOfLine: "lf"` — so any
+# file that arrives by checkout rather than by being written locally fails
+# `pnpm format:check` on Windows and passes it in CI on Linux. A gate that
+# disagrees with itself between machines is worse than no gate: it trains
+# whoever sees the red to ignore it.
+#
+# `eol=lf` (not just `text=auto`) is the load-bearing part — it overrides
+# core.autocrlf for the working tree, which is exactly the setting that caused
+# the divergence.
+* text=auto eol=lf
+
+# Binary and generated artifacts git must not touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+pnpm-lock.yaml -diff linguist-generated

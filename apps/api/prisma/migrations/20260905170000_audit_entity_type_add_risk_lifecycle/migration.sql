@@ -1,0 +1,29 @@
+-- T153/US6 — Additive growth of the `AuditEntityType` enum: adds
+-- `RISK_LIFECYCLE_TRANSITION` and `APPROVAL` (ADR-008: "closed platform
+-- enums grow by reviewed migration"). Two distinct values rather than one
+-- generic "lifecycle" value: a transition is an APPLIED state change, an
+-- approval is a REQUEST/DECISION pair that may never result in a
+-- transition at all (REJECTED clears the pending condition and leaves the
+-- risk exactly where it was) — the same reasoning that gave the three risk
+-- relationship link types their own distinct values
+-- (`20260905160000_audit_entity_type_add_risk_treatment`).
+--
+-- ## The PostgreSQL restriction this migration must respect
+--
+-- Same restriction as every prior `audit_entity_type_add_*` migration (see
+-- `20260905140000_audit_entity_type_add_risk`,
+-- `20260905150000_audit_entity_type_add_risk_assessment_methodology`,
+-- `20260905160000_audit_entity_type_add_risk_treatment` for the full
+-- explanation): a value added by `ALTER TYPE ... ADD VALUE` cannot be
+-- referenced by any statement in the SAME transaction that added it. This
+-- migration contains only the two `ADD VALUE` statements and writes no
+-- data using either new label — nor does the migration that runs
+-- immediately after it
+-- (`20260905170100_risk_lifecycle_and_approvals_baseline`), which only
+-- creates tables/indexes/constraints/triggers and writes no `audit_event`
+-- rows. The first real use of each new label is `AuditRecorder.record(...)`
+-- called at normal application runtime, in an entirely separate
+-- transaction opened long after `prisma migrate deploy` has committed this
+-- one.
+ALTER TYPE "AuditEntityType" ADD VALUE 'RISK_LIFECYCLE_TRANSITION';
+ALTER TYPE "AuditEntityType" ADD VALUE 'APPROVAL';

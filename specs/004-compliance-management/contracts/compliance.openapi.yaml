@@ -1,0 +1,1791 @@
+openapi: 3.1.0
+info:
+  title: PharosGRC - Compliance API
+  version: 1.0.0
+  summary: >-
+    Normative library (framework, version, requirement), the explicit N:M mapping from a
+    requirement to the controls that satisfy it, mapping migration between framework versions, and
+    the calculated compliance state of a requirement and of a version.
+  description: |
+    The third business module (ADR-017): a control satisfies clauses from many norms without ever
+    being duplicated per norm. Every operation in this document is subject to two independent
+    server-side checks (FR-022, FR-023, ADR-003, ADR-004):
+
+    1. the caller's `resource:action` permission, named in each operation's description
+       (`compliance:view`, `compliance:administer` or `compliance:map` - research.md D-13);
+    2. for the one operation that reaches into another module's data -
+       `POST /requirements/{requirementId}/controls` - the caller's resolved organizational scope
+       over the referenced control, applied through `ControlDirectoryPort` (ADR-020).
+
+    **The normative library itself carries no organizational scope.** `Framework`,
+    `FrameworkVersion` and `Requirement` are a platform-wide catalog, gated by permission alone -
+    the same regime `Role` and `Permission` already use, and for the same reason: a scope predicate
+    that expands only downward from a granted unit (`ScopeResolverService`) would make a
+    company-wide standard invisible to anyone not granted at the organizational root
+    (research.md D-2). This is a deliberate, documented difference from the Risk and Control
+    management APIs, not an oversight.
+
+    **Existence is not disclosed.** A control referenced by
+    `POST /requirements/{requirementId}/controls` that lies outside the caller's organizational
+    scope, and one that does not exist, are both answered with `422` naming the field - never
+    `403` - so the response cannot be used to probe for records the caller may not see. A
+    framework, version or requirement the caller may not view answers `404` when the caller lacks
+    `compliance:view` entirely; `403` is reserved for a caller who can see the record but lacks the
+    permission for the specific write, and for the cross-site request forgery origin check.
+
+    **Compliance state is never accepted as input, anywhere in this document.** `complianceState`
+    on `Requirement` and every field of `ComplianceSummary` are computed exclusively by
+    `RequirementComplianceService` (data-model.md §7, research.md D-8) from the requirement's
+    applicability and the effectiveness of its linked controls, read through
+    `ControlDirectoryPort` and the new `ControlEffectivenessPort` (research.md D-9). There is no
+    column for it anywhere in the schema, and no request body in this document declares the
+    property - a supplied `complianceState` is rejected as an unknown property by the global
+    validation pipe.
+
+    **A compliance-state change is audited when it is next observed, not when its cause occurs.**
+    FR-021 requires previous/posterior auditing of a compliance-state change; the fact that causes
+    one - typically a control's attestation being decided - usually happens inside the Controls
+    module, which Compliance cannot observe without violating the module boundary (research.md
+    D-11). Every read of a `Requirement`'s `complianceState`, and the side effect of every write
+    that could change it, compares the freshly computed value against a private audit watermark and
+    emits `requirement.compliance_state.changed` exactly when they differ. A state that changed but
+    was never read after changing is not yet in the audit trail - this is a reported, deliberate
+    consequence of tying the guarantee to observation (research.md D-11), not a silent gap.
+
+    **Optimistic locking is scoped to each root entity's own row.** `Framework`, `FrameworkVersion`
+    and `Requirement` each carry their own `version`; the `PATCH` and (for `FrameworkVersion`) the
+    `publish` operation on each require `If-Match` carrying the value last read as the resource's
+    `ETag`. A stale version yields `409` with the current version in the problem document, and the
+    write is not applied. Links, applicability declarations and mapping migrations are independent,
+    separately-keyed rows that never write to a root entity's `version` column - none of the
+    operations that create or withdraw them carries `If-Match`.
+
+    **History is never overwritten.** A published requirement is immutable - enforced by a database
+    trigger, not application code alone (data-model.md §3, research.md D-4); there is deliberately
+    no update operation for it once its version is `PUBLISHED`. Withdrawing a control link or
+    revoking an applicability declaration stamps who did it and when; the row is preserved, never
+    deleted (FR-011). A mapping migration is never re-run over a requirement that already has its
+    own decided mapping - it is skipped, never overwritten (FR-014).
+
+    **A mapping migration is the human's decision, recorded - never the system's guess.** The
+    request body carries the correspondence between source and target requirements exactly as the
+    compliance manager decided it; this API never infers a correspondence from matching clause
+    codes, text similarity, or any other heuristic (research.md D-6). A target requirement absent
+    from the correspondence, and with no mapping of its own already, comes back `PENDING_DECISION` -
+    never silently unmapped (FR-013).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Framework Library
+    description: >-
+      Frameworks, their versions, and the versions' publication lifecycle (US1, ADR-017).
+  - name: Requirement
+    description: The clauses of a framework version - created and editable only while it is a draft (US1).
+  - name: Requirement-Control Mapping
+    description: >-
+      The explicit N:M link from a requirement to the controls that satisfy it (US2, ADR-017,
+      ADR-020).
+  - name: Mapping Migration
+    description: >-
+      Carrying a mapping decision from one framework version to the next, as a single audited
+      operation (US2, FR-012-FR-014).
+  - name: Applicability and Compliance State
+    description: >-
+      Declaring a requirement not applicable, and reading the calculated compliance state of a
+      requirement or of a version (US3, FR-015-FR-021).
+security:
+  - session: []
+paths:
+  /frameworks:
+    get:
+      operationId: listFrameworks
+      summary: List frameworks
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:view`. Frameworks are a platform-wide catalog with no organizational
+        scope predicate (data-model.md §1, research.md D-2) - every caller with the permission sees
+        every framework. An empty `data` array with `meta.total` of zero and no filters applied
+        means no frameworks exist; with `q` applied it means no matches.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          description: Text search across framework code and name.
+          schema:
+            type: string
+            maxLength: 200
+        - name: origin
+          in: query
+          description: Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/FrameworkOrigin'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [code, name, updatedAt]
+            default: code
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: A page of frameworks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Framework'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createFramework
+      summary: Register a framework
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:administer`. The server assigns the unique, human-readable `code`
+        (`FMK-` prefix, `GrcCodeSequence`, data-model.md §1/§10), never client-supplied. `version`
+        is likewise server-owned and rejected as an unknown property if supplied.
+
+        A framework is created with no versions (FR-002); it is legible but has no compliance state
+        to report until it has at least one published version (edge case "framework sem versão
+        alguma"). Audited (`framework.created`) with the new values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFrameworkRequest'
+      responses:
+        '201':
+          description: Framework created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Framework'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /frameworks/{frameworkId}:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+    get:
+      operationId: getFramework
+      summary: Retrieve a framework
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:view`. The `ETag` carries the framework's `version` and must be
+        echoed in `If-Match` on `PATCH /frameworks/{frameworkId}`.
+      responses:
+        '200':
+          description: The framework.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Framework'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateFramework
+      summary: Update a framework's descriptive data
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:administer`. `code` and `version` are read-only and rejected as
+        unknown properties. Each changed field's previous and new value is written to the audit
+        trail (`framework.updated`). `If-Match` is required; a stale version yields `409` and
+        nothing is written.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFrameworkRequest'
+      responses:
+        '200':
+          description: Updated framework.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Framework'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /frameworks/{frameworkId}/versions:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+    get:
+      operationId: listFrameworkVersions
+      summary: List a framework's versions
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:view`. Returns every version, newest first by `createdAt` - drafts and
+        published versions alike, and more than one published version may coexist (edge case "duas
+        versões vigentes ao mesmo tempo") - compliance state is always read per version
+        (`GET .../compliance-summary`), never rolled up to a single number for the framework.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          description: Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/FrameworkVersionStatus'
+      responses:
+        '200':
+          description: A page of versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FrameworkVersion'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createFrameworkVersion
+      summary: Create the next version of a framework
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:administer`. The version is created `DRAFT` (FR-002); creating it does
+        not alter or invalidate any other version of the same framework (FR-006). `status`,
+        `publishedAt`, `publishedBy` and `version` are server-owned and rejected if supplied.
+        `label` must be unique within the framework. Audited (`framework_version.created`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFrameworkVersionRequest'
+      responses:
+        '201':
+          description: Version created, in `DRAFT`.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkVersion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: '`label` is already used by another version of this framework.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /frameworks/{frameworkId}/versions/{versionId}:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      operationId: getFrameworkVersion
+      summary: Retrieve a framework version
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:view`. The `ETag` carries the version's own `version` and must be
+        echoed in `If-Match` on `PATCH` and `publish` below.
+      responses:
+        '200':
+          description: The framework version.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateFrameworkVersion
+      summary: Update a version's label
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:administer`. Permitted only while the version is `DRAFT`; a
+        `PUBLISHED` version refuses with `422` (FR-006 - publishing does not merely restrict its
+        requirements, it fixes the version's own identity too). `status`, `publishedAt`,
+        `publishedBy` and `version` are read-only and rejected if supplied. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFrameworkVersionRequest'
+      responses:
+        '200':
+          description: Updated version.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkVersion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: The version is already `PUBLISHED` and its label is fixed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /frameworks/{frameworkId}/versions/{versionId}/publish:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      operationId: publishFrameworkVersion
+      summary: Publish a framework version
+      tags: [Framework Library]
+      description: |
+        Requires `compliance:administer`. `DRAFT -> PUBLISHED` is the version's one legal
+        transition, and it is one-way - there is deliberately no operation to un-publish or revert
+        it (research.md D-3). Refused with `422` when the version has no requirement at all
+        (FR-005, edge case "versão publicada sem cláusulas") - a version with nothing to measure
+        would count, incorrectly, as 100% compliant. Refused with `422` when the version is already
+        `PUBLISHED`.
+
+        Publishing stamps `publishedAt`/`publishedByUserId` and freezes every requirement of this
+        version against further edits, enforced by a database trigger in addition to the
+        application check (data-model.md §3, research.md D-4). It does not affect any other version
+        of the same framework (FR-006) - a framework may have more than one `PUBLISHED` version at
+        once (edge case "duas versões vigentes ao mesmo tempo"). `If-Match` is required, so two
+        concurrent publish requests cannot both apply.
+
+        Audited as a field change on `framework_version.updated` (`status`: `DRAFT` -> `PUBLISHED`)
+        - there is no separate lifecycle-transition log for this version, unlike `Control`'s
+        multi-state lifecycle (research.md D-3): one edge, firing at most once, needs no history
+        table of its own.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Version published.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameworkVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: >-
+            The version has no requirement (FR-005), or is already `PUBLISHED`. The record is
+            unchanged.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /frameworks/{frameworkId}/versions/{versionId}/requirements:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      operationId: listRequirements
+      summary: List a version's requirements
+      tags: [Requirement]
+      description: |
+        Requires `compliance:view`. Ordered by `externalRef` by default. Each row carries
+        `complianceState`, freshly computed (data-model.md §7, research.md D-8) - reading this list
+        is one of the points where a compliance-state change is detected and audited if it differs
+        from what was last observed (FR-021, research.md D-11). Capped at 100 rows per page - the
+        same cap every paginated listing in this API uses - which keeps a full-version read
+        (SC-008's 500-requirement case) to five pages at most, each independently within budget.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: complianceState
+          in: query
+          description: >-
+            Comma-separated. When supplied, the server computes `complianceState` for every
+            requirement of the version first (the same bounded, one-version batch the compliance
+            summary endpoint uses, research.md D-10), filters over that complete set, and only then
+            paginates the filtered result - never filters within an already-paginated page, which
+            would silently under-report matches on later pages. This is why the filter is not
+            offered on any listing that is not already bounded to one version.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/RequirementComplianceState'
+      responses:
+        '200':
+          description: A page of requirements.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Requirement'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createRequirement
+      summary: Register a requirement (clause) on a draft version
+      tags: [Requirement]
+      description: |
+        Requires `compliance:administer`. Permitted only while the version is `DRAFT`; refused with
+        `422` once it is `PUBLISHED` (FR-004) - a clause is born and dies with its version's draft
+        state, never added after publication. `complianceState` and `version` are server-owned and
+        rejected if supplied. The same `externalRef` may legitimately repeat across two different
+        norms' versions - the system never deduplicates it (FR-007). Audited
+        (`requirement.created`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequirementRequest'
+      responses:
+        '201':
+          description: Requirement created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Requirement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The version is already `PUBLISHED` and accepts no new requirement (FR-004).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /requirements/{requirementId}:
+    parameters:
+      - $ref: '#/components/parameters/RequirementId'
+    get:
+      operationId: getRequirement
+      summary: Retrieve a requirement
+      tags: [Requirement]
+      description: |
+        Requires `compliance:view`. `complianceState` is freshly computed on every call
+        (data-model.md §7) - this is the other point, alongside the listing above, where a state
+        change is detected and audited (FR-021, research.md D-11). The `ETag` carries the
+        requirement's `version` and must be echoed in `If-Match` on `PATCH`.
+      responses:
+        '200':
+          description: The requirement.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Requirement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateRequirement
+      summary: Edit a requirement's text
+      tags: [Requirement]
+      description: |
+        Requires `compliance:administer`. Permitted only while the parent version is `DRAFT`;
+        refused with `422` once it is `PUBLISHED` (FR-004), enforced both here and by a database
+        trigger that rejects the underlying `UPDATE` regardless of caller (data-model.md §3,
+        research.md D-4) - the trigger, not this endpoint, is the actual guarantee. `externalRef`
+        may be corrected while still in `DRAFT`. `complianceState` and `version` are read-only and
+        rejected if supplied. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRequirementRequest'
+      responses:
+        '200':
+          description: Updated requirement.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Requirement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: >-
+            The parent version is already `PUBLISHED`; the requirement is immutable (FR-004).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /requirements/{requirementId}/controls:
+    parameters:
+      - $ref: '#/components/parameters/RequirementId'
+    get:
+      operationId: listRequirementControlLinks
+      summary: List the controls linked to a requirement
+      tags: [Requirement-Control Mapping]
+      description: |
+        Requires `compliance:view`. Returns current links by default; `includeWithdrawn` also
+        returns links that were withdrawn, with who withdrew them and when, so a removal remains
+        visible in history (FR-011). The same control may appear here and under links to other
+        requirements, of this or another framework's version, without ever being duplicated
+        (SC-001) - this endpoint reads `RequirementControlLink` (data-model.md §4), never a copy.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The control links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RequirementControlLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkRequirementToControl
+      summary: Link a control to a requirement
+      tags: [Requirement-Control Mapping]
+      description: |
+        Requires `compliance:map` on the requirement **and** the referenced control to lie inside
+        the caller's organizational scope, verified through `ControlDirectoryPort` (ADR-020,
+        research.md D-2, D-9) - the one place in this API where organizational scope is checked, and
+        the reason a control outside scope, or nonexistent, answers `422` rather than `404`: unlike
+        a path parameter naming a resource this document owns, the control here is request-body
+        input being validated, and this API's convention (per Controls' own contract) is that a
+        referenced-but-invalid body field is a business-rule failure, not routing.
+
+        Linking an already-linked (currently active) control is refused with `409`; linking a
+        control whose previous link with this requirement was withdrawn is permitted and creates a
+        new link, preserving the withdrawn one in history. Records who linked it and when; audited
+        with the `REQUIREMENT_CONTROL_LINK` entity type (data-model.md §4, ADR-008, ADR-020 part 1).
+        This operation does not write to the requirement's `version` and does not carry `If-Match`.
+
+        Permitted regardless of the requirement's own version status - linking is not editing the
+        clause's text (FR-004 governs the clause's own fields, not its mappings), and a published
+        version's mappings need to evolve as the control landscape does. Permitted also on a
+        requirement declared not applicable (edge case "cláusula não aplicável ligada a controle") -
+        the link is kept, the requirement still does not count toward compliance while the
+        declaration stands (FR-016).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkRequirementControlRequest'
+      responses:
+        '201':
+          description: Control linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequirementControlLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: An active link between this requirement and this control already exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: >-
+            The referenced control does not exist, or lies outside the caller's organizational
+            scope - the two are deliberately indistinguishable (FR-022).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /requirements/{requirementId}/controls/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/RequirementId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkRequirementFromControl
+      summary: Withdraw a requirement-control link
+      tags: [Requirement-Control Mapping]
+      description: |
+        Requires `compliance:map`. The link is withdrawn, never physically deleted: the removal
+        stamps `unlinkedAt`/`unlinkedByUserId` so history remains complete (FR-011). Not a `DELETE`
+        in the storage sense - the HTTP verb withdraws the link, it does not erase the row.
+        Audited. Does not write to the requirement's `version` and does not carry `If-Match`.
+      responses:
+        '204':
+          description: Link withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: This link was already withdrawn.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /requirements/{requirementId}/applicability-declarations:
+    parameters:
+      - $ref: '#/components/parameters/RequirementId'
+    get:
+      operationId: listRequirementApplicabilityDeclarations
+      summary: List a requirement's applicability declarations
+      tags: [Applicability and Compliance State]
+      description: |
+        Requires `compliance:view`. A requirement with no declaration at all is applicable by
+        default (FR-015 AS1) - an empty array here means exactly that, not an unanswered question.
+        At most one declaration in the array has `revokedAt: null` at any time (data-model.md §6);
+        returns every declaration, current and revoked, newest first, so a reversal of applicability
+        remains visible in history.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of declarations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RequirementApplicabilityDeclaration'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: declareRequirementNotApplicable
+      summary: Declare a requirement not applicable
+      tags: [Applicability and Compliance State]
+      description: |
+        Requires `compliance:administer`. `justification` is required - omitting it is refused with
+        `422` (FR-015 AS1). Refused with `409` if a declaration is already active for this
+        requirement; revoke it first (`DELETE .../applicability-declarations/{declarationId}`)
+        before declaring again, so each declaration keeps its own single, unambiguous
+        justification (research.md D-7) rather than one being silently replaced by another.
+
+        From the moment this is recorded, the requirement is excluded from its version's compliance
+        calculation (FR-016) - its `complianceState` becomes `NOT_APPLICABLE` on the next read. A
+        control link on this requirement, if any, is left untouched (edge case "cláusula não
+        aplicável ligada a controle"). Audited with the `REQUIREMENT_APPLICABILITY` entity type.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeclareApplicabilityRequest'
+      responses:
+        '201':
+          description: Declaration recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequirementApplicabilityDeclaration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A not-applicable declaration is already active for this requirement.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: '`justification` is missing or empty (FR-015).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /requirements/{requirementId}/applicability-declarations/{declarationId}:
+    parameters:
+      - $ref: '#/components/parameters/RequirementId'
+      - $ref: '#/components/parameters/DeclarationId'
+    delete:
+      operationId: revokeRequirementApplicabilityDeclaration
+      summary: Revoke a not-applicable declaration (the requirement becomes applicable again)
+      tags: [Applicability and Compliance State]
+      description: |
+        Requires `compliance:administer`. Stamps `revokedAt`/`revokedByUserId`; the row is
+        preserved, never deleted (research.md D-7). Only the currently active declaration
+        (`revokedAt: null`) may be revoked - revoking an already-revoked one is refused with `422`.
+        From this point the requirement is applicable again and re-enters the compliance
+        calculation on the next read. Audited.
+      responses:
+        '204':
+          description: Declaration revoked; the requirement is applicable again.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: This declaration was already revoked.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /frameworks/{frameworkId}/versions/{versionId}/compliance-summary:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      operationId: getFrameworkVersionComplianceSummary
+      summary: Read the version's calculated compliance summary
+      tags: [Applicability and Compliance State]
+      description: |
+        Requires `compliance:view`. Aggregates the `complianceState` of every **applicable**
+        requirement of this version (FR-020, FR-016) - the same calculator used per requirement
+        (data-model.md §7, research.md D-8), never a second rule for the aggregate. Computed in
+        memory over one batch read per version, never a replicated SQL expression (research.md
+        D-10) - within budget for SC-008's 500-requirement case because it is bounded to one
+        version, not paginated across an unbounded set.
+
+        A version with zero requirements answers with `totalRequirements: 0` and no percentage
+        (`compliancePercentage: null`) - explicitly "nothing to measure yet", never `0` (which would
+        assert zero compliance) nor `100` (edge case "framework sem versão alguma" applied to a
+        version instead of a whole framework with no version). Reading this endpoint also drives the
+        same per-requirement audit-on-change comparison as the listing and detail endpoints above
+        (FR-021, research.md D-11), for every requirement it aggregates over.
+      responses:
+        '200':
+          description: The version's compliance summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /frameworks/{frameworkId}/versions/{versionId}/mapping-migrations:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      operationId: listMappingMigrations
+      summary: List mapping migrations executed into this version
+      tags: [Mapping Migration]
+      description: |
+        Requires `compliance:view`. Newest first by `executedAt`. Each entry is a summary - outcome
+        counts, not the per-requirement detail (`GET .../mapping-migrations/{migrationId}` for
+        that). A version may have more than one migration recorded, reflecting the re-runnable
+        design of the operation (research.md D-6, edge case "migração para uma versão que já tem
+        mapeamentos").
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of migrations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MappingMigrationSummary'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: executeMappingMigration
+      summary: Migrate a requirement-control mapping from another version into this one
+      tags: [Mapping Migration]
+      description: |
+        Requires `compliance:map`. `sourceFrameworkVersionId` must belong to the **same** framework
+        as the target version in the path (FR-012); a source from a different framework is refused
+        with `422`. The two need not be adjacent versions - any other version of the same framework
+        may be the source.
+
+        `correspondences` is the compliance manager's own decision, supplied exactly as the request
+        carries it - this operation never infers a correspondence by matching `externalRef`, clause
+        text, or any other heuristic (research.md D-6). Each entry names one `targetRequirementId`
+        (must belong to the target version; may appear at most once in the array - duplicated target
+        is refused with `422`) and one or more `sourceRequirementIds` (must belong to
+        `sourceFrameworkVersionId`; the same source id may appear under more than one target, for a
+        clause that split into several).
+
+        For every requirement of the target version, this operation records exactly one outcome
+        (data-model.md §5):
+
+        - **`SKIPPED_ALREADY_MAPPED`** - the target already has an active `RequirementControlLink`
+          of its own, whether from a prior migration or a manual decision. Never overwritten
+          (FR-014), regardless of whether it also appears in `correspondences`.
+        - **`COPIED`** - the target appears in `correspondences` and had no active link of its own:
+          the union of the listed sources' active control links is copied onto it (deduplicated by
+          control, so a control already linked to two listed sources is linked once).
+        - **`PENDING_DECISION`** - the target has no active link of its own and does not appear in
+          `correspondences` (FR-013). Never silently left unmapped.
+
+        Re-running this operation for the same target version is permitted and processes only
+        requirements not yet decided by a previous run or by hand - it never revisits a
+        `SKIPPED_ALREADY_MAPPED` or previously `COPIED` requirement (research.md D-6).
+
+        Recorded as a single `RequirementControlMappingMigration` plus one
+        `RequirementControlMappingMigrationItem` per target requirement processed, and audited as a
+        **single** event (`REQUIREMENT_CONTROL_MAPPING_MIGRATION`, SC-004) carrying the outcome
+        counts - never one audit event per copied link, which would read as unrelated manual work
+        rather than one migration (US2 AS4).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteMappingMigrationRequest'
+      responses:
+        '201':
+          description: Migration executed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingMigrationDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: >-
+            `sourceFrameworkVersionId` belongs to a different framework than the path's version
+            (FR-012); a `targetRequirementId` does not belong to the target version, or appears more
+            than once in `correspondences`; or a `sourceRequirementIds` entry does not belong to
+            `sourceFrameworkVersionId`. Field-level entries are returned in `errors[]`. No item is
+            recorded.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /frameworks/{frameworkId}/versions/{versionId}/mapping-migrations/{migrationId}:
+    parameters:
+      - $ref: '#/components/parameters/FrameworkId'
+      - $ref: '#/components/parameters/VersionId'
+      - $ref: '#/components/parameters/MigrationId'
+    get:
+      operationId: getMappingMigration
+      summary: Retrieve one migration's full per-requirement detail
+      tags: [Mapping Migration]
+      description: |
+        Requires `compliance:view`. Returns every `RequirementControlMappingMigrationItem` this
+        execution produced - the outcome, the source(s) considered, and the number of links copied,
+        per target requirement (SC-004: "conferir o que foi transportado"). Immutable once
+        recorded; there is deliberately no update or delete operation for a migration record.
+      responses:
+        '200':
+          description: The migration's full detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingMigrationDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: pgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  headers:
+    ETag:
+      description: |
+        The resource's optimistic-locking `version` as an entity tag, for example `"3"`. Echo it in
+        `If-Match` on the corresponding `PATCH` (and, for a framework version, `publish`).
+      schema:
+        type: string
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    FrameworkId:
+      name: frameworkId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RequirementId:
+      name: requirementId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LinkId:
+      name: linkId
+      in: path
+      required: true
+      description: Identifier of the `RequirementControlLink` row, not of the linked control.
+      schema:
+        type: string
+        format: uuid
+    DeclarationId:
+      name: declarationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MigrationId:
+      name: migrationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: |
+        The resource's `version` last read, as an entity tag, for example `"3"`. A missing or
+        malformed header is `400`; a stale value is `409` and nothing is written.
+      schema:
+        type: string
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Never contains a stack trace, SQL fragment or internal identifier.
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+    VersionConflictProblem:
+      description: |
+        Problem document returned when the supplied `If-Match` version is not the current one. The
+        write was not applied; the client reloads, re-applies its edits and retries.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [currentVersion]
+          properties:
+            currentVersion:
+              type: integer
+              description: The resource's current `version`, to be echoed in the retried `If-Match`.
+            modifiedAt:
+              type: string
+              format: date-time
+            modifiedBy:
+              $ref: '#/components/schemas/UserRef'
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    ControlRef:
+      type: object
+      description: >-
+        The minimum a requirement may know about a control that satisfies it, read through
+        `ControlDirectoryPort` - never the control's own domain model (ADR-020 part 4,
+        research.md D-9).
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    FrameworkRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    FrameworkVersionRef:
+      type: object
+      required: [id, label, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        status:
+          $ref: '#/components/schemas/FrameworkVersionStatus'
+    FrameworkOrigin:
+      type: string
+      description: Whether the framework is an external standard or an internal policy (FR-001).
+      enum: [EXTERNAL_STANDARD, INTERNAL_POLICY]
+    FrameworkVersionStatus:
+      type: string
+      description: >-
+        The version's two-state, one-way lifecycle (data-model.md §2, research.md D-3). `PUBLISHED`
+        is terminal - there is no operation that reverts it.
+      enum: [DRAFT, PUBLISHED]
+    MappingMigrationOutcome:
+      type: string
+      description: >-
+        The per-target-requirement result of one mapping migration execution (data-model.md §5,
+        research.md D-6).
+      enum: [COPIED, PENDING_DECISION, SKIPPED_ALREADY_MAPPED]
+    RequirementComplianceState:
+      type: string
+      description: |
+        The requirement's derived, current compliance state (data-model.md §7, research.md D-8).
+        Computed exclusively by `RequirementComplianceService` from the requirement's applicability
+        and the effectiveness of its currently linked controls; there is no stored column and no
+        request body in this API accepts it as input.
+
+        `NOT_APPLICABLE` - an active not-applicable declaration exists (FR-016); excluded from the
+        version's compliance summary. `NOT_MET` - applicable, with zero currently linked controls
+        (FR-018) - never `COMPLIANT` by omission. `NOT_PROVEN` - applicable, with at least one
+        linked control, but none of them currently proves it: every linked control is either
+        inactive/retired or its effectiveness is `NOT_ASSESSED`, `EXPIRED` or `INEFFECTIVE`
+        (FR-019) - distinct from `NOT_MET`: there is a mapping, it just does not currently hold.
+        `PARTIALLY_MET` - applicable, with a mix of controls that currently prove it and controls
+        that do not (or a control that only partially does). `COMPLIANT` - applicable, with at
+        least one linked control and every linked control active with effectiveness `EFFECTIVE`
+        (SC-002: never compliant without an effective, attested control behind it).
+      enum: [NOT_APPLICABLE, NOT_MET, NOT_PROVEN, PARTIALLY_MET, COMPLIANT]
+    Framework:
+      type: object
+      required: [id, code, name, description, origin, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          description: >-
+            Human-readable, unique and stable for the life of the record. Server-generated; never
+            client-supplied (data-model.md §1/§10).
+          examples: ['FMK-2026-0001']
+        name:
+          type: string
+        description:
+          type: string
+        origin:
+          $ref: '#/components/schemas/FrameworkOrigin'
+        version:
+          type: integer
+          readOnly: true
+          description: Optimistic-locking version, scoped to this record.
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateFrameworkRequest:
+      type: object
+      required: [name, description, origin]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        origin:
+          $ref: '#/components/schemas/FrameworkOrigin'
+    UpdateFrameworkRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        origin:
+          $ref: '#/components/schemas/FrameworkOrigin'
+    FrameworkVersion:
+      type: object
+      required: [id, framework, label, status, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        framework:
+          $ref: '#/components/schemas/FrameworkRef'
+        label:
+          type: string
+          description: >-
+            The domain's own identifier for this revision (e.g. `"2022"`), not a generated code
+            (research.md D-14). Unique within the framework.
+        status:
+          $ref: '#/components/schemas/FrameworkVersionStatus'
+        publishedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        publishedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        version:
+          type: integer
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateFrameworkVersionRequest:
+      type: object
+      required: [label]
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+    UpdateFrameworkVersionRequest:
+      type: object
+      required: [label]
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Requirement:
+      type: object
+      description: |
+        Not split into a summary/detail pair the way `ControlSummary`/`ControlDetail` are: a
+        requirement's page size is capped at 100 like every listing in this API (never the
+        50,000-row scale that motivated truncating `Control`'s description for its catalog), and
+        truncating clause text a compliance officer or auditor needs to read in full would work
+        against the module's purpose.
+      required:
+        [id, frameworkVersion, externalRef, title, description, applicability, complianceState,
+         version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        frameworkVersion:
+          $ref: '#/components/schemas/FrameworkVersionRef'
+        externalRef:
+          type: string
+          description: The clause's own identifier in the norm (e.g. `"A.5.16"`).
+        title:
+          type: string
+        description:
+          type: string
+        applicability:
+          oneOf:
+            - $ref: '#/components/schemas/RequirementApplicabilityDeclaration'
+            - type: 'null'
+          readOnly: true
+          description: >-
+            `null` means applicable (the default, FR-015 AS1). Non-null is the currently active
+            not-applicable declaration; its own `revokedAt` is always `null` when embedded here.
+        complianceState:
+          $ref: '#/components/schemas/RequirementComplianceState'
+        version:
+          type: integer
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          description: >-
+            Changes only while the parent version is `DRAFT` (FR-004) - enforced by a database
+            trigger (data-model.md §3).
+    CreateRequirementRequest:
+      type: object
+      required: [externalRef, title, description]
+      additionalProperties: false
+      properties:
+        externalRef:
+          type: string
+          minLength: 1
+          maxLength: 100
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+    UpdateRequirementRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        externalRef:
+          type: string
+          minLength: 1
+          maxLength: 100
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+    RequirementControlLink:
+      type: object
+      description: >-
+        An explicitly modelled requirement-to-control relationship (ADR-017, ADR-020), audited with
+        its own `REQUIREMENT_CONTROL_LINK` entity type (data-model.md §4, ADR-008).
+      required: [id, control, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        control:
+          $ref: '#/components/schemas/ControlRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    LinkRequirementControlRequest:
+      type: object
+      required: [controlId]
+      additionalProperties: false
+      properties:
+        controlId:
+          type: string
+          format: uuid
+          description: >-
+            Must exist and lie inside the caller's organizational scope (ADR-020) - checked through
+            `ControlDirectoryPort`, never by a direct read of Controls' own tables (FR-024).
+    RequirementApplicabilityDeclaration:
+      type: object
+      description: >-
+        A not-applicable declaration, audited with its own `REQUIREMENT_APPLICABILITY` entity type
+        (data-model.md §6). Revoking preserves the row (research.md D-7) - it is never deleted.
+      required: [id, justification, declaredBy, declaredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        justification:
+          type: string
+          readOnly: true
+        declaredBy:
+          $ref: '#/components/schemas/UserRef'
+        declaredAt:
+          type: string
+          format: date-time
+          readOnly: true
+        revokedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        revokedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    DeclareApplicabilityRequest:
+      type: object
+      required: [justification]
+      additionalProperties: false
+      properties:
+        justification:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    ComplianceSummary:
+      type: object
+      description: >-
+        The version's calculated compliance state (FR-020), aggregated from the same
+        `RequirementComplianceState` every requirement of this version reports individually
+        (data-model.md §7, research.md D-8) - never a second rule.
+      required:
+        [frameworkVersion, totalRequirements, applicableRequirementCount, counts,
+         compliancePercentage, computedAt]
+      properties:
+        frameworkVersion:
+          $ref: '#/components/schemas/FrameworkVersionRef'
+        totalRequirements:
+          type: integer
+          minimum: 0
+          description: Every requirement of the version, applicable or not.
+        applicableRequirementCount:
+          type: integer
+          minimum: 0
+          description: '`totalRequirements` minus those with an active not-applicable declaration (FR-016).'
+        counts:
+          type: object
+          description: One count per `RequirementComplianceState`, over applicable requirements only.
+          required: [notApplicable, notMet, notProven, partiallyMet, compliant]
+          properties:
+            notApplicable:
+              type: integer
+              minimum: 0
+            notMet:
+              type: integer
+              minimum: 0
+            notProven:
+              type: integer
+              minimum: 0
+            partiallyMet:
+              type: integer
+              minimum: 0
+            compliant:
+              type: integer
+              minimum: 0
+        compliancePercentage:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 100
+          description: >-
+            `compliant / applicableRequirementCount * 100`. `null` when
+            `applicableRequirementCount` is zero - "nothing to measure", never `0` or `100`.
+        computedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Server clock at computation time. Never cached; recomputed on every call.
+    MappingMigrationCorrespondence:
+      type: object
+      description: >-
+        One decided correspondence: the target requirement's own mapping is built from the union of
+        the listed sources' active control links (research.md D-6). Decided by the compliance
+        manager; never inferred by this operation.
+      required: [targetRequirementId, sourceRequirementIds]
+      additionalProperties: false
+      properties:
+        targetRequirementId:
+          type: string
+          format: uuid
+          description: >-
+            Must belong to the target version (the path's `versionId`). May appear at most once
+            across the whole `correspondences` array.
+        sourceRequirementIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          description: Must belong to `sourceFrameworkVersionId`. The same id may repeat across entries.
+    ExecuteMappingMigrationRequest:
+      type: object
+      required: [sourceFrameworkVersionId, correspondences]
+      additionalProperties: false
+      properties:
+        sourceFrameworkVersionId:
+          type: string
+          format: uuid
+          description: >-
+            Must belong to the same framework as the target version in the path (FR-012). Need not
+            be the immediately preceding version.
+        correspondences:
+          type: array
+          items:
+            $ref: '#/components/schemas/MappingMigrationCorrespondence'
+          description: >-
+            May be empty - every requirement of the target version without its own existing mapping
+            then comes back `PENDING_DECISION` (FR-013). This is a legal, meaningful call: it is how
+            an "everything pending, decide the rest by hand" run is expressed.
+    MappingMigrationItem:
+      type: object
+      required: [targetRequirement, sourceRequirements, outcome, copiedLinkCount]
+      properties:
+        targetRequirement:
+          type: object
+          required: [id, externalRef, title]
+          properties:
+            id:
+              type: string
+              format: uuid
+            externalRef:
+              type: string
+            title:
+              type: string
+        sourceRequirements:
+          type: array
+          description: Empty when `outcome` is `PENDING_DECISION`.
+          items:
+            type: object
+            required: [id, externalRef, title]
+            properties:
+              id:
+                type: string
+                format: uuid
+              externalRef:
+                type: string
+              title:
+                type: string
+        outcome:
+          $ref: '#/components/schemas/MappingMigrationOutcome'
+        copiedLinkCount:
+          type: integer
+          minimum: 0
+          description: Number of `RequirementControlLink` rows this execution created for this target.
+    MappingMigrationSummary:
+      type: object
+      required:
+        [id, sourceFrameworkVersion, targetFrameworkVersion, executedBy, executedAt, itemCount,
+         copiedCount, pendingDecisionCount, skippedAlreadyMappedCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        sourceFrameworkVersion:
+          $ref: '#/components/schemas/FrameworkVersionRef'
+        targetFrameworkVersion:
+          $ref: '#/components/schemas/FrameworkVersionRef'
+        executedBy:
+          $ref: '#/components/schemas/UserRef'
+        executedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        itemCount:
+          type: integer
+          minimum: 0
+        copiedCount:
+          type: integer
+          minimum: 0
+        pendingDecisionCount:
+          type: integer
+          minimum: 0
+        skippedAlreadyMappedCount:
+          type: integer
+          minimum: 0
+    MappingMigrationDetail:
+      allOf:
+        - $ref: '#/components/schemas/MappingMigrationSummary'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/MappingMigrationItem'
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties - including any attempt to supply
+        `code`, `status`, `version` or `complianceState` - or omits a required header such as
+        `If-Match`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The caller may see the record but lacks the permission for this action, or the request
+        failed the cross-site request forgery origin check. A caller who lacks `compliance:view`
+        entirely receives `404`, not `403`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: |
+        No such record, or the caller lacks `compliance:view`. The two are deliberately
+        indistinguishable so the response cannot disclose the existence of a record the caller may
+        not see.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    VersionConflict:
+      description: |
+        The supplied `If-Match` version is stale - the record was modified by someone else since it
+        was read. Nothing was written; last-write-wins never occurs.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/VersionConflictProblem'
+          example:
+            type: /problems/version-conflict
+            title: The record was modified by another user
+            status: 409
+            detail: Reload the record and reapply your changes.
+            instance: /api/v1/frameworks/0193c1f6-0000-7000-8000-000000000001
+            correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+            currentVersion: 4

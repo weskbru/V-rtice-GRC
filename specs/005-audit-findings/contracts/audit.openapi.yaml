@@ -1,0 +1,1506 @@
+openapi: 3.1.0
+info:
+  title: PharosGRC - Audit & Findings API
+  version: 1.0.0
+  summary: >-
+    Audit engagements that scope an examination against a framework version, requirements and/or
+    controls; the non-manual producer of a Finding; the operation that finally makes the
+    OPEN -> IN_REMEDIATION edge reachable; and the two Finding relationships (to Control, to Risk)
+    Phase 1 deliberately deferred.
+  description: |
+    The fourth business module (ADR-016, ADR-017, ADR-020), closing the cycle
+    requirement -> control -> evidence -> finding -> action. `Finding` is **not created by this
+    document** - it already exists (`contracts/grc-foundation.openapi.yaml`, 002-shared-grc-foundation)
+    as a GRC-kernel capability. This document extends it: a non-manual producer
+    (`POST /audits/{auditId}/findings`), the operation that closes a debt named since Phase 1
+    (`POST /findings/{findingId}/start-remediation`), and the two relationships Phase 1's own spec
+    assumed prematurely and deferred (`Finding <-> Control`, `Finding <-> Risk`).
+
+    Every operation in this document is subject to two independent server-side checks (ADR-003,
+    ADR-004), named in each operation's own description:
+
+    1. the caller's `resource:action` permission - `audit-engagement:*` for the engagement and its
+       scope, `finding:*` for every Finding operation (`finding:remediate`, `finding:link` are new;
+       `finding:create`/`finding:view` are reused unchanged from 002-shared-grc-foundation -
+       research.md D-7);
+    2. the caller's resolved organizational scope, over the PRIMARY resource of the operation
+       (`AuditEngagement`, `Finding`) and, for the six write operations that reference an entity
+       owned by another module (a framework version, a requirement, a control, a risk), over that
+       REFERENCED entity too - the full five-part ADR-020 pattern, applied from this module's first
+       link rather than discovered by a later correction (research.md D-11).
+
+    **`audit-engagement`, never `audit`, is this module's permission resource and route namespace
+    is `/audits`.** A permission named `audit:*` already exists and means something else entirely -
+    read access to the platform's cross-cutting audit TRAIL (`core/audit`, `audit:view`). This
+    document never introduces a permission or a module folder that could be confused with it
+    (research.md D-7, D-15).
+
+    **Existence is not disclosed, in two different shapes depending on which side of an operation is
+    being asked about.** `AuditEngagement`/`Finding` themselves, as the PRIMARY resource of an
+    operation, are `404` when they do not exist or lie outside the caller's organizational scope -
+    the same non-disclosure shape every other module in this platform uses for its own root entity.
+    A framework version, requirement, control or risk REFERENCED by a scope or relationship write
+    (operations 6, 7, 8, 15, 18) that does not exist, is not in a linkable state, or lies outside the
+    caller's scope is instead `422`, naming the field - the shape `004-compliance-management` and the
+    2026-09-08 ADR-020 correction already establish for exactly this situation, so that a caller who
+    can create the link cannot use a `404` vs `422` split to probe for referenced records they may
+    not see through a different channel than the one FR-014/FR-015 already govern.
+
+    **A finding is never deleted, by any operation in this document or in
+    `grc-foundation.openapi.yaml`.** Archival, already the only terminal path since Phase 1, remains
+    the only one - this document adds no exception. Neither is an audit engagement, nor a scope
+    link, nor a `FindingControlLink`/`FindingRiskLink`: withdrawing the latter two stamps
+    `unlinkedAt`/`unlinkedBy` and preserves the row (FR-016); every other write here is either an
+    append or a field on the owning root record, never a row removal.
+
+    **The engagement's scope is immune to a later revision of the standard, without a second
+    snapshot mechanism.** `AddFrameworkVersionScopeRequest`/`AddRequirementScopeRequest` reference a
+    specific `FrameworkVersion`/`Requirement` row, never the version-agnostic `Framework` itself -
+    those rows are immutable once their parent version is `PUBLISHED` (enforced, for `Requirement`,
+    by a database trigger since 004-compliance-management), so pointing at the row already IS the
+    preservation FR-006 requires (research.md D-2). A framework version must itself be `PUBLISHED`
+    before it - or a requirement inside it - may be added to any engagement's scope; a still-`DRAFT`
+    version is refused with `422`, because auditing a standard that can still change underneath the
+    engagement would defeat the very guarantee this paragraph describes.
+
+    **Closing a finding now requires evidence, additively.** `closeFinding` itself is not redefined
+    in this document (it belongs to `grc-foundation.openapi.yaml`), but its enforced precondition
+    changes: on top of the rule already in force since Phase 1 (a completed linked action OR a
+    written justification), closing now ALSO requires at least one active `Evidence` link on the
+    finding (any evidence status, including `ARCHIVED` - only the total absence of a link refuses,
+    FR-010, research.md D-6). This is a real behavior change to an operation this document does not
+    itself define, reported here because it is the reason `POST /findings/{findingId}/start-remediation`
+    and the two relationship endpoints below exist in the same phase as the rule that makes them
+    matter.
+
+    **Optimistic locking is scoped to `AuditEngagement` alone.** It is a new root entity and carries
+    `version`/`ETag`/`If-Match` like every root entity introduced since Controls Management (Phase
+    2). `Finding` predates that convention and was never retrofitted with it (no `version` column
+    exists on `findings`) - the operations this document adds to `Finding`
+    (`start-remediation`, the two relationship endpoints) follow `Finding`'s own existing shape
+    instead, relying on its transition table and invariants for write safety, exactly like
+    `closeFinding`/`reopenFinding`/`archiveFinding` already do (research.md D-18). Mixing the two
+    conventions within the SAME entity would be more confusing than consistently having neither.
+
+    **No response in this document computes state at read time.** Every property below is a plain
+    column, written by a prior explicit request - never a value joined or aggregated fresh on this
+    particular `GET`. No operation in this document declares `Cache-Control: no-store`, and none is
+    silently exempt from the requirement: the condition that would trigger it (a body containing
+    state derived fresh at read time, the defect `004-compliance-management` shipped and fixed on
+    2026-09-08) does not occur anywhere in this module (research.md D-14).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Audit Engagement
+    description: The engagement itself and its lifecycle (US1, FR-001-FR-004).
+  - name: Audit Scope
+    description: >-
+      What an engagement examines - a framework version, requirements and/or controls, by explicit
+      named links that survive a later revision of the standard (US1, FR-005-FR-006, research.md D-2).
+  - name: Findings from Engagement
+    description: The engagement's own producer of findings, and their listing (US2, FR-007-FR-008).
+  - name: Finding Remediation
+    description: >-
+      The operation that finally makes OPEN -> IN_REMEDIATION reachable - a debt named since Phase 1
+      (US2, FR-009, research.md D-10).
+  - name: Finding Relationships
+    description: >-
+      Finding <-> Control and Finding <-> Risk - the two relationships Phase 1's own spec assumed
+      and deferred (US3, FR-013-FR-016).
+security:
+  - session: []
+paths:
+  /audits:
+    get:
+      operationId: listAuditEngagements
+      summary: List audit engagements
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:view`. Scoped to the caller's organizational scope
+        (`ScopeResolverService`) - an engagement outside it is simply absent from the page, never
+        disclosed by count or otherwise.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AuditEngagementStatus'
+        - name: orgUnitId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: leadAuditorUserId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [code, periodStart, updatedAt]
+            default: code
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: A page of audit engagements.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEngagement'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createAuditEngagement
+      summary: Open an audit engagement
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:create` and scope over `orgUnitId`. The server assigns the
+        unique, human-readable `code` (`AUD-` prefix, `GrcCodeSequence`, data-model.md §1/§8), never
+        client-supplied; `version` is likewise server-owned. Created in `PLANNING`
+        (`status`, `startedAt`, `completedAt` and their `*By` companions are not accepted - all four
+        are rejected as unknown properties). Audited (`audit_engagement.created`) with the new
+        values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAuditEngagementRequest'
+      responses:
+        '201':
+          description: Engagement created, in `PLANNING`.
+          headers:
+            Location:
+              schema: { type: string, format: uri-reference }
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEngagement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: >-
+            `periodEnd` is earlier than `periodStart`, or `orgUnitId`/`leadAuditorUserId` does not
+            resolve.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    get:
+      operationId: getAuditEngagement
+      summary: Read one audit engagement
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:view` and scope. The `ETag` carries the engagement's `version`
+        and must be echoed in `If-Match` on `PATCH`/`start`/`complete` below.
+      responses:
+        '200':
+          description: The engagement.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEngagement'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateAuditEngagement
+      summary: Edit an engagement's descriptive fields
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:edit` and scope. Permitted only while `status = PLANNING`
+        (research.md D-3, D-13 - inferred by precedent from every other root entity's own
+        draft-editable rule, not traced to a literal FR); refused with `422` once `IN_PROGRESS` or
+        `COMPLETED`. `code`, `status`, `startedAt`/`startedBy`, `completedAt`/`completedBy` and
+        `version` are read-only and rejected as unknown properties. Each changed field's previous
+        and new value is written to the audit trail (`audit_engagement.updated`). `If-Match` is
+        required; a stale version yields `409` and nothing is written.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAuditEngagementRequest'
+      responses:
+        '200':
+          description: Updated engagement.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEngagement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: The engagement is not in `PLANNING`, or `periodEnd` is earlier than `periodStart`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/scope:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    get:
+      operationId: listAuditScope
+      summary: List everything an engagement's scope covers
+      tags: [Audit Scope]
+      description: |
+        Requires `audit-engagement:view` and scope over the engagement. Returns the union of all
+        three scope link kinds (framework version, requirement, control), newest first. Not
+        paginated - an engagement's scope is bounded by what a human explicitly added, the same
+        reasoning `listControlRiskLinks` already relies on for an unpaginated array response.
+      responses:
+        '200':
+          description: The engagement's scope.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditScopeEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /audits/{auditId}/scope/framework-versions:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    post:
+      operationId: addFrameworkVersionToScope
+      summary: Add a published framework version to the engagement's scope
+      tags: [Audit Scope]
+      description: |
+        Requires `audit-engagement:scope` on the engagement AND `compliance:view` on the referenced
+        framework version (ADR-020 part 5, applied from this module's first link - research.md
+        D-11). The version must be `PUBLISHED`; a `DRAFT` version, or one that does not exist, is
+        `422` naming `frameworkVersionId` - indistinguishable (research.md D-2). Permitted only
+        while the engagement is `PLANNING` (research.md D-3). No unlink operation exists for this
+        link (research.md D-12) - a mistaken entry is corrected by adding the right one, never by
+        removing the wrong one. Audited (`audit_scope_framework_version.linked`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFrameworkVersionScopeRequest'
+      responses:
+        '201':
+          description: Scope link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditScopeEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: This framework version is already in the engagement's scope.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: >-
+            The framework version does not exist, is not `PUBLISHED`, or the engagement is not
+            `PLANNING` - all answered the same way, naming the offending field.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/scope/requirements:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    post:
+      operationId: addRequirementToScope
+      summary: Add a requirement to the engagement's scope
+      tags: [Audit Scope]
+      description: |
+        Requires `audit-engagement:scope` on the engagement AND `compliance:view` on the referenced
+        requirement. The requirement's own framework version must be `PUBLISHED` - same rule as
+        `addFrameworkVersionToScope`, checked transitively. Otherwise identical in shape to
+        `addFrameworkVersionToScope` above: `PLANNING`-only, no unlink, `422` naming
+        `requirementId` for nonexistent/unpublished-parent/wrong-state, `409` for a duplicate.
+        Audited (`audit_scope_requirement.linked`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRequirementScopeRequest'
+      responses:
+        '201':
+          description: Scope link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditScopeEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: This requirement is already in the engagement's scope.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: >-
+            The requirement does not exist, its framework version is not `PUBLISHED`, or the
+            engagement is not `PLANNING`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/scope/controls:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    post:
+      operationId: addControlToScope
+      summary: Add a control to the engagement's scope
+      tags: [Audit Scope]
+      description: |
+        Requires `audit-engagement:scope` on the engagement AND `control:view` on the referenced
+        control (ADR-020 part 5). Reuses `ControlDirectoryPort` unchanged - the same boundary port
+        `modules/risk`/`modules/compliance` already depend on. The control must exist, be `ACTIVE`,
+        and its organizational unit must lie within the caller's resolved scope - checked and
+        recorded BEFORE any write (ADR-020 part 4, research.md D-11); a control failing any of the
+        three is `422` naming `controlId`, indistinguishable from one that does not exist.
+        Otherwise identical in shape to the two operations above: `PLANNING`-only, no unlink, `409`
+        for a duplicate. Audited (`audit_scope_control.linked`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddControlScopeRequest'
+      responses:
+        '201':
+          description: Scope link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditScopeEntry'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: This control is already in the engagement's scope.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: >-
+            The control does not exist, is not `ACTIVE`, lies outside the caller's organizational
+            scope, or the engagement is not `PLANNING` - four causes, one indistinguishable
+            response (ADR-020, "Verificação em código - 2026-09-08 (correção 2)").
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/start:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    post:
+      operationId: startAuditEngagement
+      summary: Start the engagement's fieldwork
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:transition` and scope. `PLANNING -> IN_PROGRESS`
+        (research.md D-3). Refused with `422` when the engagement has no scope link of any of the
+        three kinds (FR-003) - `COUNT(*)` across all three scope tables, summed, must be greater
+        than zero. `If-Match` is required; `startedAt`/`startedByUserId` are stamped together.
+        Audited (`audit_engagement.started`, previous/new `status`).
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Engagement started.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEngagement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: The engagement is not `PLANNING`, or has no scope link of any kind.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    post:
+      operationId: completeAuditEngagement
+      summary: Conclude the engagement
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:transition` and scope. `IN_PROGRESS -> COMPLETED`, terminal
+        (research.md D-3). A completed engagement never accepts a new finding again (FR-004) - the
+        only enforcement of that rule is `createFindingFromEngagement`'s own precondition below,
+        never a state this operation itself needs to check further. `If-Match` is required;
+        `completedAt`/`completedByUserId` are stamped together. Audited
+        (`audit_engagement.completed`, previous/new `status`).
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Engagement completed.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEngagement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: The engagement is not `IN_PROGRESS`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    post:
+      operationId: cancelAuditEngagement
+      summary: Discard the engagement (FR-004a)
+      tags: [Audit Engagement]
+      description: |
+        Requires `audit-engagement:transition` and scope. `PLANNING -> CANCELLED` or
+        `IN_PROGRESS -> CANCELLED`, terminal (research.md D-3, amended by FR-004a at the analysis
+        gate). Added because a `PLANNING` engagement that cannot start (no scope, FR-003) and has
+        no delete operation would otherwise be stuck forever - the same unreachable-state defect
+        `FindingStatus` and `ControlStatus.DRAFT` each shipped with once already. Requires a
+        non-empty `justification` in the request body; refused with `422` when absent or blank.
+        Never reachable from `COMPLETED` (already terminal). `If-Match` is required;
+        `cancelledAt`/`cancelledByUserId`/`cancellationJustification` are stamped together.
+        Audited (`audit_engagement.cancelled`, previous/new `status`). The engagement remains fully
+        legible afterward, the same guarantee `completeAuditEngagement` gives `COMPLETED` -
+        `CANCELLED` is not an opaque state either.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelAuditEngagementRequest'
+      responses:
+        '200':
+          description: Engagement cancelled.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEngagement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: The engagement is already `COMPLETED`/`CANCELLED`, or `justification` is empty.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audits/{auditId}/findings:
+    parameters:
+      - $ref: '#/components/parameters/AuditId'
+    get:
+      operationId: listAuditEngagementFindings
+      summary: List the findings this engagement produced
+      tags: [Findings from Engagement]
+      description: |
+        Requires `audit-engagement:view` and scope over the engagement (`finding:view` is NOT
+        additionally required - the engagement's own scope already gates visibility of what it
+        produced, the same reasoning `getControlLifecycle` gives for not re-requiring `risk:view`
+        on a risk-scoped read elsewhere in this platform). Filters `findings` by
+        `auditEngagementId`, newest first - SC-001's own "o engajamento lista os achados que
+        produziu".
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/FindingStatus' }
+      responses:
+        '200':
+          description: A page of findings produced by this engagement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FindingSummary'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createFindingFromEngagement
+      summary: Record a finding from this engagement
+      tags: [Findings from Engagement]
+      description: |
+        Requires `finding:create` and `audit-engagement:view` (the caller must be able to see the
+        engagement they are recording a finding for), scope over the engagement. Permitted only
+        while the engagement is `IN_PROGRESS` (FR-007) - `PLANNING`, `COMPLETED` and `CANCELLED`
+        all refuse with `422` (a completed OR cancelled engagement never accepts a new finding,
+        FR-004 - an engagement that never happened produces no findings either). `orgUnitId` is NOT
+        accepted in the request body - it is derived server-side from the engagement's own
+        `orgUnitId`, so a finding produced by an engagement can never diverge from the unit being
+        examined. `auditEngagementId` is stamped on the created finding, making its origin visible
+        on the finding itself (SC-001) - this is the field the manual `POST /findings` path in
+        `grc-foundation.openapi.yaml` never sets, leaving it `null` (FR-008: the manual path stays
+        fully valid, unchanged). Created in `OPEN` - the same status every finding starts in,
+        manual or produced. Audited (`finding.created`, with `auditEngagementId` in `newValues`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFindingFromEngagementRequest'
+      responses:
+        '201':
+          description: Finding created, in `OPEN`, linked to this engagement.
+          headers:
+            Location:
+              schema: { type: string, format: uri-reference }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The engagement is not `IN_PROGRESS`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /findings/{findingId}/start-remediation:
+    parameters:
+      - $ref: '#/components/parameters/FindingId'
+    post:
+      operationId: startFindingRemediation
+      summary: Move a finding from OPEN to IN_REMEDIATION
+      tags: [Finding Remediation]
+      description: |
+        Requires `finding:remediate`. Legal only from `OPEN` (`finding.entity.ts`'s own transition
+        table already declares this edge - `LEGAL_TRANSITIONS.OPEN` includes `IN_REMEDIATION`; this
+        operation is the first, and only, caller in this codebase to ever request that specific
+        transition - research.md D-10). A finding already `IN_REMEDIATION`, `CLOSED` or `ARCHIVED`
+        is refused with `422`; reopening a closed finding is a different operation
+        (`reopenFinding`, `grc-foundation.openapi.yaml`) with its own precondition and reason
+        requirement, not this one. No request body - no reason or note is required to begin
+        remediation (unlike reopening, which reverses a closure and therefore does need one).
+        Audited (`finding.remediation_started`, previous/new `status`). This is SC-002's own proof
+        surface: a test that calls exactly this operation on an `OPEN` finding and observes
+        `IN_REMEDIATION` is the "operação real" the criterion requires - not a re-reading of the
+        transition table.
+      responses:
+        '200':
+          description: Finding moved to `IN_REMEDIATION`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The finding is not `OPEN`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /findings/{findingId}/controls:
+    parameters:
+      - $ref: '#/components/parameters/FindingId'
+    get:
+      operationId: listFindingControlLinks
+      summary: List the controls this finding points to
+      tags: [Finding Relationships]
+      description: |
+        Requires `finding:view` and scope over the finding. Not paginated - bounded by what an
+        auditor explicitly linked, the same reasoning `listAuditScope` above and
+        `listControlRiskLinks` (`003-controls-management`) already rely on. `includeWithdrawn`
+        also returns links withdrawn earlier, with who withdrew them and when.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: The controls this finding points to.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FindingControlLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkFindingToControl
+      summary: Link a finding to a control it points to
+      tags: [Finding Relationships]
+      description: |
+        Requires `finding:link` on the finding AND `control:view` on the referenced control
+        (ADR-020 part 5, applied from this pair's first link - not discovered later, unlike the two
+        prior pairs' own history in the ADR). The control must exist, be `ACTIVE`, and its
+        organizational unit must lie within the caller's resolved scope, checked and recorded
+        BEFORE any write via `ControlDirectoryPort` (ADR-020 part 4) - any of the three failing is
+        `422` naming `controlId`, indistinguishable from a nonexistent control. The finding must not
+        be `ARCHIVED` (the same rule `updateFinding` already enforces, applied here - research.md
+        D-4). A retired control linked to an open finding is not refused at read time afterward -
+        only the write-time state matters (spec's own edge case: "Controle aposentado ligado a
+        achado aberto. O vínculo permanece"). Audited (`finding_control_link.linked`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFindingControlLinkRequest'
+      responses:
+        '201':
+          description: Link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingControlLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: This control is already actively linked to this finding.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: >-
+            The control does not exist, is not `ACTIVE`, lies outside the caller's organizational
+            scope, or the finding is `ARCHIVED`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /findings/{findingId}/controls/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/FindingId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkFindingFromControl
+      summary: Withdraw a finding-control link
+      tags: [Finding Relationships]
+      description: |
+        Requires `finding:link`. Does NOT re-check `control:view` - the control behind `linkId` was
+        already fully disclosed (id, code, name) by `listFindingControlLinks`, which the caller must
+        already have read under `finding:view` to obtain that `linkId` (the same exemption
+        `UnlinkControlUseCase`/`UnlinkRequirementFromControlUseCase` already document in ADR-020's
+        own 2026-09-08 correction). Stamps `unlinkedAt`/`unlinkedByUserId`; the row is preserved,
+        never deleted (FR-016). Audited (`finding_control_link.unlinked`).
+      responses:
+        '200':
+          description: Link withdrawn.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingControlLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: This link was already withdrawn.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /findings/{findingId}/risks:
+    parameters:
+      - $ref: '#/components/parameters/FindingId'
+    get:
+      operationId: listFindingRiskLinks
+      summary: List the risks this finding points to
+      tags: [Finding Relationships]
+      description: |
+        Requires `finding:view` and scope over the finding. Same shape as `listFindingControlLinks`
+        above, against `Risk` instead of `Control`.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: The risks this finding points to.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FindingRiskLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkFindingToRisk
+      summary: Link a finding to a risk it materializes
+      tags: [Finding Relationships]
+      description: |
+        Requires `finding:link` on the finding AND `risk:view` on the referenced risk (ADR-020 part
+        5). The risk must exist and not be `ARCHIVED`, and its organizational unit must lie within
+        the caller's resolved scope, checked and recorded BEFORE any write via the new
+        `RiskDirectoryPort` (ADR-020 part 4, research.md D-4) - any of the three failing is `422`
+        naming `riskId`, indistinguishable from a nonexistent risk. The finding must not be
+        `ARCHIVED`. Linking makes the finding visible from the risk side too (US3 AS2) through a
+        route this document does not itself define - see research.md D-16 for the reciprocal
+        read port this creates a need for, deferred to whichever future change touches the Risk
+        module's own contract. Audited (`finding_risk_link.linked`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFindingRiskLinkRequest'
+      responses:
+        '201':
+          description: Link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingRiskLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: This risk is already actively linked to this finding.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: >-
+            The risk does not exist, is `ARCHIVED`, lies outside the caller's organizational scope,
+            or the finding is `ARCHIVED`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /findings/{findingId}/risks/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/FindingId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkFindingFromRisk
+      summary: Withdraw a finding-risk link
+      tags: [Finding Relationships]
+      description: |
+        Requires `finding:link`. Does NOT re-check `risk:view`, the same exemption
+        `unlinkFindingFromControl` documents above. Stamps `unlinkedAt`/`unlinkedByUserId`; the row
+        is preserved, never deleted (FR-016). Audited (`finding_risk_link.unlinked`).
+      responses:
+        '200':
+          description: Link withdrawn.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FindingRiskLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: This link was already withdrawn.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: pgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  headers:
+    ETag:
+      description: |
+        The resource's optimistic-locking `version` as an entity tag, for example `"2"`. Applies
+        only to `AuditEngagement` responses (research.md D-18) - echo it in `If-Match` on the
+        corresponding `PATCH`/`start`/`complete`.
+      schema:
+        type: string
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    AuditId:
+      name: auditId
+      in: path
+      required: true
+      description: The `AuditEngagement` identifier.
+      schema:
+        type: string
+        format: uuid
+    FindingId:
+      name: findingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LinkId:
+      name: linkId
+      in: path
+      required: true
+      description: >-
+        Identifier of the `FindingControlLink`/`FindingRiskLink` row, not of the linked control or
+        risk.
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: |
+        The engagement's `version` last read, as an entity tag, for example `"2"`. A missing or
+        malformed header is `400`; a stale value is `409` and nothing is written.
+      schema:
+        type: string
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Never contains a stack trace, SQL fragment or internal identifier.
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field: { type: string }
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message: { type: string }
+    VersionConflictProblem:
+      description: |
+        Problem document returned when the supplied `If-Match` version is not the current one. The
+        write was not applied; the client reloads, re-applies its edits and retries.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [currentVersion]
+          properties:
+            currentVersion:
+              type: integer
+              description: The engagement's current `version`, to be echoed in the retried `If-Match`.
+            modifiedAt:
+              type: string
+              format: date-time
+            modifiedBy:
+              $ref: '#/components/schemas/UserRef'
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+    OrgUnitRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    ControlRef:
+      type: object
+      description: >-
+        The minimal, read-only projection of a `Control` this API ever shows (ADR-020 part 4) - id,
+        code and name only, never status, owner or effectiveness. Mirrors `ControlRiskLink`'s own
+        embedded control reference in `003-controls-management`'s contract.
+      required: [id, code, name]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+    RiskRef:
+      type: object
+      description: The minimal, read-only projection of a `Risk` this API ever shows (ADR-020 part 4).
+      required: [id, code, title]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        title: { type: string }
+    AuditEngagementStatus:
+      type: string
+      description: >-
+        Four states, four forward edges, no way back (research.md D-3, AMENDED by FR-004a at the
+        analysis gate - the original three-state design is superseded). `PLANNING` - editable,
+        scopeable, cannot receive findings; may advance to `IN_PROGRESS` (once scoped) or be
+        discarded to `CANCELLED`. `IN_PROGRESS` - fixed scope and terms, accepts findings; may
+        advance to `COMPLETED` or be discarded to `CANCELLED`. `COMPLETED` - terminal, fully
+        legible, accepts nothing new. `CANCELLED` - terminal, fully legible, accepts nothing new;
+        reachable from `PLANNING` or `IN_PROGRESS`, always carrying a written justification
+        (`cancellationJustification`). Without `CANCELLED`, an engagement opened by mistake - or
+        abandoned before it has scope - could neither advance (starting requires scope, FR-003) nor
+        be removed (no delete operation exists anywhere in this contract, SC-005): the exact
+        unreachable-state defect `FindingStatus` and `ControlStatus.DRAFT` each shipped with once
+        already.
+      enum: [PLANNING, IN_PROGRESS, COMPLETED, CANCELLED]
+    FindingStatus:
+      type: string
+      description: >-
+        Mirrors `grc-foundation.openapi.yaml`'s own `FindingStatus` exactly - duplicated here
+        because this document does not cross-reference another phase's contract file (no precedent
+        for that in this codebase - `003`/`004` each define their own local copies of referenced
+        enums/summaries instead). Not redefined in meaning, only in file.
+      enum: [OPEN, IN_REMEDIATION, CLOSED, ARCHIVED]
+    AuditScopeTargetType:
+      type: string
+      enum: [FRAMEWORK_VERSION, REQUIREMENT, CONTROL]
+    AuditScopeTargetRef:
+      type: object
+      description: >-
+        A minimal, precomputed label for the scoped target - `FrameworkVersion.label`,
+        `Requirement`'s `"{externalRef} — {title}"`, or `Control`'s `"{code} — {name}"`, depending on
+        `targetType`. Never the referenced entity's own full domain shape (ADR-020 part 4).
+      required: [id, label]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+    AuditScopeEntry:
+      type: object
+      required: [id, targetType, target, linkedAt, linkedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        targetType:
+          $ref: '#/components/schemas/AuditScopeTargetType'
+        target:
+          $ref: '#/components/schemas/AuditScopeTargetRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+    AddFrameworkVersionScopeRequest:
+      type: object
+      required: [frameworkVersionId]
+      additionalProperties: false
+      properties:
+        frameworkVersionId: { type: string, format: uuid }
+    AddRequirementScopeRequest:
+      type: object
+      required: [requirementId]
+      additionalProperties: false
+      properties:
+        requirementId: { type: string, format: uuid }
+    AddControlScopeRequest:
+      type: object
+      required: [controlId]
+      additionalProperties: false
+      properties:
+        controlId: { type: string, format: uuid }
+    AuditEngagement:
+      type: object
+      required:
+        [id, code, objective, periodStart, periodEnd, orgUnit, leadAuditor, status, version,
+         createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          description: Human-readable, unique and stable for the life of the record. Server-generated.
+          examples: ['AUD-2026-0001']
+        objective:
+          type: string
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        orgUnit:
+          $ref: '#/components/schemas/OrgUnitRef'
+        leadAuditor:
+          $ref: '#/components/schemas/UserRef'
+        status:
+          $ref: '#/components/schemas/AuditEngagementStatus'
+        startedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        startedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        completedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        cancelledAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+          description: FR-004a. Set only when `status` is `CANCELLED`.
+        cancelledBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        cancellationJustification:
+          type: [string, 'null']
+          readOnly: true
+          description: >-
+            FR-004a. The written justification supplied to `cancelAuditEngagement`. Null unless
+            `status` is `CANCELLED`.
+        version:
+          type: integer
+          readOnly: true
+          description: Optimistic-locking version, scoped to this record (research.md D-18).
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateAuditEngagementRequest:
+      type: object
+      required: [objective, periodStart, periodEnd, orgUnitId, leadAuditorUserId]
+      additionalProperties: false
+      properties:
+        objective:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        orgUnitId:
+          type: string
+          format: uuid
+        leadAuditorUserId:
+          type: string
+          format: uuid
+    UpdateAuditEngagementRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        objective:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        orgUnitId:
+          type: string
+          format: uuid
+        leadAuditorUserId:
+          type: string
+          format: uuid
+    CancelAuditEngagementRequest:
+      type: object
+      description: FR-004a - the discard path's own request body.
+      required: [justification]
+      additionalProperties: false
+      properties:
+        justification:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    FindingCategory:
+      type: string
+      enum: [NONCONFORMITY, CONTROL_DEFICIENCY, OBSERVATION, IMPROVEMENT_OPPORTUNITY]
+    FindingOrigin:
+      type: string
+      description: >-
+        Unchanged since Phase 1 - three values, none of them "produced by an engagement"
+        (research.md D-5). Which engagement produced a finding is carried by the separate
+        `auditEngagementId` field below, not by this classification.
+      enum: [INTERNAL_ASSESSMENT, CONTROL_TESTING, MANAGEMENT_REVIEW]
+    FindingSeverity:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    FindingPriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, URGENT]
+    FindingSummary:
+      type: object
+      description: >-
+        A purpose-fit projection of `Finding` for this document's own operations - not the
+        exhaustive shape `grc-foundation.openapi.yaml`'s own `Finding` schema owns (that file is not
+        edited by this document; no cross-file `$ref` is used, matching the precedent every prior
+        phase's contract already sets of a local, minimal copy for a resource owned elsewhere).
+      required:
+        [id, code, title, category, origin, severity, priority, owner, status, auditEngagementId,
+         identifiedOn, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          examples: ['FND-2026-0001']
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/FindingCategory'
+        origin:
+          $ref: '#/components/schemas/FindingOrigin'
+        severity:
+          $ref: '#/components/schemas/FindingSeverity'
+        priority:
+          $ref: '#/components/schemas/FindingPriority'
+        owner:
+          $ref: '#/components/schemas/UserRef'
+        status:
+          $ref: '#/components/schemas/FindingStatus'
+        auditEngagementId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+          description: >-
+            Null for a finding recorded manually (`POST /findings`, FR-008); set, and never
+            changeable afterward, for one produced by `createFindingFromEngagement` (SC-001).
+        identifiedOn:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateFindingFromEngagementRequest:
+      type: object
+      description: >-
+        Same fields as `grc-foundation.openapi.yaml`'s own `CreateFindingRequest`, minus
+        `orgUnitId` - deliberately absent, never accepted here, because it is derived server-side
+        from the engagement's own `orgUnitId` (a finding produced by an engagement can never
+        diverge from the unit being examined).
+      required:
+        [title, description, category, origin, severity, priority, ownerUserId, identifiedOn]
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 8000
+        recommendation:
+          type: string
+          maxLength: 4000
+        category:
+          $ref: '#/components/schemas/FindingCategory'
+        origin:
+          $ref: '#/components/schemas/FindingOrigin'
+        severity:
+          $ref: '#/components/schemas/FindingSeverity'
+        priority:
+          $ref: '#/components/schemas/FindingPriority'
+        ownerUserId:
+          type: string
+          format: uuid
+        identifiedOn:
+          type: string
+          format: date
+    FindingControlLink:
+      type: object
+      required: [id, control, linkedAt, linkedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        control:
+          $ref: '#/components/schemas/ControlRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+    CreateFindingControlLinkRequest:
+      type: object
+      required: [controlId]
+      additionalProperties: false
+      properties:
+        controlId: { type: string, format: uuid }
+    FindingRiskLink:
+      type: object
+      required: [id, risk, linkedAt, linkedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        risk:
+          $ref: '#/components/schemas/RiskRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+    CreateFindingRiskLinkRequest:
+      type: object
+      required: [riskId]
+      additionalProperties: false
+      properties:
+        riskId: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties - including any attempt to supply
+        `code`, `status`, `version`, `orgUnitId` (on the engagement-scoped finding producer) or any
+        other read-only/derived field - or omits a required header such as `If-Match`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: |
+        The caller may see the record but lacks the permission for this action, or the request
+        failed the cross-site request forgery origin check. A caller who lacks the relevant `*:view`
+        permission entirely receives `404`, not `403`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: |
+        No such record, or the record lies outside the caller's organizational scope. The two are
+        deliberately indistinguishable so the response cannot disclose the existence of a record the
+        caller may not see (SC-006).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    VersionConflict:
+      description: |
+        The supplied `If-Match` version is stale - the engagement was modified by someone else since
+        it was read. Nothing was written; last-write-wins never occurs.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/VersionConflictProblem'
+          example:
+            type: /problems/version-conflict
+            title: The record was modified by another user
+            status: 409
+            detail: Reload the record and reapply your changes.
+            instance: /api/v1/audits/0193c1f6-0000-7000-8000-000000000001
+            correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+            currentVersion: 2

@@ -1,0 +1,1657 @@
+openapi: 3.1.0
+info:
+  title: PharosGRC - Control Management API
+  version: 1.0.0
+  summary: >-
+    Control catalog and lifecycle, immutable effectiveness assessments with segregated attestation,
+    and the explicit relationships from a control to the risks it treats, and to processes and
+    assets.
+  description: |
+    The second business module, promoting the minimal `Control` registry introduced in Fase 1 to a
+    full domain (ADR-016, ADR-017). Every operation in this document is subject to two independent
+    server-side checks (FR-007, FR-025, ADR-003, ADR-004):
+
+    1. the caller's `resource:action` permission, named in each operation's description;
+    2. the caller's resolved organizational scope, applied as a mandatory predicate in the
+       repository layer on every read and every write.
+
+    **Existence is not disclosed.** A control outside the caller's organizational scope, and a
+    control the caller may not view, are both answered with `404` - never `403` - so the response
+    cannot be used to probe for records (FR-007). The same rule applies to a linked process, asset
+    or risk reached through this document: an identifier outside the caller's scope answers exactly
+    as a nonexistent one would (FR-025). `403` is reserved for a caller who can see the record but
+    lacks the permission for the specific action, and for the cross-site request forgery origin
+    check.
+
+    **Derived values are read-only.** `effectiveness` is computed exclusively by
+    `ControlEffectivenessService` from the control's attested assessment history and its declared
+    frequency (data-model.md §3, FR-012). There is no column for it and no request body in this
+    document accepts it; a supplied `effectiveness` is rejected as an unknown property by the
+    global validation pipe, exactly as `code`, `status` and `version` are.
+
+    **Optimistic locking is scoped to the control's own row.** `PATCH /controls/{controlId}` and
+    `POST /controls/{controlId}/transitions` write directly to the versioned `controls` row and
+    require the `If-Match` header carrying the `version` last read, returned as the `ETag` of
+    `GET /controls/{controlId}`; a stale version yields `409` with the current version in the
+    problem document, and the write is not applied. Assessments, attestations and the process/asset
+    links are independent, separately-keyed rows that never write to `controls.version` - none of
+    the operations that create or withdraw them carries `If-Match`, and a genuine conflict on those
+    (an already-active link, an already-decided attestation) is reported as an ordinary `409`
+    without a version.
+
+    **History is never overwritten.** An assessment is immutable: there is deliberately no update
+    and no delete operation for one (FR-010) - a new assessment succeeds the previous one, and both
+    remain individually legible. Withdrawing a process or asset link stamps who withdrew it and
+    when; the row is preserved, never deleted (FR-023). There is deliberately no
+    `DELETE /controls/{controlId}` - a retired control stays fully legible (FR-006).
+
+    **The risk relationship is read-only here, by design.** `RiskControlLink` is owned by the Risk
+    module and is created and withdrawn from the risk side (`POST/DELETE /risks/{riskId}/controls`
+    in the Risk Management API). `GET /controls/{controlId}/risks` only reads it, through the
+    `ControlDirectoryPort` boundary defined by ADR-020 - there is deliberately no
+    `POST`/`DELETE /controls/{controlId}/risks` in this document (FR-021).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Control Catalog
+    description: Listing, searching and filtering the control catalog at scale (US1).
+  - name: Control Record
+    description: Creating and maintaining a control's descriptive and ownership data (US1).
+  - name: Control Lifecycle
+    description: State transitions across the control's life cycle (US1, D-6).
+  - name: Control Assessment
+    description: >-
+      Effectiveness verification, immutable once recorded, and its attestation by a segregated
+      actor (US2).
+  - name: Control Relationships
+    description: >-
+      Explicit links from a control to the risks it treats, and to processes and assets (US3,
+      ADR-020).
+security:
+  - session: []
+paths:
+  /controls:
+    get:
+      operationId: listControlCatalog
+      summary: List the control catalog
+      tags: [Control Catalog]
+      description: |
+        Requires `control:view`. Returns a page of controls restricted to the caller's authorized
+        organizational scope; controls outside it are neither listed nor counted (FR-007).
+
+        All filters combine with AND. Ordering is by the requested `sort` field with `code` as the
+        tiebreaker, so paging is stable across requests. `effectiveness` is the value derived by
+        `ControlEffectivenessService` (data-model.md §3) - filtering and sorting by it use the SQL
+        expression kept in parity with that service, never a stored column (D-2).
+
+        Each row carries `effectiveness` and `status` as named values, not colour alone, so the
+        catalog can distinguish a control that is `NOT_ASSESSED` from one that is `EXPIRED` from
+        one that has never left `DRAFT`. An empty `data` array with `meta.total` of zero and no
+        filters applied means no controls exist; with filters applied it means no matches.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          description: Text search across control code and name.
+          schema:
+            type: string
+            maxLength: 200
+        - name: status
+          in: query
+          description: Lifecycle statuses to include. Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ControlStatus'
+        - name: effectiveness
+          in: query
+          description: >-
+            Derived effectiveness values to include (data-model.md §3). Comma-separated. Evaluated
+            by the same expression `ControlEffectivenessService` uses, never a cached flag.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ControlEffectiveness'
+        - name: nature
+          in: query
+          description: Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ControlNature'
+        - name: type
+          in: query
+          description: Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ControlType'
+        - name: frequency
+          in: query
+          description: >-
+            Comma-separated. A control with no declared frequency is excluded by every value of
+            this filter (FR-015) - it has no position on any frequency axis.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ControlFrequency'
+        - name: orgUnitId
+          in: query
+          description: >-
+            Organizational units to include. Comma-separated. Always intersected with the caller's
+            authorized scope - it narrows, never widens.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: ownerUserId
+          in: query
+          description: Control owners to include. Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: sort
+          in: query
+          description: >-
+            Sort field. Deliberately limited to fields the repository can order by without a
+            client-side pass: `nature`, `type` and `frequency` are filterable above but not
+            offered here.
+          schema:
+            type: string
+            enum: [code, name, status, effectiveness, owner, updatedAt]
+            default: code
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: A page of the catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlSummary'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createControl
+      summary: Create a control
+      tags: [Control Record]
+      description: |
+        Requires `control:create`. The control is created in `DRAFT` and may be incomplete: `owner`
+        is not required at creation, only to leave `DRAFT` (FR-005, edge case "controle sem dono").
+        `nature`, `type` and `frequency` are likewise optional at creation.
+
+        The server assigns the unique, human-readable `code` (`CTL-` prefix, `GrcCodeSequence`,
+        data-model.md §1), which is stable for the life of the record and is never client-supplied.
+        `status`, `version` and `effectiveness` are likewise server-owned and rejected as unknown
+        properties if supplied.
+
+        Creation into an organizational unit outside the caller's authorized scope is refused with
+        `422`. Creation is audited with the new values (`control.created`, FR-030).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateControlRequest'
+      responses:
+        '201':
+          description: Control created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: >-
+            Server-side validation failed: the target organizational unit does not exist, is
+            inactive, or lies outside the caller's scope; or the supplied owner does not belong to
+            the organizational line of `orgUnitId` (FR-008). Field-level entries are returned in
+            `errors[]`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    get:
+      operationId: getControl
+      summary: Retrieve a control
+      tags: [Control Record]
+      description: |
+        Requires `control:view` and the control must be inside the caller's authorized
+        organizational scope; otherwise `404` (FR-007). A control registered before this fase is
+        returned with whichever new attributes it has, and `null` for those it does not - never an
+        invented value (FR-003, US1 AS5).
+
+        The `ETag` carries the control's `version` and must be echoed in `If-Match` on
+        `PATCH /controls/{controlId}` and `POST /controls/{controlId}/transitions`.
+      responses:
+        '200':
+          description: The control.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateControl
+      summary: Update a control's descriptive and ownership data
+      tags: [Control Record]
+      description: |
+        Requires `control:edit` and scope. Every supplied field is validated on the server
+        independently of the interface, and each changed field's previous and new value is written
+        to the audit trail.
+
+        `code`, `status`, `effectiveness` and `version` are read-only and are rejected as unknown
+        properties. Reassignment into an organizational unit outside the caller's scope, or an
+        owner outside the organizational line of the (possibly new) unit, is refused with `422`
+        (FR-008).
+
+        `If-Match` is required; a stale version yields `409` and nothing is written.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateControlRequest'
+      responses:
+        '200':
+          description: Updated control.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /controls/{controlId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    get:
+      operationId: getControlLifecycle
+      summary: Retrieve the current state and the transitions available to the caller
+      tags: [Control Lifecycle]
+      description: |
+        Requires `control:view` and scope. Returns the current status and the transitions that are
+        both valid from it and permitted to this caller, each with its unmet preconditions
+        (D-6): `DRAFT -> ACTIVE`, `ACTIVE -> SUSPENDED`, `SUSPENDED -> ACTIVE`, and
+        `DRAFT -> RETIRED` / `ACTIVE -> RETIRED` / `SUSPENDED -> RETIRED`, with `RETIRED`
+        terminal.
+
+        `DRAFT -> RETIRED` exists because without it `DRAFT` is a trap: activation requires an
+        owner (FR-005) and controls are never hard-deleted (FR-006), so a control drafted by
+        mistake — or one that never gets an owner — could neither advance nor be disposed of.
+        Found by the analysis gate before implementation; it is the same unreachable-state
+        defect Phase 1 shipped in `FindingStatus`.
+
+        This endpoint exists so the interface offers only legal, permitted transitions. It is not
+        the control: `POST /controls/{controlId}/transitions` re-evaluates the same declarative
+        transition table server-side on every request.
+      responses:
+        '200':
+          description: Current lifecycle state and available transitions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlLifecycleState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /controls/{controlId}/transitions:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    post:
+      operationId: transitionControl
+      summary: Apply a lifecycle transition
+      tags: [Control Lifecycle]
+      description: |
+        Requires `control:edit` for `DRAFT -> ACTIVE`, `ACTIVE -> SUSPENDED` and
+        `SUSPENDED -> ACTIVE`; requires `control:administer` for the terminal transition into
+        `RETIRED` - retirement is a discontinuation decision, not a routine edit, and the
+        specification does not name a lighter permission for it. Plus scope in every case.
+
+        A pair absent from the table, or one whose preconditions are unmet, is refused with `422`
+        naming what is missing, and the record is left unchanged. Entering `ACTIVE` without an
+        `owner` on the record is refused with `422` (FR-005). Transitioning into `RETIRED` requires
+        `justification` in the request body; omitting it is refused with `422` (US1 AS3).
+
+        Applying `RETIRED` stamps `retiredAt`, `retiredByUserId` and `retirementReason`, and flips
+        `isActive` to `false` at the single point of write shared with the rest of the record's
+        lifecycle (data-model.md §1) - no other operation writes `isActive`. A retired control
+        rejects further transitions, new assessments and new links, while remaining fully readable
+        (FR-006).
+
+        Each applied transition records previous state, new state, acting user, timestamp and any
+        justification, and is audited. `If-Match` is required, so two concurrent transition
+        requests cannot both apply - the loser receives `409` with the current state.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionControlRequest'
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlLifecycleTransition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: >-
+            The transition is not permitted from the current state, its preconditions are unmet
+            (no `owner` for entry into `ACTIVE`; no `justification` for entry into `RETIRED`), or
+            the control is already `RETIRED`. The record is unchanged.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}/assessments:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    get:
+      operationId: listControlAssessments
+      summary: List the control's assessment history
+      tags: [Control Assessment]
+      description: |
+        Requires `control:view` and scope. Returns every assessment, newest first by
+        `assessedOn`/`createdAt` (the ordering `ControlEffectivenessService` itself relies on,
+        data-model.md §2), each with its assessor, date, result, conclusion and attestation
+        condition. Prior assessments are returned unchanged for the life of the record; none is
+        ever edited (FR-010).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of assessments, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlAssessment'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createControlAssessment
+      summary: Register an effectiveness assessment
+      tags: [Control Assessment]
+      description: |
+        Requires `control:test` and scope. The control must be `ACTIVE`; a `DRAFT`, `SUSPENDED` or
+        `RETIRED` control refuses new assessments with `422` (D-6, FR-006).
+
+        The request carries **only** `assessedOn`, `result` and `conclusion`. The assessor is taken
+        from the session and is never accepted as input; no attestation field exists on this
+        request - attesting the result is a distinct, later act (FR-016, FR-017), performed through
+        `POST .../attestation` and `POST .../attestation/decision`.
+
+        `assessedOn` may not be in the future - a verification records what was observed, not what
+        has yet to happen; a future date is refused with `422` (FR-011).
+
+        This operation does not write to `controls.version`: a new assessment is a new,
+        independently-keyed row, so it does not carry `If-Match`. The assessment itself is
+        immutable once created - there is deliberately no update or delete operation for it
+        (FR-010); a new assessment succeeds the previous one instead. Emits `control.assessment.recorded`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateControlAssessmentRequest'
+      responses:
+        '201':
+          description: Assessment recorded.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAssessment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: >-
+            `assessedOn` is in the future (FR-011), or the control is not `ACTIVE` and therefore
+            does not accept new assessments (D-6, FR-006).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}/assessments/{assessmentId}:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+      - $ref: '#/components/parameters/AssessmentId'
+    get:
+      operationId: getControlAssessment
+      summary: Retrieve one assessment
+      tags: [Control Assessment]
+      description: >-
+        Requires `control:view` and scope. There is deliberately no update and no delete operation
+        for an assessment: it is immutable once recorded, and a new assessment succeeds it rather
+        than replacing it (FR-010).
+      responses:
+        '200':
+          description: The assessment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAssessment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /controls/{controlId}/assessments/{assessmentId}/attestation:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+      - $ref: '#/components/parameters/AssessmentId'
+    post:
+      operationId: requestControlAssessmentAttestation
+      summary: Request attestation of an assessment's result
+      tags: [Control Assessment]
+      description: |
+        Requires `control:test` and scope. Opens a pending attestation on the assessment through
+        the existing generic approval mechanism (`ApprovableEntityType.CONTROL_ASSESSMENT`,
+        data-model.md §4) - no new approval infrastructure is introduced (§19.4).
+
+        Declaring a result is an explicit act distinct from recording it (FR-016): a freshly
+        recorded assessment carries no attestation until this endpoint is called. An assessment
+        accepts at most one attestation lifecycle - requesting again while one is pending, or after
+        one has already been decided, is refused with `409`; a disputed result is addressed by
+        registering a new assessment, not by re-requesting attestation on an immutable one. No
+        request body: the assessment identifies the subject and the session identifies the
+        requester.
+      responses:
+        '201':
+          description: Attestation requested; pending decision.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAssessmentAttestation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >-
+            An attestation already exists for this assessment - pending or already decided.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}/assessments/{assessmentId}/attestation/decision:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+      - $ref: '#/components/parameters/AssessmentId'
+    post:
+      operationId: decideControlAssessmentAttestation
+      summary: Approve or reject a pending attestation
+      tags: [Control Assessment]
+      description: |
+        Requires `control:approve` and scope.
+
+        **Two independent segregation-of-duties rules, checked separately (D-3):**
+
+        - **C1** - the deciding user may not be the assessor who executed the verification being
+          attested (FR-017). Mirrors the requester/approver segregation already used by Risk
+          approvals.
+        - **C2** - the deciding user may not be the control's `owner` (FR-018) - the person who
+          declares a control effective is never the person who answers for it.
+
+        Both are evaluated independently and both are audited on refusal, with the reason
+        (`control.attestation.refused`, FR-019). **When the same person accumulates both roles -
+        tested the control and owns it - the refusal names both C1 and C2**, not a single merged
+        reason, because the trail needs to distinguish "this person tested it" from "this person
+        owns it" (edge case "atestação por quem acumula papéis"). Either or both violations answer
+        `422`; the assessment's attestation is left `PENDING`.
+
+        `APPROVED` stamps `attestedAt`/`attestedByUserId` on the assessment; the control's derived
+        `effectiveness` is recalculated in the same transaction and the change is audited with its
+        previous and new value (FR-020). `REJECTED` records the decision without attesting the
+        assessment - it never contributes to `effectiveness`. The decision is recorded once and is
+        immutable; deciding an already-decided attestation is refused with `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlAssessmentAttestationDecisionRequest'
+      responses:
+        '200':
+          description: Decision recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAssessmentAttestation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: >-
+            The control or the assessment is unknown or outside the caller's scope, or no
+            attestation has been requested for this assessment yet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: This attestation has already been decided.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: >-
+            The deciding user is the assessor (C1), is the control's owner (C2), or both - the
+            problem `detail` names every violated rule.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/segregation-of-duties
+                title: Attester must differ from the assessor and from the control owner
+                status: 422
+                detail: >-
+                  This user executed the assessment being attested and is also the control's
+                  owner; neither may attest it.
+                instance: /api/v1/controls/0193c1f6-0000-7000-8000-000000000001/assessments/0193c1f6-0000-7000-8000-000000000002/attestation/decision
+                correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+  /controls/{controlId}/risks:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    get:
+      operationId: listControlRiskLinks
+      summary: List the risks this control treats
+      tags: [Control Relationships]
+      description: |
+        Requires `control:view` and scope. **Read-only by design** (FR-021): the risk-to-control
+        link is `RiskControlLink`, owned by the Risk module and created and withdrawn only from the
+        risk side (`POST`/`DELETE /risks/{riskId}/controls` in the Risk Management API). There is
+        deliberately no `POST` or `DELETE` on this path - reading it here does not create a second
+        vínculo, it exposes the one that already exists, reached through the `ControlDirectoryPort`
+        boundary defined by ADR-020.
+
+        `includeWithdrawn` also returns links that were withdrawn from the risk side, with who
+        withdrew them and when, mirroring the same parameter on
+        `GET /risks/{riskId}/controls`.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The risks this control treats.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ControlRiskLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /controls/{controlId}/processes:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    get:
+      operationId: listControlProcessLinks
+      summary: List the processes associated with the control
+      tags: [Control Relationships]
+      description: |
+        Requires `control:view` and scope. Returns current links by default;
+        `includeWithdrawn` also returns links that were removed, with who removed them and when, so
+        a removal remains visible in history (FR-023).
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The process links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ControlProcessLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkControlToProcess
+      summary: Associate a process with the control
+      tags: [Control Relationships]
+      description: |
+        Requires `control:edit` on the control **and** the referenced process to lie inside the
+        caller's organizational scope (FR-024) - the read-side check that stands in for a
+        dedicated process permission while Processes remains a reference registry (spec
+        Assumptions). A process outside the caller's scope, or one that does not exist, answers
+        exactly as a nonexistent one would: `404` (FR-025).
+
+        The control must not be `RETIRED` (FR-006). Linking an already-linked (currently active)
+        process is refused with `409`; linking a process whose previous link with this control was
+        withdrawn is permitted and creates a new link, preserving the withdrawn one in history
+        (edge case "vínculo duplicado"). Records who linked it and when; audited with the
+        `CONTROL_PROCESS_LINK` entity type (data-model.md §5, ADR-008). This operation does not
+        write to `controls.version` and does not carry `If-Match`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkEntityRequest'
+      responses:
+        '201':
+          description: Process linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlProcessLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: An active link between this control and this process already exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The control is `RETIRED` and does not accept new links (FR-006).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}/processes/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkControlFromProcess
+      summary: Remove a process association
+      tags: [Control Relationships]
+      description: |
+        Requires `control:edit` and scope. The link is withdrawn, never physically deleted: the
+        removal stamps `unlinkedAt`/`unlinkedByUserId` so history remains complete (FR-023). Not a
+        `DELETE` in the storage sense - the `DELETE` HTTP verb withdraws the link, it does not erase
+        the row. Audited. This operation does not write to `controls.version` and does not carry
+        `If-Match`.
+      responses:
+        '204':
+          description: Process association withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: This link was already withdrawn.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}/assets:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+    get:
+      operationId: listControlAssetLinks
+      summary: List the assets associated with the control
+      tags: [Control Relationships]
+      description: |
+        Requires `control:view` and scope. Returns current links by default;
+        `includeWithdrawn` also returns links that were removed, with who removed them and when
+        (FR-023).
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The asset links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ControlAssetLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkControlToAsset
+      summary: Associate an asset with the control
+      tags: [Control Relationships]
+      description: |
+        Requires `control:edit` on the control **and** the referenced asset to lie inside the
+        caller's organizational scope (FR-024) - the read-side check that stands in for a dedicated
+        asset permission while Assets remains a reference registry (spec Assumptions). An asset
+        outside the caller's scope, or one that does not exist, answers exactly as a nonexistent
+        one would: `404` (FR-025).
+
+        The control must not be `RETIRED` (FR-006). Linking an already-linked (currently active)
+        asset is refused with `409`; linking an asset whose previous link with this control was
+        withdrawn is permitted and creates a new link, preserving the withdrawn one in history
+        (edge case "vínculo duplicado"). Records who linked it and when; audited with the
+        `CONTROL_ASSET_LINK` entity type (data-model.md §5, ADR-008). This operation does not write
+        to `controls.version` and does not carry `If-Match`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkEntityRequest'
+      responses:
+        '201':
+          description: Asset linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlAssetLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: An active link between this control and this asset already exists.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The control is `RETIRED` and does not accept new links (FR-006).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /controls/{controlId}/assets/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/ControlId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkControlFromAsset
+      summary: Remove an asset association
+      tags: [Control Relationships]
+      description: |
+        Requires `control:edit` and scope. The link is withdrawn, never physically deleted: the
+        removal stamps `unlinkedAt`/`unlinkedByUserId` so history remains complete (FR-023). Not a
+        `DELETE` in the storage sense - the `DELETE` HTTP verb withdraws the link, it does not erase
+        the row. Audited. This operation does not write to `controls.version` and does not carry
+        `If-Match`.
+      responses:
+        '204':
+          description: Asset association withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: This link was already withdrawn.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: pgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  headers:
+    ETag:
+      description: |
+        The control's optimistic-locking `version` as an entity tag, for example `"3"`. Echo it in
+        `If-Match` on `PATCH /controls/{controlId}` and `POST /controls/{controlId}/transitions`.
+      schema:
+        type: string
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    ControlId:
+      name: controlId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssessmentId:
+      name: assessmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LinkId:
+      name: linkId
+      in: path
+      required: true
+      description: Identifier of the relationship record, not of the linked entity.
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: |
+        The control's `version` last read, as an entity tag, for example `"3"`. Required on
+        `PATCH /controls/{controlId}` and `POST /controls/{controlId}/transitions` - the only two
+        operations in this document that write directly to the versioned `controls` row. A missing
+        or malformed header is `400`; a stale value is `409` and nothing is written.
+      schema:
+        type: string
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Never contains a stack trace, SQL fragment or internal identifier.
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+    VersionConflictProblem:
+      description: |
+        Problem document returned when the supplied `If-Match` version is not the current one. The
+        write was not applied; the client reloads, re-applies its edits and retries.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [currentVersion, currentStatus]
+          properties:
+            currentVersion:
+              type: integer
+              description: The control's current version, to be echoed in the retried `If-Match`.
+            currentStatus:
+              $ref: '#/components/schemas/ControlStatus'
+            modifiedAt:
+              type: string
+              format: date-time
+            modifiedBy:
+              $ref: '#/components/schemas/UserRef'
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    ControlStatus:
+      type: string
+      description: The four lifecycle states (D-6). `RETIRED` is terminal.
+      enum: [DRAFT, ACTIVE, SUSPENDED, RETIRED]
+    ControlNature:
+      type: string
+      description: Executed by a person, or by a system (FR-001).
+      enum: [MANUAL, AUTOMATED]
+    ControlType:
+      type: string
+      description: When the control acts relative to the event (FR-001).
+      enum: [PREVENTIVE, DETECTIVE, CORRECTIVE]
+    ControlFrequency:
+      type: string
+      description: >-
+        Closed vocabulary (D-7); a control may also declare none, in which case it has no vencible
+        effectiveness (FR-015).
+      enum: [CONTINUOUS, DAILY, WEEKLY, MONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL]
+    ControlAssessmentResult:
+      type: string
+      description: The result an assessor records when verifying the control (FR-009).
+      enum: [EFFECTIVE, PARTIALLY_EFFECTIVE, INEFFECTIVE]
+    ControlEffectiveness:
+      type: string
+      description: |
+        The control's derived, current effectiveness (data-model.md §3, D-2). Computed exclusively
+        by `ControlEffectivenessService` from attested assessments and the declared `frequency`;
+        there is no stored column and no request body in this API accepts it as input.
+
+        `NOT_ASSESSED` when no assessment has ever been attested (FR-013) - never `EFFECTIVE` by
+        omission. `EXPIRED` when `frequency` is declared and the most recent attested assessment's
+        `assessedOn` is older than that frequency allows (FR-014); `EXPIRED` is unreachable when no
+        `frequency` is declared (FR-015), in which case the value is simply the most recent attested
+        result. An assessment that was recorded but never attested never contributes to this value
+        (FR-016).
+      enum: [NOT_ASSESSED, EFFECTIVE, PARTIALLY_EFFECTIVE, INEFFECTIVE, EXPIRED]
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    OrgUnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    EntityRef:
+      type: object
+      description: An entry in the minimal process or asset registry (spec Assumptions).
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    RiskRef:
+      type: object
+      description: >-
+        The minimum a control may know about a risk it treats, reached through the Risk module's
+        own API - never the risk's domain model (ADR-020).
+      required: [id, code, title]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+    ControlSummary:
+      type: object
+      description: One catalog row.
+      required: [id, code, name, orgUnit, status, effectiveness, version, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          description: >-
+            Human-readable, unique and stable for the life of the record. Server-generated; never
+            client-supplied (FR-002).
+          examples: ['CTL-2026-0001']
+        name:
+          type: string
+          readOnly: true
+        descriptionExcerpt:
+          type: [string, 'null']
+          readOnly: true
+          maxLength: 200
+          description: >-
+            The first 200 characters of the control's description, for list previews only. The
+            full text is on `ControlDetail.description`. Truncated by character count, not on a
+            word boundary.
+        orgUnit:
+          # Nullable, and deliberately still REQUIRED — the property is always
+          # present, its value may be null. A control created before Phase 2
+          # (the minimal registry the module was promoted from) has no
+          # organizational unit recorded, and FR-003/US1-AS5 require exactly
+          # that record to stay readable rather than be rejected or given a
+          # fabricated unit. An earlier draft of this contract declared it
+          # non-nullable while the mapper already returned null for those rows;
+          # the mismatch surfaced as a client-side crash on the very first
+          # legacy control rendered, not as a contract-test failure.
+          oneOf:
+            - $ref: '#/components/schemas/OrgUnitRef'
+            - type: 'null'
+          readOnly: true
+        owner:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+          description: >-
+            `null` until assigned. Required to enter `ACTIVE` (FR-005); a control may exist without
+            one in `DRAFT`.
+        nature:
+          oneOf:
+            - $ref: '#/components/schemas/ControlNature'
+            - type: 'null'
+          readOnly: true
+        type:
+          oneOf:
+            - $ref: '#/components/schemas/ControlType'
+            - type: 'null'
+          readOnly: true
+        frequency:
+          oneOf:
+            - $ref: '#/components/schemas/ControlFrequency'
+            - type: 'null'
+          readOnly: true
+          description: '`null` means the control has no vencible effectiveness (FR-015).'
+        status:
+          $ref: '#/components/schemas/ControlStatus'
+        effectiveness:
+          $ref: '#/components/schemas/ControlEffectiveness'
+        version:
+          type: integer
+          readOnly: true
+          description: Optimistic-locking version, scoped to this record.
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    ControlDetail:
+      allOf:
+        - $ref: '#/components/schemas/ControlSummary'
+        - type: object
+          required: [description, createdAt]
+          properties:
+            description:
+              type: string
+              description: Stored intact regardless of length.
+            retiredAt:
+              type: [string, 'null']
+              format: date-time
+              readOnly: true
+              description: Set by the transition into `RETIRED`. Controls are never hard-deleted (FR-006).
+            retiredBy:
+              oneOf:
+                - $ref: '#/components/schemas/UserRef'
+                - type: 'null'
+              readOnly: true
+            retirementReason:
+              type: [string, 'null']
+              readOnly: true
+              description: Required by the transition into `RETIRED` (US1 AS3).
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+    CreateControlRequest:
+      type: object
+      description: |
+        Creates a `DRAFT` control. `code`, `status`, `effectiveness` and `version` are server-owned
+        and rejected if supplied.
+      required: [name, description, orgUnitId]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        orgUnitId:
+          type: string
+          format: uuid
+          description: Must be inside the caller's authorized scope.
+        ownerUserId:
+          type: [string, 'null']
+          format: uuid
+          description: >-
+            Optional at creation (FR-005, edge case "controle sem dono"); required before the
+            control may enter `ACTIVE`. Must belong to the organizational line of `orgUnitId`
+            (FR-008).
+        nature:
+          oneOf:
+            - $ref: '#/components/schemas/ControlNature'
+            - type: 'null'
+        type:
+          oneOf:
+            - $ref: '#/components/schemas/ControlType'
+            - type: 'null'
+        frequency:
+          oneOf:
+            - $ref: '#/components/schemas/ControlFrequency'
+            - type: 'null'
+    UpdateControlRequest:
+      type: object
+      description: |
+        Partial update of descriptive and ownership data. Omitted properties are left unchanged.
+        `code`, `status`, `effectiveness` and `version` are read-only and rejected if supplied.
+        Lifecycle status is changed only through `POST /controls/{controlId}/transitions`.
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        orgUnitId:
+          type: string
+          format: uuid
+          description: Reassignment is refused if the target unit is outside the caller's scope (FR-025).
+        ownerUserId:
+          type: [string, 'null']
+          format: uuid
+          description: Reassignment is refused if the owner is outside the organizational line of the unit (FR-008).
+        nature:
+          oneOf:
+            - $ref: '#/components/schemas/ControlNature'
+            - type: 'null'
+        type:
+          oneOf:
+            - $ref: '#/components/schemas/ControlType'
+            - type: 'null'
+        frequency:
+          oneOf:
+            - $ref: '#/components/schemas/ControlFrequency'
+            - type: 'null'
+    ControlLifecycleState:
+      type: object
+      required: [status, availableTransitions]
+      properties:
+        status:
+          $ref: '#/components/schemas/ControlStatus'
+        availableTransitions:
+          type: array
+          description: >-
+            Transitions valid from the current state **and** permitted to this caller. Advisory:
+            the server re-evaluates on every transition request.
+          items:
+            type: object
+            required: [toStatus, requiredPermission, preconditionsMet]
+            properties:
+              toStatus:
+                $ref: '#/components/schemas/ControlStatus'
+              requiredPermission:
+                type: string
+                description: The `resource:action` identifier the transition requires.
+              preconditionsMet:
+                type: boolean
+              unmetPreconditions:
+                type: array
+                description: What is missing, phrased for display.
+                items:
+                  type: string
+    TransitionControlRequest:
+      type: object
+      required: [toStatus]
+      additionalProperties: false
+      properties:
+        toStatus:
+          allOf:
+            - $ref: '#/components/schemas/ControlStatus'
+          description: Target state. Must be a legal transition from the current state (D-6).
+        justification:
+          type: string
+          maxLength: 2000
+          description: >-
+            Required when `toStatus` is `RETIRED` (US1 AS3); recorded with the transition when
+            supplied for any other target.
+    ControlLifecycleTransition:
+      type: object
+      description: An append-only record of a state change.
+      required: [id, fromStatus, toStatus, performedBy, performedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fromStatus:
+          $ref: '#/components/schemas/ControlStatus'
+        toStatus:
+          $ref: '#/components/schemas/ControlStatus'
+        performedBy:
+          $ref: '#/components/schemas/UserRef'
+        performedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        justification:
+          type: [string, 'null']
+    ControlAssessment:
+      type: object
+      description: |
+        An immutable point-in-time verification (FR-010). Never updated; a new assessment succeeds
+        this one rather than replacing it.
+      required: [id, assessedOn, assessor, result, conclusion, attestation, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        assessedOn:
+          type: string
+          format: date
+          readOnly: true
+          description: Never in the future (FR-011).
+        assessor:
+          $ref: '#/components/schemas/UserRef'
+        result:
+          $ref: '#/components/schemas/ControlAssessmentResult'
+        conclusion:
+          type: string
+          readOnly: true
+        attestation:
+          oneOf:
+            - $ref: '#/components/schemas/ControlAssessmentAttestation'
+            - type: 'null'
+          readOnly: true
+          description: '`null` until `POST .../attestation` has been called for this assessment.'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateControlAssessmentRequest:
+      type: object
+      description: |
+        The assessor is taken from the session and is never accepted as input. There is no
+        attestation field here - attesting the result is a distinct, later operation (FR-016).
+      required: [assessedOn, result, conclusion]
+      additionalProperties: false
+      properties:
+        assessedOn:
+          type: string
+          format: date
+          description: May not be in the future; a future date is refused with `422` (FR-011).
+        result:
+          $ref: '#/components/schemas/ControlAssessmentResult'
+        conclusion:
+          type: string
+          minLength: 1
+    ControlAssessmentAttestation:
+      type: object
+      description: >-
+        The attestation lifecycle of one assessment, through the platform's existing generic
+        approval mechanism (`ApprovableEntityType.CONTROL_ASSESSMENT`, data-model.md §4). At most
+        one exists per assessment.
+      required: [id, status, requestedBy, requestedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+          readOnly: true
+        requestedBy:
+          $ref: '#/components/schemas/UserRef'
+        requestedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        decidedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        decidedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        justification:
+          type: [string, 'null']
+          readOnly: true
+    ControlAssessmentAttestationDecisionRequest:
+      type: object
+      required: [decision]
+      additionalProperties: false
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED]
+        justification:
+          type: string
+          maxLength: 2000
+          description: Recorded with the decision; expected on rejection.
+    ControlProcessLink:
+      type: object
+      description: >-
+        An explicitly modelled control-to-process relationship, audited with its own
+        `CONTROL_PROCESS_LINK` entity type (data-model.md §5, ADR-008).
+      required: [id, process, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        process:
+          $ref: '#/components/schemas/EntityRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    ControlAssetLink:
+      type: object
+      description: >-
+        An explicitly modelled control-to-asset relationship, audited with its own
+        `CONTROL_ASSET_LINK` entity type (data-model.md §5, ADR-008).
+      required: [id, asset, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        asset:
+          $ref: '#/components/schemas/EntityRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    ControlRiskLink:
+      type: object
+      description: >-
+        `RiskControlLink` (FR-021), read from the control side through `ControlDirectoryPort`
+        (ADR-020). Owned by the Risk module; created and withdrawn only from
+        `POST`/`DELETE /risks/{riskId}/controls`.
+      required: [id, risk, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        risk:
+          $ref: '#/components/schemas/RiskRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    LinkEntityRequest:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identifier of the process or asset to associate.
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties - including any attempt to supply
+        `code`, `status`, `version` or `effectiveness` - or omits a required header such as
+        `If-Match`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The caller may see the control but lacks the permission for this action, or the request
+        failed the cross-site request forgery origin check. A caller who may not see the record at
+        all receives `404`, not `403`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: |
+        No such control, **or** the control exists but lies outside the caller's authorized
+        organizational scope or the caller lacks `control:view`. The two are deliberately
+        indistinguishable so the response cannot disclose the existence of records the caller may
+        not see (FR-007).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    VersionConflict:
+      description: |
+        The supplied `If-Match` version is stale - the control was modified by someone else since
+        it was read. Nothing was written; last-write-wins never occurs.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/VersionConflictProblem'
+          example:
+            type: /problems/version-conflict
+            title: The control was modified by another user
+            status: 409
+            detail: Reload the control and reapply your changes.
+            instance: /api/v1/controls/0193c1f6-0000-7000-8000-000000000001
+            correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+            currentVersion: 4
+            currentStatus: ACTIVE
+    UnprocessableEntity:
+      description: >-
+        The request is well formed but violates a domain rule - server-side validation, referential
+        integrity, organizational scope on the target unit, or an owner outside the organizational
+        line of the unit (FR-008).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

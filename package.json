@@ -1,0 +1,62 @@
+{
+  "name": "pharos-grc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PharosGRC — corporate Governance, Risk and Compliance platform",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "lint": "pnpm -r --if-present run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "test:unit": "pnpm -r --if-present run test:unit",
+    "test:integration": "pnpm -r --if-present run test:integration",
+    "test:contract": "pnpm -r --if-present run test:contract",
+    "test:e2e": "pnpm -r --if-present run test:e2e",
+    "dev": "pnpm -r --parallel --if-present run dev",
+    "db:migrate": "pnpm --filter @pharos/api --if-present run db:migrate",
+    "db:generate": "pnpm --filter @pharos/api --if-present run db:generate",
+    "db:seed": "pnpm --filter @pharos/api --if-present run db:seed"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.7",
+    "@eslint/js": "9.39.5",
+    "@typescript-eslint/eslint-plugin": "8.69.0",
+    "@typescript-eslint/parser": "8.69.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.25",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-boundaries": "7.2.0",
+    "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.69.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild",
+      "unrs-resolver",
+      "@scarf/scarf",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "argon2"
+    ],
+    "overrides": {
+      "postcss": "8.5.28",
+      "deepmerge-ts": "8.0.2",
+      "multer": "2.3.0",
+      "@redocly/openapi-core>js-yaml": "4.3.2"
+    }
+  }
+}

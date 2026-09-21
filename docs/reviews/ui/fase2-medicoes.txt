@@ -1,0 +1,24 @@
+light/1440 lista: document 1440/1440 (+0), main 1184/1184 (+0)
+light/1440 painel aberto: document 1440/1440 (+0), main 1184/1184 (+0)
+light/1440 chips: document 1440/1440 (+0), main 1184/1184 (+0)
+light/1440 chips+painel: document 1440/1440 (+0), main 1184/1184 (+0)
+light/1440 indicador "Papéis do sistema" aria-pressed=true, url=?type=system
+light/1440 /risks: document 1440/1440 (+0), main 1184/1184 (+0)
+light/390 lista: document 390/390 (+0), main 326/326 (+0)
+light/390 painel aberto: document 390/390 (+0), main 326/326 (+0)
+light/390 chips: document 390/390 (+0), main 326/326 (+0)
+light/390 chips+painel: document 390/390 (+0), main 326/326 (+0)
+light/390 indicador "Papéis do sistema" aria-pressed=true, url=?type=system
+light/390 /risks: document 390/390 (+0), main 326/326 (+0)
+dark/1440 lista: document 1440/1440 (+0), main 1184/1184 (+0)
+dark/1440 painel aberto: document 1440/1440 (+0), main 1184/1184 (+0)
+dark/1440 chips: document 1440/1440 (+0), main 1184/1184 (+0)
+dark/1440 chips+painel: document 1440/1440 (+0), main 1184/1184 (+0)
+dark/1440 indicador "Papéis do sistema" aria-pressed=true, url=?type=system
+dark/1440 /risks: document 1440/1440 (+0), main 1184/1184 (+0)
+dark/390 lista: document 390/390 (+0), main 326/326 (+0)
+dark/390 painel aberto: document 390/390 (+0), main 326/326 (+0)
+dark/390 chips: document 390/390 (+0), main 326/326 (+0)
+dark/390 chips+painel: document 390/390 (+0), main 326/326 (+0)
+dark/390 indicador "Papéis do sistema" aria-pressed=true, url=?type=system
+dark/390 /risks: document 390/390 (+0), main 326/326 (+0)

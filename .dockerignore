@@ -1,0 +1,68 @@
+# .dockerignore
+#
+# Keeps the build context sent to the Docker daemon small and reproducible
+# for docker/api.Dockerfile and docker/web.Dockerfile (T012). Both Dockerfiles
+# build from the repository root (`context: .` in docker-compose.yml) because
+# a pnpm workspace needs the lockfile and every workspace package visible to
+# `pnpm install`.
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (reinstalled inside the image from the lockfile)
+node_modules
+**/node_modules
+
+# Build output (rebuilt inside the image)
+dist
+**/dist
+.next
+**/.next
+build
+**/build
+
+# Test output
+coverage
+**/coverage
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files — never bake secrets into an image layer.
+#
+# The `**/` prefix is load-bearing: a bare `.env` pattern matches ONLY at the
+# root of the build context, so `apps/api/.env` and `apps/web/.env` were being
+# copied into every image (F-14). Development credentials today; a real secret
+# on any machine that has one. Both forms are kept so the intent survives a
+# future reader who deletes one of them.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Dockerfiles and compose files themselves
+Dockerfile*
+docker-compose*.yml
+
+# Documentation and planning artifacts — not needed to build or run the apps
+docs
+specs
+.specify
+AGENTS.md
+CLAUDE.md
+*.md
+
+# Editor / tooling metadata not needed inside the image
+.vscode
+.idea
+.claude
+.github
