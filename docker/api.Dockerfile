@@ -112,6 +112,17 @@ RUN mkdir -p /workspace/deploy/api/prisma \
     && /workspace/apps/api/node_modules/.bin/prisma generate \
        --schema=/workspace/deploy/api/prisma/schema.prisma
 
+# ---- migrate: short-lived, operator/pipeline-invoked schema migration -------
+# Built only with `--target migrate` (see .gitlab-ci.yml and
+# k8s/08-migrate-job.yaml). It keeps the full workspace toolchain (pnpm +
+# prisma CLI) that the runtime stage deliberately drops, and its only command
+# is `prisma migrate deploy` — it never serves traffic, which preserves every
+# reason listed in this file's header for not migrating from the API
+# container itself: the owner role lives only in this Job's own Secret, and
+# a failed migration fails the pipeline instead of crash-looping the API.
+FROM build AS migrate
+CMD ["pnpm", "--filter", "./apps/api", "exec", "prisma", "migrate", "deploy"]
+
 # ---- runtime: minimal image, no build toolchain, non-root user --------------
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production
@@ -120,7 +131,9 @@ WORKDIR /app
 # Non-root runtime user. The attachment storage directory (ADR-010,
 # FileStorageProvider local adapter) is created and owned here so the
 # container never needs root to write uploads.
-RUN addgroup -S pharos && adduser -S pharos -G pharos \
+# Fixed UID/GID (10001) so Kubernetes can set `runAsUser`/`fsGroup` on the
+# attachments volume (k8s/02-api-deployment.yaml) without guessing.
+RUN addgroup -S -g 10001 pharos && adduser -S -u 10001 pharos -G pharos \
     && mkdir -p /app/storage/attachments \
     && chown -R pharos:pharos /app
 

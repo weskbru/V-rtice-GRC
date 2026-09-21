@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pharosgrc-ingress
+  namespace: pharosgrc
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: pharosgrc.aeb.gov.br
+      http:
+        paths:
+          # /api vai direto para a API — um unico proxy (o Traefik) entre o
+          # cliente e a API, que e exatamente o que TRUSTED_PROXY_HOPS = 1 em
+          # apps/api/src/main.ts assume para o IP gravado na auditoria.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: pharosgrc-api
+                port:
+                  number: 3001
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pharosgrc-web
+                port:
+                  number: 3000
+  # O secret pharosgrc-cert precisa existir no namespace pharosgrc:
+  #   kubectl create secret tls pharosgrc-cert -n pharosgrc \
+  #     --cert=pharosgrc.crt --key=pharosgrc.key
+  # Sem TLS valido o navegador recusa o cookie de sessao (Secure) e o login
+  # nao funciona.
+  tls:
+    - hosts:
+        - pharosgrc.aeb.gov.br
+      secretName: pharosgrc-cert

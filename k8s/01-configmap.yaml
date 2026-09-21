@@ -1,0 +1,61 @@
+# Configuracao NAO sensivel da API. Segredos (senhas, URLs com credencial)
+# NAO ficam aqui nem em nenhum arquivo versionado: o job de deploy cria o
+# Secret `pharosgrc-secret` a partir de variaveis mascaradas do GitLab
+# (Settings > CI/CD > Variables). Ver .gitlab-ci.yml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pharosgrc-config
+  namespace: pharosgrc
+data:
+  NODE_ENV: "production"
+  API_PORT: "3001"
+  WEB_PORT: "3000"
+
+  # Origem publica unica (ADR-014). A API rejeita com 403 toda requisicao de
+  # escrita cujo Origin nao bata com este valor. Deve ser igual ao host do
+  # Ingress (06-ingress.yaml) e ao APP_ORIGIN usado no build do web.
+  APP_ORIGIN: "https://pharosgrc.aeb.gov.br"
+  API_INTERNAL_URL: "http://pharosgrc-api:3001"
+
+  # O env.schema.ts da API exige estas duas (distintas) mesmo em producao,
+  # mas elas so sao usadas pelas suites de teste. Enderecos inertes de
+  # proposito — nunca apontar para um banco real aqui.
+  TEST_DATABASE_URL: "postgresql://unused:unused@test-db-not-used-in-production.invalid:5432/app"
+  TEST_DATABASE_MIGRATION_URL: "postgresql://unused:unused@test-db-not-used-in-production.invalid:5432/owner"
+
+  REDIS_URL: "redis://pharosgrc-redis:6379"
+
+  # Cookie Secure exige HTTPS: o TLS e terminado no Ingress.
+  SESSION_COOKIE_NAME: "pgrc_session"
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_COOKIE_SAMESITE: "lax"
+  SESSION_IDLE_TIMEOUT_MINUTES: "30"
+  SESSION_ABSOLUTE_LIFETIME_HOURS: "12"
+
+  PASSWORD_MIN_LENGTH: "12"
+  PASSWORD_REQUIRE_COMPLEXITY: "true"
+
+  ARGON2_MEMORY_COST: "19456"
+  ARGON2_TIME_COST: "2"
+  ARGON2_PARALLELISM: "1"
+
+  LOG_LEVEL: "info"
+  LOG_PRETTY: "false"
+
+  THROTTLE_TTL_SECONDS: "60"
+  THROTTLE_LIMIT: "100"
+  # Valores de producao do FR-008 (o .env.example usa 200/1000 so por causa
+  # do E2E local — ver o comentario dele).
+  AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: "5"
+  AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: "20"
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: "300"
+  AUTH_LOCKOUT_MINUTES: "15"
+
+  ATTACHMENT_STORAGE_DRIVER: "local"
+  ATTACHMENT_STORAGE_PATH: "/app/storage/attachments"
+  ATTACHMENT_MAX_SIZE_BYTES: "26214400"
+  ATTACHMENT_ALLOWED_MIME_TYPES: "application/pdf,image/png,image/jpeg,text/plain"
+
+  SEED_DEV_FIXTURES: "false"
+  SEED_ADMIN_EMAIL: "admin@aeb.gov.br"
