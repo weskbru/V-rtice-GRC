@@ -1,5 +1,10 @@
+# Builds em estagios SEQUENCIAIS, nao paralelos: cada build do Kaniko instala
+# o workspace pnpm inteiro (~4-6 GB de disco temporario). Tres em paralelo
+# esgotaram o ephemeral-storage do node do runner (pod despejado pelo kubelet).
 stages:
-  - build
+  - build-api
+  - build-web
+  - build-migrate
   - deploy
 
 variables:
@@ -37,6 +42,12 @@ variables:
     KUBERNETES_MEMORY_REQUEST: "2Gi"
     KUBERNETES_CPU_LIMIT: "2"
     KUBERNETES_MEMORY_LIMIT: "6Gi"
+    # Reserva disco temporario: o scheduler so coloca o pod num node que
+    # tenha esse espaco livre, em vez de despeja-lo no meio do build.
+    # Exige ephemeral_storage_overwrite_max_allowed no config.toml do runner;
+    # se o job falhar reclamando de overwrite, remova estas duas linhas.
+    KUBERNETES_EPHEMERAL_STORAGE_REQUEST: "8Gi"
+    KUBERNETES_EPHEMERAL_STORAGE_LIMIT: "12Gi"
   before_script:
     - mkdir -p /kaniko/.docker
     - |
@@ -59,7 +70,7 @@ variables:
 #########################################################
 build_api:
   extends: .kaniko
-  stage: build
+  stage: build-api
   script:
     - echo "BUILD API"
     # Contexto = raiz do repo: o workspace pnpm precisa do lockfile e de
@@ -72,6 +83,7 @@ build_api:
         --destination "${API_IMAGE}" \
         --destination "${CI_REGISTRY_IMAGE}/api:latest" \
         --snapshot-mode=redo \
+        --single-snapshot \
         --use-new-run \
         --cache=false \
         --compressed-caching=false \
@@ -82,7 +94,7 @@ build_api:
 #########################################################
 build_migrate:
   extends: .kaniko
-  stage: build
+  stage: build-migrate
   script:
     - echo "BUILD MIGRATE"
     - |
@@ -93,6 +105,7 @@ build_migrate:
         --destination "${MIGRATE_IMAGE}" \
         --destination "${CI_REGISTRY_IMAGE}/migrate:latest" \
         --snapshot-mode=redo \
+        --single-snapshot \
         --use-new-run \
         --cache=false \
         --compressed-caching=false \
@@ -103,7 +116,7 @@ build_migrate:
 #########################################################
 build_web:
   extends: .kaniko
-  stage: build
+  stage: build-web
   script:
     - echo "BUILD WEB"
     - |
@@ -115,6 +128,7 @@ build_web:
         --destination "${WEB_IMAGE}" \
         --destination "${CI_REGISTRY_IMAGE}/web:latest" \
         --snapshot-mode=redo \
+        --single-snapshot \
         --use-new-run \
         --cache=false \
         --compressed-caching=false \
