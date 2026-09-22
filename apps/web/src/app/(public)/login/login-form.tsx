@@ -69,7 +69,7 @@
  * whichever side of hydration a keystroke lands on, exactly as before.
  */
 import { FormField } from '@pharos/design-system/components';
-import { Loader2 } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Mail } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { useNavigate } from '@/components/shell/navigation-pending';
@@ -99,9 +99,12 @@ export function LoginForm({ returnTo }: LoginFormProps): React.JSX.Element {
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const submittingRef = useRef(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (submittingRef.current) return;
 
     // Read the DOM directly rather than any framework-tracked copy of it —
     // see the header comment for why that distinction is the entire point
@@ -122,12 +125,14 @@ export function LoginForm({ returnTo }: LoginFormProps): React.JSX.Element {
         }
       }
       setFieldErrors(nextFieldErrors);
+      (nextFieldErrors.email ? emailRef : passwordRef).current?.focus();
       return;
     }
 
     setFieldErrors({});
     setFormError(null);
     setSubmitting(true);
+    submittingRef.current = true;
     try {
       // A failed sign-in is an expected, form-owned outcome here — it must
       // never be treated as a "session expired mid-use" event.
@@ -151,6 +156,7 @@ export function LoginForm({ returnTo }: LoginFormProps): React.JSX.Element {
           : errors.invalidCredentials,
       );
       setSubmitting(false);
+      submittingRef.current = false;
     }
   }
 
@@ -174,34 +180,69 @@ export function LoginForm({ returnTo }: LoginFormProps): React.JSX.Element {
 
       <FormField label={auth.login.emailLabel} error={fieldErrors.email}>
         {(field) => (
-          <Input
-            {...field}
-            ref={emailRef}
-            type="email"
-            name="email"
-            autoComplete="username"
-            autoFocus
-            disabled={submitting}
-          />
+          <div className="relative">
+            <Mail
+              aria-hidden="true"
+              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              {...field}
+              ref={emailRef}
+              type="email"
+              name="email"
+              autoComplete="username"
+              autoFocus
+              disabled={submitting}
+              placeholder={auth.login.emailPlaceholder}
+              className="h-12 pl-14 text-sm"
+            />
+          </div>
         )}
       </FormField>
 
       <FormField label={auth.login.passwordLabel} error={fieldErrors.password}>
         {(field) => (
-          <Input
-            {...field}
-            ref={passwordRef}
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            disabled={submitting}
-          />
+          <div className="relative">
+            <LockKeyhole
+              aria-hidden="true"
+              className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              {...field}
+              ref={passwordRef}
+              type={passwordVisible ? 'text' : 'password'}
+              name="password"
+              autoComplete="current-password"
+              disabled={submitting}
+              placeholder={auth.login.passwordPlaceholder}
+              className="h-12 pl-14 pr-12 text-sm"
+            />
+            <button
+              type="button"
+              disabled={submitting}
+              aria-label={passwordVisible ? auth.login.hidePassword : auth.login.showPassword}
+              aria-controls={field.id}
+              onClick={() => setPasswordVisible((visible) => !visible)}
+              className="absolute right-1 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              {passwordVisible ? (
+                <Eye aria-hidden="true" className="size-5" />
+              ) : (
+                <EyeOff aria-hidden="true" className="size-5" />
+              )}
+            </button>
+          </div>
         )}
       </FormField>
 
-      <Button type="submit" disabled={submitting} className="mt-2">
+      <Button
+        type="submit"
+        disabled={submitting}
+        className="h-12 w-full gap-3 text-base font-semibold"
+      >
         {submitting ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
         {submitting ? auth.login.submitting : auth.login.submit}
+        {!submitting ? <ArrowRight aria-hidden="true" className="size-4" /> : null}
       </Button>
     </form>
   );

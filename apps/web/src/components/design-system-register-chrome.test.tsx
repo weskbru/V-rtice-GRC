@@ -9,9 +9,9 @@ import {
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ActiveFilterChip } from '@pharos/design-system/components';
-
 import { common } from '@/lib/messages/common';
+
+import type { ActiveFilterChip } from '@pharos/design-system/components';
 
 /**
  * PharosGRC — direct evidence for the register/list chrome of
@@ -65,6 +65,33 @@ describe('FilterBar — collapsible filter disclosure', () => {
     renderCollapsible();
 
     expect(screen.getByLabelText('Buscar por código, título ou descrição')).toBeInTheDocument();
+  });
+
+  it('uses the compact register surface without changing the default card treatment', () => {
+    const { rerender } = renderCollapsible({ variant: 'register' });
+
+    const registerBar = screen.getByRole('search', { name: 'Filtros do registro de riscos' });
+    expect(registerBar).toHaveClass(
+      'border',
+      'border-x-0',
+      'border-t-0',
+      'bg-transparent',
+      'px-0',
+      'pb-4',
+    );
+    expect(registerBar).not.toHaveClass('rounded-lg', 'border-x');
+
+    rerender(
+      <FilterBar
+        label="Filtros do registro de riscos"
+        searchLabel="Buscar por código, título ou descrição"
+        searchValue=""
+        onSearchChange={() => undefined}
+      />,
+    );
+
+    const defaultBar = screen.getByRole('search', { name: 'Filtros do registro de riscos' });
+    expect(defaultBar).toHaveClass('rounded-lg', 'border', 'bg-card', 'p-4');
   });
 
   it('keeps presentation controls available while filters are collapsed', () => {

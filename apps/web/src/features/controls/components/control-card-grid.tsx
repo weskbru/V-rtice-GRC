@@ -4,10 +4,9 @@
  * PharosGRC — control catalog card view (CLAUDE.md §18.12).
  *
  * The grid frame — list semantics, responsive columns, the
- * loading/error/empty contract and the narrower layout when the quick-view
- * panel is open — is the shared `CardGrid`. What stays here is the part
- * that is about controls: which card to render, and a skeleton shaped like
- * that card.
+ * loading/error/empty contract — is the shared `CardGrid`. What stays here
+ * is the part that is about controls: which card to render, and a skeleton
+ * shaped like that card.
  */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
 
@@ -20,14 +19,10 @@ import { controls } from '@/lib/messages/controls';
 
 export interface ControlCardGridProps {
   controls: readonly ControlSummary[];
-  selectedControlId: string | null;
-  onSelect: (controlId: string) => void;
   isLoading: boolean;
   emptyContent: React.ReactNode;
   error?: ErrorStateProblem;
   errorAction?: React.ReactNode;
-  /** When true the grid is narrower because the quick-view panel is open beside it. */
-  compact?: boolean;
 }
 
 function ControlCardSkeleton(): React.JSX.Element {
@@ -56,25 +51,16 @@ function ControlCardSkeleton(): React.JSX.Element {
 
 export function ControlCardGrid({
   controls: controlList,
-  selectedControlId,
-  onSelect,
   isLoading,
   emptyContent,
   error,
   errorAction,
-  compact = false,
 }: ControlCardGridProps): React.JSX.Element {
   return (
     <CardGrid
       items={controlList}
       getItemKey={(control) => control.id}
-      renderItem={(control) => (
-        <ControlCard
-          control={control}
-          selected={control.id === selectedControlId}
-          onSelect={onSelect}
-        />
-      )}
+      renderItem={(control) => <ControlCard control={control} />}
       regionLabel={controls.register.card.regionLabel}
       isLoading={isLoading}
       loadingLabel={controls.register.results.countLoading}
@@ -82,7 +68,6 @@ export function ControlCardGrid({
       emptyContent={emptyContent}
       error={error}
       errorAction={errorAction}
-      compact={compact}
     />
   );
 }

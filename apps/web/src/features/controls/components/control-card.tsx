@@ -5,9 +5,11 @@
  * §18.12 — reusing exactly the pattern `risk-card.tsx` established rather
  * than inventing a Controls-specific visual language).
  *
- * Two independent click targets, deliberately not nested: the code (a real
- * `<Link>` to the full record) and the name (a `<button>` whose stretched
- * `::after` pseudo-element covers the whole card, opening the quick view).
+ * Two `<Link>`s to the same destination (`/controls/{id}`), deliberately not
+ * nested inside one another: the code, sitting above the rest of the card
+ * (`relative z-10`) with its own, narrower click target; and the name, whose
+ * stretched `::after` pseudo-element covers the whole card. Both resolve to
+ * the exact same record — there is no intermediate quick-view step.
  */
 import { EmptyValue, StatusBadge } from '@pharos/design-system/components';
 import { Building2, ShieldCheck, User } from 'lucide-react';
@@ -31,11 +33,9 @@ import { cn } from '@/lib/utils';
 
 export interface ControlCardProps {
   control: ControlSummary;
-  selected: boolean;
-  onSelect: (controlId: string) => void;
 }
 
-export function ControlCard({ control, selected, onSelect }: ControlCardProps): React.JSX.Element {
+export function ControlCard({ control }: ControlCardProps): React.JSX.Element {
   const cardTone =
     control.effectiveness === 'NOT_ASSESSED'
       ? controlStatusBadgeVariant(control.status)
@@ -48,7 +48,7 @@ export function ControlCard({ control, selected, onSelect }: ControlCardProps): 
         registerCardStyles.card,
         'relative flex h-full min-w-0 flex-col gap-3 rounded-lg border p-4 text-card-foreground shadow-sm transition-colors',
         'hover:border-ring/60 has-[:focus-visible]:border-ring/60',
-        selected ? 'border-ring bg-accent/40 ring-2 ring-ring' : 'border-border',
+        'border-border',
       )}
     >
       <Link
@@ -63,18 +63,15 @@ export function ControlCard({ control, selected, onSelect }: ControlCardProps): 
       </Link>
 
       <div className="flex flex-col gap-1">
-        <button
-          type="button"
-          data-control-card-select={control.id}
-          aria-pressed={selected}
+        <Link
+          href={`/controls/${control.id}`}
           aria-label={controls.register.card.selectLabel(control.code, control.name)}
-          onClick={() => onSelect(control.id)}
           className="rounded-sm text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="line-clamp-2 text-[15px] leading-5 font-semibold text-foreground">
             {control.name}
           </span>
-        </button>
+        </Link>
 
         {control.descriptionExcerpt ? (
           <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">

@@ -41,6 +41,18 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
+import { auditEngagementsApi } from '../api';
+import { formatTimestamp } from '../date';
+
+import type {
+  AuditEngagement,
+  CreateAuditEngagementRequest,
+  OrgUnitNode,
+  UpdateAuditEngagementRequest,
+  UserRef,
+} from '../types';
+import type { ApiProblem } from '@/lib/api-client';
+
 import { UserPicker } from '@/components/directory/user-picker';
 import { feedback } from '@/components/shell/feedback-provider';
 import { useNavigate } from '@/components/shell/navigation-pending';
@@ -63,18 +75,6 @@ import {
   type AuditEngagementFormValues,
 } from '@/lib/validation/audit-engagement';
 
-import { auditEngagementsApi } from '../api';
-import { formatTimestamp } from '../date';
-
-import type {
-  AuditEngagement,
-  CreateAuditEngagementRequest,
-  OrgUnitNode,
-  UpdateAuditEngagementRequest,
-  UserRef,
-} from '../types';
-import type { ApiProblem } from '@/lib/api-client';
-
 export interface AuditEngagementFormProps {
   mode: 'create' | 'edit';
   /** Required, and used as the initial values, when `mode === 'edit'`. */
@@ -83,6 +83,7 @@ export interface AuditEngagementFormProps {
   etag?: string;
   /** Called after a successful create or update with the fresh record and its new `ETag`. */
   onSaved: (result: { engagement: AuditEngagement; etag: string }) => void;
+  onCancel?: () => void;
 }
 
 interface ReferenceData {
@@ -139,6 +140,7 @@ export function AuditEngagementForm({
   engagement,
   etag,
   onSaved,
+  onCancel,
 }: AuditEngagementFormProps): React.JSX.Element {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
@@ -479,7 +481,7 @@ export function AuditEngagementForm({
           type="button"
           variant="outline"
           disabled={submitting}
-          onClick={() => navigate.back()}
+          onClick={() => (onCancel ? onCancel() : navigate.back())}
         >
           {common.actions.cancel}
         </Button>

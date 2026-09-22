@@ -67,6 +67,34 @@ describe('LoginForm', () => {
     expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument();
   });
 
+  it('reveals and conceals the existing password input without losing an autofilled value', () => {
+    render(<LoginForm returnTo="/dashboard" />);
+    const password = asInputElement(screen.getByLabelText('Senha'));
+    password.value = 'password-manager-value';
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }));
+    expect(screen.getByLabelText('Senha')).toBe(password);
+    expect(password).toHaveAttribute('type', 'text');
+    expect(password).toHaveValue('password-manager-value');
+    expect(password).toHaveAttribute('autoComplete', 'current-password');
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar senha' }));
+    expect(password).toHaveAttribute('type', 'password');
+    expect(password).toHaveValue('password-manager-value');
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts only one submission while the request is pending', () => {
+    postMock.mockReturnValue(new Promise(() => undefined));
+    render(<LoginForm returnTo="/dashboard" />);
+    asInputElement(screen.getByLabelText('E-mail')).value = 'user@example.com';
+    asInputElement(screen.getByLabelText('Senha')).value = 'correct-password';
+    fireEvent.submit(screen.getByRole('form'));
+    fireEvent.submit(screen.getByRole('form'));
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Entrando…' })).toBeDisabled();
+    expect(screen.getByLabelText('E-mail')).toBeDisabled();
+    expect(screen.getByLabelText('Senha')).toBeDisabled();
+  });
+
   it('shows one generic, non-disclosing error on failed sign-in regardless of the server detail (FR-007)', async () => {
     postMock.mockRejectedValueOnce(
       new ApiError({

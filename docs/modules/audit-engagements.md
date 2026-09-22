@@ -204,3 +204,7 @@ Achado: `finding.created`, `.updated`, `.priority_changed`, `.remediation_starte
 - Prisma: `apps/api/prisma/schema.prisma` — `AuditEngagement` (linha ~2808),
   `AuditScopeFrameworkVersion`/`AuditScopeRequirement`/`AuditScopeControl` (linhas ~2869–2922),
   `Finding` (linha ~2438), `FindingControlLink`/`FindingRiskLink` (linhas ~2940–2979).
+
+## Refinamento V2 do detalhe de Auditoria (2026-09-21)
+
+O detalhe do engajamento passou a usar o `DetailLayout` compartilhado, breadcrumb, tabs compactas vinculáveis por `?section=` e edição em painel lateral. A visão geral agora agrupa objetivo, execução/responsabilidade, registro e ciclo de vida sem alterar status, precondições de escopo, transições, achados ou permissões. Estados terminais continuam integralmente legíveis.

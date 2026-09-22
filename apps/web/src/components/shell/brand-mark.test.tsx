@@ -3,29 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import { BrandMark } from './brand-mark';
 
-/**
- * The dark-theme defect this component fixed was invisible to every test the
- * project had: the mark rendered, the page compiled, and the only symptom was
- * a white block in the corner of a dark screen. These assertions cover the
- * part that IS mechanically checkable — that both assets are present and
- * that each is gated to one theme — so a future edit cannot quietly drop the
- * inverse asset and restore the defect.
- */
 describe('BrandMark', () => {
-  it('ships both the positive and the inverse asset, one per theme', () => {
+  it('uses the supplied blue symbol in both themes without an inverse recoloring', () => {
     const { container } = render(<BrandMark tileClassName="size-8" markClassName="size-5" />);
 
-    const positive = container.querySelector('img[src="/brand/pharos-mark.svg"]');
-    const inverse = container.querySelector('img[src="/brand/pharos-mark-inverse.svg"]');
-
-    expect(positive).not.toBeNull();
-    expect(inverse).not.toBeNull();
-
-    // CSS, not JavaScript, decides which one paints — `next-themes` resolves
-    // the theme on the client, so a component that branched on `useTheme()`
-    // would render the wrong mark for one paint on every load.
-    expect(positive?.className).toContain('dark:hidden');
-    expect(inverse?.className).toContain('dark:block');
+    const images = container.querySelectorAll('img');
+    expect(images).toHaveLength(1);
+    expect(images[0]).toHaveAttribute('src', '/brand/pharos/symbol-96.png');
+    expect(images[0]).not.toHaveClass('dark:hidden', 'hidden');
   });
 
   it('drops the white tile in the dark theme rather than keeping a lighter one', () => {

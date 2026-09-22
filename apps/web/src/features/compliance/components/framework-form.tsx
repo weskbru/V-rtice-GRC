@@ -33,6 +33,16 @@ import { Loader2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
+import { complianceApi } from '../api';
+
+import type {
+  CreateFrameworkRequest,
+  Framework,
+  FrameworkOrigin,
+  UpdateFrameworkRequest,
+} from '../types';
+import type { ApiProblem } from '@/lib/api-client';
+
 import { feedback } from '@/components/shell/feedback-provider';
 import { useNavigate } from '@/components/shell/navigation-pending';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -51,16 +61,6 @@ import { common } from '@/lib/messages/common';
 import { compliance } from '@/lib/messages/compliance';
 import { frameworkFormSchema, type FrameworkFormValues } from '@/lib/validation/compliance';
 
-import { complianceApi } from '../api';
-
-import type {
-  CreateFrameworkRequest,
-  Framework,
-  FrameworkOrigin,
-  UpdateFrameworkRequest,
-} from '../types';
-import type { ApiProblem } from '@/lib/api-client';
-
 export interface FrameworkFormSavedResult {
   framework: Framework;
   etag: string;
@@ -72,6 +72,7 @@ export interface FrameworkFormProps {
   /** The `ETag` last read for `framework`. Required when `mode === 'edit'`. */
   etag?: string;
   onSaved: (result: FrameworkFormSavedResult) => void;
+  onCancel?: () => void;
 }
 
 interface ConflictState {
@@ -108,6 +109,7 @@ export function FrameworkForm({
   framework,
   etag,
   onSaved,
+  onCancel,
 }: FrameworkFormProps): React.JSX.Element {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
@@ -395,7 +397,7 @@ export function FrameworkForm({
           type="button"
           variant="outline"
           disabled={submitting}
-          onClick={() => navigate.back()}
+          onClick={() => (onCancel ? onCancel() : navigate.back())}
         >
           {common.actions.cancel}
         </Button>

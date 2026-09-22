@@ -209,9 +209,11 @@ Contratos: `specs/003-controls-management/contracts/`, `specs/004-compliance-man
   `finding-control-link.spec.ts`, `requirement-compliance-audit-mark.spec.ts`,
   `requirement-compliance-state-reachability.spec.ts`, `requirement-control-link.spec.ts`,
   `risk-control-link.spec.ts`, `compliance-summary-performance.spec.ts`.
-- **E2E/acessibilidade**: **nenhum spec dedicado** (F-55). `accessibility.spec.ts` cobre apenas a
-  aba "Controles vinculados" embutida em risco/ativo/processo e o catálogo `/controls` — não
-  `/compliance` em nenhuma tela.
+- **E2E/acessibilidade**: `apps/web/e2e/compliance.spec.ts` cobre o cadastro de framework pela
+  biblioteca normativa; `accessibility.spec.ts` varre o catálogo `/compliance` em repouso, nos
+  temas claro e escuro — o painel de filtros aberto **não** entra em nenhuma das duas varreduras.
+  Versões, requisitos e mapeamentos continuam sem E2E dedicado (F-55, resolvido para o catálogo
+  em 2026-09-19).
 
 ## Onde vive o código
 
@@ -227,3 +229,7 @@ Contratos: `specs/003-controls-management/contracts/`, `specs/004-compliance-man
   (linha ~2564), `FrameworkVersion` (~2587), `Requirement` (~2622), `RequirementControlLink`
   (~2670), `RequirementComplianceState` (~2546), `RequirementControlMappingMigration`(`Item`),
   `RequirementApplicabilityDeclaration`, `RequirementComplianceAuditMark` (~2692–2773).
+
+## Refinamento V2 do detalhe de Framework (2026-09-21)
+
+O detalhe do framework passou a usar o `DetailLayout` compartilhado, breadcrumb, navegação compacta com `?section=` e edição em painel lateral. A visão geral separa descrição e contexto normativo usando apenas origem e datas já presentes no payload. A seção de versões, a criação de versão e todas as regras de publicação permanecem inalteradas.

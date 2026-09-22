@@ -7,13 +7,15 @@
  * sign-in form they do not need (reuses the same server-side session check
  * `(app)/layout.tsx` uses, ADR-014).
  */
+import { Shield } from 'lucide-react';
 import { redirect } from 'next/navigation';
 
-import { BrandMark } from '@/components/shell/brand-mark';
+import { PharosSymbol } from '@/components/branding/pharos-symbol';
 import { auth } from '@/lib/messages/auth';
 import { fetchCurrentSession } from '@/lib/server-session';
 
 import { LoginForm } from './login-form';
+import styles from './login.module.css';
 
 import type { Metadata } from 'next';
 
@@ -44,34 +46,60 @@ export default async function LoginPage({
   const returnTo = sanitizeReturnTo(typeof rawReturnTo === 'string' ? rawReturnTo : undefined);
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-muted/40 px-4 py-12">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          {/*
-           * Brand mark — the same `BrandMark` the sidebar uses, sized up for a
-           * sign-in card rather than a compact nav rail: [symbol] + live text per
-           * CLAUDE.md §18.6, rather than an image of the full wordmark. It used to
-           * inline the positive mark on a permanent white tile, which is the same
-           * dark-theme defect the sidebar carried (see `brand-mark.tsx`'s header) —
-           * one component now owns the per-theme asset choice for both.
-           */}
-          <BrandMark tileClassName="size-12" markClassName="size-7" />
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-xl font-semibold tracking-tight text-foreground">
-              {auth.brand.name}
-            </span>
-            <p className="text-sm text-muted-foreground">{auth.brand.tagline}</p>
+    <main className={styles.page}>
+      <div className={styles.space} aria-hidden="true">
+        <picture>
+          <source
+            media="(min-width: 900px)"
+            srcSet="/brand/login/proteus-1280.webp 1280w, /brand/login/proteus-1672.webp 1672w"
+            sizes="(max-width: 1199px) 100vw, 90vw"
+            type="image/webp"
+          />
+          {/* A transparent fallback avoids downloading the decorative artwork on mobile. */}
+          <img
+            src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
+            alt=""
+            width={1672}
+            height={941}
+            decoding="async"
+          />
+        </picture>
+      </div>
+      <div className={styles.diagonal} aria-hidden="true" />
+      <section className={styles.institutional} aria-label={auth.login.institutionalAriaLabel}>
+        <div className={styles.content}>
+          <header className={styles.brand}>
+            <div className={styles.wordmark}>
+              <PharosSymbol className={styles.symbol} />
+              <span>{auth.brand.name}</span>
+            </div>
+            <p className={styles.tagline}>{auth.brand.tagline}</p>
+          </header>
+          <div className={styles.intro}>
+            <h2>{auth.login.slogan}</h2>
+            <p>{auth.login.introduction}</p>
+          </div>
+          <div className={styles.card}>
+            <h1>{auth.login.heading}</h1>
+            <p className={styles.subheading}>{auth.login.subheading}</p>
+            <LoginForm returnTo={returnTo} />
+            <div className={styles.restricted}>{auth.login.restricted}</div>
+            <div className={styles.provisioning}>
+              <Shield aria-hidden="true" />
+              <p>{auth.login.footer}</p>
+            </div>
           </div>
         </div>
-
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h1 className="mb-1 text-lg font-semibold text-foreground">{auth.login.heading}</h1>
-          <p className="mb-6 text-sm text-muted-foreground">{auth.login.subheading}</p>
-          <LoginForm returnTo={returnTo} />
-        </div>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">{auth.login.footer}</p>
-      </div>
-    </div>
+        <footer className={styles.signature}>
+          <p>{auth.login.institution}</p>
+          <p>{auth.login.signature}</p>
+        </footer>
+      </section>
+      <aside className={styles.story} aria-labelledby="proteus-heading">
+        <p className={styles.eyebrow}>{auth.login.inspiredBy}</p>
+        <h2 id="proteus-heading">{auth.login.proteus}</h2>
+        <p>{auth.login.origin}</p>
+      </aside>
+    </main>
   );
 }

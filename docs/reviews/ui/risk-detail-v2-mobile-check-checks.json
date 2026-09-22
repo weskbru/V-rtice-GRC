@@ -1,0 +1,44 @@
+[
+  {
+    "theme": "light",
+    "width": 390,
+    "overflow": false,
+    "summaryHeight": 300,
+    "height": 3219,
+    "axe": [
+      {
+        "id": "scrollable-region-focusable",
+        "nodes": [
+          {
+            "target": [
+              ".pb-1"
+            ],
+            "html": "<div class=\"overflow-x-auto pb-1\">",
+            "summary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "width": 390,
+    "overflow": false,
+    "summaryHeight": 300,
+    "height": 3219,
+    "axe": [
+      {
+        "id": "scrollable-region-focusable",
+        "nodes": [
+          {
+            "target": [
+              ".pb-1"
+            ],
+            "html": "<div class=\"overflow-x-auto pb-1\">",
+            "summary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+          }
+        ]
+      }
+    ]
+  }
+]

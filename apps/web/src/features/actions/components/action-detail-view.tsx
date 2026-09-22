@@ -124,7 +124,7 @@ import {
   LoadingState,
   StatusBadge,
 } from '@pharos/design-system/components';
-import { AlertTriangle, Pencil } from 'lucide-react';
+import { AlertTriangle, Eye, History, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Link } from '@/components/navigation/link';
@@ -280,6 +280,11 @@ export function ActionDetailView({ actionId }: ActionDetailViewProps): React.JSX
               {
                 id: 'overview',
                 label: actions.detail.sections.overview,
+                // `Eye` matches every other detail screen's own overview
+                // tab; `History` (below) matches the exact icon
+                // Risk/Problem/Incident already use for their own audit-
+                // trail-bearing "Registro" group (CLAUDE.md §18.12).
+                icon: Eye,
                 content: (
                   <div className="flex flex-col gap-6">
                     <ActionOverview action={action} />
@@ -294,6 +299,7 @@ export function ActionDetailView({ actionId }: ActionDetailViewProps): React.JSX
               {
                 id: 'audit',
                 label: actions.detail.sections.audit,
+                icon: History,
                 visible: canViewAudit,
                 content: <ActionAuditSection actionId={action.id} />,
               },

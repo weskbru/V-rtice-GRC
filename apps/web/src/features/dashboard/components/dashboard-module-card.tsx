@@ -61,10 +61,8 @@
  * stronger.
  *
  * `TONE_ACCENT_CLASSES` is exported from `dashboard-icon-chip.tsx`, not
- * declared here — `DashboardChartCard` (Fase D) uses the identical
- * calibrated value for its own base accent, and a second copy of the
- * `/45` figure is exactly how a future recalibration misses one of the
- * two.
+ * declared here, so the module-card palette and calibration remain
+ * centralized.
  *
  * ## The way in is a corner arrow, not a text row (`025-dashboard-composition` F3)
  *

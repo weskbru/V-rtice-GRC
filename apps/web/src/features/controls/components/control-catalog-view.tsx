@@ -3,12 +3,17 @@
 /**
  * PharosGRC — control catalog screen (T045), mirroring
  * `risk-register-view.tsx` (CLAUDE.md §18.12): the same
- * summary/filters/results-bar/cards-or-table/pagination/quick-view
+ * summary/filters/results-bar/cards-or-table/pagination
  * orchestration, reused rather than reinvented for Controls.
  *
  * Never fetches more than the current page (SC-008 — the catalog must
  * render in under 2 seconds against 50,000 controls) and never sorts,
  * filters or paginates client-side.
+ *
+ * Selecting a card navigates straight to the full record at
+ * `/controls/{id}` — there is no intermediate quick-view panel (mirrors
+ * `risk-register-view.tsx`'s own removal of the same mechanism). The grid
+ * uses the full width available to it.
  */
 import {
   ColumnVisibilityMenu,
@@ -21,13 +26,12 @@ import {
   type VisibilityState,
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { controlsApi } from '../api';
 import { CATALOG_PAGE_SIZE_OPTIONS, useCatalogState } from '../hooks/use-catalog-state';
 
 import { ControlCardGrid } from './control-card-grid';
-import { ControlQuickView } from './control-quick-view';
 import {
   CONTROL_REGISTER_HIDEABLE_COLUMNS,
   buildControlRegisterColumns,
@@ -53,7 +57,6 @@ import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api-client';
 import { common } from '@/lib/messages/common';
 import { controls } from '@/lib/messages/controls';
-import { cn } from '@/lib/utils';
 
 const VIEW_OPTIONS = [
   {
@@ -86,7 +89,6 @@ export function ControlCatalogView(): React.JSX.Element {
     setPage,
     setPageSize,
     setView,
-    setSelectedControlId,
     clearFilters,
     hasActiveFilters,
     activeFilterCount,
@@ -177,22 +179,6 @@ export function ControlCatalogView(): React.JSX.Element {
     }
   }, [loading, state.page, totalPages, setPage]);
 
-  const returnFocusControlIdRef = useRef<string | null>(null);
-
-  function handleQuickViewClose(): void {
-    returnFocusControlIdRef.current = state.selectedControlId;
-    setSelectedControlId(null);
-  }
-
-  useEffect(() => {
-    const controlId = returnFocusControlIdRef.current;
-    if (!controlId || state.selectedControlId !== null) return;
-    returnFocusControlIdRef.current = null;
-    document
-      .querySelector<HTMLElement>(`[data-control-card-select="${CSS.escape(controlId)}"]`)
-      ?.focus();
-  }, [state.selectedControlId]);
-
   const columns = useMemo(() => buildControlRegisterColumns(), []);
 
   const sorting: SortingState = [{ id: state.sort, desc: state.direction === 'desc' }];
@@ -216,10 +202,6 @@ export function ControlCatalogView(): React.JSX.Element {
   );
 
   const isCardView = state.view === 'cards';
-  const quickViewControlId = isCardView ? state.selectedControlId : null;
-  const selectedControl = quickViewControlId
-    ? (rows.find((row) => row.id === quickViewControlId) ?? null)
-    : null;
 
   const presentationControls = (
     <>
@@ -299,44 +281,24 @@ export function ControlCatalogView(): React.JSX.Element {
       </ResultsToolbar>
 
       {isCardView ? (
-        <div
-          className={cn(
-            'grid grid-cols-1 items-start gap-4',
-            quickViewControlId && 'xl:grid-cols-[minmax(0,1fr)_22rem]',
-          )}
-        >
-          <div className="flex min-w-0 flex-col gap-4">
-            <ControlCardGrid
-              controls={rows}
-              selectedControlId={quickViewControlId}
-              onSelect={setSelectedControlId}
-              isLoading={loading}
-              emptyContent={emptyContent}
-              error={error}
-              errorAction={errorAction}
-              compact={Boolean(quickViewControlId)}
-            />
+        <div className="flex min-w-0 flex-col gap-4">
+          <ControlCardGrid
+            controls={rows}
+            isLoading={loading}
+            emptyContent={emptyContent}
+            error={error}
+            errorAction={errorAction}
+          />
 
-            {!error && rows.length > 0 ? (
-              <PaginationFooter
-                showPageSize={false}
-                pageIndex={state.page - 1}
-                pageSize={state.pageSize}
-                totalRows={total}
-                onPageIndexChange={(index) => setPage(index + 1)}
-                onPageSizeChange={setPageSize}
-                labels={common.dataTable}
-              />
-            ) : null}
-          </div>
-
-          {quickViewControlId ? (
-            <ControlQuickView
-              key={quickViewControlId}
-              controlId={quickViewControlId}
-              summary={selectedControl}
-              onClose={handleQuickViewClose}
-              className="xl:sticky xl:top-4"
+          {!error && rows.length > 0 ? (
+            <PaginationFooter
+              showPageSize={false}
+              pageIndex={state.page - 1}
+              pageSize={state.pageSize}
+              totalRows={total}
+              onPageIndexChange={(index) => setPage(index + 1)}
+              onPageSizeChange={setPageSize}
+              labels={common.dataTable}
             />
           ) : null}
         </div>
