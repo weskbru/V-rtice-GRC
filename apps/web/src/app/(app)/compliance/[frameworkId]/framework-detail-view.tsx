@@ -7,18 +7,25 @@
  * framework does not exist or the caller lacks `compliance:view`.
  */
 import {
+  DetailLayout,
   EmptyState,
   EntityHeader,
   EntityTabs,
   ErrorState,
   LoadingState,
 } from '@pharos/design-system/components';
-import { Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Eye, Layers, Pencil } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
 
+import type { Framework } from '@/features/compliance/types';
+import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
+
+import { useDetailSection } from '@/components/detail/use-detail-section';
+import { Link } from '@/components/navigation/link';
 import { Button } from '@/components/ui/button';
 import { complianceApi } from '@/features/compliance/api';
-import { FrameworkForm } from '@/features/compliance/components/framework-form';
+import { FrameworkEditPanel } from '@/features/compliance/components/detail/framework-edit-panel';
+import { FrameworkOverview } from '@/features/compliance/components/framework-overview';
 import { FrameworkVersionListSection } from '@/features/compliance/components/framework-version-list-section';
 import { formatTimestampDate } from '@/features/compliance/date';
 import { ApiError } from '@/lib/api-client';
@@ -26,14 +33,21 @@ import { common } from '@/lib/messages/common';
 import { compliance } from '@/lib/messages/compliance';
 import { usePermissions } from '@/lib/permissions';
 
-import type { Framework } from '@/features/compliance/types';
-import type { ErrorStateProblem } from '@pharos/design-system/components';
-
 export interface FrameworkDetailViewProps {
   frameworkId: string;
 }
 
 export function FrameworkDetailView({ frameworkId }: FrameworkDetailViewProps): React.JSX.Element {
+  return (
+    <Suspense
+      fallback={<LoadingState variant="block" label={compliance.frameworkDetail.loading} />}
+    >
+      <FrameworkDetailViewContent frameworkId={frameworkId} />
+    </Suspense>
+  );
+}
+
+function FrameworkDetailViewContent({ frameworkId }: FrameworkDetailViewProps): React.JSX.Element {
   const { hasPermission } = usePermissions();
   const [framework, setFramework] = useState<Framework | null>(null);
   const [etag, setEtag] = useState<string | null>(null);
@@ -76,6 +90,8 @@ export function FrameworkDetailView({ frameworkId }: FrameworkDetailViewProps): 
     };
   }, [frameworkId]);
 
+  const { sectionParam, setSection } = useDetailSection();
+
   if (loading) {
     return <LoadingState variant="block" label={compliance.frameworkDetail.loading} />;
   }
@@ -95,75 +111,100 @@ export function FrameworkDetailView({ frameworkId }: FrameworkDetailViewProps): 
   }
 
   const canEdit = hasPermission('compliance:administer');
+  // `Eye` matches every other detail screen's own overview tab. `Layers`
+  // for Versões is the same "multiple, stacked records" icon this app
+  // already uses for register "total count" summary cards (`Layers` in
+  // `risk-register-summary.tsx`/`control-register-summary.tsx`/etc.) — a
+  // framework version list is exactly that shape (CLAUDE.md §18.12).
+  const tabs: EntityTab[] = [
+    {
+      id: 'overview',
+      label: compliance.frameworkDetail.sections.overview,
+      icon: Eye,
+      content: <FrameworkOverview framework={framework} />,
+    },
+    {
+      id: 'versions',
+      label: compliance.frameworkDetail.sections.versions,
+      icon: Layers,
+      content: <FrameworkVersionListSection frameworkId={framework.id} />,
+    },
+  ];
 
   return (
-    <div className="flex flex-col gap-6">
-      <EntityHeader
-        code={framework.code}
-        title={framework.name}
-        badges={
-          <span className="rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {compliance.originLabels[framework.origin]}
-          </span>
+    <>
+      <DetailLayout
+        header={
+          <EntityHeader
+            breadcrumb={
+              <>
+                <Link href="/compliance" className="hover:underline">
+                  {compliance.frameworkDetail.breadcrumbLabel}
+                </Link>
+                <span aria-hidden="true"> › </span>
+                <span>{framework.code}</span>
+              </>
+            }
+            code={framework.code}
+            title={framework.name}
+            badges={
+              <span className="rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {compliance.originLabels[framework.origin]}
+              </span>
+            }
+            metadata={
+              <>
+                <span>
+                  {compliance.frameworkDetail.metadata.createdAt(
+                    formatTimestampDate(framework.createdAt),
+                  )}
+                </span>
+                <span>
+                  {compliance.frameworkDetail.metadata.updatedAt(
+                    formatTimestampDate(framework.updatedAt),
+                  )}
+                </span>
+              </>
+            }
+            actions={
+              canEdit ? (
+                <Button variant="outline" onClick={() => setEditing(true)}>
+                  <Pencil aria-hidden="true" className="size-4" />
+                  {compliance.frameworkDetail.editAction}
+                </Button>
+              ) : null
+            }
+          />
         }
-        metadata={
-          <>
-            <span>
-              {compliance.frameworkDetail.metadata.createdAt(
-                formatTimestampDate(framework.createdAt),
-              )}
-            </span>
-            <span>
-              {compliance.frameworkDetail.metadata.updatedAt(
-                formatTimestampDate(framework.updatedAt),
-              )}
-            </span>
-          </>
-        }
-        actions={
-          canEdit && !editing ? (
-            <Button variant="outline" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden="true" className="size-4" />
-              {compliance.frameworkDetail.editAction}
-            </Button>
-          ) : null
+        navigation={
+          <EntityTabs
+            ariaLabel={common.entityTabs.sectionsAriaLabel}
+            scrollLabels={{
+              scrollBack: common.entityTabs.scrollBack,
+              scrollForward: common.entityTabs.scrollForward,
+            }}
+            value={sectionParam ?? ''}
+            onValueChange={setSection}
+            tabs={tabs}
+            size="compact"
+          />
         }
       />
 
-      <EntityTabs
-        ariaLabel={common.entityTabs.sectionsAriaLabel}
-        scrollLabels={{
-          scrollBack: common.entityTabs.scrollBack,
-          scrollForward: common.entityTabs.scrollForward,
-        }}
-        tabs={[
-          {
-            id: 'overview',
-            label: compliance.frameworkDetail.sections.overview,
-            content: editing ? (
-              <FrameworkForm
-                mode="edit"
-                framework={framework}
-                etag={etag}
-                onSaved={(result) => {
-                  setFramework(result.framework);
-                  setEtag(result.etag);
-                  setEditing(false);
-                }}
-              />
-            ) : (
-              <p className="max-w-3xl whitespace-pre-wrap text-sm text-foreground">
-                {framework.description}
-              </p>
-            ),
-          },
-          {
-            id: 'versions',
-            label: compliance.frameworkDetail.sections.versions,
-            content: <FrameworkVersionListSection frameworkId={framework.id} />,
-          },
-        ]}
-      />
-    </div>
+      {editing ? (
+        <FrameworkEditPanel
+          framework={framework}
+          etag={etag}
+          onOpenChange={(open) => {
+            if (!open) setEditing(false);
+          }}
+          onSaved={(result) => {
+            setFramework(result.framework);
+            setEtag(result.etag);
+            setEditing(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

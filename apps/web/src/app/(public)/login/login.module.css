@@ -1,0 +1,352 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.space {
+  position: absolute;
+  inset: 0 0 0 35%;
+  overflow: hidden;
+  background: #020d20;
+  z-index: -2;
+}
+
+.space picture,
+.space img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: left center;
+}
+
+.diagonal {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 46%;
+  background: linear-gradient(160deg, #8eb6f4, #17324d 65%);
+  clip-path: polygon(0 0, 78% 0, 100% 100%, 0 100%);
+  z-index: -1;
+}
+
+.diagonal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--background);
+  clip-path: polygon(0 0, 75.7% 0, 97.8% 100%, 0 100%);
+}
+
+.institutional {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  width: 45%;
+  padding: clamp(32px, 8.8vh, 100px) 0 32px;
+}
+
+.content {
+  width: min(28vw, 460px);
+  margin-left: 5.4vw;
+}
+
+.brand {
+  margin-left: 16px;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: clamp(28px, 2.35vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  color: var(--primary-on-surface);
+}
+
+.symbol {
+  width: 42px;
+  height: 62px;
+  flex-shrink: 0;
+}
+
+.tagline {
+  margin-top: 6px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.intro {
+  margin: 34px 0 26px 16px;
+}
+
+.intro h2 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.intro p {
+  margin-top: 6px;
+  max-width: 330px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 2px 8px rgb(23 50 77 / 0.06);
+  padding: 28px;
+}
+
+.card h1 {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.subheading {
+  max-width: 310px;
+  margin: 6px 0 24px;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.restricted {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0 20px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.restricted::before,
+.restricted::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.provisioning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--primary-on-surface);
+}
+
+.provisioning svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.provisioning p {
+  max-width: 290px;
+}
+
+.signature {
+  margin: auto 0 0 5.4vw;
+  width: min(28vw, 460px);
+  padding-top: 36px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.signature p:first-child {
+  font-weight: 600;
+}
+
+.story {
+  position: absolute;
+  left: 47%;
+  bottom: 16%;
+  width: 350px;
+  max-width: 40%;
+  color: #cbd9ee;
+  text-shadow: 0 2px 12px #020d20;
+}
+
+.story::before {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 2px;
+  margin-bottom: 20px;
+  background: linear-gradient(90deg, #379cff 60%, #234574 60%);
+}
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+}
+.story h2 {
+  margin-top: 8px;
+  font-size: 42px;
+  line-height: 1.2;
+  font-weight: 400;
+  color: #fff;
+}
+.story p:last-child {
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+@media (min-width: 1100px) and (max-height: 820px) {
+  .institutional {
+    padding-top: 28px;
+    padding-bottom: 20px;
+  }
+  .intro {
+    margin-top: 22px;
+    margin-bottom: 20px;
+  }
+  .card {
+    padding: 24px;
+  }
+  .signature {
+    padding-top: 22px;
+  }
+}
+
+@media (max-width: 1199px) {
+  .signature {
+    margin-left: 28px;
+    width: 390px;
+    max-width: calc(100% - 56px);
+  }
+  .institutional {
+    width: 56%;
+    padding-top: 36px;
+  }
+  .content {
+    width: 390px;
+    max-width: calc(100% - 56px);
+    margin-left: 28px;
+  }
+  .diagonal {
+    width: 58%;
+  }
+  .space {
+    left: 44%;
+  }
+  .story {
+    left: 60%;
+    max-width: 34%;
+    bottom: 12%;
+  }
+  .wordmark {
+    font-size: 32px;
+  }
+  .brand,
+  .intro {
+    margin-left: 0;
+  }
+  .tagline {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 899px) {
+  .space,
+  .diagonal,
+  .story {
+    display: none;
+  }
+  .institutional {
+    width: 100%;
+    padding: 32px 20px 24px;
+  }
+  .content {
+    width: 440px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .signature {
+    margin: auto auto 0;
+    padding-top: 24px;
+    width: 440px;
+    max-width: 100%;
+  }
+  .intro {
+    margin-top: 24px;
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .institutional {
+    padding: 24px 16px;
+  }
+  .wordmark {
+    font-size: 30px;
+    gap: 16px;
+  }
+  .symbol {
+    width: 32px;
+    height: 48px;
+  }
+  .tagline {
+    font-size: 12px;
+  }
+  .intro h2 {
+    font-size: 20px;
+  }
+  .intro p {
+    font-size: 14px;
+  }
+  .card {
+    padding: 24px;
+  }
+  .signature {
+    padding-top: 20px;
+  }
+}
+
+@media (min-width: 900px) and (max-height: 820px) {
+  .signature {
+    display: none;
+  }
+  .institutional {
+    padding-top: 24px;
+    padding-bottom: 20px;
+  }
+  .intro {
+    margin-top: 20px;
+    margin-bottom: 18px;
+  }
+  .card {
+    padding: 24px;
+  }
+}
+
+@media (min-width: 900px) and (min-height: 821px) and (max-height: 920px) {
+  .institutional {
+    padding-top: 40px;
+  }
+  .signature {
+    padding-top: 20px;
+  }
+}
+
+@media (min-width: 900px) and (max-height: 880px) {
+  .signature {
+    display: none;
+  }
+}

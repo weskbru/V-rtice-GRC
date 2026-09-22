@@ -189,10 +189,15 @@ async function signIn(page) {
   // Exact labels, matching e2e/support/admin-session.ts: a loose /senha/i also
   // matches "Senha atual", "Nova senha" and "Confirmar nova senha" on the
   // password-change screen, which Playwright rejects under strict mode.
+  // `getByLabel('Senha')` on its own no longer works either, for a different
+  // reason: it matches by SUBSTRING by default, and the reveal-password
+  // button's `aria-label="Mostrar senha"` also contains "senha", so it now
+  // resolves 2 elements. Anchoring to the textbox role excludes that button
+  // explicitly instead of relying on substring luck.
   for (const password of PASSWORDS) {
     await page.goto(`${ORIGIN}/login`, { waitUntil: 'networkidle' });
     await page.getByLabel('E-mail').fill(EMAIL);
-    await page.getByLabel('Senha').fill(password);
+    await page.getByRole('textbox', { name: 'Senha', exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar' }).click();
     try {
       // 30s, not 12s: against a freshly (re)started dev server this is the
@@ -1803,18 +1808,12 @@ if (await assessmentsTab.count()) {
   }
 }
 
-// Control catalog: the two views and the quick view (003-controls-management,
-// mirroring the risk register block above — CLAUDE.md §18.12).
+// Control catalog: the table view (003-controls-management, mirroring the
+// risk register block above — CLAUDE.md §18.12). There is no quick-view
+// panel to capture any more: a card's links navigate straight to the full
+// record.
 await page.goto(`${ORIGIN}/controls`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(600);
-
-const firstControlCard = page.getByRole('button', { name: /^Abrir prévia de/ }).first();
-if (await firstControlCard.count()) {
-  await firstControlCard.click();
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(400);
-  await shoot(page, '20b-control-catalog-quick-view');
-}
 
 const controlTableToggle = page.getByRole('radio', { name: 'Exibir como tabela' });
 if (await controlTableToggle.count()) {

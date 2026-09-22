@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 
 import { ControlCard } from './control-card';
 
@@ -28,53 +28,30 @@ const baseControl: ControlSummary = {
 
 describe('ControlCard', () => {
   it('renders the last update as a calendar date, never "Invalid Date"', () => {
-    render(<ControlCard control={baseControl} selected={false} onSelect={vi.fn()} />);
+    render(<ControlCard control={baseControl} />);
 
     expect(screen.getByText('Atualizado em 04/09/2026')).toBeInTheDocument();
     expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument();
   });
 
   it('renders the code as a link to the full record', () => {
-    render(<ControlCard control={baseControl} selected={false} onSelect={vi.fn()} />);
+    render(<ControlCard control={baseControl} />);
 
     const link = screen.getByRole('link', { name: 'CTL-2026-0001' });
     expect(link).toHaveAttribute('href', '/controls/control-1');
   });
 
-  it('calls onSelect with the control id when the name button is clicked', () => {
-    const onSelect = vi.fn();
-    render(<ControlCard control={baseControl} selected={false} onSelect={onSelect} />);
+  it('renders the name as a link to the same full record, with the "Abrir o controle" accessible name', () => {
+    render(<ControlCard control={baseControl} />);
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Abrir prévia de CTL-2026-0001 — Revisão trimestral de acessos privilegiados',
-      }),
-    );
-
-    expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect).toHaveBeenCalledWith('control-1');
-  });
-
-  it('exposes selection state via aria-pressed on the name button', () => {
-    const { rerender } = render(
-      <ControlCard control={baseControl} selected={false} onSelect={vi.fn()} />,
-    );
-    expect(screen.getByRole('button', { name: /Abrir prévia/ })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
-
-    rerender(<ControlCard control={baseControl} selected onSelect={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /Abrir prévia/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    const link = screen.getByRole('link', {
+      name: 'Abrir o controle CTL-2026-0001: Revisão trimestral de acessos privilegiados',
+    });
+    expect(link).toHaveAttribute('href', '/controls/control-1');
   });
 
   it('renders status and effectiveness each with an icon, a colour and a text label — never colour alone', () => {
-    const { container } = render(
-      <ControlCard control={baseControl} selected={false} onSelect={vi.fn()} />,
-    );
+    const { container } = render(<ControlCard control={baseControl} />);
 
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Efetivo')).toBeInTheDocument();
@@ -83,14 +60,14 @@ describe('ControlCard', () => {
 
   it('renders "Sem responsável definido", never a blank field, for a control with no owner', () => {
     const unowned: ControlSummary = { ...baseControl, owner: null };
-    render(<ControlCard control={unowned} selected={false} onSelect={vi.fn()} />);
+    render(<ControlCard control={unowned} />);
 
     expect(screen.getByText('Sem responsável definido')).toBeInTheDocument();
   });
 
   it('never shows the description excerpt when there is none', () => {
     const noDescription: ControlSummary = { ...baseControl, descriptionExcerpt: null };
-    render(<ControlCard control={noDescription} selected={false} onSelect={vi.fn()} />);
+    render(<ControlCard control={noDescription} />);
 
     expect(
       screen.queryByText('Descrição resumida do controle para pré-visualização.'),

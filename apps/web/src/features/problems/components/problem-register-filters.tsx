@@ -86,6 +86,7 @@ export function ProblemRegisterFilters({
 
   return (
     <FilterBar
+      variant="register"
       label={filters.regionLabel}
       searchLabel={filters.searchLabel}
       searchValue={searchValue}

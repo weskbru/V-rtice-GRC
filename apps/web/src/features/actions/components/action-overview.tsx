@@ -84,15 +84,15 @@ import {
   User,
 } from 'lucide-react';
 
-import { DetailField } from '@/components/detail/detail-field';
-import { Link } from '@/components/navigation/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { actions } from '@/lib/messages/actions';
-
 import { formatDateOnly, formatTimestamp } from '../../risks/date';
 import { actionOriginHref } from '../origin';
 
 import type { Action } from '../types';
+
+import { DetailField } from '@/components/detail/detail-field';
+import { Link } from '@/components/navigation/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { actions } from '@/lib/messages/actions';
 
 export interface ActionOverviewProps {
   action: Action;
@@ -111,49 +111,51 @@ export function ActionOverview({ action }: ActionOverviewProps): React.JSX.Eleme
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <FileText aria-hidden="true" className="size-4 text-muted-foreground" />
-            {overview.descriptionCardTitle}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {action.description?.trim() ? (
-            <p className="whitespace-pre-wrap text-sm text-foreground">{action.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">{overview.descriptionEmpty}</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Milestone aria-hidden="true" className="size-4 text-muted-foreground" />
-            {overview.originCardTitle}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-1">
-          {showOriginTypeEyebrow ? (
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {originTypeLabel}
-            </p>
-          ) : null}
-          <p className="text-base font-medium text-foreground">
-            {originHref ? (
-              <Link
-                href={originHref}
-                className="text-primary-on-surface underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {originLabel}
-              </Link>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText aria-hidden="true" className="size-4 text-muted-foreground" />
+              {overview.descriptionCardTitle}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {action.description?.trim() ? (
+              <p className="whitespace-pre-wrap text-sm text-foreground">{action.description}</p>
             ) : (
-              originLabel
+              <p className="text-sm text-muted-foreground">{overview.descriptionEmpty}</p>
             )}
-          </p>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Milestone aria-hidden="true" className="size-4 text-muted-foreground" />
+              {overview.originCardTitle}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1">
+            {showOriginTypeEyebrow ? (
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {originTypeLabel}
+              </p>
+            ) : null}
+            <p className="text-base font-medium text-foreground">
+              {originHref ? (
+                <Link
+                  href={originHref}
+                  className="text-primary-on-surface underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {originLabel}
+                </Link>
+              ) : (
+                originLabel
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>

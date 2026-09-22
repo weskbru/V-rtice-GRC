@@ -114,6 +114,7 @@ export function MyActionsFilters({
 
   return (
     <FilterBar
+      variant="register"
       label={filters.regionLabel}
       searchTrailing={presentationControls}
       collapsible

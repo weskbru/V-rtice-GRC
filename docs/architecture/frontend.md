@@ -30,6 +30,10 @@ permanente). Todo trecho de código citado aqui foi verificado no código-fonte 
 Dois grupos de rota:
 
 - **`src/app/(public)/login/page.tsx`** — tela pública de login.
+  A composição visual Proteu, seu símbolo vetorial e a proveniência do asset fornecido estão em
+  [Login — referência Proteu](../brand/login-proteus.md). O formulário mantém a leitura direta do
+  DOM de D-21, com mostrar/ocultar senha local e bloqueio de submissões concorrentes; endpoints,
+  resolução de sessão e redirecionamentos permanecem no fluxo existente.
 - **`src/app/(app)/`** — tudo autenticado, renderizado dentro de `AppShell`
   (`src/components/shell/app-shell.tsx`). Cada módulo GRC é um diretório com `page.tsx` (lista) e,
   quando aplicável, `[id]/page.tsx` (detalhe) e `new/page.tsx` (criação):

@@ -158,6 +158,7 @@ export function IncidentRegisterFilters({
         />
       ) : null}
       <FilterBar
+        variant="register"
         label={filters.regionLabel}
         searchLabel={incidents.register.searchLabel}
         searchValue={searchValue}

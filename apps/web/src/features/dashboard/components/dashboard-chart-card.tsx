@@ -12,7 +12,7 @@
  * same register, and the row above already carries the way into it. A third
  * "Ver riscos" link on the same screen is noise, not navigation.
  *
- * ## Area tint, via the icon chip and a thin base accent — never the surface
+ * ## Area tint via the icon chip
  *
  * Dashboard V2 Fase D: before this, "Distribuições" was the one section
  * still wearing the plain pre-V2 card, unconnected to either colour rule the
@@ -20,13 +20,12 @@
  * own header has the full reasoning for why the answer here is AREA (not
  * severity — a distribution has no single severity to report) applied
  * through the exact same restrained mechanism `DashboardModuleCard` already
- * uses: `DashboardIconChip` at its default `variant="chip"` beside the
- * title, and `TONE_ACCENT_CLASSES` (shared, calibrated `/45` opacity) as a
- * thin strip along the card's own bottom edge — never a wash behind the
- * chart itself. A chart's `<svg>`/`<table>` already carries its own
- * meaningful colour (risk level, status, reused unchanged from
- * `chart-tokens.ts`); this card's own chrome adds identity without adding a
- * second, competing colour anywhere near the data.
+ * uses `DashboardIconChip` at its default `variant="chip"` beside the
+ * title. The chart's `<svg>`/`<table>` already carries meaningful colour
+ * (risk level or status, reused unchanged from `chart-tokens.ts`), so a
+ * second coloured strip at the bottom read as a leftover rule after the
+ * chart grid. The icon chip is enough to identify the area while the card
+ * ends cleanly with its ordinary border.
  *
  * ## The title is a real `<h3>`, not the shared `CardTitle` primitive
  *
@@ -44,10 +43,11 @@
  * component, so the visual result is byte-identical and the semantics are
  * now correct.
  */
+
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-import { DashboardIconChip, TONE_ACCENT_CLASSES } from './dashboard-icon-chip';
+import { DashboardIconChip } from './dashboard-icon-chip';
 
 import type { DashboardTone } from './dashboard-icon-chip';
 import type { LucideIcon } from 'lucide-react';
@@ -81,14 +81,7 @@ export function DashboardChartCard({
         </div>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      {/* flex-1: absorbs whatever leftover height a CSS grid row's
-          `align-items: stretch` gives this card over its neighbours' own
-          content height, so the accent bar below stays flush with the
-          card's real bottom edge instead of floating above blank space
-          on a shorter chart in a mixed-height row. */}
       <CardContent className="flex-1">{children}</CardContent>
-
-      <div aria-hidden="true" className={cn('h-0.5 w-full shrink-0', TONE_ACCENT_CLASSES[tone])} />
     </Card>
   );
 }

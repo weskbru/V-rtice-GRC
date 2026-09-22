@@ -284,3 +284,7 @@ CLAUDE.md §17) registra como padrão geral não resolvido para escopo de víncu
   `model IncidentProcessLink` (3184).
 - **Spec de origem**: `specs/006-assets-processes/` (spec.md, plan.md, tasks.md, research.md,
   data-model.md, contracts/, `STATE.md`).
+
+## Refinamento V2 do detalhe de Processos (2026-09-21)
+
+O detalhe de Processo passou a compor o `DetailLayout` compartilhado, com breadcrumb, tabs compactas vinculáveis por `?section=`, leitura em cards semânticos e edição em painel lateral. Situação e transições continuam usando os mesmos endpoints e permissões; Riscos, Controles e Incidentes vinculados continuam em suas seções originais, sem mudança de regra ou de carregamento.

@@ -240,10 +240,19 @@ test.describe('Accessibility (WCAG 2.1 AA) — login', () => {
 
   test('login form is fully keyboard operable with a visible focus indicator', async ({ page }) => {
     await page.goto('/login');
+    // Not `getByLabel('Senha')`: the reveal-password button's
+    // `aria-label="Mostrar senha"` contains "senha" too, so a substring
+    // label match resolves 2 elements and strict mode rejects it.
+    const passwordField = page.getByRole('textbox', { name: 'Senha', exact: true });
     await page.getByLabel('E-mail').focus();
     await expect(page.getByLabel('E-mail')).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByLabel('Senha')).toBeFocused();
+    await expect(passwordField).toBeFocused();
+    // The reveal-password toggle is a real, focusable control and belongs
+    // in the tab order — this stop is expected, not a regression to work
+    // around.
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Mostrar senha' })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Entrar' })).toBeFocused();
   });
@@ -491,7 +500,16 @@ test.describe('Accessibility (WCAG 2.1 AA) — authenticated surfaces', () => {
     await expect(page.getByText('Nenhum item no escopo deste engajamento ainda.')).toHaveCount(0);
 
     // Start the engagement (FR-002/FR-003) so a finding can be recorded.
+    // `AuditEngagementLifecycleActions` lives inside the "Visão geral" tab's
+    // own content since 91fc4e3 (aligned with every other detail screen,
+    // Riscos included, per CLAUDE.md §18.12) — it is no longer above
+    // `EntityTabs`. Radix `Tabs.Content` does not mount an inactive panel's
+    // children at all, so with "Escopo" still active above, "Iniciar
+    // engajamento" is not merely hidden — it is absent from the DOM, and
+    // `getByRole` finds zero matches. Return to "Visão geral" first.
+    await page.getByRole('tab', { name: 'Visão geral' }).click();
     const startButton = page.getByRole('button', { name: 'Iniciar engajamento' });
+    await expect(startButton).toBeVisible({ timeout: 10_000 });
     await expect(startButton).toBeEnabled({ timeout: 10_000 });
     await startButton.click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -1278,7 +1296,7 @@ test.describe('Accessibility (WCAG 2.1 AA) — authenticated surfaces', () => {
     await expect(page.getByRole('heading', { name: 'Controles' })).toBeVisible();
     await expect(
       page
-        .getByRole('button', { name: /^Abrir prévia de/ })
+        .getByRole('link', { name: /^Abrir o controle/ })
         .first()
         .or(page.getByText('Nenhum controle cadastrado ainda')),
     ).toBeVisible({ timeout: 15_000 });

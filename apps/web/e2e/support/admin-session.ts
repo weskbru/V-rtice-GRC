@@ -160,7 +160,11 @@ export async function fillLoginCredentials(
   password: string,
 ): Promise<void> {
   const emailField = page.getByLabel('E-mail');
-  const passwordField = page.getByLabel('Senha');
+  // Not `getByLabel('Senha')`: the reveal-password button's
+  // `aria-label="Mostrar senha"` contains "senha" too, so a substring label
+  // match now resolves 2 elements and strict mode rejects it. The role
+  // narrows this back to the actual `<input>`.
+  const passwordField = page.getByRole('textbox', { name: 'Senha', exact: true });
   const maxAttempts = 5;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {

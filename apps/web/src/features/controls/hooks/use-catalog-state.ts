@@ -98,11 +98,6 @@ function parsePageSize(value: string | null): number {
     : DEFAULT_PAGE_SIZE;
 }
 
-function parseSelectedControlId(value: string | null): string | null {
-  const trimmed = value?.trim() ?? '';
-  return trimmed === '' ? null : trimmed;
-}
-
 function parseSort(value: string | null): ControlRegisterSortField {
   return SORTABLE_FIELDS.includes(value as ControlRegisterSortField)
     ? (value as ControlRegisterSortField)
@@ -126,7 +121,6 @@ export interface ControlCatalogUrlState {
   orgUnitId: readonly string[];
   ownerUserId: readonly string[];
   view: ControlCatalogView;
-  selectedControlId: string | null;
 }
 
 export interface UseCatalogStateResult {
@@ -144,7 +138,6 @@ export interface UseCatalogStateResult {
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
   setView: (view: ControlCatalogView) => void;
-  setSelectedControlId: (controlId: string | null) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
   /** How many filter fields are currently applied — shown on the collapsed "Filtros" button. */
@@ -175,7 +168,6 @@ export function useCatalogState(): UseCatalogStateResult {
     orgUnitId: parseCsv(searchParams.get('orgUnitId')),
     ownerUserId: parseCsv(searchParams.get('ownerUserId')),
     view: searchParams.get('view') === 'table' ? 'table' : DEFAULT_VIEW,
-    selectedControlId: parseSelectedControlId(searchParams.get('selected')),
   };
 
   function setCsvFilter(key: string, values: readonly string[]): void {
@@ -251,22 +243,6 @@ export function useCatalogState(): UseCatalogStateResult {
         } else {
           params.set('view', view);
         }
-        if (view === 'table') {
-          params.delete('selected');
-        }
-      }, false);
-    },
-    [commit],
-  );
-
-  const setSelectedControlId = useCallback(
-    (controlId: string | null) => {
-      commit((params) => {
-        if (controlId) {
-          params.set('selected', controlId);
-        } else {
-          params.delete('selected');
-        }
       }, false);
     },
     [commit],
@@ -319,7 +295,6 @@ export function useCatalogState(): UseCatalogStateResult {
     setPage,
     setPageSize,
     setView,
-    setSelectedControlId,
     clearFilters,
     hasActiveFilters,
   };

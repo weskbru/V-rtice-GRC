@@ -12,6 +12,7 @@
  * column (`features/processes/types.ts`'s own header comment).
  */
 import {
+  DetailLayout,
   EmptyState,
   EntityHeader,
   EntityTabs,
@@ -19,12 +20,18 @@ import {
   LoadingState,
   StatusBadge,
 } from '@pharos/design-system/components';
-import { Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Eye, Pencil, ShieldAlert, ShieldCheck, Siren } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
 
+import type { ProcessDetail } from '@/features/processes/types';
+import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
+
+import { useDetailSection } from '@/components/detail/use-detail-section';
+import { Link } from '@/components/navigation/link';
 import { Button } from '@/components/ui/button';
 import { processesApi } from '@/features/processes/api';
-import { ProcessForm } from '@/features/processes/components/process-form';
+import { ProcessContextAside } from '@/features/processes/components/detail/process-context-aside';
+import { ProcessEditPanel } from '@/features/processes/components/detail/process-edit-panel';
 import { ProcessLifecycleActions } from '@/features/processes/components/process-lifecycle-actions';
 import {
   ProcessLinkedControlsSection,
@@ -39,14 +46,19 @@ import { common } from '@/lib/messages/common';
 import { processes } from '@/lib/messages/processes';
 import { usePermissions } from '@/lib/permissions';
 
-import type { ProcessDetail } from '@/features/processes/types';
-import type { ErrorStateProblem } from '@pharos/design-system/components';
-
 export interface ProcessDetailViewProps {
   processId: string;
 }
 
 export function ProcessDetailView({ processId }: ProcessDetailViewProps): React.JSX.Element {
+  return (
+    <Suspense fallback={<LoadingState variant="block" label={processes.detail.loading} />}>
+      <ProcessDetailViewContent processId={processId} />
+    </Suspense>
+  );
+}
+
+function ProcessDetailViewContent({ processId }: ProcessDetailViewProps): React.JSX.Element {
   const { hasPermission } = usePermissions();
   const [process, setProcess] = useState<ProcessDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +99,8 @@ export function ProcessDetailView({ processId }: ProcessDetailViewProps): React.
     };
   }, [processId]);
 
+  const { sectionParam, setSection } = useDetailSection();
+
   if (loading) {
     return <LoadingState variant="block" label={processes.detail.loading} />;
   }
@@ -108,88 +122,129 @@ export function ProcessDetailView({ processId }: ProcessDetailViewProps): React.
   const canEdit = hasPermission('process:edit');
   const canAdminister = hasPermission('process:administer');
 
+  // Reused, not invented (CLAUDE.md §18.12): same three icons
+  // `AssetDetailView` uses for its own Riscos/Controles/Incidentes tabs,
+  // which in turn are `navigation-registry.ts`'s own sidebar icons for
+  // those three modules. `Eye` for Visão geral matches every other detail
+  // screen's own overview tab.
+  const tabs: EntityTab[] = [
+    {
+      id: 'overview',
+      label: processes.detail.sections.overview,
+      icon: Eye,
+      content: (
+        <div className="flex flex-col gap-4">
+          <ProcessOverview process={process} />
+          <ProcessLifecycleActions
+            process={process}
+            canAdminister={canAdminister}
+            onChanged={(updated) => setProcess(updated)}
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'risks',
+      label: processes.detail.sections.risks,
+      icon: ShieldAlert,
+      content: <ProcessLinkedRisksSection risks={process.risks} />,
+    },
+    {
+      id: 'controls',
+      label: processes.detail.sections.controls,
+      icon: ShieldCheck,
+      content: <ProcessLinkedControlsSection controls={process.controls} />,
+    },
+    {
+      id: 'incidents',
+      label: processes.detail.sections.incidents,
+      icon: Siren,
+      content: <ProcessLinkedIncidentsSection processId={process.id} />,
+    },
+  ];
+
+  // Mirrors `AssetDetailView`'s own `resolvedValue` fallback exactly —
+  // a stale/absent `sectionParam` resolves to the first tab, never to
+  // nothing. Needed here (not just inside `EntityTabs`) because
+  // `ProcessContextAside`'s own `aria-current` reads the SAME resolved id.
+  const activeSectionId = tabs.some((tab) => tab.id === sectionParam) ? sectionParam! : tabs[0]!.id;
+
   return (
-    <div className="flex flex-col gap-6">
-      <EntityHeader
-        code={process.code}
-        title={process.name}
-        badges={
-          <StatusBadge
-            variant={processSituationVariant(process.isActive)}
-            label={processSituationLabel(process.isActive)}
+    <>
+      <DetailLayout
+        header={
+          <EntityHeader
+            breadcrumb={
+              <>
+                <Link href="/processes" className="hover:underline">
+                  {processes.detail.breadcrumbLabel}
+                </Link>
+                <span aria-hidden="true"> › </span>
+                <span>{process.code}</span>
+              </>
+            }
+            code={process.code}
+            title={process.name}
+            badges={
+              <StatusBadge
+                variant={processSituationVariant(process.isActive)}
+                label={processSituationLabel(process.isActive)}
+              />
+            }
+            metadata={
+              <>
+                <span>
+                  {process.orgUnit
+                    ? processes.detail.metadata.orgUnit(process.orgUnit.name)
+                    : processes.detail.metadata.noOrgUnit}
+                </span>
+                <span>
+                  {processes.detail.metadata.createdAt(formatTimestampDate(process.createdAt))}
+                </span>
+                <span>
+                  {processes.detail.metadata.updatedAt(formatTimestampDate(process.updatedAt))}
+                </span>
+              </>
+            }
+            actions={
+              canEdit ? (
+                <Button variant="outline" onClick={() => setEditing(true)}>
+                  <Pencil aria-hidden="true" className="size-4" />
+                  {processes.detail.editAction}
+                </Button>
+              ) : null
+            }
           />
         }
-        metadata={
-          <>
-            <span>
-              {process.orgUnit
-                ? processes.detail.metadata.orgUnit(process.orgUnit.name)
-                : processes.detail.metadata.noOrgUnit}
-            </span>
-            <span>
-              {processes.detail.metadata.createdAt(formatTimestampDate(process.createdAt))}
-            </span>
-            <span>
-              {processes.detail.metadata.updatedAt(formatTimestampDate(process.updatedAt))}
-            </span>
-          </>
+        navigation={
+          <EntityTabs
+            ariaLabel={common.entityTabs.sectionsAriaLabel}
+            scrollLabels={{
+              scrollBack: common.entityTabs.scrollBack,
+              scrollForward: common.entityTabs.scrollForward,
+            }}
+            value={sectionParam ?? ''}
+            onValueChange={setSection}
+            tabs={tabs}
+            size="compact"
+          />
         }
-        actions={
-          canEdit && !editing ? (
-            <Button variant="outline" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden="true" className="size-4" />
-              {processes.detail.editAction}
-            </Button>
-          ) : null
-        }
+        aside={<ProcessContextAside process={process} activeSectionId={activeSectionId} />}
+        asideLabel={processes.detail.asideLabel}
       />
 
-      <ProcessLifecycleActions
-        process={process}
-        canAdminister={canAdminister}
-        onChanged={(updated) => setProcess(updated)}
-      />
-
-      <EntityTabs
-        ariaLabel={common.entityTabs.sectionsAriaLabel}
-        scrollLabels={{
-          scrollBack: common.entityTabs.scrollBack,
-          scrollForward: common.entityTabs.scrollForward,
-        }}
-        tabs={[
-          {
-            id: 'overview',
-            label: processes.detail.sections.overview,
-            content: editing ? (
-              <ProcessForm
-                mode="edit"
-                process={process}
-                onSaved={(updated) => {
-                  setProcess(updated);
-                  setEditing(false);
-                }}
-              />
-            ) : (
-              <ProcessOverview process={process} />
-            ),
-          },
-          {
-            id: 'risks',
-            label: processes.detail.sections.risks,
-            content: <ProcessLinkedRisksSection risks={process.risks} />,
-          },
-          {
-            id: 'controls',
-            label: processes.detail.sections.controls,
-            content: <ProcessLinkedControlsSection controls={process.controls} />,
-          },
-          {
-            id: 'incidents',
-            label: processes.detail.sections.incidents,
-            content: <ProcessLinkedIncidentsSection processId={process.id} />,
-          },
-        ]}
-      />
-    </div>
+      {editing ? (
+        <ProcessEditPanel
+          process={process}
+          onOpenChange={(open) => {
+            if (!open) setEditing(false);
+          }}
+          onSaved={(updated) => {
+            setProcess(updated);
+            setEditing(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

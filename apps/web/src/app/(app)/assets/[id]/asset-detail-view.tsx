@@ -206,7 +206,7 @@ import {
   LoadingState,
   StatusBadge,
 } from '@pharos/design-system/components';
-import { Pencil } from 'lucide-react';
+import { Eye, Pencil, ShieldAlert, ShieldCheck, Siren } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
 
 import { useDetailSection } from '@/components/detail/use-detail-section';
@@ -308,10 +308,17 @@ function AssetDetailViewContent({ assetId }: AssetDetailViewProps): React.JSX.El
   const canEdit = hasPermission('asset:edit');
   const canAdminister = hasPermission('asset:administer');
 
+  // Reused, not invented (CLAUDE.md §18.12): `ShieldAlert`/`ShieldCheck`/
+  // `Siren` are the exact icons `navigation-registry.ts` already uses for
+  // the Riscos/Controles/Incidentes entries in the sidebar — this tab strip
+  // names the same three domains, so it wears the same three icons. `Eye`
+  // for Visão geral matches every other detail screen's own overview tab
+  // (`RiskDetailView`, `ProblemDetailView`, `IncidentDetailView`).
   const tabs: EntityTab[] = [
     {
       id: 'overview',
       label: assets.detail.sections.overview,
+      icon: Eye,
       content: (
         <div className="flex flex-col gap-6">
           <AssetOverview asset={asset} />
@@ -326,16 +333,19 @@ function AssetDetailViewContent({ assetId }: AssetDetailViewProps): React.JSX.El
     {
       id: 'risks',
       label: assets.detail.sections.risks,
+      icon: ShieldAlert,
       content: <AssetLinkedRisksSection risks={asset.risks} />,
     },
     {
       id: 'controls',
       label: assets.detail.sections.controls,
+      icon: ShieldCheck,
       content: <AssetLinkedControlsSection controls={asset.controls} />,
     },
     {
       id: 'incidents',
       label: assets.detail.sections.incidents,
+      icon: Siren,
       content: <AssetLinkedIncidentsSection assetId={asset.id} />,
     },
   ];

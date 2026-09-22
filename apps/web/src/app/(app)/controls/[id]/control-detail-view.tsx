@@ -178,7 +178,7 @@ import {
   LoadingState,
   StatusBadge,
 } from '@pharos/design-system/components';
-import { Pencil } from 'lucide-react';
+import { Eye, FilePlus, Link2, ListChecks, Pencil } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
 
 import { useDetailSection } from '@/components/detail/use-detail-section';
@@ -342,6 +342,7 @@ function ControlDetailViewContent({ controlId }: ControlDetailViewProps): React.
     {
       id: 'overview',
       label: controls.detail.sections.overview,
+      icon: Eye,
       content: (
         <div className="flex flex-col gap-6">
           <ControlOverview control={control} />
@@ -359,6 +360,7 @@ function ControlDetailViewContent({ controlId }: ControlDetailViewProps): React.
     {
       id: 'assessments',
       label: controls.detail.sections.assessments,
+      icon: ListChecks,
       content: (
         <div className="flex flex-col gap-6">
           {canTest ? (
@@ -385,6 +387,7 @@ function ControlDetailViewContent({ controlId }: ControlDetailViewProps): React.
     {
       id: 'relationships',
       label: controls.detail.sections.relationships,
+      icon: Link2,
       content: (
         <ControlLinksSection controlId={control.id} canLinkRelationships={canLinkRelationships} />
       ),
@@ -392,6 +395,7 @@ function ControlDetailViewContent({ controlId }: ControlDetailViewProps): React.
     {
       id: 'evidence',
       label: controls.detail.sections.evidence,
+      icon: FilePlus,
       content: (
         <EvidencePanel
           subjectType="CONTROL"

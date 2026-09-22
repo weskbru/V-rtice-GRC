@@ -27,6 +27,16 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
+import { processesApi } from '../api';
+
+import type {
+  ProcessDetail,
+  CreateProcessRequest,
+  OrgUnitNode,
+  UpdateProcessRequest,
+} from '../types';
+import type { ApiProblem } from '@/lib/api-client';
+
 import { feedback } from '@/components/shell/feedback-provider';
 import { useNavigate } from '@/components/shell/navigation-pending';
 import { Button } from '@/components/ui/button';
@@ -44,20 +54,11 @@ import { common } from '@/lib/messages/common';
 import { processes } from '@/lib/messages/processes';
 import { processFormSchema, type ProcessFormValues } from '@/lib/validation/process';
 
-import { processesApi } from '../api';
-
-import type {
-  ProcessDetail,
-  CreateProcessRequest,
-  OrgUnitNode,
-  UpdateProcessRequest,
-} from '../types';
-import type { ApiProblem } from '@/lib/api-client';
-
 export interface ProcessFormProps {
   mode: 'create' | 'edit';
   process?: ProcessDetail;
   onSaved: (process: ProcessDetail) => void;
+  onCancel?: () => void;
 }
 
 function defaultValuesFor(process: ProcessDetail | undefined): ProcessFormValues {
@@ -97,7 +98,12 @@ function buildUpdateBody(values: ProcessFormValues): UpdateProcessRequest {
   };
 }
 
-export function ProcessForm({ mode, process, onSaved }: ProcessFormProps): React.JSX.Element {
+export function ProcessForm({
+  mode,
+  process,
+  onSaved,
+  onCancel,
+}: ProcessFormProps): React.JSX.Element {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -290,7 +296,7 @@ export function ProcessForm({ mode, process, onSaved }: ProcessFormProps): React
           type="button"
           variant="outline"
           disabled={submitting}
-          onClick={() => navigate.back()}
+          onClick={() => (onCancel ? onCancel() : navigate.back())}
         >
           {common.actions.cancel}
         </Button>

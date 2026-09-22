@@ -292,3 +292,7 @@ por qualquer um dos três módulos irmãos — idempotente).
 - Prisma: `Action`/`ActionOriginType`/`ActionStatus` (schema.prisma linha ~2273–2352), `Evidence`/
   `EvidenceLink`/`EvidenceSubjectType`/`EvidenceStatus` (~2134–2271), `Finding`/`FindingStatus`
   (~2381–2487), `GrcCodeSequence` (contador compartilhado de código `EVD-`/`ACT-`/`FND-`, ~2499).
+
+## Refinamento V2 do detalhe de Planos de Ação (2026-09-21)
+
+O detalhe de Plano de Ação permanece no `DetailLayout` já adotado, com os mesmos dados, permissões, transições e seções. A composição da visão geral foi compactada: descrição e origem compartilham a primeira faixa em viewport amplo e voltam a empilhar em viewport estreito; detalhes e ciclo de vida permanecem integrais. Nenhum indicador ou capacidade foi acrescentado.

@@ -210,6 +210,7 @@ export const auditEngagements = {
     notFoundDescription:
       'Este engajamento não existe ou está fora do seu escopo organizacional de acesso.',
     editAction: 'Editar',
+    breadcrumbLabel: 'Auditoria',
     backToRegister: 'Voltar à auditoria',
     metadata: {
       code: (code: string): string => `Código: ${code}`,
@@ -230,6 +231,10 @@ export const auditEngagements = {
     },
     overview: {
       objectiveLabel: 'Objetivo',
+      objectiveCardTitle: 'Objetivo do engajamento',
+      executionCardTitle: 'Execução e responsabilidade',
+      registerCardTitle: 'Registro',
+      notSet: 'Não definido',
       periodLabel: 'Período',
       orgUnitLabel: 'Unidade organizacional',
       leadAuditorLabel: 'Auditor responsável',

@@ -18,6 +18,7 @@
  * affordance disappear; every fact stays visible.
  */
 import {
+  DetailLayout,
   EmptyState,
   EntityHeader,
   EntityTabs,
@@ -25,18 +26,23 @@ import {
   LoadingState,
   StatusBadge,
 } from '@pharos/design-system/components';
-import { Pencil } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Eye, Pencil, Search, Target } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
 
+import type { AuditEngagement } from '@/features/audit-engagements/types';
+import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
+
+import { useDetailSection } from '@/components/detail/use-detail-section';
+import { Link } from '@/components/navigation/link';
 import { Button } from '@/components/ui/button';
 import {
   auditEngagementsApi,
   type AuditEngagementWithEtag,
 } from '@/features/audit-engagements/api';
-import { AuditEngagementForm } from '@/features/audit-engagements/components/audit-engagement-form';
 import { AuditEngagementLifecycleActions } from '@/features/audit-engagements/components/audit-engagement-lifecycle-actions';
 import { AuditEngagementOverview } from '@/features/audit-engagements/components/audit-engagement-overview';
 import { AuditScopeSection } from '@/features/audit-engagements/components/audit-scope-section';
+import { AuditEngagementEditPanel } from '@/features/audit-engagements/components/detail/audit-engagement-edit-panel';
 import { EngagementFindingsSection } from '@/features/audit-engagements/components/engagement-findings-section';
 import { formatDateOnly, formatTimestampDate } from '@/features/audit-engagements/date';
 import {
@@ -49,14 +55,21 @@ import { auditEngagements } from '@/lib/messages/audit-engagements';
 import { common } from '@/lib/messages/common';
 import { usePermissions } from '@/lib/permissions';
 
-import type { AuditEngagement } from '@/features/audit-engagements/types';
-import type { ErrorStateProblem } from '@pharos/design-system/components';
-
 export interface AuditEngagementDetailViewProps {
   auditId: string;
 }
 
 export function AuditEngagementDetailView({
+  auditId,
+}: AuditEngagementDetailViewProps): React.JSX.Element {
+  return (
+    <Suspense fallback={<LoadingState variant="block" label={auditEngagements.detail.loading} />}>
+      <AuditEngagementDetailViewContent auditId={auditId} />
+    </Suspense>
+  );
+}
+
+function AuditEngagementDetailViewContent({
   auditId,
 }: AuditEngagementDetailViewProps): React.JSX.Element {
   const { hasPermission } = usePermissions();
@@ -104,6 +117,8 @@ export function AuditEngagementDetailView({
     };
   }, [auditId]);
 
+  const { sectionParam, setSection } = useDetailSection();
+
   if (loading) {
     return <LoadingState variant="block" label={auditEngagements.detail.loading} />;
   }
@@ -140,134 +155,163 @@ export function AuditEngagementDetailView({
     setEtag(result.etag);
   }
 
+  // `Eye` matches every other detail screen's own overview tab. `Search`
+  // for Achados is the exact icon the indicator catalog already assigns
+  // the FINDING domain (`INDICATOR_DOMAIN_ICON.FINDING`,
+  // `indicator-domain-caption.tsx`) — reused, not invented. `Target` for
+  // Escopo has no prior icon in this app to reuse (the concept is unique
+  // to audit engagements) and is a neutral, non-decorative "objetivo/
+  // escopo" mark, not tied to any other concept here (CLAUDE.md §18.12).
+  const tabs: EntityTab[] = [
+    {
+      id: 'overview',
+      label: auditEngagements.detail.sections.overview,
+      icon: Eye,
+      content: (
+        <div className="flex flex-col gap-4">
+          <AuditEngagementOverview engagement={engagement} />
+          <AuditEngagementLifecycleActions
+            engagement={engagement}
+            etag={etag}
+            scopeChangeToken={scopeChangeToken}
+            onChanged={handleLifecycleChanged}
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'scope',
+      label: auditEngagements.detail.sections.scope,
+      icon: Target,
+      content: (
+        <AuditScopeSection
+          auditId={engagement.id}
+          engagementStatus={engagement.status}
+          canManageScope={canManageScope}
+          onChanged={() => {
+            setScopeChangeToken((token) => token + 1);
+            void reloadEngagement();
+          }}
+        />
+      ),
+    },
+    {
+      id: 'findings',
+      label: auditEngagements.detail.sections.findings,
+      icon: Search,
+      content: (
+        <EngagementFindingsSection
+          engagementId={engagement.id}
+          engagementStatus={engagement.status}
+          canCreate={hasPermission('finding:create')}
+          defaultOwnerUserId={user.id}
+        />
+      ),
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      <EntityHeader
-        code={engagement.code}
-        title={engagement.objective}
-        badges={
-          <StatusBadge
-            variant={engagementStatusBadgeVariant(engagement.status)}
-            label={auditEngagements.statusLabels[engagement.status]}
-            icon={engagementStatusIcon(engagement.status)}
+    <>
+      <DetailLayout
+        header={
+          <EntityHeader
+            breadcrumb={
+              <>
+                <Link href="/audits" className="hover:underline">
+                  {auditEngagements.detail.breadcrumbLabel}
+                </Link>
+                <span aria-hidden="true"> › </span>
+                <span>{engagement.code}</span>
+              </>
+            }
+            code={engagement.code}
+            title={engagement.objective}
+            badges={
+              <StatusBadge
+                variant={engagementStatusBadgeVariant(engagement.status)}
+                label={auditEngagements.statusLabels[engagement.status]}
+                icon={engagementStatusIcon(engagement.status)}
+              />
+            }
+            metadata={
+              <>
+                <span>{auditEngagements.detail.metadata.orgUnit(engagement.orgUnit.name)}</span>
+                <span>
+                  {auditEngagements.detail.metadata.leadAuditor(engagement.leadAuditor.fullName)}
+                </span>
+                <span>
+                  {auditEngagements.detail.metadata.period(
+                    formatDateOnly(engagement.periodStart),
+                    formatDateOnly(engagement.periodEnd),
+                  )}
+                </span>
+                <span>
+                  {auditEngagements.detail.metadata.createdAt(
+                    formatTimestampDate(engagement.createdAt),
+                  )}
+                </span>
+                {engagement.startedAt ? (
+                  <span>
+                    {auditEngagements.detail.metadata.startedAt(
+                      formatTimestampDate(engagement.startedAt),
+                    )}
+                  </span>
+                ) : null}
+                {engagement.completedAt ? (
+                  <span>
+                    {auditEngagements.detail.metadata.completedAt(
+                      formatTimestampDate(engagement.completedAt),
+                    )}
+                  </span>
+                ) : null}
+                {engagement.cancelledAt ? (
+                  <span>
+                    {auditEngagements.detail.metadata.cancelledAt(
+                      formatTimestampDate(engagement.cancelledAt),
+                    )}
+                  </span>
+                ) : null}
+              </>
+            }
+            actions={
+              canEdit ? (
+                <Button variant="outline" onClick={() => setEditing(true)}>
+                  <Pencil aria-hidden="true" className="size-4" />
+                  {auditEngagements.detail.editAction}
+                </Button>
+              ) : null
+            }
           />
         }
-        metadata={
-          <>
-            <span>{auditEngagements.detail.metadata.code(engagement.code)}</span>
-            <span>{auditEngagements.detail.metadata.orgUnit(engagement.orgUnit.name)}</span>
-            <span>
-              {auditEngagements.detail.metadata.leadAuditor(engagement.leadAuditor.fullName)}
-            </span>
-            <span>
-              {auditEngagements.detail.metadata.period(
-                formatDateOnly(engagement.periodStart),
-                formatDateOnly(engagement.periodEnd),
-              )}
-            </span>
-            <span>
-              {auditEngagements.detail.metadata.createdAt(
-                formatTimestampDate(engagement.createdAt),
-              )}
-            </span>
-            {engagement.startedAt ? (
-              <span>
-                {auditEngagements.detail.metadata.startedAt(
-                  formatTimestampDate(engagement.startedAt),
-                )}
-              </span>
-            ) : null}
-            {engagement.completedAt ? (
-              <span>
-                {auditEngagements.detail.metadata.completedAt(
-                  formatTimestampDate(engagement.completedAt),
-                )}
-              </span>
-            ) : null}
-            {engagement.cancelledAt ? (
-              <span>
-                {auditEngagements.detail.metadata.cancelledAt(
-                  formatTimestampDate(engagement.cancelledAt),
-                )}
-              </span>
-            ) : null}
-          </>
-        }
-        actions={
-          canEdit && !editing ? (
-            <Button variant="outline" onClick={() => setEditing(true)}>
-              <Pencil aria-hidden="true" className="size-4" />
-              {auditEngagements.detail.editAction}
-            </Button>
-          ) : null
+        navigation={
+          <EntityTabs
+            ariaLabel={common.entityTabs.sectionsAriaLabel}
+            scrollLabels={{
+              scrollBack: common.entityTabs.scrollBack,
+              scrollForward: common.entityTabs.scrollForward,
+            }}
+            value={sectionParam ?? ''}
+            onValueChange={setSection}
+            tabs={tabs}
+            size="compact"
+          />
         }
       />
 
-      <AuditEngagementLifecycleActions
-        engagement={engagement}
-        etag={etag}
-        scopeChangeToken={scopeChangeToken}
-        onChanged={handleLifecycleChanged}
-      />
-
-      <EntityTabs
-        ariaLabel={common.entityTabs.sectionsAriaLabel}
-        scrollLabels={{
-          scrollBack: common.entityTabs.scrollBack,
-          scrollForward: common.entityTabs.scrollForward,
-        }}
-        tabs={[
-          {
-            id: 'overview',
-            label: auditEngagements.detail.sections.overview,
-            content: editing ? (
-              <AuditEngagementForm
-                mode="edit"
-                engagement={engagement}
-                etag={etag}
-                onSaved={(result) => {
-                  setEngagement(result.engagement);
-                  setEtag(result.etag);
-                  setEditing(false);
-                }}
-              />
-            ) : (
-              <AuditEngagementOverview engagement={engagement} />
-            ),
-          },
-          {
-            id: 'scope',
-            label: auditEngagements.detail.sections.scope,
-            content: (
-              <AuditScopeSection
-                auditId={engagement.id}
-                engagementStatus={engagement.status}
-                canManageScope={canManageScope}
-                onChanged={() => {
-                  // Adding a scope entry does NOT bump the engagement's own
-                  // version, so re-reading the engagement alone leaves the
-                  // lifecycle card's start precondition stale — see
-                  // `AuditEngagementLifecycleActions`' `scopeChangeToken`.
-                  setScopeChangeToken((token) => token + 1);
-                  void reloadEngagement();
-                }}
-              />
-            ),
-          },
-          {
-            id: 'findings',
-            label: auditEngagements.detail.sections.findings,
-            content: (
-              <EngagementFindingsSection
-                engagementId={engagement.id}
-                engagementStatus={engagement.status}
-                canCreate={hasPermission('finding:create')}
-                defaultOwnerUserId={user.id}
-              />
-            ),
-          },
-        ]}
-      />
-    </div>
+      {editing ? (
+        <AuditEngagementEditPanel
+          engagement={engagement}
+          etag={etag}
+          onOpenChange={(open) => {
+            if (!open) setEditing(false);
+          }}
+          onSaved={(result) => {
+            setEngagement(result.engagement);
+            setEtag(result.etag);
+            setEditing(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

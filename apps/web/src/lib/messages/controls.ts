@@ -227,7 +227,13 @@ export const controls = {
 
     card: {
       regionLabel: 'Controles',
-      selectLabel: (code: string, name: string): string => `Abrir prévia de ${code} — ${name}`,
+      /**
+       * The card's own click target now navigates straight to the full
+       * record (quick view removed) — matches the "Abrir o X {code}:
+       * {name}" convention `risks.ts`'s own `card.selectLabel` uses since
+       * the same removal there.
+       */
+      selectLabel: (code: string, name: string): string => `Abrir o controle ${code}: ${name}`,
       categoryLabel: 'Natureza',
       orgUnitLabel: 'Unidade',
       ownerLabel: 'Responsável',
@@ -247,17 +253,6 @@ export const controls = {
         description: 'Nenhum controle corresponde aos filtros atuais.',
         clearAction: 'Limpar filtros',
       },
-    },
-
-    quickView: {
-      title: 'Prévia do controle',
-      closeLabel: 'Fechar prévia',
-      openControl: 'Abrir controle completo',
-      loading: 'Carregando detalhes…',
-      loadError: 'Não foi possível carregar os detalhes deste controle.',
-      descriptionTitle: 'Descrição',
-      noDescription: 'Sem descrição.',
-      updatedAtLabel: 'Última atualização',
     },
   },
 

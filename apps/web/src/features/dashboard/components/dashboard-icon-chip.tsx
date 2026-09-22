@@ -71,18 +71,15 @@
  * every status at once, several of them favourable), and it is not a
  * flat count either. It IS scoped to one area (Riscos for the two risk
  * charts, Planos de Ação for the action donut), so AREA tint is the rule
- * that applies — but restricted to exactly the same restrained mechanism
- * `DashboardModuleCard` already uses (`variant="chip"` here, plus
- * `TONE_ACCENT_CLASSES` below on the card's own base edge), never a
- * surface wash. A chart's `<svg>`/`<table>` already carries its OWN
+ * that applies — but restricted to the `variant="chip"` icon, never a
+ * surface wash or a second decorative rule. A chart's `<svg>`/`<table>` already carries its OWN
  * meaningful colour — risk level, status — reused unchanged from
  * `RiskLevelBadge`/`StatusBadge` (`chart-tokens.ts`) precisely so it
  * never disagrees with the register. Washing the card behind that data
  * would add a second, non-data colour directly around shapes and legend
  * swatches whose distinctness from each other is the entire point;
- * `variant="chip"` and a thin base accent, both outside the chart's own
- * drawing area, tie the card to the rest of the screen without touching
- * a single data-bearing pixel.
+ * `variant="chip"` ties the card to the rest of the screen without
+ * touching a single data-bearing pixel.
  */
 import { cn } from '@/lib/utils';
 
@@ -116,9 +113,9 @@ const TONE_TEXT_CLASSES: Readonly<Record<DashboardTone, string>> = {
 };
 
 /**
- * Shared base accent bar fill — `DashboardModuleCard` and
- * `DashboardChartCard` both apply this as a thin (`h-0.5`) strip along a
- * card's bottom edge, `aria-hidden`, never a progress/completion signal
+ * Shared module-card base accent bar fill. `DashboardModuleCard` applies
+ * this as a thin (`h-0.5`) strip along its bottom edge, `aria-hidden`,
+ * never a progress/completion signal
  * (no percentage exists behind either card's data for it to represent).
  * `/45` opacity is a calibrated value, not a rough one: at full `-fg`
  * strength this bar measured as the single most saturated element on the

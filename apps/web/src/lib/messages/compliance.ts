@@ -280,6 +280,7 @@ export const compliance = {
     notFoundDescription:
       'O framework consultado não existe ou você não tem permissão para visualizá-lo.',
     editAction: 'Editar',
+    breadcrumbLabel: 'Compliance',
     backToRegister: 'Voltar à biblioteca normativa',
     metadata: {
       createdAt: (date: string): string => `Cadastrado em ${date}`,
@@ -288,6 +289,14 @@ export const compliance = {
     sections: {
       overview: 'Visão geral',
       versions: 'Versões',
+    },
+    overview: {
+      descriptionCardTitle: 'Descrição',
+      contextCardTitle: 'Contexto normativo',
+      originLabel: 'Origem',
+      createdAtLabel: 'Cadastrado em',
+      updatedAtLabel: 'Atualizado em',
+      notSet: 'Não definido',
     },
     versions: {
       description:

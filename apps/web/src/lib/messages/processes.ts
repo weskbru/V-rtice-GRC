@@ -180,6 +180,7 @@ export const processes = {
     notFoundDescription:
       'Este processo não existe ou está fora do seu escopo organizacional de acesso.',
     editAction: 'Editar',
+    breadcrumbLabel: 'Processos',
     backToRegister: 'Voltar ao catálogo de processos',
     metadata: {
       orgUnit: (name: string): string => `Unidade: ${name}`,
@@ -199,12 +200,45 @@ export const processes = {
     },
     overview: {
       descriptionLabel: 'Descrição',
+      descriptionCardTitle: 'Descrição',
+      detailsCardTitle: 'Contexto do processo',
       noDescription: 'Sem descrição.',
+      notSet: 'Não definido',
       situationLabel: 'Situação',
       orgUnitLabel: 'Unidade organizacional',
       createdAtLabel: 'Cadastrado em',
       updatedAtLabel: 'Atualizado em',
     },
+    /**
+     * Accessible name for `DetailLayout`'s `asideLabel` — the sticky
+     * `complementary` landmark holding "Relacionamentos"/"Última
+     * atualização" (mirrors `assets.detail.asideLabel`'s/`controls.detail.
+     * asideLabel`'s own naming exactly, CLAUDE.md §18.12).
+     */
+    asideLabel: 'Contexto do processo',
+    /**
+     * The contextual aside's "Relacionamentos" block
+     * (`process-context-aside.tsx`). No "Ações rápidas" heading — Process's
+     * three relationship tabs are read-only by design (FR-008, same
+     * reasoning as `assets.detail.relationshipsPanel`'s own doc comment):
+     * a link is created and withdrawn only from the Risk/Control/Incident
+     * module's own contract, never from here.
+     *
+     * `risks`/`controls` take a REAL count — `ProcessDetail.risks`/
+     * `.controls` arrive already embedded (active links, from the
+     * process's own side), mirroring `AssetDetail`'s identical shape.
+     * `incidents` gets the same "Ver" hint every sibling aside uses for an
+     * uncounted relationship — `GET /processes/{processId}/incidents` is
+     * its own request, never fetched just to produce a number here (F-59).
+     */
+    relationshipsPanel: {
+      heading: 'Relacionamentos',
+      risks: (count: number): string => `Riscos vinculados (${count})`,
+      controls: (count: number): string => `Controles vinculados (${count})`,
+      incidents: 'Incidentes vinculados',
+      viewHint: 'Ver',
+    },
+    lastUpdatedHeading: 'Última atualização',
   },
 
   /**

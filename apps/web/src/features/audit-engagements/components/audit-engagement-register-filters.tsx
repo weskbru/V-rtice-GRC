@@ -162,7 +162,7 @@ export function AuditEngagementRegisterFilters({
         />
       ) : null}
       <FilterBar
-        className="rounded-none border-x-0 border-t-0 bg-transparent px-0 pt-0 pb-4"
+        variant="register"
         searchTrailing={presentationControls}
         label={filters.regionLabel}
         collapsible

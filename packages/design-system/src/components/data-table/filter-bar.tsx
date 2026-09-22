@@ -85,6 +85,13 @@ export interface FilterBarProps {
   activeFilterCount?: number;
   /** Accessible name for the disclosure panel itself, e.g. "Filtros do registro de riscos". */
   filtersPanelLabel?: string;
+  /**
+   * Visual treatment for the toolbar surface. `register` keeps the controls
+   * flush with the list layout and uses only a bottom divider, matching the
+   * exploration bar shared by the GRC registers. The default `card` variant
+   * preserves the original self-contained bordered surface for other uses.
+   */
+  variant?: 'card' | 'register';
   className?: string;
 }
 
@@ -201,6 +208,7 @@ export function FilterBar({
   filtersToggleLabel,
   activeFilterCount,
   filtersPanelLabel,
+  variant = 'card',
   className,
 }: FilterBarProps): React.JSX.Element {
   const searchId = useId();
@@ -262,7 +270,15 @@ export function FilterBar({
     ) : null;
 
     return (
-      <div role="search" aria-label={label} className={cn('flex flex-col gap-2', className)}>
+      <div
+        role="search"
+        aria-label={label}
+        className={cn(
+          'flex flex-col gap-2',
+          variant === 'register' && 'border-b border-border pb-4',
+          className,
+        )}
+      >
         {/* Slim, unboxed row: the toggle, then the active-filter chips (in
             their own labelled group, exactly as in the with-search
             disposition) and "Limpar filtros" — no full-width bordered card
@@ -349,6 +365,8 @@ export function FilterBar({
       className={cn(
         'flex flex-col rounded-lg border border-border bg-card p-4',
         collapsible ? 'gap-3' : 'gap-4',
+        variant === 'register' &&
+          'rounded-none border-x-0 border-t-0 bg-transparent px-0 pt-0 pb-4',
         className,
       )}
     >
