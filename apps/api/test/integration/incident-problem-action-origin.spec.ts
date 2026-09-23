@@ -1,27 +1,3 @@
-/**
- * 008-incidents-problems — real, exercised coverage (not a stub, CLAUDE.md
- * §19.10) for the two `ActionOriginType` registrations this phase adds:
- *
- *   1. `INCIDENT`, registered against `ActionOriginResolverPort` by
- *      `IncidentActionOriginAccessor` — an `Action` created with this
- *      origin appears in the shared work list identified by its origin,
- *      an origin outside the caller's scope is refused (spec.md FR-016),
- *      and — the coordinator's own three conditions for this piece —
- *      access tracks the origin's LIVE organizational unit (never a
- *      creation-time snapshot), a refusal is indistinguishable from a
- *      nonexistent record and keyed to the identifier the caller actually
- *      supplied, and the enum growth (`20260911030000_action_origin_type
- *      _add_incidents_problems`) only became legal once this registration
- *      genuinely existed (`test/unit/action-model-convergence-guard.spec.ts`,
- *      confirmed failing without it — see this feature's own report).
- *   2. `PROBLEM`, registered by `ProblemActionOriginAccessor` — the same
- *      four proofs, plus the specific consequence named in spec.md
- *      FR-016's own dated note: `Problem`'s `CLOSED` transition (Fase 4,
- *      not yet built) needs a `COMPLETED` `Action` of this origin to
- *      exist, which was unreachable before this file's registration did.
- *
- * Mirrors `control-collaboration-registrations.spec.ts`'s exact shape.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -178,10 +154,6 @@ describe('008-incidents-problems — INCIDENT/PROBLEM action origin, genuinely e
 
       expect(refusalForOutOfScope).toBeInstanceOf(NotFoundDomainError);
       expect(refusalForNonexistent).toBeInstanceOf(NotFoundDomainError);
-      // Indistinguishable: same problem+json shape for a real-but-out-of-
-      // scope origin and a genuinely nonexistent one (FR-030), and both
-      // keyed to the ORIGIN id the caller actually supplied — never a
-      // different identifier they never sent.
       expect((refusalForOutOfScope as NotFoundDomainError).message).toBe(
         (refusalForNonexistent as NotFoundDomainError).message.replace(
           nonexistentId,
@@ -215,33 +187,19 @@ describe('008-incidents-problems — INCIDENT/PROBLEM action origin, genuinely e
         dueOn: '2026-09-12',
       });
 
-      // Still in unit A: the actor scoped to A can read the action, via
-      // the origin's live scope.
       await expect(
         getActionUseCase.execute({ actorUserId: actorInA.id, actionId: action.id }),
       ).resolves.toMatchObject({ id: action.id });
 
-      // The incident is reassigned to unit B — no `UpdateIncidentUseCase`
-      // exists yet (Fase 3, tasks.md), so this is the direct row update a
-      // future "reassign" capability would perform; what matters here is
-      // only the CONSEQUENCE of that reassignment, not how it is reached.
       await ctx.prisma.client.incident.update({
         where: { id: incident.id },
         data: { orgUnitId: unitB.id },
       });
 
-      // The actor's OWN scope never changed (still only unit A) and the
-      // Action's own stored `orgUnitId` was stamped from unit A at
-      // creation and never rewritten — a stale-snapshot implementation
-      // would still permit this read. Live re-derivation must refuse it.
       await expect(
         getActionUseCase.execute({ actorUserId: actorInA.id, actionId: action.id }),
       ).rejects.toThrow(NotFoundDomainError);
 
-      // Symmetrically, an actor newly scoped to unit B (the incident's
-      // CURRENT unit) can now read the very same action — proving the
-      // check is live in both directions, not merely "used to work and
-      // now does not".
       const actorInB = await setupActor(unitB.id, ['incident:view', 'action:view']);
       await expect(
         getActionUseCase.execute({ actorUserId: actorInB.id, actionId: action.id }),

@@ -3,16 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { UserAdminSummary } from './user-admin-summary';
 
-/**
- * Component-mount evidence for `UserAdminSummary` (CLAUDE.md §19.7).
- *
- * The permission caveat is the behaviour most worth pinning down: this
- * component's own header explains WHY `role:administer` does not imply
- * `user:administer` (015-roles-permissions-surface FR-019) — this test
- * proves the CONSEQUENCE, that "Sem papel" is absent (never a zero, never a
- * stuck skeleton) and `getRolesSummary` is never even called when the
- * caller lacks that permission.
- */
 const { listUsersMock, getRolesSummaryMock } = vi.hoisted(() => ({
   listUsersMock: vi.fn(),
   getRolesSummaryMock: vi.fn(),
@@ -44,7 +34,6 @@ describe('UserAdminSummary', () => {
 
     await waitFor(() => expect(screen.getByText('172')).toBeInTheDocument());
     expect(screen.getByText('130')).toBeInTheDocument();
-    // Inactive = total − active = 42, computed here rather than a third request.
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(getRolesSummaryMock).not.toHaveBeenCalled();
   });
@@ -71,7 +60,6 @@ describe('UserAdminSummary', () => {
 
     await waitFor(() => expect(screen.getByText('Sem papel')).toBeInTheDocument());
     expect(getRolesSummaryMock).toHaveBeenCalledTimes(1);
-    // 100 − 91 = 9.
     await waitFor(() => expect(screen.getByText('9')).toBeInTheDocument());
   });
 

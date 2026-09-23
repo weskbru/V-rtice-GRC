@@ -1,41 +1,9 @@
-/**
- * PharosGRC — Gestão de Incidentes (pt-BR), 008-incidents-problems.
- *
- * Frontend-facing scaffold only (coordinator instruction, 2026-09-11): the
- * backend and Prisma schema for this module are being built by a separate
- * front, so nothing here has been exercised against a running endpoint yet.
- * Field labels and lifecycle vocabulary mirror
- * `specs/008-incidents-problems/contracts/incidents.openapi.yaml` and
- * `data-model.md`/`research.md` (D-4, D-6) exactly — every label here names
- * a real `Incident` field or a real transition, never an invented one.
- * Presentation-specific copy that depends on a screen layout not yet
- * designed (card quick-view panels, sort-dropdown option strings, filter
- * chips) is deliberately NOT included here — that belongs to whichever
- * session builds the actual catalog/detail screens (tasks.md T028/T029),
- * the same way `controls.ts`'s own `register.card`/`register.results
- * .sortOptions` sections were written alongside the components that
- * consume them, not before.
- *
- * `statusLabels`/`severityLabels` below are exhaustive `Record`s typed
- * against this app's own union types (F-1, `risks.ts`'s own header
- * comment) — adding a value to an enum without adding its translation here
- * is a compile error, never a raw identifier shown to a Brazilian user at
- * runtime.
- *
- * The relationship to `Problem` is deliberately READ-ONLY in this catalog's
- * `relationships.problems` (no `pickerLabel`/`pickerPlaceholder`/link
- * action) — `problems.openapi.yaml` owns the write side of the shared
- * many-to-many (research.md D-14); `incidents.ts`'s own `relationships
- * .incidents` section is the write side, from the Problem catalog's point
- * of view.
- */
 import type {
   IncidentSeverity,
   IncidentStatus,
   ProblemStatusRef,
 } from '@/features/incidents/types';
 
-/** Mirrors `IncidentStatus` (data-model.md, research.md D-4) — five states, each with an observable consequence; never merged with `ProblemStatus` even though three of the five names coincide (D-5's own reasoning for keeping the two enums separate). */
 const INCIDENT_STATUS_LABELS: Record<IncidentStatus, string> = {
   OPEN: 'Aberto',
   IN_PROGRESS: 'Em andamento',
@@ -44,7 +12,6 @@ const INCIDENT_STATUS_LABELS: Record<IncidentStatus, string> = {
   CANCELLED: 'Cancelado',
 };
 
-/** Mirrors `IncidentSeverity` — a domain-own enum (D-9), never shared with `ProblemSeverity` even though the four values read identically. */
 const INCIDENT_SEVERITY_LABELS: Record<IncidentSeverity, string> = {
   CRITICAL: 'Crítica',
   HIGH: 'Alta',
@@ -122,7 +89,6 @@ export const incidents = {
       },
       customSortOption: (fieldLabel: string, directionLabel: string): string =>
         `${fieldLabel} — ${directionLabel}`,
-      /** Every field × direction this contract's own `sort` enum accepts (research.md/`incidents.openapi.yaml`) — the full cartesian product, the same set this register has always offered, now declared instead of recomputed in the component. */
       sortOptions: {
         'code:asc': 'Código — crescente',
         'code:desc': 'Código — decrescente',
@@ -139,7 +105,6 @@ export const incidents = {
       } as Record<string, string>,
     },
 
-    /** Cards is the primary view (CLAUDE.md §18); the table remains for dense comparison — the same `ViewToggle` vocabulary every other register in this product already uses. */
     view: {
       groupLabel: 'Modo de visualização',
       cards: 'Cards',
@@ -148,7 +113,6 @@ export const incidents = {
       tableLabel: 'Visualização em tabela',
     },
 
-    /** `IncidentCard`/`IncidentCardGrid` — no quick-view side panel for this register (mirrors `AssetCard`'s/`AuditEngagementCard`'s own precedent), so the card's own click target navigates straight to `/incidents/{id}`. */
     card: {
       regionLabel: 'Incidentes',
       orgUnitLabel: 'Unidade',
@@ -159,12 +123,6 @@ export const incidents = {
       selectLabel: (code: string, title: string): string => `Abrir o incidente ${code}: ${title}`,
     },
 
-    /**
-     * `IncidentRegisterSummary` (CLAUDE.md §18.5, §19.7) — see that
-     * component's own header comment for why its source is
-     * `dashboardApi.getSummary()`'s `breakdowns.incidents`, not a second
-     * `GET /incidents` calculator.
-     */
     summary: {
       regionLabel: 'Situação geral dos incidentes no seu escopo',
       error: 'Não foi possível carregar os indicadores.',
@@ -194,7 +152,6 @@ export const incidents = {
   form: {
     createHeading: 'Novo incidente',
     editHeading: 'Editar incidente',
-    /** `IncidentEditPanel`'s own overlay header description (Fase 4), mirroring `risks.form.editDescription`'s exact wording pattern. */
     editDescription: 'Altere os dados cadastrais do incidente.',
     sections: {
       identification: {
@@ -263,15 +220,6 @@ export const incidents = {
       comments: 'Comentários',
     },
 
-    /**
-     * The four top-level groups of the incident detail's two-level
-     * navigation (018-incident-detail-experience, Fase 2+3) — level 1 of the
-     * `EntityTabs`/`EntityTabs` nesting `IncidentDetailView` builds. Leaf
-     * section labels stay exactly `sections` above; nothing here duplicates
-     * them. Deliberately FOUR groups, not Risk's five: Incidents has no
-     * "Análise" — copying Risk's own five-group shape verbatim was
-     * explicitly ruled out.
-     */
     groups: {
       overview: 'Visão geral',
       response: 'Resposta',
@@ -279,23 +227,9 @@ export const incidents = {
       register: 'Registro',
     },
     groupsAriaLabel: 'Grupos de seções do incidente',
-    /** Accessible name for a group's own leaf-section `EntityTabs`, e.g. "Seções de Relacionamentos". */
     sectionsAriaLabel: (groupLabel: string): string => `Seções de ${groupLabel}`,
-    /**
-     * Accessible name for `DetailLayout`'s `asideLabel` — the sticky
-     * `complementary` landmark holding Ações rápidas/Relacionamentos/Última
-     * atualização (018-incident-detail-experience, Fase 4). Mirrors
-     * `risks.detail.asideLabel`'s own naming exactly.
-     */
     asideLabel: 'Contexto do incidente',
 
-    /**
-     * The contextual aside's "Ações rápidas" and "Relacionamentos" blocks
-     * (`incident-context-aside.tsx`, Fase 4) — no "Atenção" block exists for
-     * Incident (see that file's own header comment: there is no honest
-     * pendency to report, unlike Risk's overdue review/treatment or pending
-     * approval).
-     */
     quickActions: {
       heading: 'Ações rápidas',
       linkRisk: 'Vincular risco',
@@ -311,21 +245,10 @@ export const incidents = {
       assets: 'Ativos',
       processes: 'Processos',
       problems: 'Problemas',
-      /** Trailing hint for every relationship row — `IncidentDetail` carries no counts for any of the four, mirroring `risks.detail.relationshipsPanel.viewHint`'s own reasoning: never a fabricated number, never a second request just to produce one (F-59). */
       viewHint: 'Ver',
     },
     lastUpdatedHeading: 'Última atualização',
 
-    /**
-     * The incident's conditional lifecycle outcome facts — rendered inside
-     * `IncidentLifecycleSection`'s "Ciclo de vida" card
-     * (018-incident-detail-experience, Fase 2+3), not inside `IncidentOverview`
-     * any more: each describes an OUTCOME OF A TRANSITION (resolving,
-     * closing, cancelling), not a fact about the record's identity. Every
-     * field here renders only when the underlying value is actually present
-     * — a brand-new `OPEN` incident shows none of them, exactly as before
-     * this move.
-     */
     lifecycleOutcomes: {
       resolutionSummaryLabel: 'Resumo da resolução',
       resolvedAtLabel: 'Resolvido em',
@@ -335,29 +258,9 @@ export const incidents = {
       cancellationReasonLabel: 'Motivo do cancelamento',
     },
 
-    /**
-     * The "Ciclo de vida" track visual (`IncidentLifecycleTrackView`) —
-     * labels for the four main-track `IncidentStatus` positions come from
-     * `incidentStatusLabel`/`statusLabels` above, the exact same word the
-     * header's own `StatusBadge` uses; nothing here re-names a status.
-     * `stateLabels` mirrors Risk's own lifecycle-spine vocabulary
-     * ("Concluído"/"Atual"/"Disponível"/"Indisponível") — the same concept
-     * gets the same words across both screens (CLAUDE.md §18.12) — minus
-     * "Bloqueado", which has no equivalent here: Incidents has no
-     * precondition-evaluation endpoint to report a blocked transition from.
-     */
     lifecycleTrack: {
       mainAriaLabel: 'Posições do ciclo de vida do incidente',
       cancelledAriaLabel: 'Incidente cancelado',
-      /**
-       * Short context line under the `CANCELLED` node (C2, Fase 2+3 review
-       * correction) — this payload does not record which of the two
-       * possible origins (`OPEN`/`IN_PROGRESS`) the cancellation came from,
-       * so the node is presented as a terminal of the WHOLE trajectory,
-       * never visually tied to a specific column. This sentence is the
-       * honest substitute for the dashed connector that used to (wrongly)
-       * suggest "cancelled from Aberto".
-       */
       cancelledContextLabel: 'Encerrado por cancelamento',
       stateLabels: {
         current: 'Atual',
@@ -368,14 +271,6 @@ export const incidents = {
     },
   },
 
-  /**
-   * The overview section's first two cards — "Descrição" and "Detalhes do
-   * incidente" (018-incident-detail-experience, Fase 2+3), mirroring
-   * `risks.ts`'s own top-level `overview` catalog exactly (same shape,
-   * consumed the same way by the shared `DetailField`). The record's
-   * lifecycle outcome facts are NOT here — see `detail.lifecycleOutcomes`
-   * above.
-   */
   overview: {
     descriptionCardTitle: 'Descrição',
     detailsCardTitle: 'Detalhes do incidente',
@@ -390,22 +285,7 @@ export const incidents = {
     notSet: 'Não definido',
   },
 
-  /**
-   * Legal moves per `incidents.openapi.yaml`'s own `transitionIncident`
-   * description: `OPEN->IN_PROGRESS`, `OPEN->CANCELLED`,
-   * `IN_PROGRESS->RESOLVED`, `IN_PROGRESS->CANCELLED`, `RESOLVED->CLOSED`,
-   * `RESOLVED->IN_PROGRESS` (reopen). Closing an incident one resolved
-   * oneself needs no second approver (D-6) — unlike `Problem`'s `CLOSED`
-   * transition below, there is no segregation-of-duties copy here.
-   */
   lifecycle: {
-    /**
-     * The "Ciclo de vida" card's own title/description
-     * (`IncidentLifecycleSection`, 018-incident-detail-experience), mirroring
-     * `risks.ts`'s `lifecycle.cardTitle`/`cardDescription` — the exact same
-     * card CONCEPT on both screens, even though the trajectory visual and
-     * the transition table underneath are each domain-specific.
-     */
     cardTitle: 'Ciclo de vida',
     cardDescription: 'Trajetória e transições disponíveis para este incidente.',
     actions: {
@@ -445,16 +325,6 @@ export const incidents = {
     fieldRequiredError: 'Este campo é obrigatório.',
   },
 
-  /**
-   * The incident detail's own "Ações corretivas" tab (008-incidents-problems
-   * follow-up, 2026-09-11) — mirrors `problems.ts`'s own `correctiveActions`
-   * exactly, minus its closing-precondition sentence (`Incident` has no
-   * equivalent to Invariant P2: closing an incident never requires a
-   * completed `Action`). Uses the shared `Action` capability directly
-   * (`features/actions/api.ts`'s `actionsApi`, `originType: 'INCIDENT'`) —
-   * see that file's own header comment for the full CLAUDE.md §19.6
-   * reasoning this one does not repeat.
-   */
   correctiveActions: {
     cardTitle: 'Ações corretivas',
     cardDescription: 'Ações corretivas abertas a partir deste incidente.',
@@ -582,12 +452,6 @@ export const incidents = {
       },
       columns: { process: 'Processo', linkedBy: 'Vinculado por', linkedAt: 'Vinculado em' },
     },
-    /**
-     * Read-only from this side (research.md D-14): `problems.openapi.yaml`
-     * owns `POST`/`DELETE /problems/{problemId}/incidents`. No
-     * `pickerLabel`/`linkAction`/`unlinkAction` here — this section only
-     * ever renders `GET /incidents/{incidentId}/problems`'s own list.
-     */
     problems: {
       sectionTitle: 'Problemas',
       sectionDescription:
@@ -595,11 +459,6 @@ export const incidents = {
       empty: 'Nenhum problema vinculado a este incidente.',
       loading: 'Carregando problemas vinculados…',
       loadError: 'Não foi possível carregar os problemas vinculados a este incidente.',
-      /** `ProblemStatusRef` (`packages/api-types/src/generated/incidents.ts`)
-       * — Problem's own status enum, read only from this side; never merged
-       * with `incidents.statusLabels` above even though three of the five
-       * names coincide (same reasoning as `problems.ts`'s own
-       * `PROBLEM_STATUS_LABELS` header comment). */
       statusLabels: {
         OPEN: 'Aberto',
         IN_ANALYSIS: 'Em análise',
@@ -616,13 +475,6 @@ export const incidents = {
     },
   },
 
-  /**
-   * Comments (CLAUDE.md §19.10 remediation — `CommentableEntityType.INCIDENT`
-   * was registered on the backend with no reachable interface). Feeds
-   * `CommentThread` (`@pharos/design-system`), exactly mirroring
-   * `risks.ts`'s own `comments` catalog (D-10: every word supplied by the
-   * consuming feature, never the generic component).
-   */
   comments: {
     cardTitle: 'Comentários',
     cardDescription:
@@ -649,12 +501,6 @@ export const incidents = {
     withdrawError: 'Não foi possível remover o comentário. Tente novamente.',
   },
 
-  /**
-   * Attachments (CLAUDE.md §19.10 remediation — `AttachableEntityType
-   * .INCIDENT` was registered on the backend with no reachable interface).
-   * Feeds `AttachmentList` (`@pharos/design-system`), mirroring `risks.ts`'s
-   * own `attachments` catalog exactly.
-   */
   attachments: {
     cardTitle: 'Anexos',
     cardDescription:

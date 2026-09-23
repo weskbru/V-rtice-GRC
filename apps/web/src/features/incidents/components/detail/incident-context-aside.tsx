@@ -1,67 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident detail, the contextual aside
- * (018-incident-detail-experience, Fase 4).
- *
- * Only `DetailLayout`'s `aside` slot — "Ações rápidas", "Relacionamentos"
- * and "Última atualização" — fed entirely by data the page already loaded
- * (`IncidentDetail`), never a request of its own.
- *
- * ## `asideLead` stays omitted — a decision, not an oversight
- *
- * `RiskAttentionAside` (`features/risks/components/detail/risk-context-
- * aside.tsx`) exists because Risk has real, honest pendencies to surface:
- * `overdueReview`, `overdueTreatment`, a pending approval, a blocked
- * transition. `Incident` has NONE of these — no review cadence, no
- * approval workflow, and its lifecycle's only "blocked" concept is a
- * transition that is simply absent from `availableIncidentTransitions`
- * (never offered, so never worth a warning about). There is nothing honest
- * to put in an "Atenção" block, and CLAUDE.md §18.11 ("erros e avisos
- * compreensíveis") does not ask for a warning-shaped panel that just
- * repeats the header's own status badge. `IncidentDetailView` therefore
- * never passes `asideLead` at all — this file does not define one.
- *
- * ## Local `AsideBlock`, not the shared one from Risk
- *
- * Copies `RiskRelationshipsAside`'s own `AsideBlock` mechanism (a plain
- * `<section>` at `xl`+, a `DisclosureGroup` below it) verbatim in
- * behaviour, using the ALREADY-SHARED `useWideViewport`
- * (`@/components/detail/use-wide-viewport`, promoted in Fase 1). This is
- * NOT promoted to shared infrastructure itself: it is eleven lines of
- * layout branching with no logic of its own, and CLAUDE.md §19.10 only
- * credits a promotion once it is exercised by a genuine second consumer —
- * copying it once here is cheaper than a new cross-feature dependency
- * between `features/incidents` and `features/risks`, which nothing else in
- * this app has.
- *
- * ## Quick actions are LINKS, never buttons (the mistake Risk already paid
- * for)
- *
- * Every quick action below is `role="link"` via this app's own `Link`
- * (`@/components/navigation/link`), with a literal `href`
- * (`/incidents/{id}?section={sectionId}`) — never a `<button onClick>`
- * calling a same-page URL commit. `RiskRelationshipsAside`'s own header
- * comment documents why: before its own correction, "Comentar" (the
- * shortcut) and "Comentar" (the real submit button inside the Comentários
- * section) both existed as `<button>`s with the identical accessible name
- * whenever that section was already open — ambiguous for
- * `getByRole('button', { name: … })` and for a screen reader alike. Here
- * the same collision is just as real: "Adicionar ação corretiva" (this
- * shortcut) and the real add-action button inside "Ações corretivas" share
- * the exact same words on purpose (the shortcut names its destination
- * honestly) — a DIFFERENT role is what keeps the two distinguishable, not
- * a deliberately different label.
- *
- * ## No counts in "Relacionamentos"
- *
- * `IncidentDetail` carries no count for risks/assets/processes/problems —
- * fetching one to display would be a new request this phase does not get
- * to add (F-59 is already open). Every row instead carries the same "Ver"
- * hint `RiskRelationshipsAside` uses for its own uncounted relationships
- * (incidents/problems, evidence, findings) — distinguishing "not loaded"
- * from an honest zero, never inventing a number.
- */
 import { DisclosureGroup } from '@pharos/design-system/components';
 import { ChevronRight, FilePlus, Link2, ListChecks, MessageSquare } from 'lucide-react';
 
@@ -80,7 +18,6 @@ interface AsideBlockProps {
   children: React.ReactNode;
 }
 
-/** A collapsible-below-`xl` aside block — local copy of `RiskRelationshipsAside`'s own mechanism, see this file's header comment for why it is not shared. */
 function AsideBlock({ id, title, children }: AsideBlockProps): React.JSX.Element {
   const isWide = useWideViewport();
 
@@ -115,12 +52,10 @@ interface RelationshipRow {
   targetSection: string;
 }
 
-/** The SAME `?section=<id>` deep link `useDetailSection` reads — built directly rather than routed through that hook, since a `Link`'s `href` must be a plain string known at render time, not a commit function. */
 function incidentSectionHref(incidentId: string, sectionId: string): string {
   return `/incidents/${incidentId}?section=${sectionId}`;
 }
 
-/** `12/09/2026, 11:02` — pt-BR, no seconds, mirroring `RiskRelationshipsAside`'s own `formatUpdatedAt`. */
 function formatUpdatedAt(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', {
     day: '2-digit',
@@ -243,10 +178,6 @@ export function IncidentContextAside({
                 <Link
                   href={incidentSectionHref(incident.id, row.targetSection)}
                   aria-current={isActive ? 'true' : undefined}
-                  // Explicit, rather than relying on "name from content" —
-                  // see this file's own header comment and
-                  // `RiskRelationshipsAside`'s identical fix (its own doc
-                  // comment names it "Riscos8").
                   aria-label={`${row.label} ${viewHint}`}
                   className={cn(
                     'flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',

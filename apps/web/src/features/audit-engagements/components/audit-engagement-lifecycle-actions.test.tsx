@@ -5,15 +5,6 @@ import { AuditEngagementLifecycleActions } from './audit-engagement-lifecycle-ac
 
 import type { AuditEngagement, AuditScopeEntry } from '../types';
 
-/**
- * Component-mount evidence for T076 (`AuditEngagementLifecycleActions`,
- * US1, FR-002 to FR-004a). Unlike `ControlLifecycleActions`, this contract
- * exposes no `GET /audits/{id}/lifecycle` endpoint — the transition table
- * is encoded locally in the component and verified here directly against
- * `research.md` D-3/FR-004a/quickstart.md §2, not against a mocked server
- * response shaped by the component's own author. `../api` is mocked at the
- * network boundary.
- */
 const { listScopeMock, startEngagementMock, completeEngagementMock, cancelEngagementMock } =
   vi.hoisted(() => ({
     listScopeMock: vi.fn(),
@@ -188,23 +179,6 @@ describe('AuditEngagementLifecycleActions', () => {
     );
   });
 
-  /**
-   * Regression for the stale start-precondition defect found by rendered
-   * verification (CLAUDE.md §18.1), not by any green gate.
-   *
-   * Adding a scope entry writes `audit_scope_*`, never `audit_engagements`,
-   * so the engagement's own `version`/`ETag` does not change. The effect
-   * that reads the scope count used to be keyed on `[id, status, etag]`
-   * alone, so it never re-ran: "Iniciar engajamento" stayed DISABLED, under
-   * its "adicione ao menos um item ao escopo" notice, on a screen whose
-   * scope table directly below already listed the entry just saved. Only a
-   * full page reload cleared it.
-   *
-   * The assertion is deliberately on the BUTTON'S ENABLED STATE, not on the
-   * number of `listScope` calls: a test that only counted fetches would
-   * still pass if the refetch happened but the button never re-enabled,
-   * which is the half the user actually experiences.
-   */
   it('re-reads the scope count and enables start when scopeChangeToken changes (scope added without an engagement version bump)', async () => {
     listScopeMock.mockResolvedValueOnce([]);
 
@@ -222,8 +196,6 @@ describe('AuditEngagementLifecycleActions', () => {
       expect(screen.getByRole('button', { name: 'Iniciar engajamento' })).toBeDisabled(),
     );
 
-    // The scope entry lands. The engagement itself is UNCHANGED — same
-    // object, same `etag` — exactly as the real server leaves it.
     listScopeMock.mockResolvedValueOnce([scopeEntry()]);
     rerender(
       <AuditEngagementLifecycleActions

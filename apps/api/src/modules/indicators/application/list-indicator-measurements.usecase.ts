@@ -1,22 +1,3 @@
-/**
- * 009-indicators-reports, Fase 4 (T036) — `ListIndicatorMeasurementsUseCase`
- * (`listIndicatorMeasurements`, spec.md FR-014/FR-015, research.md D-6).
- * Reads the organization-wide historical series for a metric key, oldest
- * first, paginated by `computedAt`.
- *
- * Same double gate as `CreateIndicatorMeasurementUseCase` (T035, see that
- * file's own header for the full reasoning): `indicator:view` is enforced
- * by `PermissionGuard` at the controller, and this use case enforces the
- * REST of FR-014 — the caller's resolved `ScopeFilter` must be
- * `{ kind: 'GLOBAL' }`, checked FIRST, before the `metricKey` is even
- * validated against the catalog and therefore before
- * `IndicatorMeasurementRepositoryPort.list` is ever called.
- *
- * Never stored, never re-derived: `breached` on every item returned here is
- * read back exactly as `CreateIndicatorMeasurementUseCase` persisted it —
- * this use case performs no calculation of any kind (contrast
- * `GetIndicatorCurrentValueUseCase`, which recomputes on every call).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';
@@ -33,8 +14,6 @@ import type { IndicatorMeasurementRecord } from '../domain/indicator-measurement
 
 export interface ListIndicatorMeasurementsInput {
   readonly actorUserId: string;
-  /** Raw path segment — validated against the closed catalog INSIDE this
-   * use case, hence `string`, not `IndicatorMetricKey`. */
   readonly metricKey: string;
   readonly page: number;
   readonly pageSize: number;
@@ -59,9 +38,6 @@ export class ListIndicatorMeasurementsUseCase {
   ) {}
 
   async execute(input: ListIndicatorMeasurementsInput): Promise<ListIndicatorMeasurementsResult> {
-    // research.md D-6 — checked FIRST, before the catalog and before the
-    // measurement table is ever read. Mirrors
-    // `CreateIndicatorMeasurementUseCase`'s own ordering exactly.
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
     if (scope.kind !== 'GLOBAL') {
       throw new ForbiddenDomainError(USER_MESSAGES.indicators.measurementRequiresGlobalScope);

@@ -1,18 +1,3 @@
-/**
- * T126 — `PublishMethodologyVersionUseCase`: `POST /risk-methodology/versions`
- * (FR-068, ADR-006). Always an INSERT — see `RiskMethodologyVersion`'s own
- * doc comment in schema.prisma for why there is no update path at all.
- *
- * Validates the WHOLE submitted configuration via
- * `validateMethodologyConfiguration` (`domain/methodology.schema.ts`,
- * T121) BEFORE ever calling the repository — an invalid configuration is
- * refused with 422 and nothing is published (`contracts/platform.openapi
- * .yaml`: "A violation is refused with 422 and nothing is published").
- *
- * Same transaction-boundary reasoning as `CreateRiskUseCase`: depends on
- * `TransactionRunnerPort`, never `PrismaService` directly, so the version
- * `INSERT` and its audit entry (FR-032) share one transaction.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

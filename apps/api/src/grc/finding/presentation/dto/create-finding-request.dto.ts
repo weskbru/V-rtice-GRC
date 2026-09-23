@@ -1,11 +1,3 @@
-/**
- * T073/002-shared-grc-foundation, US3 — matches
- * `contracts/grc-foundation.openapi.yaml`'s `CreateFindingRequest`
- * exactly. `additionalProperties: false` (the global `ValidationPipe`'s
- * `forbidNonWhitelisted`) means this class is also where a caller cannot
- * smuggle `code`/`status`/`closedAt`/`archivedAt` past creation — not
- * declaring them here IS the rejection.
- */
 import {
   IsIn,
   IsOptional,

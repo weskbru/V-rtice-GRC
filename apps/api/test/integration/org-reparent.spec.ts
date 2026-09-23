@@ -1,10 +1,3 @@
-/**
- * T174 — reparenting an organizational unit updates subtree paths and is
- * audited (ADR-004, data-model.md §4); a cycle is refused. Exercises
- * `OrgUnitAdminService` directly against real PostgreSQL (this capability's
- * usual integration-test shape — `buildIntegrationTestingModule` composes
- * exactly the modules this spec needs, not the full `AppModule`).
- */
 import { AuditEntityType } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -40,11 +33,6 @@ describe('Organizational unit reparenting (T174, ADR-004)', () => {
   });
 
   it('moving a unit under a new parent rewrites its own path/depth AND every descendant in its subtree', async () => {
-    // root
-    // ├── source
-    // │   └── child
-    // │       └── grandchild
-    // └── target
     const root = await orgUnitAdmin.create({
       actorUserId: actorId,
       code: uniqueTestMarker('org-reparent-root'),
@@ -76,7 +64,6 @@ describe('Organizational unit reparenting (T174, ADR-004)', () => {
       parentId: root.id,
     });
 
-    // Move `source` (and its whole subtree: child, grandchild) under `target`.
     await orgUnitAdmin.update({ actorUserId: actorId, orgUnitId: source.id, parentId: target.id });
 
     const movedSource = await orgUnitAdmin.getById(source.id);
@@ -88,16 +75,11 @@ describe('Organizational unit reparenting (T174, ADR-004)', () => {
     expect(movedSource.path).toBe(`${unchangedTarget.path}${source.id}/`);
     expect(movedSource.depth).toBe(unchangedTarget.depth + 1);
 
-    // The descendants moved WITH it — same relative structure, rooted at
-    // the new path.
     expect(movedChild.path).toBe(`${movedSource.path}${child.id}/`);
     expect(movedChild.depth).toBe(movedSource.depth + 1);
     expect(movedGrandchild.path).toBe(`${movedChild.path}${grandchild.id}/`);
     expect(movedGrandchild.depth).toBe(movedChild.depth + 1);
 
-    // Real prefix-match proof, not just field equality: every descendant's
-    // NEW path is still prefixed by the moved unit's NEW path (ADR-004's
-    // whole point — scope resolution depends on this holding).
     expect(movedChild.path.startsWith(movedSource.path)).toBe(true);
     expect(movedGrandchild.path.startsWith(movedSource.path)).toBe(true);
   });
@@ -162,13 +144,10 @@ describe('Organizational unit reparenting (T174, ADR-004)', () => {
       parentId: parent.id,
     });
 
-    // Moving `parent` under its own child (`child`) would make `parent` its
-    // own descendant's descendant — a cycle.
     await expect(
       orgUnitAdmin.update({ actorUserId: actorId, orgUnitId: parent.id, parentId: child.id }),
     ).rejects.toBeInstanceOf(ValidationDomainError);
 
-    // Nothing changed: `parent` still reports its original path/parent.
     const unchangedParent = await orgUnitAdmin.getById(parent.id);
     expect(unchangedParent.parentId).toBe(root.id);
     expect(unchangedParent.path).toBe(parent.path);

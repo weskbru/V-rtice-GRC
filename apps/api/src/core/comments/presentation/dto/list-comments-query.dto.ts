@@ -1,8 +1,3 @@
-/**
- * T192 — `GET /comments`'s query parameters
- * (`contracts/platform.openapi.yaml`'s `EntityTypeQuery`/`EntityIdQuery`/
- * `Page`/`PageSize` parameters).
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
@@ -13,8 +8,6 @@ import { IsRegisteredCommentableEntityType } from './registered-entity-type.vali
 import type { CommentableEntityType } from '@prisma/client';
 
 export class ListCommentsQueryDto {
-  // F-22 defect 1: validated against the LIVE entity-type registry, not a
-  // hand-maintained literal — see registered-entity-type.validator.ts.
   @IsRegisteredCommentableEntityType({ message: USER_MESSAGES.dto.entityType.isIn })
   entityType!: CommentableEntityType;
 

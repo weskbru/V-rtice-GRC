@@ -1,51 +1,16 @@
 'use client';
 
-/**
- * PharosGRC — risk register compact summary row (CLAUDE.md §18.5, §19.7).
- *
- * Four small indicators shown above the register's toolbar: total risks,
- * critical residual risks, risks under treatment and risks with an overdue
- * review. This is a summary, not a second dashboard — it fetches its own
- * data from the SAME `GET /dashboard` used by the GRC dashboard page
- * (`@/features/dashboard/api`), never a bespoke count of its own.
- *
- * ## Why `GET /dashboard` and not four counting requests (CLAUDE.md §19.7)
- *
- * `GET /dashboard` resolves the caller's organizational scope through the
- * exact same `ScopeResolverService.resolveScope` that `GET /risks` (the
- * register itself) uses, and computes each figure with the same rule as the
- * register filter the card links to — `itemsRequiringReview.total` is
- * literally `next_review_on IS NOT NULL AND next_review_on < today`, the
- * identical condition to the register's own `overdueReview` filter fragment.
- * That parity is what makes the number on a card and the list it links into
- * incapable of disagreeing. Computing a second, independent count here
- * — even one that looks equivalent — would be exactly the duplicated
- * derived-state rule CLAUDE.md §19.7 forbids: derived state has ONE
- * calculator, and for these four figures that calculator is the dashboard's
- * `GetDashboardUseCase`, not this component.
- *
- * The "Riscos críticos" card links to `/risks?riskLevel=CRITICAL` with no
- * explicit `riskLevelBasis` — the register's own default basis is
- * `RESIDUAL` (`useRegisterState`'s `DEFAULT_BASIS`), which matches
- * `risks.byResidualLevel` exactly, so an unset basis param already opens the
- * same figure this card shows.
- *
- * A failure here degrades to one quiet message (`summary.error`) in place of
- * the whole row — it must never hide or block the register underneath it,
- * which works independently of this summary.
- */
 import { CalendarClock, Layers, OctagonAlert, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import type { DashboardResponse } from '@/features/dashboard/types';
-import type { ComponentType, SVGProps } from 'react';
 
 import { RegisterSummaryCard } from '@/components/register/register-summary-card';
 import { dashboardApi } from '@/features/dashboard/api';
 import { risks } from '@/lib/messages/risks';
 
+import type { DashboardResponse } from '@/features/dashboard/types';
+import type { ComponentType, SVGProps } from 'react';
+
 export interface RiskRegisterSummaryProps {
-  /** Applied to the "Riscos críticos" link so the register it opens matches the residual figure the card shows. */
   className?: string;
 }
 

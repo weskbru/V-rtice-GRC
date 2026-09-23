@@ -1,26 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident create/edit form (008-incidents-problems, US1),
- * mirroring `AssetForm`'s overall shape (CLAUDE.md §18.12): one
- * `FormSection`, `FormField` for every control, a single top-of-form error
- * banner for anything the server rejects beyond field-level 422s, and a
- * reference-data error state with its own retry action.
- *
- * `orgUnitId` is required to CREATE (invariant, `CreateIncidentRequest`) but
- * absent from `UpdateIncidentRequest` altogether — `incidents.openapi.yaml`
- * makes the organizational unit immutable once an incident exists. The
- * field therefore stays visible in edit mode (so the user always sees which
- * unit owns the incident) but disabled, with a helper explaining why —
- * never removed, which would make a real, permanent property of the record
- * look unspecified (CLAUDE.md §18.11 "estados editável, somente-leitura e
- * desabilitado são distinguíveis").
- *
- * `ownerUserId` carries no required-selection rule (`lib/validation/
- * incidents.ts`'s own header comment) — leaving it unset is a legitimate
- * choice that means "assign to me", exactly as the contract's own
- * `ownerUserId` doc string says.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -59,7 +38,6 @@ import type { ApiProblem } from '@/lib/api-client';
 
 const SEVERITIES: readonly IncidentSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-/** Radix `Select.Item` cannot carry an empty-string value; this sentinel means "assign to me" (`ownerUserId` omitted). */
 const NONE_OWNER_VALUE = '__none__';
 
 export interface IncidentFormProps {
@@ -123,12 +101,6 @@ export function IncidentForm({ mode, incident, onSaved }: IncidentFormProps): Re
   const [formError, setFormError] = useState<string | null>(null);
 
   const [orgUnits, setOrgUnits] = useState<OrgUnitNode[] | null>(null);
-  // S-10 — the owner picker now searches the directory server-side
-  // (`UserPicker`) instead of a preloaded, bounded list. Seeded from
-  // `incident.owner` itself in edit mode (already carries `fullName`);
-  // stays unselected in create mode, exactly like the old `<Select>`'s
-  // `NONE_OWNER_VALUE` did — both mean "assign to me" (this file's own
-  // header comment).
   const [owner, setOwner] = useState<UserRef | undefined>(incident?.owner);
   const [referenceDataError, setReferenceDataError] = useState(false);
   const [loadingReferenceData, setLoadingReferenceData] = useState(true);

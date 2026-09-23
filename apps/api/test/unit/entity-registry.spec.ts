@@ -1,8 +1,3 @@
-/**
- * Unit tests for T191's attachable/commentable entity-type registry (no
- * I/O, no NestJS container) — the extension point F-7 records as
- * previously undocumented and unbuilt.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -59,11 +54,6 @@ describe('attachable/commentable entity-type registry (T191, FR-098, F-7)', () =
   });
 
   it('a future module registers its own entity type independently, without touching an existing registration (worked example)', () => {
-    // Simulates a second module registering a DIFFERENT capability
-    // (commentable only) for the SAME entity type value a first module
-    // already registered as attachable — proving the two registries never
-    // interfere with each other, exactly as `entity-registry.ts`'s header
-    // describes for a future `PROBLEM` entity type.
     const riskAccessor = fakeAccessor();
     const secondAccessor = fakeAccessor();
 

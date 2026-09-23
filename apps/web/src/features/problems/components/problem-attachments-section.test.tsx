@@ -7,12 +7,6 @@ import { ProblemAttachmentsSection } from './problem-attachments-section';
 
 import type { Attachment } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for `ProblemAttachmentsSection` (CLAUDE.md
- * §19.10 remediation), mirroring `risk-attachments-section.test.tsx`
- * exactly. `@/features/problems/api` is mocked at the network boundary.
- */
-
 const { listAttachmentsMock, uploadAttachmentMock, withdrawAttachmentMock } = vi.hoisted(() => ({
   listAttachmentsMock: vi.fn(),
   uploadAttachmentMock: vi.fn(),

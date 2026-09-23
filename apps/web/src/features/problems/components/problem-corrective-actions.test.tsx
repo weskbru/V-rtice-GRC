@@ -6,16 +6,6 @@ import { ProblemCorrectiveActions } from './problem-corrective-actions';
 import type { UserRef } from '../types';
 import type { Action } from '@/features/actions/types';
 
-/**
- * Component-mount evidence for the missing corrective-action affordance
- * (008-incidents-problems follow-up, 2026-09-11, data-model.md P2/P3):
- * before this component existed, `ProblemCloseDialog`'s own precondition
- * (a completed `Action` of `originType: 'PROBLEM'`) could never be
- * satisfied by a real user. `@/features/actions/api` and `../api` are
- * mocked at the network boundary — the same convention
- * `treatment-actions-table.test.tsx` (`features/risks`) establishes.
- */
-
 const { listActionsMock, createActionMock, transitionActionMock } = vi.hoisted(() => ({
   listActionsMock: vi.fn(),
   createActionMock: vi.fn(),
@@ -150,15 +140,10 @@ describe('ProblemCorrectiveActions', () => {
     render(<ProblemCorrectiveActions problemId="problem-1" canCreate={false} canTransition />);
 
     await screen.findByText('Corrigir causa raiz');
-    // Radix's `DropdownMenuTrigger` opens on `pointerdown` (mouse) / `keydown`
-    // (keyboard) — never a plain `click` — so `fireEvent.pointerDown` is
-    // required here; a `click` alone leaves the menu closed.
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Ações' }));
     const menu = await screen.findByRole('menu');
     expect(within(menu).getByRole('menuitem', { name: 'Iniciar' })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: 'Cancelar' })).toBeInTheDocument();
-    // OPEN never offers "Concluir" or "Reabrir" directly — those exist only
-    // from IN_PROGRESS/COMPLETED respectively (`features/actions/status.ts`).
     expect(within(menu).queryByRole('menuitem', { name: 'Concluir' })).not.toBeInTheDocument();
 
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Iniciar' }));
@@ -184,8 +169,6 @@ describe('ProblemCorrectiveActions', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Reabrir' }));
 
     const dialog = await screen.findByRole('dialog');
-    // Confirming without a reason must not call the API — the dialog's own
-    // client-side courtesy check (never the actual gate, CLAUDE.md §18.9).
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
     expect(transitionActionMock).not.toHaveBeenCalled();
 

@@ -1,26 +1,3 @@
-/**
- * 008-incidents-problems, US3 — the five domain relationships
- * (Incident->Risk, Incident->Asset, Incident->Process, Problem->Risk,
- * Problem->Incident N:M) ALL follow the identical pattern this repository
- * has now had to fix four separate times (coordinator, 2026-09-11):
- *
- *   - ADR-020 part 5 — BOTH the "link" permission on the source AND the
- *     "view" permission on the target are checked, from the first line.
- *   - ADR-020 part 4 — the target's organizational scope is verified
- *     against its LIVE unit before any row is written; a target outside
- *     scope answers EXACTLY like a target that does not exist at all.
- *   - Every link/unlink is audited with its OWN `AuditEntityType`.
- *   - Unlinking preserves history (stamps `unlinkedAt`) rather than
- *     deleting the row.
- *
- * This suite proves each of the four GENERALIZES across all five pairs,
- * not for one and by assertion for the rest (this project's own
- * engineering rule — a single-instance fix has already left siblings
- * broken twice). Refusal proofs are checked by COUNTING rows before and
- * after (never by asserting only the error's type, which cannot by itself
- * show that nothing was written) — the same discipline
- * `finding-risk-link.spec.ts` established for its own single pair.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -77,11 +54,7 @@ interface LinkScenario {
   readonly entityType: AuditEntityType;
   readonly linkedAction: string;
   readonly unlinkedAction: string;
-  /** Uses the actor that holds BOTH the link permission on the source and
-   * the view permission on the target. */
   attemptLinkWithView(targetId: string): Promise<LinkedRecord>;
-  /** Uses a SEPARATE actor that holds the link permission but NOT the
-   * view permission on the target (ADR-020 part 5). */
   attemptLinkNoView(targetId: string): Promise<LinkedRecord>;
   unlink(linkId: string): Promise<LinkedRecord>;
   countLinks(): Promise<number>;
@@ -423,9 +396,6 @@ describe('The five domain relationships (008-incidents-problems, US3)', () => {
       );
       expect((outOfScopeError as ValidationDomainError).message).toBe(scenario.notFoundMessage);
 
-      // The row-count proof: an error of the right TYPE is not, by itself,
-      // proof that nothing was written — this is what actually checks it,
-      // for every one of the five pairs, not just one.
       const countAfter = await scenario.countLinks();
       expect(countAfter).toBe(countBefore);
     },
@@ -487,7 +457,6 @@ describe('The five domain relationships (008-incidents-problems, US3)', () => {
       expect(rowAfterUnlink?.unlinkedAt).not.toBeNull();
       expect(rowAfterUnlink?.unlinkedByUserId).not.toBeNull();
 
-      // Preserved, not deleted — the row still counts.
       const countAfterUnlink = await scenario.countLinks();
       expect(countAfterUnlink).toBeGreaterThanOrEqual(1);
 

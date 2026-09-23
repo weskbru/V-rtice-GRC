@@ -1,9 +1,3 @@
-/**
- * T033/003-controls-management, User Story 2 — matches
- * `contracts/controls.openapi.yaml`'s
- * `ControlAssessmentAttestationDecisionRequest` exactly
- * (`additionalProperties: false`, `required: [decision]`).
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

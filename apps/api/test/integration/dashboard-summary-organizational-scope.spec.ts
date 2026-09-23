@@ -1,20 +1,3 @@
-/**
- * `GetDashboardSummaryUseCase` — organizational-scope proof, against a
- * real Postgres database, never a mocked `IndicatorCalculationPort`.
- * Mirrors `report-run-organizational-scope.spec.ts`'s own convention
- * (`RunReportUseCase`'s identical proof for `IndicatorCalculationPort`),
- * applied here to the dashboard summary's own use case.
- *
- * `CONTROL_INACTIVE_COUNT` (`ORGANIZATIONAL_UNIT` scope applicability,
- * `INDICATOR_METRIC_CATALOG`) is the metric under test: a caller scoped to
- * ONE organizational unit only sees that unit's own non-ACTIVE controls, a
- * caller holding a GLOBAL scope grant sees every non-ACTIVE control in the
- * database. Two controls are created in the narrow caller's own unit and
- * one more in a SECOND unit the narrow caller has no grant for — the
- * broad caller's total is therefore guaranteed strictly greater than the
- * narrow caller's own count (>= 3 vs exactly 2), never both counting the
- * same total, which would pass even with the scope filter deleted.
- */
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 import { CacheModule } from '../../src/infrastructure/cache/cache.module';
@@ -55,7 +38,6 @@ describe('GetDashboardSummaryUseCase — organizational-scope parity between a n
       code: uniqueTestMarker('dashboard-summary-scope-other'),
     });
 
-    // Two non-ACTIVE controls in the narrow caller's own unit.
     await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('dbsc-ctl-narrow-1'),
@@ -72,8 +54,6 @@ describe('GetDashboardSummaryUseCase — organizational-scope parity between a n
         status: 'SUSPENDED',
       },
     });
-    // One more non-ACTIVE control OUTSIDE the narrow caller's own unit —
-    // only the broad (global-scope) caller can see it.
     await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('dbsc-ctl-other-1'),
@@ -112,9 +92,6 @@ describe('GetDashboardSummaryUseCase — organizational-scope parity between a n
       (metric) => metric.metricKey === 'CONTROL_INACTIVE_COUNT',
     );
 
-    // Both callers hold `control:view`, so the key is present for both —
-    // never omitted here (that is the permission-filtering unit test's own
-    // job; this file's only job is proving scope).
     expect(narrowControlItem).toBeDefined();
     expect(broadControlItem).toBeDefined();
 

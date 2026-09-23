@@ -1,9 +1,3 @@
-/**
- * T046/004-compliance-management, User Story 3 —
- * `ListRequirementApplicabilityDeclarationsUseCase`. `GET
- * /requirements/{requirementId}/applicability-declarations`
- * (`listRequirementApplicabilityDeclarations` operation).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

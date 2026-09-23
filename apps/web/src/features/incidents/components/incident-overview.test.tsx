@@ -5,24 +5,6 @@ import { IncidentOverview } from './incident-overview';
 
 import type { IncidentDetail } from '../types';
 
-/**
- * Component-mount evidence for the "Visão geral" section's first two cards
- * (018-incident-detail-experience, Fase 2+3 — replaces the flat, card-less
- * `<dl>` this component used to be). Two things this suite exists to prove:
- *
- *   - "Descrição" and "Detalhes do incidente" both render as real cards
- *     with real headings, each of the six attributes anchored by its own
- *     icon-carrying `DetailField`;
- *   - "Registrado em" (`createdAt`) renders ONLY when the fact is present —
- *     the SAME conditional discipline the original flat `<dl>` already
- *     had, now inside the "Detalhes do incidente" card instead of a
- *     separate, un-carded block.
- *
- * The lifecycle outcome facts (resolution/closure/cancellation) are NOT
- * this component's concern any more — `incident-lifecycle-section.test.tsx`
- * covers those.
- */
-
 function buildIncident(overrides: Partial<IncidentDetail> = {}): IncidentDetail {
   return {
     id: 'incident-1',

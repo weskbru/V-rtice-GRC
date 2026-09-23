@@ -1,12 +1,3 @@
-/**
- * T040/005-audit-findings, User Story 1 — maps `AuditEngagementRecord`
- * (`domain/ports/audit-engagement-repository.port.ts`) to the wire shape
- * `contracts/audit.openapi.yaml`'s `AuditEngagement` schema describes. This
- * is the ONLY place an `AuditEngagementRecord` becomes an
- * `AuditEngagementResponse` body — no Prisma model, and no
- * `AuditEngagementRecord` either, is ever returned directly from a
- * controller (ADR-009). Mirrors `control-response.mapper.ts`'s own shape.
- */
 import type {
   AuditEngagementOrgUnitRefRecord,
   AuditEngagementRecord,
@@ -57,10 +48,6 @@ function toOrgUnitRefResponse(
   return { id: ref.id, name: ref.name };
 }
 
-/** `periodStart`/`periodEnd` are `format: date` in the contract (never
- * `date-time`) — the same `toISOString().slice(0, 10)` convention every
- * other date-only field in this codebase uses (`risk-response.mapper.ts`,
- * `control-assessment-response.mapper.ts`). */
 function toDateOnlyString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }

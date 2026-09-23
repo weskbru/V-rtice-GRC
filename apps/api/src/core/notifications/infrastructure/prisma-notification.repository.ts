@@ -1,7 +1,3 @@
-/**
- * T193 — the sole Prisma-backed `NotificationRepositoryPort`
- * implementation.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

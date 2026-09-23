@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem register route (008-incidents-problems, US2),
- * mirroring `(app)/assets/page.tsx`/`(app)/controls/page.tsx` exactly:
- * `ProblemCatalogView` reads `useSearchParams()` (via
- * `useProblemRegisterState`), which Next.js requires behind a `<Suspense>`
- * boundary.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

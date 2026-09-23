@@ -3,17 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { RiskLevelChart } from './risk-level-chart';
 
-/**
- * Component-mount evidence for T198 (FR-049, FR-091, SC-012).
- *
- * Recharts' `ResponsiveContainer` never measures a real size under jsdom
- * (`ResizeObserver` is a no-op polyfill, `vitest.setup.ts`), so it never
- * paints its SVG children here — that is fine, because the invariant this
- * test asserts is the one the task actually requires: the values reaching
- * the screen (via the accessible text table) are exactly what the caller
- * passed in, never summed or re-derived, and every level is present even
- * at zero.
- */
 describe('RiskLevelChart', () => {
   it('renders every risk level with its exact server-supplied count, never recomputed', () => {
     render(<RiskLevelChart byResidualLevel={{ LOW: 5, MEDIUM: 2, HIGH: 0, CRITICAL: 1 }} />);

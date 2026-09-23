@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new framework version screen (US1). Needs the framework's own
- * name for the form's descriptive copy, so it loads the framework once
- * (`compliance:view`) before rendering the create form (`compliance:
- * administer`).
- */
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 

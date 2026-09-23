@@ -1,28 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the requirement↔control mapping section of a requirement's
- * detail screen (US2, ADR-017, ADR-020). Mirrors `RiskControlsSection`'s/
- * `ControlLinksSection`'s own registry-picker-to-link,
- * confirm-before-remove-to-unlink pattern (CLAUDE.md §18.12) — deliberately
- * NOT the generic `RelationshipSubsection<TLink>` those two files each
- * declare locally, since this module owns exactly one relationship kind
- * here, not three; a bespoke component stays smaller than importing a
- * private, unexported generic from another business module (CLAUDE.md §2,
- * §4 — modules must not depend directly on each other).
- *
- * Link/unlink is permitted regardless of the requirement's own version
- * status (FR-004 governs the clause's text, not its mappings) and
- * regardless of applicability (a non-applicable clause may still keep a
- * control link, edge case "cláusula não aplicável ligada a controle") — this
- * section is never gated by `versionIsDraft`, only by the caller's
- * `compliance:map` permission (`canLink`).
- *
- * A control referenced at link time that does not exist, and one that lies
- * outside the caller's organizational scope, both answer `422` —
- * deliberately indistinguishable (FR-022) — surfaced here as one honest
- * message, never a stack trace or a silent no-op.
- */
 import { ConfirmDialog, SearchablePicker } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -53,7 +30,6 @@ import type { SearchablePickerOption } from '@pharos/design-system/components';
 export interface RequirementControlsSectionProps {
   requirementId: string;
   canLink: boolean;
-  /** Called after a successful link/unlink — the requirement's own `complianceState` is recalculated as a result, so the caller re-reads the requirement (its header badge and description are otherwise left showing a stale state, exactly the class of defect CLAUDE.md records paying for before). */
   onChanged?: () => void;
 }
 

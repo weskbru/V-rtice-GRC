@@ -1,12 +1,3 @@
-/**
- * T054/002-shared-grc-foundation, US2 — `ActionModule`, Action's own
- * composition root. Sits directly under `src/grc/action/`, outside the
- * `domain`/`application`/`infrastructure`/`presentation` folders the
- * boundary lint rules classify — exactly like `evidence.module.ts`. Depends
- * INTO `core/**` (`AuditModule`, `OrganizationsModule`,
- * `AuthorizationModule`, `PrismaModule`) and nothing under `modules/**`
- * (ADR-016).
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../core/audit/audit.module';
@@ -35,11 +26,6 @@ import { PrismaActionRepository } from './infrastructure/prisma-action.repositor
 import { ActionAuditController } from './presentation/action-audit.controller';
 import { ActionController } from './presentation/action.controller';
 
-// Same idempotency shape `EvidenceModule` establishes — several
-// `test/integration/**` specs each build their OWN minimal Nest testing
-// module importing `ActionModule` directly, and
-// `registerEvidenceSubjectResolver` throws on a genuine second
-// registration.
 let actionCollaborationRegistered = false;
 
 @Module({
@@ -59,12 +45,6 @@ let actionCollaborationRegistered = false;
     { provide: EntityCodeGeneratorPort, useClass: PrismaEntityCodeGenerator },
     { provide: TransactionRunnerPort, useClass: GrcTransactionRunner },
   ],
-  // Exported so `modules/risk`'s treatment-action use cases
-  // (007-implementation-remediation, D-1/D-3/D-4) can create, edit and
-  // transition the shared `Action` DIRECTLY — no mirror any more — from
-  // their own composition root, without re-instantiating this module's
-  // providers (ADR-016: `grc/**` never imports `modules/**`, but the
-  // reverse is allowed and expected).
   exports: [
     CreateActionUseCase,
     GetActionUseCase,
@@ -76,18 +56,8 @@ let actionCollaborationRegistered = false;
 })
 export class ActionModule {
   constructor(actionEvidenceSubjectAccessor: ActionEvidenceSubjectAccessor) {
-    // T014 — idempotent across every capability under `grc/` that calls it
-    // (see that file's own header); safe to call from here regardless of
-    // which sibling module boots first.
     registerGrcAuditAllowlists();
 
-    // T045a — `EVIDENCE` was already registered by `EvidenceModule` for the
-    // ATTACHABLE-entity registry (files reaching evidence); THIS is the
-    // separate `EvidenceSubjectResolverPort` registry (evidence LINKED to a
-    // subject) — `ACTION` is a new member of the closed
-    // `EvidenceSubjectType` enum that had no consumer until this task (see
-    // `evidence-subject-resolver.port.ts`'s own header, "Who registers
-    // what").
     if (!actionCollaborationRegistered) {
       actionCollaborationRegistered = true;
       registerEvidenceSubjectResolver('ACTION', actionEvidenceSubjectAccessor);

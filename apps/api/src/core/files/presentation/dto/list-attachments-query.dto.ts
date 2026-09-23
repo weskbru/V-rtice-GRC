@@ -1,8 +1,3 @@
-/**
- * T190 — `GET /attachments`'s query parameters
- * (`contracts/platform.openapi.yaml`'s `EntityTypeQuery`/`EntityIdQuery`/
- * `Page`/`PageSize` parameters).
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
@@ -12,9 +7,6 @@ import { IsRegisteredAttachableEntityType } from '../../../comments/presentation
 import type { AttachableEntityType } from '@prisma/client';
 
 export class ListAttachmentsQueryDto {
-  // F-22 defect 1: validated against the LIVE entity-type registry, not a
-  // hand-maintained literal — see
-  // core/comments/presentation/dto/registered-entity-type.validator.ts.
   @IsRegisteredAttachableEntityType({ message: USER_MESSAGES.dto.entityType.isIn })
   entityType!: AttachableEntityType;
 

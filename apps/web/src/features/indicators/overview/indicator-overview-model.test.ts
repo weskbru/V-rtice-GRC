@@ -16,7 +16,6 @@ import type { IndicatorDefinition, IndicatorMetricKey } from '../types';
 import type { IndicatorNavigationEntry } from './indicator-overview-model';
 import type { DashboardSummaryMetric } from '@/features/dashboard/types';
 
-/** A minimal, valid `IndicatorDefinition` fixture — every field the generated contract requires. */
 function buildDefinition(overrides: Partial<IndicatorDefinition> = {}): IndicatorDefinition {
   return {
     id: 'def-1',
@@ -42,11 +41,6 @@ describe('INDICATOR_METRIC_KEY_ORDER', () => {
     const iconKeys = Object.keys(INDICATOR_METRIC_ICON).sort();
     const catalogKeys = [...INDICATOR_METRIC_KEY_ORDER].sort();
     expect(catalogKeys).toHaveLength(11);
-    // Independent, runtime cross-check: metric-visuals.ts's own `INDICATOR_METRIC_ICON` is a
-    // second, independently-typed `Record<IndicatorMetricKey, ...>` enumerating the same closed
-    // union. If a 12th key is ever added to the contract, both records must grow (tsc enforces
-    // each individually); this assertion additionally catches the two enumerations drifting from
-    // EACH OTHER at runtime, which a type-only guarantee would not.
     expect(catalogKeys).toEqual(iconKeys);
   });
 });
@@ -189,8 +183,6 @@ describe('buildIndicatorOverviewItems', () => {
         metricKey: 'INCIDENT_OPEN_COUNT_BY_SEVERITY',
         shape: 'BY_BUCKET',
         scopeApplicability: 'ORGANIZATIONAL_UNIT',
-        // Deliberately out of order and missing MEDIUM/CRITICAL, to prove this model imposes its
-        // own fixed order/zero-fill rather than trusting response key order.
         valueByBucket: { HIGH: 212, LOW: 3 },
       },
     ];
@@ -361,14 +353,6 @@ describe('resolveIndicatorNavigation', () => {
   });
 });
 
-/**
- * The real, coordinator-approved `INDICATOR_NAVIGATION_TABLE` — one rule per
- * metric key, per S3's rendered-exactness probe
- * (`indicators-round/s3-nav-exactness.md`). Every URL string below is
- * asserted EXACTLY (param order included) — S1's view renders these
- * literally, so a silent param reorder here would be a silent link change
- * there.
- */
 describe('INDICATOR_NAVIGATION_TABLE (approved, default table)', () => {
   it('RISK_TOTAL_BY_LEVEL never has a recordsHref, even with risk:view (no exact "all" link exists)', () => {
     const resolution = resolveIndicatorNavigation('RISK_TOTAL_BY_LEVEL', ALWAYS_TRUE);

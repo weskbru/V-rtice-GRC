@@ -1,35 +1,3 @@
-/**
- * T168/US7 — the sole implementation of `AuditEventReaderPort`
- * (`domain/ports/audit-event-reader.port.ts`).
- *
- * ## Parameterization (CLAUDE.md §12, FR-106)
- *
- * Every value binds as a query parameter, following
- * `modules/risk/infrastructure/risk-query.service.ts`'s established
- * pattern exactly: `Prisma.sql`/`Prisma.join` tagged templates, `= ANY($n
- * ::type[])` casts for array parameters (`IN` does not implicitly cast a
- * raw parameter's wire type to an enum/uuid column type — see that file's
- * `inFragment` comment for the empirical reason). The only interpolated,
- * non-parameter SQL fragments are this file's OWN fixed enum-cast literals
- * (`'RISK'::"AuditEntityType"`) built from a request's `AuditEntityType`
- * value that the CALLER (`modules/risk`) already validated against the
- * closed Prisma enum before it ever reaches here — never raw, unsanitized
- * request input.
- *
- * ## Scope (ADR-004)
- *
- * Filtered directly against `audit_event.organizationalUnitId` — the
- * column ADR-005 added specifically "to enable scoped audit reads"
- * (data-model.md §"audit_event"). An empty `UNIT` scope (a caller with no
- * grants) compiles to `FALSE`, matching `RiskQueryService`'s own
- * "escopo vazio" handling — never silently unfiltered.
- *
- * ## Total count
- *
- * `COUNT(*) OVER()` on the data page, with the same one-query
- * `countOnly` fallback `RiskQueryService` uses for the (rare, this
- * dataset is always small) case where the requested page is empty.
- */
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
@@ -114,9 +82,6 @@ export class PrismaAuditEventReader implements AuditEventReaderPort {
   }
 }
 
-/** Groups refs by `entityType` (never more than a handful of distinct
- * types in practice) so each group binds ONE `entity_id = ANY($n::uuid[])`
- * array parameter rather than one parameter per id. */
 function entityRefsFragment(refs: readonly AuditEntityRef[]): Prisma.Sql {
   const idsByType = new Map<AuditEntityType, string[]>();
   for (const ref of refs) {
@@ -129,7 +94,6 @@ function entityRefsFragment(refs: readonly AuditEntityRef[]): Prisma.Sql {
   }
 
   if (idsByType.size === 0) {
-    // No refs to match — deliberately matches nothing, never "unfiltered".
     return Prisma.sql`FALSE`;
   }
 

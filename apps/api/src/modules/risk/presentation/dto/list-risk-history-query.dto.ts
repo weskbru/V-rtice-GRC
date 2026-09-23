@@ -1,10 +1,3 @@
-/**
- * T167/US7 — matches `GET /risks/{riskId}/history`'s query parameters
- * (`contracts/risks.openapi.yaml`'s `getRiskHistory` operation): `page`,
- * `pageSize` (inherited from `PageQueryDto`) plus `type`, a comma-separated
- * `RiskHistoryEntryType[]` filter (`style: form, explode: false`, same
- * `splitCsv` transform `ListRisksQueryDto` established for this shape).
- */
 import { Transform } from 'class-transformer';
 import { IsArray, IsIn, IsOptional } from 'class-validator';
 
@@ -14,9 +7,6 @@ import { PageQueryDto } from './page-query.dto';
 
 import type { RiskHistoryEntryType } from '../../domain/ports/risk-history-query.port';
 
-/** Every value this task's `RiskHistoryQueryService` can actually produce
- * (`RiskHistoryQueryPort`'s own header explains why this is a subset of
- * `contracts/risks.openapi.yaml`'s full `RiskHistoryEntryType` enum). */
 const RISK_HISTORY_ENTRY_TYPE_VALUES: readonly RiskHistoryEntryType[] = [
   'ASSESSMENT',
   'OWNERSHIP_CHANGE',

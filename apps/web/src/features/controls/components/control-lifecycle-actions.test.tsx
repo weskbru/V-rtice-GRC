@@ -5,25 +5,6 @@ import { ControlLifecycleActions } from './control-lifecycle-actions';
 
 import type { AvailableControlTransition } from '../types';
 
-/**
- * Component-mount evidence for `ControlLifecycleActions`
- * (021-control-detail-experience, Fase B) — rewritten for this phase's new
- * component boundary: this component no longer fetches `GET
- * .../lifecycle` itself (`../api`'s `getLifecycle` is gone from this
- * component entirely — the fetch moved to `useControlLifecycle`,
- * `components/detail/`, and `availableTransitions` now arrives as a plain
- * prop) and no longer owns a `Card` (moved to `ControlLifecycleSection`,
- * its new caller). `transitionControl` is still mocked at the network
- * boundary — this component still owns the mutation itself.
- *
- * The central assertion is UNCHANGED from before this phase, and NOT
- * weakened by it (the coordinator's explicit instruction): an illegal
- * transition is never rendered as a disabled/refused button — it is simply
- * absent. Every status offers EXACTLY the buttons `availableTransitions`
- * names, never more, never fewer, and a transition with an unmet
- * precondition renders disabled WITH its own "Pendências para esta
- * transição" explanation, never silently.
- */
 const { transitionControlMock } = vi.hoisted(() => ({
   transitionControlMock: vi.fn(),
 }));

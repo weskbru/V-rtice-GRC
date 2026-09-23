@@ -1,13 +1,3 @@
-/**
- * 009-indicators-reports, Fase 2 (T014) + Fase 3 (T018/T031) —
- * `PrismaIndicatorDefinitionRepository`: the sole Prisma-backed
- * implementation of `IndicatorDefinitionRepositoryPort`. No `ScopeFilter`
- * anywhere (research.md D-8) — mirrors
- * `modules/compliance/infrastructure/framework.repository.ts` exactly: every
- * method reads `indicator_definitions` unconditionally, gated only by the
- * caller's own `indicator:view`/`indicator:create` permission check
- * (`IndicatorController`'s own `@RequirePermission` decorators).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -70,12 +60,6 @@ export class PrismaIndicatorDefinitionRepository implements IndicatorDefinitionR
     return toIndicatorDefinitionRecord(row);
   }
 
-  /** `PATCH /indicators/{definitionId}` (T068 prep). `updateMany` + a
-   * `count` check, not a bare `update` in a try/catch for `P2025` — the
-   * same "no scope, but still a not-found-safe write" technique
-   * `PrismaAssetRepository.update` already uses for its OWN scoped
-   * `updateMany`, here with no `where` predicate beyond `id` at all (no
-   * scope column exists on this table, this port's own header). */
   async update(
     id: string,
     changes: UpdateIndicatorDefinitionChanges,
@@ -100,10 +84,6 @@ export class PrismaIndicatorDefinitionRepository implements IndicatorDefinitionR
     return this.findById(id);
   }
 
-  /** `GET /indicators/metric-keys` (T068 prep) — this port's own doc
-   * comment: every `metricKey` currently configured, as a `Set` for O(1)
-   * membership. A single `SELECT metric_key FROM indicator_definitions`,
-   * never one lookup per catalog key. */
   async listConfiguredMetricKeys(): Promise<ReadonlySet<IndicatorMetricKey>> {
     const rows = await this.prisma.client.indicatorDefinition.findMany({
       select: { metricKey: true },
@@ -111,10 +91,6 @@ export class PrismaIndicatorDefinitionRepository implements IndicatorDefinitionR
     return new Set(rows.map((row) => row.metricKey));
   }
 
-  /** T044 — every `IndicatorDefinition` id, unconditionally (this port's
-   * own doc comment: there is no unit column to filter by). A single
-   * `SELECT id FROM indicator_definitions`, never one row-by-row lookup
-   * per candidate id. */
   async listAllIds(): Promise<readonly string[]> {
     const rows = await this.prisma.client.indicatorDefinition.findMany({ select: { id: true } });
     return rows.map((row) => row.id);
@@ -130,10 +106,6 @@ function toIndicatorDefinitionRecord(row: IndicatorDefinition): IndicatorDefinit
     description: row.description,
     ownerUserId: row.ownerUserId,
     thresholdComparator: row.thresholdComparator,
-    // `Decimal | null` -> `number | null` — this phase does not constrain
-    // the range of a threshold value (schema.prisma's own comment), so a
-    // plain `toNumber()` is enough; no rounding/precision rule exists yet
-    // for a caller to violate.
     thresholdValue: row.thresholdValue ? row.thresholdValue.toNumber() : null,
     isActive: row.isActive,
     createdByUserId: row.createdByUserId,

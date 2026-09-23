@@ -1,28 +1,3 @@
-/**
- * 008-incidents-problems — real, exercised coverage (CLAUDE.md §19.10) for
- * `INCIDENT`/`PROBLEM` against the attachable/commentable entity-type
- * registry (`core/comments/domain/entity-registry.ts`).
- *
- * ## The defect this exists because of
- *
- * `AttachableEntityType`/`CommentableEntityType` grew `INCIDENT`/`PROBLEM`
- * (008-incidents-problems foundation), and the registry's own header names
- * `PROBLEM` as its worked example of how a future module registers itself
- * — but neither `IncidentsModule` nor `ProblemsModule` ever called
- * `registerAttachableEntityType`/`registerCommentableEntityType`. The
- * value was a legal enum member with no registered accessor: exactly the
- * "compiles but was never executed" shape CLAUDE.md §19.10 exists to
- * catch. A real comment or attachment attempt against an Incident/Problem
- * threw `EntityTypeNotRegisteredError` at the use-case boundary (verified
- * before this file's fix landed — see the coordinator's report).
- *
- * Mirrors `control-collaboration-registrations.spec.ts`'s exact shape,
- * covering both comments and attachments for both entity types, plus the
- * same authorization/scope guarantees `RiskParentRecordAccessor` already
- * proves for RISK (a caller without view permission, and a caller whose
- * scope excludes the record, must both see the SAME `NotFoundDomainError`
- * a genuinely nonexistent record produces — FR-030, FR-098).
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

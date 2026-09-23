@@ -1,22 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement detail screen (T076, US1, FR-002 to
- * FR-004a), mirroring `ControlDetailView`'s structure exactly (CLAUDE.md
- * §18.12): `EntityHeader` + `EntityTabs`, a 404 rendered identically
- * whether the engagement does not exist or lies outside the caller's
- * organizational scope.
- *
- * `canEdit` is gated by BOTH the permission AND the record's own status
- * (`status === 'PLANNING'`, research.md D-3/D-13) — the "Editar" action
- * itself is never offered once the server would refuse the edit (CLAUDE.md
- * §18.11), rather than being shown and then failing with a `422`.
- *
- * `COMPLETED`/`CANCELLED` render through this exact same view, never a
- * degraded one (FR-004, "permanece integralmente legível") — only the
- * lifecycle card's own available actions and the scope tab's edit
- * affordance disappear; every fact stays visible.
- */
 import {
   DetailLayout,
   EmptyState,
@@ -28,9 +11,6 @@ import {
 } from '@pharos/design-system/components';
 import { Eye, Pencil, Search, Target } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
-
-import type { AuditEngagement } from '@/features/audit-engagements/types';
-import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
 
 import { useDetailSection } from '@/components/detail/use-detail-section';
 import { Link } from '@/components/navigation/link';
@@ -54,6 +34,9 @@ import { useAuth } from '@/lib/auth-context';
 import { auditEngagements } from '@/lib/messages/audit-engagements';
 import { common } from '@/lib/messages/common';
 import { usePermissions } from '@/lib/permissions';
+
+import type { AuditEngagement } from '@/features/audit-engagements/types';
+import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
 
 export interface AuditEngagementDetailViewProps {
   auditId: string;
@@ -80,7 +63,6 @@ function AuditEngagementDetailViewContent({
   const [notFound, setNotFound] = useState(false);
   const [problem, setProblem] = useState<ErrorStateProblem | undefined>(undefined);
   const [editing, setEditing] = useState(false);
-  /** Incremented on every scope change — see `AuditEngagementLifecycleActions`' own prop doc. */
   const [scopeChangeToken, setScopeChangeToken] = useState(0);
 
   useEffect(() => {
@@ -145,9 +127,7 @@ function AuditEngagementDetailViewContent({
       const result = await auditEngagementsApi.getEngagement(auditId);
       setEngagement(result.engagement);
       setEtag(result.etag);
-    } catch {
-      // Best-effort, mirroring `ControlDetailView.reloadControl` — deliberately silent.
-    }
+    } catch {}
   }
 
   function handleLifecycleChanged(result: AuditEngagementWithEtag): void {
@@ -155,13 +135,6 @@ function AuditEngagementDetailViewContent({
     setEtag(result.etag);
   }
 
-  // `Eye` matches every other detail screen's own overview tab. `Search`
-  // for Achados is the exact icon the indicator catalog already assigns
-  // the FINDING domain (`INDICATOR_DOMAIN_ICON.FINDING`,
-  // `indicator-domain-caption.tsx`) — reused, not invented. `Target` for
-  // Escopo has no prior icon in this app to reuse (the concept is unique
-  // to audit engagements) and is a neutral, non-decorative "objetivo/
-  // escopo" mark, not tied to any other concept here (CLAUDE.md §18.12).
   const tabs: EntityTab[] = [
     {
       id: 'overview',

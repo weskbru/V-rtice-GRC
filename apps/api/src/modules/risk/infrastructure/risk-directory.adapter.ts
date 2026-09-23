@@ -1,10 +1,3 @@
-/**
- * T013/005-audit-findings — the sole implementation of `RiskDirectoryPort`
- * (`shared/grc-ports/risk-directory.port.ts`, ADR-020 part 3).
- * `modules/risk` OWNS the `risks` table, so this adapter is the one place
- * in the platform allowed to query it on behalf of another module. Mirrors
- * `modules/controls/infrastructure/control-directory.adapter.ts` exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

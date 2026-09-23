@@ -6,85 +6,48 @@ import { RISK_LEVEL_ICON, RISK_LEVEL_VISUALS } from './risk-level-visuals';
 
 import type { RiskLevel } from './risk-level-visuals';
 
-/** One entry of `RiskMethodologyVersion.probabilityScale` / `.impactScale` (data-model.md §7) — an ordered axis level, e.g. `{ value: 3, label: 'Possível', description: '...' }`. */
 export interface RiskMatrixScaleLevel {
   value: number;
   label: string;
   description?: string;
 }
 
-/** Identifies one matrix cell by its axis values — the coordinate the caller round-trips through `onCellSelect`/`selectedCell`/`highlighted`. */
 export interface RiskMatrixCellPosition {
   probabilityValue: number;
   impactValue: number;
 }
 
-/**
- * One entry of `RiskMethodologyVersion.matrix` (data-model.md §7): the
- * already-derived `score`/`level` for a (probability, impact) pair. `score`
- * and `level` NEVER originate in this component — per ADR-006, scoring is
- * owned exclusively by the backend `RiskScoringService`; `RiskMatrix` only
- * looks the pair up and renders it.
- */
 export interface RiskMatrixCell extends RiskMatrixCellPosition {
   score: number;
   level: RiskLevel;
 }
 
-/** Marks a cell as the risk's current inherent or residual assessment, so both can be shown in context on the same matrix and never confused with one another. */
 export interface RiskMatrixHighlight extends RiskMatrixCellPosition {
   basis: 'inherent' | 'residual';
 }
 
-/**
- * `RiskMatrix`'s own chrome text. Required, never defaulted inside the
- * component — like `DataTableLabels`, `packages/design-system` must not
- * depend on `apps/web`'s pt-BR message catalog, so every caller supplies
- * this from its own source.
- */
 export interface RiskMatrixLabels {
-  /** Row-axis title, e.g. "Probabilidade". */
   probabilityAxisLabel: string;
-  /** Column-axis title, e.g. "Impacto". */
   impactAxisLabel: string;
-  /** Text for the empty top-left corner header cell, e.g. "Probabilidade \ Impacto". */
   cornerCellLabel: string;
-  /** Full level name, e.g. `LOW` -> "Baixo". Reuse the same source `RiskLevelBadge`'s caller uses, so the vocabulary matches across the app. */
   levelName: (level: RiskLevel) => string;
-  /** Full basis name for assistive technology and the legend, e.g. "Inerente" / "Residual". */
   basisName: (basis: 'inherent' | 'residual') => string;
-  /** Short marker text painted on a highlighted cell (kept to a letter or two so it fits), e.g. "I" / "R". */
   basisAbbreviation: (basis: 'inherent' | 'residual') => string;
-  /** Full accessible name read for a cell, e.g. "Probabilidade Possível, Impacto Grave: pontuação 12, nível Alto". */
   cellAccessibleLabel: (params: {
     probabilityLabel: string;
     impactLabel: string;
     score: number;
     levelLabel: string;
   }) => string;
-  /** Visually hidden `<caption>` naming the table for assistive technology, e.g. "Matriz de risco". */
   caption: string;
 }
 
 export interface RiskMatrixProps {
-  /** Ordered row axis (data-model.md `probabilityScale`) — rendered highest-value row first, the conventional risk-matrix orientation. */
   probabilityScale: readonly RiskMatrixScaleLevel[];
-  /** Ordered column axis (data-model.md `impactScale`) — rendered in the given (ascending) order, left to right. */
   impactScale: readonly RiskMatrixScaleLevel[];
-  /** Every (probability, impact) cell's pre-derived score/level. Must cover the full `probabilityScale` × `impactScale` cross product; a missing pair renders blank. */
   matrix: readonly RiskMatrixCell[];
-  /** The risk's current inherent and/or residual assessment, drawn on top of the base grid. Omit entirely for a bare methodology preview with no risk in context. */
   highlighted?: readonly RiskMatrixHighlight[];
-  /** Controlled selection (for input use, e.g. the assessment form) — a cell the caller wants shown as chosen, independent of `highlighted`. */
   selectedCell?: RiskMatrixCellPosition | null;
-  /**
-   * Cell-selection callback. When supplied, every cell becomes a real
-   * `<button>` — focusable, clickable, announced as pressed when it matches
-   * `selectedCell`. When omitted (the default), `RiskMatrix` is purely
-   * presentational: cells render as plain, non-focusable content, matching
-   * a read-only assessment display. This is the only switch between the two
-   * use cases — no other prop changes behavior.
-   */
   onCellSelect?: (cell: RiskMatrixCell) => void;
   labels: RiskMatrixLabels;
   className?: string;
@@ -94,28 +57,6 @@ function cellKey(position: RiskMatrixCellPosition): string {
   return `${position.probabilityValue}:${position.impactValue}`;
 }
 
-/**
- * Renders the organization's configured probability × impact matrix
- * (`RiskMethodologyVersion`, data-model.md §7). Deliberately dumb: it never
- * computes a score or a level (ADR-006 — that is `RiskScoringService`'s job
- * alone) and never assumes 5×5 — every dimension comes from
- * `probabilityScale`/`impactScale`, so an organization's differently-sized
- * methodology renders exactly as configured (FR-061).
- *
- * A real `<table>` gives row/column headers naming each axis level, so a
- * screen-reader user can locate "Probabilidade Possível × Impacto Grave" the
- * same way a sighted user reads the grid. Horizontal scroll is contained to
- * the table's own wrapper (`overflow-x-auto`), matching `DataTable`, so a
- * wide matrix never makes the page scroll sideways.
- *
- * Severity per cell is never color-only: the cell's icon (shared with
- * `RiskLevelBadge`), its border weight (also shared — grows with severity)
- * and the numeric score together carry the same information as the color.
- * `highlighted` inherent/residual cells add a second, independent pair of
- * signals — corner position (top-left vs bottom-right) and marker shape
- * (solid ring vs dashed ring) plus the abbreviation text — so the two are
- * never confused even for a user who cannot distinguish hue.
- */
 export function RiskMatrix({
   probabilityScale,
   impactScale,
@@ -139,8 +80,6 @@ export function RiskMatrix({
     }
   }
 
-  // Highest probability row rendered first — the conventional risk-matrix
-  // reading order — while the axis data itself stays in the caller's order.
   const rows = [...probabilityScale].sort((a, b) => b.value - a.value);
   const columns = impactScale;
 

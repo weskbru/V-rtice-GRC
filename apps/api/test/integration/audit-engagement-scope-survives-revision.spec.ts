@@ -1,18 +1,3 @@
-/**
- * T037/005-audit-findings, User Story 1 — the scenario `quickstart.md` §1
- * names as the most important of this fase: the engagement's scope
- * survives a later revision of the standard, WITHOUT a second snapshot
- * mechanism (research.md D-2). A scope link is a real FK to the specific,
- * immutable-once-`PUBLISHED` `FrameworkVersion`/`Requirement` row — never
- * to the version-agnostic `Framework` — so pointing at the row already IS
- * the preservation FR-006 requires.
- *
- * Also exercises the "regra adicional" D-2 names as necessary for the
- * guarantee above to hold at all: a still-`DRAFT` version (or a requirement
- * inside one) is refused `422`, because auditing a standard that can still
- * change underneath the engagement would defeat the whole point of this
- * test file.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -160,10 +145,6 @@ describe('AuditEngagement scope survives a later revision of the standard (T037,
       requirementId: requirementA516.id,
     });
 
-    // A SECOND version of the SAME framework is published, with a
-    // DIFFERENT requirement row (a real renumbering — a new id, not an
-    // edit of the old one, since `requirements_immutable_after_publish`
-    // forbids that trigger-side).
     const version2023 = await createFrameworkVersion(
       framework.id,
       uniqueTestMarker('2023'),
@@ -185,15 +166,9 @@ describe('AuditEngagement scope survives a later revision of the standard (T037,
     const entry = scope[0];
     expect(entry).toBeDefined();
     expect(entry?.targetType).toBe('REQUIREMENT');
-    // Still points at the ORIGINAL requirement — the 2023 revision never
-    // moved, rewrote or invalidated this link (research.md D-2's own
-    // "FK ingênuo" failure mode this design rejects).
     expect(entry?.target.id).toBe(requirementA516.id);
     expect(entry?.target.label).toBe('A.5.16 — Gestão de identidade');
 
-    // The requirement itself never changed content — immutability holds
-    // independent of this module too (004-compliance-management's own
-    // trigger).
     const reread = await ctx.prisma.client.requirement.findUniqueOrThrow({
       where: { id: requirementA516.id },
     });

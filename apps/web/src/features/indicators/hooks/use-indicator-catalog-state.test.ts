@@ -1,12 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount-free evidence for `useIndicatorCatalogState` (009-
- * indicators-reports, T062) — same harness as `features/risks/hooks/
- * use-register-state.test.ts`: `next/navigation` is mocked so
- * `currentSearch` stands in for "the URL right now".
- */
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 

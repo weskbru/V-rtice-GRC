@@ -1,26 +1,3 @@
-/**
- * T024/003-controls-management — a TEST-ONLY Nest module standing in for
- * the real `ControlsModule` (`src/modules/controls/controls.module.ts`)
- * while that file's own wiring is still owned by the coordinator (this
- * task's own working rules: "Do NOT edit
- * apps/api/src/modules/controls/controls.module.ts").
- *
- * This module registers EXACTLY the controllers/use-cases/repository
- * bindings User Story 1 (operations 1-6 of
- * `contracts/controls.openapi.yaml`) needs — see this task's own report
- * for the exact list the coordinator must fold into the real
- * `ControlsModule` alongside the other Controls Management workstream's
- * own providers (assessments, attestation, process/asset links, operations
- * 7-18).
- *
- * Used via `.overrideModule(ControlsModule).useModule(ControlsTestModule)`
- * against the REAL `AppModule` (`controls-contract-app.ts`) — every other
- * guard/filter/pipe/middleware `main.ts` wires stays exactly as it is; only
- * the Controls module's own composition is swapped in for one that
- * actually has User Story 1's routes, so the contract suite exercises the
- * real HTTP surface (permission guard, session guard, validation pipe,
- * problem-details filter) end to end rather than a hand-rolled bypass.
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../../src/core/audit/audit.module';
@@ -58,12 +35,6 @@ import { TransactionRunnerPort } from '../../../src/shared/persistence/transacti
     OrganizationsModule,
     AuthorizationModule,
     ControlDirectoryModule,
-    // 004-compliance-management, T015 — overriding the real `ControlsModule`
-    // with this test-only module (this file's own header) also removes
-    // its `ControlEffectivenessModule` import; the real `AppModule` now
-    // includes `ComplianceModule`, whose `RequirementComplianceReaderService`
-    // needs `ControlEffectivenessPort` resolvable at bootstrap regardless
-    // of which Controls composition root is active.
     ControlEffectivenessModule,
   ],
   controllers: [ControlController, ControlLifecycleController],

@@ -5,12 +5,6 @@ import { ProblemCommentsSection } from './problem-comments-section';
 
 import type { Comment } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for `ProblemCommentsSection` (CLAUDE.md §19.10
- * remediation), mirroring `risk-comments-section.test.tsx` exactly —
- * `@/features/problems/api` is mocked at the network boundary.
- */
-
 const { listCommentsMock, createCommentMock, withdrawCommentMock } = vi.hoisted(() => ({
   listCommentsMock: vi.fn(),
   createCommentMock: vi.fn(),

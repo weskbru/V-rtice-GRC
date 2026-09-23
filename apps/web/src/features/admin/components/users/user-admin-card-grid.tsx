@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, users card grid (CLAUDE.md §18.12). The grid
- * frame itself is the shared `CardGrid`; what stays here is which card to
- * render and a skeleton shaped like it, mirroring `ActionCardGrid`'s
- * identical structure.
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
 
 import { Skeleton } from '@/components/ui/skeleton';

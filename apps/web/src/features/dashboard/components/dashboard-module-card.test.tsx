@@ -18,7 +18,6 @@ function renderCard(metrics: readonly DashboardModuleMetric[]) {
   );
 }
 
-/** The `<dd>` a label names — read through the description-list pairing, not by position. */
 function valueFor(label: string): HTMLElement {
   const term = screen.getByText(label, { selector: 'dt' });
   const value = term.nextElementSibling;
@@ -44,10 +43,6 @@ describe('DashboardModuleCard', () => {
     );
   });
 
-  /**
-   * A metric's tone says what its number MEANS above zero. "0 críticos" is
-   * not a danger, so the reserved status colour must not be spent on it.
-   */
   it('applies a metric tone only when the figure is above zero', () => {
     renderCard([
       { label: 'Críticos', value: 3, tone: 'danger' },

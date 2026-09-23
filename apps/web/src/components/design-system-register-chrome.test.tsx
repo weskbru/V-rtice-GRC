@@ -13,26 +13,6 @@ import { common } from '@/lib/messages/common';
 
 import type { ActiveFilterChip } from '@pharos/design-system/components';
 
-/**
- * PharosGRC — direct evidence for the register/list chrome of
- * `packages/design-system` (CLAUDE.md §18.3).
- *
- * These five components are the shared exploration frame every GRC register
- * screen composes — and, until this file, the only proof any of them worked
- * was indirect, through whichever feature happened to render them. That is
- * exactly the "guard that passes without protecting anything" this project
- * has already paid for more than once: a change to `FilterBar`'s disclosure
- * or to `PaginationFooter`'s page window reaches Risks, Controls, Assets,
- * Processes, Audits, Incidents, Problems, Reports, Compliance and
- * Administration at the same instant, with nothing between the edit and ten
- * screens.
- *
- * Everything asserted here is behaviour a user or a screen reader can
- * observe — roles, accessible names, `aria-expanded`/`aria-controls`,
- * focus — never a class name or a DOM shape, so a visual redesign that
- * keeps the behaviour keeps these tests green.
- */
-
 const CHIP_A: ActiveFilterChip = {
   id: 'status',
   label: 'Status: Em tratamento',
@@ -130,26 +110,6 @@ describe('FilterBar — collapsible filter disclosure', () => {
     expect(within(panel!).getByRole('button', { name: 'Status' })).toBeInTheDocument();
   });
 
-  /**
-   * F-71. The toggle's `aria-controls` must name an element that is actually
-   * in the document, *while the panel is closed* — not only after it opens.
-   *
-   * This is the guard for a production-visible defect, not a tidiness rule.
-   * The panel used to be created on the click, which meant two things at
-   * once: with the panel closed the reference dangled on every load in every
-   * engine (axe tolerates that only through its documented
-   * `aria-expanded="false"` exception, which is why no gate ever reported
-   * it), and — because React 19's `useId` is positional and shifts when the
-   * streamed HTML of a `<Suspense>` route races hydration, and because React
-   * does not patch an attribute mismatch — the button kept the *server's* id
-   * while the newly-created panel took the *client's*. Opening the panel
-   * then produced a dangling `aria-controls` with `aria-expanded="true"`:
-   * `aria-valid-attr-value`, impact critical, measured in a production build
-   * on Firefox in 3 of 4 measurements.
-   *
-   * Asserting resolution while closed is what catches a regression to the
-   * mount-on-click shape, because that shape cannot satisfy it.
-   */
   it('names a panel that exists in the document while the filters are still closed', () => {
     renderCollapsible();
 
@@ -161,14 +121,6 @@ describe('FilterBar — collapsible filter disclosure', () => {
     expect(document.getElementById(panelId!)).not.toBeNull();
   });
 
-  /**
-   * The other half of the same fix: keeping the panel in the document must
-   * not put its controls in front of anyone while it is closed. `hidden`
-   * (`display: none`) is what takes the subtree out of the tab order and out
-   * of the accessibility tree — an `aria-hidden` or an off-screen clip would
-   * leave the filter controls tabbable, which would be a worse defect than
-   * the one being fixed.
-   */
   it('keeps the closed panel out of sight, out of the tab order and unannounced', () => {
     renderCollapsible({ filtersPanelLabel: 'Filtros do registro de riscos' });
 
@@ -176,11 +128,9 @@ describe('FilterBar — collapsible filter disclosure', () => {
     const panel = document.getElementById(toggle.getAttribute('aria-controls')!);
 
     expect(panel).not.toBeVisible();
-    // Not exposed to assistive technology: neither the group itself…
     expect(
       screen.queryByRole('group', { name: 'Filtros do registro de riscos' }),
     ).not.toBeInTheDocument();
-    // …nor anything inside it.
     expect(screen.queryByRole('button', { name: 'Status' })).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
@@ -190,11 +140,6 @@ describe('FilterBar — collapsible filter disclosure', () => {
     expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
   });
 
-  /**
-   * Opening must reveal the panel the button already named, never replace it
-   * with a new element — that identity is precisely what stops the two ids
-   * from being produced by two different render passes.
-   */
   it('reveals the same panel element it named while closed, id unchanged', () => {
     renderCollapsible();
 
@@ -229,20 +174,13 @@ describe('FilterBar — collapsible filter disclosure', () => {
       onClearFilters: () => undefined,
     });
 
-    // The panel is closed…
     expect(screen.queryByRole('button', { name: 'Status' })).not.toBeInTheDocument();
-    // …and the user can still see, and drop, exactly which filter narrowed the list.
     expect(screen.getByText('Status: Em tratamento')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Remover filtro: Status: Em tratamento' }));
     expect(onRemove).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Limpar filtros' })).toBeInTheDocument();
   });
 
-  /**
-   * The audit engagements catalog has no text search — `GET /audits` accepts
-   * no `q` — and would otherwise have ended up with filters behind a button
-   * that never rendered.
-   */
   it('still offers the disclosure when the register has no search box', () => {
     render(
       <FilterBar
@@ -261,19 +199,6 @@ describe('FilterBar — collapsible filter disclosure', () => {
     expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument();
   });
 
-  /**
-   * The no-search collapsible disposition (Relatórios, Auditoria, Planos de
-   * Ação — no `q`/text-search parameter in their contract). Before this
-   * fix, the shared bordered card that normally holds the search box and
-   * the toggle together wrapped nothing but a lone button, rendering as a
-   * ~74px empty box on `/reports`/`/audits`/`/actions`. This does not
-   * assert class names or box dimensions (a class-name assertion would not
-   * survive a redesign that keeps the behaviour) — it asserts the same
-   * three behavioural guarantees the with-search tests above assert for
-   * their own disposition: the panel is a real, F-71-safe element while
-   * collapsed, the chips stay reachable while collapsed, and opening
-   * reveals the controls.
-   */
   function renderCollapsibleNoSearch(
     overrides: Partial<React.ComponentProps<typeof FilterBar>> = {},
   ) {
@@ -321,9 +246,7 @@ describe('FilterBar — collapsible filter disclosure', () => {
       onClearFilters: () => undefined,
     });
 
-    // The panel is closed…
     expect(screen.queryByRole('button', { name: 'Status' })).not.toBeInTheDocument();
-    // …and the user can still see, and drop, exactly which filter narrowed the list.
     expect(screen.getByText('Status: Em tratamento')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Remover filtro: Status: Em tratamento' }));
     expect(onRemove).toHaveBeenCalledTimes(1);
@@ -428,12 +351,6 @@ describe('PaginationFooter', () => {
     expect(props.onPageIndexChange).toHaveBeenCalledWith(1);
   });
 
-  /**
-   * The jump field used to sit in the footer permanently, competing with the
-   * numbered pages for the same attention. It is now behind the ellipsis
-   * that already stands for "there are pages here you cannot click" — the
-   * capability is unchanged, only its resting state is quiet.
-   */
   it('opens the jump field from the ellipsis and goes to the typed page', () => {
     const props = renderFooter();
 
@@ -500,9 +417,6 @@ describe('CardGrid', () => {
   it('announces loading in place of the list', () => {
     renderGrid({ isLoading: true, loadingLabel: 'Carregando riscos…' });
 
-    // A live region is announced by its CONTENT, not by a name — so that is
-    // what this asserts, rather than an `aria-label` a screen reader would
-    // then read instead of the text.
     expect(screen.getByRole('status')).toHaveTextContent('Carregando riscos…');
     expect(screen.queryByRole('list', { name: 'Riscos' })).not.toBeInTheDocument();
   });
@@ -558,21 +472,6 @@ describe('MultiSelectFilter', () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
-  /**
-   * F-71, the half no gate reports. This trigger carries `aria-haspopup`,
-   * and axe's `aria-valid-attr-value` rule downgrades a missing
-   * `aria-controls` target to "needs review" for ANY element carrying that
-   * attribute — so a dangling reference here is invisible to every
-   * accessibility scan this project runs. It became reachable the moment
-   * `FilterBar` stopped unmounting its collapsed panel: these triggers then
-   * started arriving in the server HTML, where a shifted `useId` leaves the
-   * trigger holding the server id and a click-created panel holding the
-   * client one. Measured on a production build before this guard existed:
-   * 22 of 32 Firefox loads of /risks, all four triggers each.
-   *
-   * Asserting the target exists while CLOSED is what pins the fix, because
-   * the mount-on-click shape cannot satisfy it.
-   */
   it('names a panel that exists in the document while it is still closed', () => {
     renderFilter();
 
@@ -584,7 +483,6 @@ describe('MultiSelectFilter', () => {
     const panel = document.getElementById(panelId!);
     expect(panel).not.toBeNull();
 
-    // …without putting its options in front of anyone, or in the tab order.
     expect(panel).not.toBeVisible();
     expect(screen.queryByRole('checkbox', { name: 'Rascunho' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Limpar' })).not.toBeInTheDocument();
@@ -630,7 +528,6 @@ describe('ColumnVisibilityMenu', () => {
     expect(onChange).toHaveBeenCalledWith({ owner: false, category: false });
   });
 
-  /** Same guard, same reason as `MultiSelectFilter`'s above (F-71). */
   it('names a panel that exists in the document while it is still closed', () => {
     renderMenu();
 

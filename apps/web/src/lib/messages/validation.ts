@@ -1,11 +1,3 @@
-/**
- * PharosGRC — client-side form validation copy (pt-BR).
- *
- * Backs the zod schemas in `src/lib/validation/auth.ts`. Presence/shape
- * only — the actual password *policy* (beyond minimum length) is enforced
- * exclusively by the server (FR-006) and its messages arrive as 422 field
- * errors, which are rendered verbatim rather than through this catalog.
- */
 export const validation = {
   email: {
     required: 'Informe seu e-mail.',

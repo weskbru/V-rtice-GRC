@@ -1,11 +1,3 @@
-/**
- * T023/004-compliance-management — `CreateFrameworkVersionUseCase`
- * (`POST /frameworks/{frameworkId}/versions`, `createFrameworkVersion`
- * operation, FR-002, FR-006). Every version is created `DRAFT`
- * (research.md D-3); creating one never alters or invalidates any other
- * version of the same framework (FR-006). `label` must be unique within
- * the framework (`422` otherwise).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

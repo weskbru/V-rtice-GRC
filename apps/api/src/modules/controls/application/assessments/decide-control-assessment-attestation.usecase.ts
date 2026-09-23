@@ -1,34 +1,3 @@
-/**
- * T030-T032/003-controls-management, User Story 2 — `DecideControlAssessmentAttestationUseCase`.
- * `POST /controls/{controlId}/assessments/{assessmentId}/attestation/decision`
- * (`decideControlAssessmentAttestation` operation). Requires
- * `control:approve`, DISTINCT from the `control:test` permission
- * `RequestControlAssessmentAttestationUseCase` requires (research.md D-9) —
- * enforced by `@RequirePermission` on the controller route.
- *
- * ## Segregation of duties — two invariants, checked and audited together
- *
- * `checkAttestationSegregation` (`domain/control-assessment-attestation.ts`)
- * evaluates C1 (assessor) and C2 (owner) independently and returns every
- * violation. BOTH are audited when both apply (FR-019) — a single merged
- * reason would not distinguish "tested it" from "owns it", and that
- * distinction is the whole point of the trail. The audit event fires
- * BEFORE the `ValidationDomainError` is thrown, inside the SAME
- * transaction as everything else this use case might otherwise have
- * written (there is nothing else to write on a refusal, but the
- * transaction boundary keeps this call site identical in shape to every
- * other use case's audit-then-return).
- *
- * ## Effectiveness before/after — computed here, never stored
- *
- * `ControlEffectivenessService#calculateControlEffectiveness` (D-2, the
- * single calculator) is called TWICE against the SAME `referenceDate`:
- * once against the assessment history as it stands BEFORE this decision,
- * once again after `attest()` has written `attestedAt`/`attestedByUserId`
- * — both reads inside the same transaction, so the "after" read reflects
- * this decision's own write. `control.effectiveness.changed` is emitted
- * ONLY when the two values differ (FR-020), carrying both.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -100,24 +69,12 @@ export class DecideControlAssessmentAttestationUseCase {
 
     const justification = input.justification ?? null;
 
-    // C1/C2 — checked BEFORE either write, for BOTH outcomes (FR-017,
-    // FR-018: deciding at all — approving OR rejecting — is restricted,
-    // not merely approving).
     const violations = checkAttestationSegregation({
       assessorUserId: assessment.assessor.id,
       controlOwnerUserId: control.ownerUserId,
       attesterUserId: input.actorUserId,
     });
     if (violations.length > 0) {
-      // The audit write MUST commit even though the request itself is
-      // refused — a `ValidationDomainError` thrown from INSIDE the same
-      // `transactionRunner.run(...)` callback that performed the audit
-      // insert would roll the insert back along with everything else
-      // (Prisma's interactive transactions abort atomically on an
-      // uncaught throw), silently losing the very audit trail FR-019
-      // requires. Mirrors `AuditOrgScopeDenialRecorder`'s own documented
-      // "dedicated, short-lived transaction for the audit write alone,
-      // then the refusal is raised outside it" pattern.
       await this.transactionRunner.run(async () => {
         await this.auditRecorder.record({
           action: 'control.attestation.refused',
@@ -154,9 +111,6 @@ export class DecideControlAssessmentAttestationUseCase {
       });
     }
 
-    // APPROVED — compute effectiveness before, attest, compute after, and
-    // audit both the attestation and (only if it changed) the derived
-    // effectiveness.
     return this.transactionRunner.run(async () => {
       const before = await this.assessmentRepository.listAllForEffectiveness(input.controlId);
       const referenceDate = new Date();

@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control catalog column definitions (T045), mirroring
- * `features/risks/components/risk-register-columns.tsx` (CLAUDE.md §18.12).
- *
- * `enableSorting` is `false` on every column whose field is absent from
- * `GET /controls`'s `sort` enum (`code, name, status, effectiveness, owner,
- * updatedAt` — controls.openapi.yaml) — `nature`, `type`, `frequency` and
- * `orgUnit` are filterable but never offered as a sortable column header,
- * exactly the documented pitfall this task calls out.
- *
- * Status and effectiveness both pair an icon with their colour and text
- * label (`StatusBadge`, CLAUDE.md §18.8) — never colour alone.
- */
 import { EmptyValue, StatusBadge } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';
@@ -44,7 +31,6 @@ export const CONTROL_REGISTER_COLUMN_IDS = {
   updatedAt: 'updatedAt',
 } as const;
 
-/** Columns eligible for `ColumnVisibilityMenu` — code/name stay always visible (`enableHiding: false` below). */
 export const CONTROL_REGISTER_HIDEABLE_COLUMNS: readonly { id: string; label: string }[] = [
   { id: CONTROL_REGISTER_COLUMN_IDS.status, label: controls.register.columns.status },
   { id: CONTROL_REGISTER_COLUMN_IDS.effectiveness, label: controls.register.columns.effectiveness },

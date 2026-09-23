@@ -1,11 +1,3 @@
-/**
- * T190 — `ListAttachmentsUseCase`: `GET /attachments` (FR-096, FR-098,
- * FR-030). No attachment id is in play here (unlike `WithdrawAttachmentUseCase`/
- * `GetAttachmentContentUseCase`), so the parent accessor's own
- * `NotFoundDomainError` (keyed by the PARENT's id) is exactly the right
- * refusal to propagate as-is — see `attachment-access.ts`'s header for why
- * that is NOT the case once an attachment id already exists.
- */
 import { Injectable } from '@nestjs/common';
 
 import { createPageRequest } from '../../../shared/pagination/page-request';

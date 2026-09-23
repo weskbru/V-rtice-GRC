@@ -1,9 +1,3 @@
-/**
- * T021/004-compliance-management — `ListFrameworksUseCase`: the read side
- * of `GET /frameworks` (`listFrameworks` operation). No scope predicate
- * (research.md D-2) — every caller with `compliance:view` sees every
- * framework.
- */
 import { Injectable } from '@nestjs/common';
 
 import { FrameworkRepositoryPort } from '../../domain/ports/framework-repository.port';

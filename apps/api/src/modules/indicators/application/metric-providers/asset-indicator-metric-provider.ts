@@ -1,9 +1,3 @@
-/**
- * 009-indicators-reports, T024 — `ASSET_INACTIVE_COUNT`. Delegates to
- * `AssetMetricsPort` (`shared/grc-ports/asset-metrics.port.ts`), which
- * itself reuses `PrismaAssetRepository.list` — no query of this file's
- * own.
- */
 import { Injectable } from '@nestjs/common';
 
 import { AssetMetricsPort } from '../../../../shared/grc-ports/asset-metrics.port';

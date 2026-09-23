@@ -1,15 +1,3 @@
-/**
- * T151 — FR-084: risks in `CLOSED` or `ARCHIVED` refuse business-content
- * edits (`PATCH /risks/{riskId}`) with 422 while remaining fully readable
- * (`GET /risks/{riskId}` still 200s with the unchanged content). This rule
- * (`assertBusinessContentEditable`, `domain/risk.entity.ts`) existed since
- * T090, but until this phase there was no way to drive a real risk to
- * `CLOSED`/`ARCHIVED` at all — so it had never been exercised against an
- * actual risk in either state. This test drives a risk through the FULL
- * lifecycle (including both approval-gated transitions) via the real HTTP
- * API to reach both states and proves the rule for real, for the first
- * time.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -72,12 +60,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     orgUnitId = orgUnit.id;
     const owner = await createUserFixture(prisma, { email: `${marker}-owner@example.test` });
     ownerUserId = owner.id;
-    // F-CV-2 (`risks-lifecycle-audit`): being assignable as owner now also
-    // requires being able to SEE the risk once assigned — `risk:view` plus
-    // scope reaching `orgUnitId`. This fixture predates that rule and had
-    // neither; every `driveRiskToClosed` call in this file creates a risk
-    // with `ownerUserId` unchanged from the first request, so this is a
-    // one-time setup cost, not a per-test one.
     const ownerRole = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-${marker}-owner-role-${randomUUID()}`,
     });
@@ -95,8 +77,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     });
     categoryId = category.id;
 
-    // Any authenticated user works as `createdByUserId` for the fixture
-    // methodology version; a throwaway user is created for this alone.
     const methodologyAuthor = await createUserFixture(prisma, {
       email: `${marker}-methodology-author@example.test`,
     });
@@ -104,10 +84,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
   });
 
   afterAll(async () => {
-    // See `risk-lifecycle.spec.ts`'s identical `afterAll` comment: this
-    // fixture category must not leak into `reference-data.spec.ts`'s own
-    // "exactly the active categories" assertion — `risk_categories` is
-    // truncated once per `vitest run`, not per file.
     await ctx.app
       .get(PrismaService)
       .client.riskCategory.update({ where: { id: categoryId }, data: { isActive: false } });
@@ -119,10 +95,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     marker: string,
   ): Promise<ReturnType<typeof request.agent>> {
     const prisma = ctx.app.get(PrismaService);
-    // The email local-part is capped at 64 chars by RFC 5321 (enforced by
-    // `class-validator`'s `IsEmail`) — a short random suffix, not the full
-    // descriptive `marker`, keeps this well under that limit regardless of
-    // how long a caller's marker string is.
     const fixture = await createLocalUserFixture(prisma, {
       email: `${randomUUID()}@example.test`,
       primaryOrgUnitId: orgUnitId,
@@ -143,11 +115,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     return agent;
   }
 
-  /** Drives a fresh risk all the way to `CLOSED` via the real HTTP API:
-   * DRAFT -> IDENTIFIED -> ASSESSED (direct transitions), then
-   * ASSESSED -> ACCEPTED -> CLOSED (both approval-gated, decided by a
-   * SEPARATE approver — FR-029a forbids the requester deciding their own
-   * request). Returns the closed risk's id and its current ETag. */
   async function driveRiskToClosed(marker: string): Promise<{ riskId: string; etag: string }> {
     const requester = await agentWithPermissions(
       [
@@ -242,8 +209,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     const closedBody = closed.body as ApprovalBody;
     expect(closedBody.status).toBe('APPROVED');
 
-    // Confirm the risk itself is CLOSED via a fresh GET (not just inferred
-    // from the decision response).
     const getClosed = await requester.get(`/api/v1/risks/${risk.id}`).set('Origin', appOrigin);
     expect(getClosed.status).toBe(200);
     expect((getClosed.body as RiskDetailBody).status).toBe('CLOSED');
@@ -267,7 +232,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     const problem = patchAttempt.body as ProblemBody;
     expect(problem.status).toBe(422);
 
-    // The record remains unchanged and fully readable.
     const getAfter = await editor.get(`/api/v1/risks/${riskId}`).set('Origin', appOrigin);
     expect(getAfter.status).toBe(200);
     const body = getAfter.body as RiskDetailBody;
@@ -275,10 +239,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     expect(body.title).toBe('Risco a ser encerrado');
   });
 
-  /** T093/F-31 — causes/consequences are business content
-   * (`domain/risk.entity.ts`'s own `BUSINESS_CONTENT_LOCKED_STATUSES` doc
-   * comment names them explicitly), so `PUT /risks/{riskId}/causes` must
-   * refuse a `CLOSED` risk exactly like `PATCH` does above. */
   it('a CLOSED risk refuses PUT /risks/{riskId}/causes with 422 while remaining readable', async () => {
     const marker = uniqueTestMarker('risk-immutability-closed-causes');
     const { riskId, etag } = await driveRiskToClosed(marker);
@@ -333,17 +293,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     expect(body.title).toBe('Risco a ser encerrado');
   });
 
-  /**
-   * F-CV-2/F-CV-3 (`risks-lifecycle-audit`) — an ARCHIVED risk's own past is
-   * still readable through `GET /risks/{riskId}/lifecycle`'s
-   * `traversedStatuses`, never confused with "not available now"
-   * (`availableTransitions`, which is empty here: ARCHIVED is terminal).
-   * `driveRiskToClosed` proves DRAFT -> IDENTIFIED -> ASSESSED -> ACCEPTED ->
-   * CLOSED already happened; this test adds CLOSED -> ARCHIVED and asserts
-   * every one of those six statuses is still marked traversed afterwards —
-   * the exact defect report: "Em tratamento — Indisponível" on an archived
-   * risk that DID pass through a status, reading as if it never had.
-   */
   it('an ARCHIVED risk still shows every status it actually passed through as traversed (F-CV-3)', async () => {
     const marker = uniqueTestMarker('risk-immutability-traversed');
     const { riskId, etag } = await driveRiskToClosed(marker);
@@ -367,8 +316,6 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
     const lifecycleBody = lifecycle.body as RiskLifecycleStateBody;
 
     expect(lifecycleBody.status).toBe('ARCHIVED');
-    // Nothing is available from a terminal status — this is the exact
-    // condition that used to be conflated with "never traversed".
     expect(lifecycleBody.availableTransitions).toHaveLength(0);
     expect(lifecycleBody.traversedStatuses).toEqual([
       'DRAFT',
@@ -378,15 +325,10 @@ describe('Risk immutability on CLOSED/ARCHIVED (T151, FR-084)', () => {
       'CLOSED',
       'ARCHIVED',
     ]);
-    // Never visited on this risk's own path — proves the set is derived
-    // from THIS risk's real history, not a static "everything before the
-    // current status" assumption.
     expect(lifecycleBody.traversedStatuses).not.toContain('UNDER_TREATMENT');
     expect(lifecycleBody.traversedStatuses).not.toContain('UNDER_REVIEW');
   });
 
-  /** T093/F-31 — see the CLOSED/causes test above; same rule against the
-   * disjoint `RiskConsequence` table and the ARCHIVED status. */
   it('an ARCHIVED risk refuses PUT /risks/{riskId}/consequences with 422 while remaining readable', async () => {
     const marker = uniqueTestMarker('risk-immutability-archived-consequences');
     const { riskId, etag } = await driveRiskToClosed(marker);

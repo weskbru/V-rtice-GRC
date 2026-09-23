@@ -1,36 +1,5 @@
 'use client';
 
-/**
- * PharosGRC application shell — notification bell and list (T196, US9,
- * FR-101).
- *
- * Consumes `GET /notifications`, `POST /notifications`
- * (`{ action: 'MARK_ALL_READ' }`) and `POST /notifications/{id}/read`
- * through `notificationsApi` (`./notifications-api.ts`). Mounted once in
- * `Header`, alongside `UserMenu` — platform-wide chrome, not scoped to any
- * one business record.
- *
- * ## The empty state is the honest, expected case — not an error
- *
- * Nothing in this platform release produces a notification yet: the
- * capability (`core/notifications`) is built and tested, but no lifecycle
- * event (a risk assessed, an approval requested, a treatment action
- * overdue, ...) is wired to call it — `docs/architecture.md` §6 states this
- * plainly, and wiring a producer is explicitly out of this task's scope.
- * `shell.notifications.empty` therefore reads as a calm, normal state
- * ("Nenhuma notificação por enquanto"), never as a failure or a "coming
- * soon" placeholder — a real signed-in user opening this panel today sees
- * exactly this, and that is correct behavior, not a gap to hide.
- *
- * ## No realtime channel
- *
- * The unread badge is refreshed on mount and again whenever the panel
- * opens or a mutation completes — there is no WebSocket/SSE/polling loop
- * in this release, so the count can be briefly stale if a notification
- * arrives while the panel is closed. Introducing realtime delivery is a
- * separate, unrequested capability (CLAUDE.md §2 — no premature
- * abstraction) and is not built here.
- */
 import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -47,7 +16,6 @@ import type { Notification } from './notifications-api';
 
 const PAGE_SIZE = 20;
 
-/** The deep-link target for a notification that refers to a record — `null` for one that does not (e.g. a purely informational message). `RISK` is the only registered entity type today (ADR-008); a future module's own notifications add their own case here. */
 function entityHref(notification: Notification): string | null {
   if (notification.entityType === 'RISK' && notification.entityId) {
     return `/risks/${notification.entityId}`;
@@ -62,11 +30,6 @@ export function NotificationBell(): React.JSX.Element {
   const [error, setError] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
 
-  // Derived "loading" — mirrors `RiskHistorySection`/`RiskCommentsSection`'s
-  // own convention exactly: never `setLoading(true)` synchronously in the
-  // effect body (`react-hooks/set-state-in-effect`). Bumping `refreshToken`
-  // (panel opened, or a mutation's own failure fallback) re-runs the fetch
-  // below; `resolvedToken` tracks which fetch last resolved.
   const [refreshToken, setRefreshToken] = useState(0);
   const [resolvedToken, setResolvedToken] = useState<number | null>(null);
   const loading = resolvedToken !== refreshToken;
@@ -106,10 +69,6 @@ export function NotificationBell(): React.JSX.Element {
 
   async function handleMarkOneRead(notification: Notification): Promise<void> {
     if (notification.readAt) return;
-    // Optimistic — reflected immediately so the unread dot/badge do not lag
-    // behind the click; a failure re-fetches from the server rather than
-    // trusting the optimistic guess (never a security/audit concern — the
-    // server's own state is authoritative regardless of what this renders).
     setItems((current) =>
       current.map((item) =>
         item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item,

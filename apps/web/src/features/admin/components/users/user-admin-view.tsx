@@ -1,32 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, users list and management (T181, FR-021,
- * FR-023, FR-011, FR-017), brought into the shared register family
- * (CLAUDE.md §18.12): `useUserAdminState` (URL-persisted filters/sort/page/
- * view), `UserAdminSummary`, the collapsible `UserAdminFilters`,
- * `ResultsToolbar`, and then EITHER `UserAdminCardGrid` or `DataTable`
- * (`@pharos/design-system`) around one `GET /admin/users` call per state
- * change — mirroring `AuditEngagementCatalogView`'s own orchestration.
- * Never fetches more than the current page, never sorts, filters or
- * paginates client-side.
- *
- * Tabela is this screen's DEFAULT presentation (`use-user-admin-state.ts`'s
- * own `DEFAULT_VIEW`) — unlike the business registers, where Cards is
- * primary (CLAUDE.md §18): an administrative listing of every user is read
- * densely, row by row, not browsed like a risk or a control.
- *
- * This screen has no detail route (no `/admin/users/{id}`, unlike every
- * business register) — every action reaches a dialog from the row-actions
- * menu (`UserRowActionsMenu`, shared by the table and the cards), so there
- * is no quick-view panel either.
- *
- * Every existing permission gate (`user:administer`, `role:administer`),
- * the create action and all six dialogs are UNCHANGED from the previous
- * version of this screen — only the surrounding register frame (state,
- * summary, filters, toolbar, presentation, empty state) was brought into
- * the shared family.
- */
 import {
   ColumnVisibilityMenu,
   DataTable,
@@ -127,11 +100,6 @@ export function UserAdminView(): React.JSX.Element {
       .catch(() => setOrgUnits([]));
   }, []);
 
-  // `loading` is derived from "the last RESOLVED request doesn't match the
-  // one this render calls for", not a `setLoading(true)` called
-  // synchronously at the top of the effect — mirrors
-  // `AuditEngagementCatalogView`'s own identical pattern and its doc
-  // comment on why (`react-hooks/set-state-in-effect`).
   const requestKey = [
     state.page,
     state.pageSize,
@@ -186,9 +154,6 @@ export function UserAdminView(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from every one of these `state.*` fields above; listing them individually as well would refetch on the same change twice for no benefit.
   }, [requestKey]);
 
-  // Self-corrects a page position left stranded by a narrower result set
-  // (e.g. a shared link pointing at a page that no longer exists once
-  // filtered) rather than rendering a permanently empty page.
   useEffect(() => {
     if (!loading && state.page > totalPages) {
       setPage(totalPages);
@@ -269,8 +234,6 @@ export function UserAdminView(): React.JSX.Element {
         onClearFilters={clearFilters}
       />
 
-      {/* One strip for every decision about HOW the matched users are shown
-          — ordering, cards or table, and (in the table) which columns. */}
       <ResultsToolbar
         count={admin.users.results.count(total)}
         isLoading={loading}

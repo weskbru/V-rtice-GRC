@@ -1,7 +1,3 @@
-/**
- * T188/T189/T190 — the sole Prisma-backed `AttachmentRepositoryPort`
- * implementation. Unscoped by design — see that port's header comment.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

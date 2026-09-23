@@ -1,12 +1,3 @@
-/**
- * T029-T030/003-controls-management, User Story 2 — the sole
- * implementation of `ControlAssessmentApprovalRepositoryPort`, against the
- * SAME generic `approvals` table `modules/risk/infrastructure/
- * approval.repository.ts` writes, scoped to `entityType:
- * 'CONTROL_ASSESSMENT'`. No scope predicate anywhere in this file — the
- * caller has already resolved and scope-checked the parent `Control`
- * before any of these run.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -61,13 +52,6 @@ export class ControlAssessmentApprovalRepository implements ControlAssessmentApp
       data: {
         entityType: 'CONTROL_ASSESSMENT',
         entityId: input.entityId,
-        // No transition string applies to an assessment attestation (it
-        // is a declare-effective/not decision, not a state machine move,
-        // research.md D-6's own "Descartado explicitamente" for the
-        // control's own lifecycle applies equally here) — a fixed literal
-        // documents what this approval is FOR without inventing a
-        // per-assessment state pair the way `Risk`'s own
-        // `${fromStatus}->${toStatus}` does.
         requestedTransition: 'ATTEST',
         requestedByUserId: input.requestedByUserId,
         requestedAt: new Date(),

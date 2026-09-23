@@ -1,25 +1,7 @@
 'use client';
 
-/**
- * PharosGRC — process catalog filter toolbar (T046). Mirrors
- * `AuditEngagementRegisterFilters`'s overall shape (CLAUDE.md §18.12:
- * reference data fetched once on mount, an active-filters chip row, a
- * retry affordance on a reference-data load failure) — single-value
- * `Select`s rather than `MultiSelectFilter`, because `GET /processes` accepts
- * exactly one org unit / one situation per filter field the way this
- * screen's own message catalog (`processes.register.activeFilters`, no
- * `countChip`) already implies. Free-text search IS present here (unlike
- * `GET /audits`), so `searchValue`/`onSearchChange` are wired straight into
- * `FilterBar`'s own search box, debounced upstream by
- * `use-process-catalog-state.ts`.
- */
 import { FilterBar, type ActiveFilterChip } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
-
-import { processesApi } from '../api';
-
-import type { OrgUnitNode } from '../types';
-import type { ReactNode } from 'react';
 
 import { ReferenceDataError } from '@/components/register/reference-data-error';
 import {
@@ -33,6 +15,11 @@ import { common } from '@/lib/messages/common';
 import { processes } from '@/lib/messages/processes';
 import { searchChip, singleValueChip } from '@/lib/register/filter-chips';
 
+import { processesApi } from '../api';
+
+import type { OrgUnitNode } from '../types';
+import type { ReactNode } from 'react';
+
 const ALL_VALUE = '__all__';
 
 export interface ProcessRegisterFiltersProps {
@@ -44,7 +31,6 @@ export interface ProcessRegisterFiltersProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }

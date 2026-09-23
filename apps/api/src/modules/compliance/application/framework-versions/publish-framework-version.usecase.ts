@@ -1,15 +1,3 @@
-/**
- * T023/004-compliance-management — `PublishFrameworkVersionUseCase`
- * (`POST /frameworks/{frameworkId}/versions/{versionId}/publish`,
- * `publishFrameworkVersion` operation, FR-005, research.md D-3). The
- * version's one legal transition, one-way — there is deliberately no
- * operation to revert it.
- *
- * Refused with `422` when the version has no requirement at all (FR-005,
- * edge case "versão publicada sem cláusulas") — a version with nothing to
- * measure would count, incorrectly, as 100% compliant. Refused with `422`
- * when already `PUBLISHED`.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -33,7 +21,6 @@ export interface PublishFrameworkVersionInput {
   readonly actorUserId: string;
   readonly frameworkId: string;
   readonly versionId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
 }
 

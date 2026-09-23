@@ -1,17 +1,3 @@
-/**
- * T025/005-audit-findings, User Story 1 — `CreateAuditEngagementUseCase`
- * (`POST /audits`, `createAuditEngagement` operation, FR-001, US1 AS1).
- * Mirrors `modules/controls/application/create-control.usecase.ts`'s
- * structure — see that file's header for the transaction-boundary/order-
- * of-checks reasoning this one does not repeat.
- *
- * ## Code generation reuses the GRC kernel's shared allocator
- *
- * `EntityCodeGeneratorPort.nextCode('AUD', year)` — the SAME allocator
- * (`GrcCodeSequence`) `Control`/`Framework` already extended, now
- * extended once more with the `AUD` prefix (T006, research.md D-8). Never
- * a second, duplicated counter mechanism in this module.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -51,16 +37,12 @@ export class CreateAuditEngagementUseCase {
     private readonly scopeResolver: ScopeResolverService,
     private readonly auditRecorder: AuditRecorder,
   ) {
-    // Idempotent — see that function's own doc comment.
     registerAuditEngagementAuditAllowlists();
   }
 
   async execute(input: CreateAuditEngagementInput): Promise<AuditEngagementRecord> {
     const actor = await this.referenceData.findUser(input.actorUserId);
     if (!actor) {
-      // Defensive only: `SessionGuard` already proved this user has a live
-      // session, so the actor row existing is expected. Fails closed
-      // rather than attributing an audit event to a fabricated label.
       throw new UnauthorizedDomainError();
     }
 
@@ -128,13 +110,6 @@ export class CreateAuditEngagementUseCase {
   }
 }
 
-/** Mirrors `create-control.usecase.ts`'s own exported
- * `isOrgUnitWithinScope`, kept as a local, module-private copy rather than
- * cross-module import (`grc/shared/domain/org-scope.ts`'s own copy exists
- * for `grc/**` capabilities; this module is a business module, and
- * duplicating this four-line predicate is cheaper than adding a cross-
- * cutting dependency for it — the same call `create-control.usecase.ts`
- * itself makes rather than importing Risk's copy). */
 export function isOrgUnitWithinScope(scope: ScopeFilter, orgUnitId: string): boolean {
   return scope.kind === 'GLOBAL' || scope.unitIds.has(orgUnitId);
 }

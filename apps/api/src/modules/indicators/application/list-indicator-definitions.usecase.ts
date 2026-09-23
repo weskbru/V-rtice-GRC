@@ -1,10 +1,3 @@
-/**
- * 009-indicators-reports, Fase 3 (T031) — `ListIndicatorDefinitionsUseCase`
- * (`listIndicatorDefinitions`). No `ScopeFilter` (research.md D-8, data-
- * model.md §8: "nenhum — definição é compartilhada") — every caller with
- * `indicator:view` sees every configured definition, paginated and
- * optionally filtered by `isActive`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { IndicatorDefinitionRepositoryPort } from '../domain/ports/indicator-definition-repository.port';
@@ -44,9 +37,6 @@ export class ListIndicatorDefinitionsUseCase {
       isActive: input.isActive,
     });
 
-    // At most eleven rows can ever exist (one per closed catalog key,
-    // data-model.md §1's `metricKey UNIQUE`) — a per-row owner lookup here
-    // is never an unbounded N+1, unlike a genuinely large, growing table.
     const items = await Promise.all(
       page.items.map(async (record) => ({
         record,

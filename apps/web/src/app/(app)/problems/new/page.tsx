@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new problem route (008-incidents-problems, US2). `ProblemForm`
- * navigates to `/problems/{id}` on a successful create — this route stays
- * a thin composition of the page chrome and the reusable form.
- */
 import { PageHeader } from '@pharos/design-system/components';
 
 import { ProblemForm } from '@/features/problems/components/problem-form';

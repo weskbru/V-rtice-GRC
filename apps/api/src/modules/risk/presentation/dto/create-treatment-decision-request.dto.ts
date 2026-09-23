@@ -1,10 +1,3 @@
-/**
- * T143 — matches `contracts/risks.openapi.yaml`'s
- * `CreateRiskTreatmentDecisionRequest` exactly: `additionalProperties: false`
- * (global `ValidationPipe`'s `forbidNonWhitelisted`) means the deciding
- * user and timestamp — never declared here — cannot be supplied by a
- * caller (FR-072: "taken from the session, never from the request body").
- */
 import { IsDateString, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

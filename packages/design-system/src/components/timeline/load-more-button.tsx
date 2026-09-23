@@ -2,15 +2,6 @@ import { Loader2 } from 'lucide-react';
 
 import { cn } from '../../lib/utils';
 
-/**
- * Shared "load more" control for `ActivityHistory`/`AuditTimeline` (T169) —
- * both paginate the same way `AssessmentHistory`/`TreatmentHistory`
- * (`apps/web`) already do: a real button the caller's own fetch drives, not
- * an unbounded single fetch (Constitution VI's audit-defensibility promise
- * would be hollow if a long-lived record's history silently truncated).
- * Extracted once so the two components never grow two slightly different
- * copies of the same control (CLAUDE.md §13.8).
- */
 export function LoadMoreButton({
   label,
   loadingLabel,

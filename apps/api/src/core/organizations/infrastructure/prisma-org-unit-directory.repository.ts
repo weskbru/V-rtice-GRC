@@ -1,13 +1,3 @@
-/**
- * T096a — the sole implementation of `OrgUnitDirectoryPort`. Extends
- * `ScopedRepository<Prisma.OrganizationalUnitWhereInput>` (ADR-004) with
- * `'id'` as the scope field: a `ScopeFilter`'s `unitIds` already names the
- * exact set of organizational units a caller may see (`ScopeResolverService`
- * has already expanded a granted unit to itself plus every descendant,
- * FR-025b), so scoping this listing is "the unit's own id is in that set" —
- * unlike `RiskRepository`, which scopes a DIFFERENT entity (`Risk`) by its
- * `orgUnitId` foreign key.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

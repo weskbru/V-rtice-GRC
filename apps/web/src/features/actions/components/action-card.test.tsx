@@ -5,13 +5,6 @@ import { ActionCard } from './action-card';
 
 import type { Action } from '../types';
 
-/**
- * Component-mount evidence for `ActionCard` (CLAUDE.md §18.12) — the card
- * anatomy this register's family requires: código → título → badges →
- * three metadata fields (Origem, Responsável, Prazo) → "Atualizado em",
- * plus the row-actions menu the coordinator's instructions require stay
- * reachable in card view.
- */
 const baseAction: Action = {
   id: 'action-1',
   code: 'ACT-2026-0001',

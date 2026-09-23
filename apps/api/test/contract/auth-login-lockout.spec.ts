@@ -1,14 +1,3 @@
-/**
- * Assurance fix (HIGH, confirmed gap) — end-to-end coverage for account
- * lockout against the REAL running application: `LoginThrottleService`
- * (FR-008, D-6) already enforced per-account lockout correctly, but never
- * called `AuditRecorder` and had zero tests anywhere in `apps/api/test/`.
- * `test/unit/login-throttle.service.spec.ts` covers the service in
- * isolation (fast, fake ports); this file proves the same behavior against
- * the real HTTP surface, real Prisma-backed `UserDirectoryPort`, and the
- * real `audit_event` table — including the field allow-list wiring
- * (`registerCoreEntityAuditAllowlists`) that only a real boot exercises.
- */
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -56,9 +45,6 @@ describe('Account lockout is audited (assurance fix, FR-008/D-6)', () => {
       email: `${uniqueTestMarker('lockout-target')}@example.test`,
     });
 
-    // Every attempt up to and including the threshold is a plain, generic
-    // 401 — the account only becomes REFUSED-AS-LOCKED starting with the
-    // NEXT attempt after that.
     for (let i = 0; i < accountAttempts; i += 1) {
       const response = await failLoginOnce(fixture.user.email);
       expect(response.status).toBe(401);
@@ -79,15 +65,8 @@ describe('Account lockout is audited (assurance fix, FR-008/D-6)', () => {
     });
     expect(lockedAudit).not.toBeNull();
     expect(lockedAudit?.outcome).toBe(AuditOutcome.DENIED);
-    // No attempted password, no password hash — only what
-    // `auth.login_failed` already records (the actor's own email) plus
-    // the allow-listed lockout fields.
     expect(JSON.stringify(lockedAudit?.newValues)).not.toMatch(/password/i);
 
-    // The account is now refused BEFORE credential verification, even
-    // with the CORRECT password — and the response stays the SAME
-    // generic shape as an ordinary failed login (FR-007), never a
-    // distinct "account locked" message.
     const refusedResponse = await request(ctx.app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('Origin', appOrigin)
@@ -95,8 +74,6 @@ describe('Account lockout is audited (assurance fix, FR-008/D-6)', () => {
     expect(refusedResponse.status).toBe(429);
     expect(refusedResponse.headers['content-type']).toContain('application/problem+json');
 
-    // The refusal-in-force fact is also audited, distinct from the
-    // moment the account first became locked.
     const refusedAudit = await prisma.client.auditEvent.findFirst({
       where: {
         action: 'auth.login_refused_locked',

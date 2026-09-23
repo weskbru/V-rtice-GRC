@@ -1,15 +1,3 @@
-/**
- * T116 — FR-065/FR-064: reassessment APPENDS (never overwrites), preserves
- * every prior assessment, and repoints `Risk.currentAssessmentId` (plus the
- * denormalized levels/`lastAssessedOn`) to the newest one, all inside one
- * transaction.
- *
- * The core proof this test exists for: the FIRST assessment's row is
- * BYTE-FOR-BYTE IDENTICAL before and after a reassessment happens — not
- * merely "still present with the same id", but every column unchanged,
- * captured via a raw Prisma read before and after and compared with
- * `toEqual` on the whole row.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -72,7 +60,6 @@ describe('Risk assessment history (T116, FR-064, FR-065, SC-007)', () => {
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('assessment-history-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
     await createMethodologyVersionFixture(ctx.prisma, actor.id);
@@ -87,7 +74,6 @@ describe('Risk assessment history (T116, FR-064, FR-065, SC-007)', () => {
     expect(risk.version).toBe(0);
     expect(risk.currentAssessmentId).toBeUndefined();
 
-    // --- First assessment -------------------------------------------------
     const { assessment: first, risk: riskAfterFirst } = await createAssessmentUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -109,12 +95,10 @@ describe('Risk assessment history (T116, FR-064, FR-065, SC-007)', () => {
     expect(riskAfterFirst.residualLevel).toBe('MEDIUM');
     expect(riskAfterFirst.version).toBe(1);
 
-    // Snapshot the first assessment's raw row BEFORE reassessing.
     const firstRowBefore: RiskAssessment = await ctx.prisma.client.riskAssessment.findUniqueOrThrow(
       { where: { id: first.id } },
     );
 
-    // --- Reassessment (different factors, different level) ----------------
     const { assessment: second, risk: riskAfterSecond } = await createAssessmentUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -137,13 +121,11 @@ describe('Risk assessment history (T116, FR-064, FR-065, SC-007)', () => {
     expect(riskAfterSecond.residualLevel).toBe('LOW');
     expect(riskAfterSecond.version).toBe(2);
 
-    // --- The core proof: the FIRST row is untouched, byte-for-byte --------
     const firstRowAfter: RiskAssessment = await ctx.prisma.client.riskAssessment.findUniqueOrThrow({
       where: { id: first.id },
     });
     expect(firstRowAfter).toEqual(firstRowBefore);
 
-    // --- Both assessments remain retrievable, newest first -----------------
     const history = await ctx.prisma.client.riskAssessment.findMany({
       where: { riskId: risk.id },
       orderBy: [{ assessedOn: 'desc' }, { id: 'desc' }],
@@ -152,8 +134,6 @@ describe('Risk assessment history (T116, FR-064, FR-065, SC-007)', () => {
     expect(history[0]!.id).toBe(second.id);
     expect(history[1]!.id).toBe(first.id);
 
-    // --- A reassessment yielding an identical level is still a new row
-    // (edge case explicitly called out by data-model.md §9) -----------------
     const { assessment: third, risk: riskAfterThird } = await createAssessmentUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,

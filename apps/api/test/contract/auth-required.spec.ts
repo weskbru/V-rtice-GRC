@@ -1,8 +1,3 @@
-/**
- * T050 — an unauthenticated request to a protected endpoint is refused
- * with `401`, and `/api/v1/health/*` stays reachable without a session
- * (SessionGuard's `@Public()` exemption, T064).
- */
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

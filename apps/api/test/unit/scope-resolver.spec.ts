@@ -1,17 +1,3 @@
-/**
- * T041 — unit tests for the organizational scope engine (ADR-004).
- * Pure unit tests, no I/O: `ScopeResolverService` is exercised against
- * fake, in-memory implementations of `OrgScopeRepositoryPort` and
- * `ScopeCachePort`; `org-unit-path.ts`'s pure functions are exercised
- * directly. No Prisma, no database, no network.
- *
- * Coverage required by T041:
- *   - descendant expansion via path prefix
- *   - GLOBAL grant behavior
- *   - empty-scope denies everything
- *   - cycle rejection on reparent
- *   - path/depth recomputation across a subtree move
- */
 import { describe, expect, it } from 'vitest';
 
 import { ScopeResolverService } from '../../src/core/organizations/application/scope-resolver.service';
@@ -32,19 +18,6 @@ import {
   type CachedScopeFilter,
 } from '../../src/core/organizations/domain/ports/scope-cache.port';
 
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
-
-/** A small fake org tree, built with the real path-computation functions so
- * "descendant expansion via path prefix" genuinely exercises prefix
- * matching rather than a hardcoded fixture:
- *
- *   root
- *   ├── unitA
- *   │   └── unitA1
- *   └── unitB
- */
 function buildFakeTree(): readonly OrgUnitPathInfo[] {
   const root = computeRootPath('root');
   const unitA = computeChildPath(root, 'unitA');
@@ -63,8 +36,6 @@ class FakeOrgScopeRepository extends OrgScopeRepositoryPort {
     return Promise.resolve(this.grantsByUser.get(userId) ?? []);
   }
 
-  /** Real prefix-match logic against the fake tree — this is what makes
-   * the "descendant expansion via path prefix" test meaningful. */
   expandToDescendants(orgUnitIds: readonly string[]): Promise<ReadonlySet<string>> {
     const grantedPaths = this.tree
       .filter((unit) => orgUnitIds.includes(unit.id))
@@ -93,9 +64,6 @@ class FakeOrgScopeRepository extends OrgScopeRepositoryPort {
     return Promise.resolve(this.grantsVersion);
   }
 
-  // T179 — not exercised by this suite (scope-grant administration is
-  // covered by its own tests); stubbed only so this fake still satisfies
-  // the port's full interface.
   userExists(): ReturnType<OrgScopeRepositoryPort['userExists']> {
     return Promise.resolve(true);
   }
@@ -136,10 +104,6 @@ class FakeScopeCache extends ScopeCachePort {
   }
 }
 
-// ---------------------------------------------------------------------------
-// ScopeResolverService
-// ---------------------------------------------------------------------------
-
 describe('ScopeResolverService', () => {
   it('expands a UNIT grant to include the granted unit and every descendant via path prefix', async () => {
     const repository = new FakeOrgScopeRepository();
@@ -150,9 +114,6 @@ describe('ScopeResolverService', () => {
 
     expect(scope.kind).toBe('UNIT');
     if (scope.kind !== 'UNIT') throw new Error('unreachable');
-    // unitA and its descendant unitA1 are included; the sibling unitB and
-    // the root are not — proving this is a genuine prefix match, not "all
-    // units" or "just the granted id".
     expect(scope.unitIds).toEqual(new Set(['unitA', 'unitA1']));
   });
 
@@ -181,21 +142,12 @@ describe('ScopeResolverService', () => {
 
   it('DENIES EVERYTHING for a user with no grants at all — never "no filter"', async () => {
     const repository = new FakeOrgScopeRepository();
-    // Deliberately no entry in grantsByUser for this user: the exact "zero
-    // OrgScopeGrant rows" case the task calls out as the classic
-    // catastrophic scope-system bug.
     const service = new ScopeResolverService(repository, new FakeScopeCache());
 
     const scope = await service.resolveScope('user-with-no-grants');
 
-    // The assertion that matters: this MUST be a UNIT scope with an empty
-    // set, never `{ kind: 'GLOBAL' }` and never anything that
-    // `ScopedRepository.applyScope` could read as "skip the filter".
     expect(scope).toEqual({ kind: 'UNIT', unitIds: new Set() });
 
-    // Demonstrate the actual deny-everything behavior, not just the shape:
-    // apply the same predicate `ScopedRepository` would, against a
-    // representative row, and show it matches nothing.
     if (scope.kind !== 'UNIT') throw new Error('unreachable');
     const wouldMatchAnyRow = ['unitA', 'unitA1', 'unitB', 'root'].some((candidateOrgUnitId) =>
       scope.unitIds.has(candidateOrgUnitId),
@@ -210,9 +162,6 @@ describe('ScopeResolverService', () => {
     const service = new ScopeResolverService(repository, cache);
 
     const first = await service.resolveScope('user-1');
-    // Mutate the fake repository's underlying grants after the first call —
-    // if the second call recomputed instead of hitting the cache, it would
-    // observe this change and the two results would differ.
     repository.grantsByUser.set('user-1', [{ scopeType: 'GLOBAL' }]);
     const second = await service.resolveScope('user-1');
 
@@ -236,10 +185,6 @@ describe('ScopeResolverService', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// org-unit-path.ts — materialized path maintenance and cycle prevention
-// ---------------------------------------------------------------------------
-
 describe('org-unit-path', () => {
   it('computes a root path and depth', () => {
     expect(computeRootPath('root')).toEqual({ id: 'root', path: '/root/', depth: 0 });
@@ -262,7 +207,6 @@ describe('org-unit-path', () => {
       const child = computeChildPath(root, 'child');
       const grandchild = computeChildPath(child, 'grandchild');
 
-      // Attempting to move `child` under its own descendant `grandchild`.
       expect(canReparent(child, grandchild)).toBe(false);
     });
 
@@ -299,13 +243,6 @@ describe('org-unit-path', () => {
 
   describe('path/depth recomputation across a subtree move', () => {
     it('recomputes the moved unit and every descendant under a new parent', () => {
-      // Before the move:
-      //   root
-      //   ├── branch
-      //   │   └── moved
-      //   │       ├── leafA
-      //   │       └── leafB
-      //   └── destination
       const root = computeRootPath('root');
       const branch = computeChildPath(root, 'branch');
       const moved = computeChildPath(branch, 'moved');
@@ -317,10 +254,6 @@ describe('org-unit-path', () => {
 
       const result = recomputeSubtreePaths(moved, destination, descendants);
 
-      // `moved` now hangs off `destination`, one level deeper than before
-      // (depth 2 under `branch` -> depth 2 under `destination`, since both
-      // parents are at depth 1 — the delta is 0 here; assert the actual
-      // new path/depth explicitly rather than relying on the delta).
       expect(result.movedUnit).toEqual({ id: 'moved', path: '/root/destination/moved/', depth: 2 });
 
       const leafAResult = result.updatedDescendants.find((node) => node.id === 'leafA');
@@ -338,9 +271,6 @@ describe('org-unit-path', () => {
     });
 
     it('adjusts descendant depth by the correct delta when the move changes tree depth', () => {
-      // `moved` starts at depth 1 (directly under root) and is moved under
-      // `deepDestination`, which is at depth 2 — every descendant must
-      // shift by the same +2 depth delta as `moved` itself.
       const root = computeRootPath('root');
       const moved = computeChildPath(root, 'moved');
       const leaf = computeChildPath(moved, 'leaf');
@@ -350,11 +280,11 @@ describe('org-unit-path', () => {
 
       const result = recomputeSubtreePaths(moved, deepDestination, [leaf]);
 
-      expect(result.movedUnit.depth).toBe(3); // was 1, deepDestination.depth (2) + 1
+      expect(result.movedUnit.depth).toBe(3);
       expect(result.updatedDescendants[0]).toEqual({
         id: 'leaf',
         path: '/root/intermediate/deepDestination/moved/leaf/',
-        depth: 4, // was 2, shifted by the same +2 delta as `moved`
+        depth: 4,
       });
     });
 

@@ -1,22 +1,3 @@
-/**
- * T018/004-compliance-management — proves the corrected FR-022 reading
- * (research.md D-2): `Framework`/`FrameworkVersion`/`Requirement` are a
- * platform-wide catalog, gated ONLY by `compliance:*` permission — no
- * `ScopedRepository`, no `orgUnitId` predicate anywhere. Guards against
- * reintroducing the exact defect the spec's own correction note describes
- * (F-34): a scope predicate that expands only DOWNWARD from a granted unit
- * would make a company-wide standard invisible to anyone not granted at
- * the organizational root.
- *
- * The decisive test below grants the acting user `compliance:view` scoped
- * to a freshly-created unit that is neither the root nor any ancestor of
- * another unit that holds no relationship to the framework at all — if a
- * scope predicate were ever reintroduced on this catalog (the classic
- * failure mode: "visible only within a granted unit or its descendants"),
- * this user would see nothing, since nothing here is scoped to their unit
- * at all. Seeing the full catalog anyway is exactly what an UNSCOPED
- * platform catalog must do.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -53,10 +34,6 @@ describe('Compliance normative library carries no organizational scope (T018, re
 
   async function agentScopedToUnrelatedUnit(): Promise<ReturnType<typeof request.agent>> {
     const prisma = ctx.app.get(PrismaService);
-    // A freshly-created unit unrelated to anything else in this test — not
-    // the root, not an ancestor/descendant of any unit the framework could
-    // conceivably be attached to (it cannot be attached to any unit at
-    // all, by design — this unit exists purely to prove that fact).
     const unrelatedUnit = await createOrgUnitFixture(prisma, {
       code: uniqueTestMarker('compliance-unscoped-unit'),
     });
@@ -68,9 +45,6 @@ describe('Compliance normative library carries no organizational scope (T018, re
       name: `fixture-compliance-unscoped-role-${randomUUID()}`,
     });
     await assignRoleFixture(prisma, { user: fixture.user, role });
-    // Deliberately NOT a global grant — scoped to the one small, unrelated
-    // unit only (`globalScope` absent/false), the exact shape that would
-    // fail if this catalog were ever scope-filtered.
     await grantUnitScopeFixture(prisma, { user: fixture.user, orgUnitId: unrelatedUnit.id });
 
     const agent = request.agent(ctx.app.getHttpServer());
@@ -86,8 +60,6 @@ describe('Compliance normative library carries no organizational scope (T018, re
     ctx = await buildContractTestApp();
     appOrigin = ctx.app.get(AppConfigService).app.appOrigin;
 
-    // Created by an administer-permissioned agent, unrelated to the
-    // read-only agent under test below.
     const adminAgent = await (async () => {
       const prisma = ctx.app.get(PrismaService);
       const fixture = await createLocalUserFixture(prisma, {

@@ -1,12 +1,3 @@
-/**
- * Unit tests for `PrismaActionRepository.getStatusBreakdown`/
- * `countDueSoonInScope` (`src/grc/action/infrastructure/
- * prisma-action.repository.ts`), added for `GET /dashboard/summary`'s
- * `breakdowns.actions` (`get-dashboard-summary.usecase.ts`). `PrismaService`
- * is a hand-rolled fake exposing only `client.action.groupBy`/
- * `client.action.count` — no real database connection, no NestJS test
- * module.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { PrismaActionRepository } from '../../src/grc/action/infrastructure/prisma-action.repository';

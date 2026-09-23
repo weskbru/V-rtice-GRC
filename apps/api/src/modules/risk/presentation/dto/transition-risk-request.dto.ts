@@ -1,8 +1,3 @@
-/**
- * T158 — matches `contracts/risks.openapi.yaml`'s `TransitionRiskRequest`
- * exactly: `additionalProperties: false` (global `ValidationPipe`'s
- * `forbidNonWhitelisted`).
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

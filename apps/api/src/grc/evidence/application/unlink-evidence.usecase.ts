@@ -1,18 +1,3 @@
-/**
- * T033/002-shared-grc-foundation, US1 — `UnlinkEvidenceUseCase`
- * (`unlinkEvidence`, FR-008). Requires only `evidence:link` and evidence-
- * side scope — unlike `LinkEvidenceUseCase`, the subject is deliberately
- * NOT re-resolved here: ending an existing link is an operation on the
- * `EvidenceLink` row itself (which the caller already reached through the
- * evidence side), not a fresh grant of visibility into the subject, the
- * same asymmetry `UnlinkControlUseCase` has relative to
- * `LinkControlUseCase` (no re-check of `control:view`-equivalent on
- * unlink).
- *
- * The row is never deleted — `unlinkedAt`/`unlinkedByUserId` are stamped,
- * every other column (including `linkedAt`/`linkedByUserId`) is left
- * untouched (FR-008, Invariant L2).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

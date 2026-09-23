@@ -1,15 +1,3 @@
-/**
- * T029/003-controls-management, User Story 2 — `RequestControlAssessmentAttestationUseCase`.
- * `POST /controls/{controlId}/assessments/{assessmentId}/attestation`
- * (`requestControlAssessmentAttestation` operation). Requires
- * `control:test` (research.md D-9: "quem pode registrar uma verificação
- * pode submetê-la à atestação") — the SAME permission
- * `createControlAssessment` requires, enforced by `@RequirePermission` on
- * the controller route.
- *
- * D-8 — an assessment admits at most one attestation lifecycle, ever:
- * requesting again — including after a decision — is refused with `409`.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -57,15 +45,6 @@ export class RequestControlAssessmentAttestationUseCase {
       );
     }
 
-    // D-8 — ANY prior attestation for this assessment (pending OR already
-    // decided) blocks a new request. `Approval.entityId`'s own uniqueness
-    // is not database-enforced (mirrors `Risk.pendingApprovalId`'s own
-    // non-unique-FK convention), so this in-memory check is the primary
-    // path; a genuine race lands on the SAME conclusion because a second
-    // concurrent request would also observe at least the first row once
-    // either commits — this endpoint is not on any hot concurrent-write
-    // path the way risk approvals are, so no additional unique index is
-    // introduced for it here.
     const existing = await this.approvalRepository.listByEntityId(input.assessmentId);
     if (existing.length > 0) {
       throw new ConflictDomainError(USER_MESSAGES.controls.assessment.attestation.alreadyRequested);

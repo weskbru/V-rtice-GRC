@@ -4,32 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { Checkbox } from '@/components/ui/checkbox';
 
-/**
- * T003/T004 (015-roles-permissions-surface).
- *
- * `Checkbox` gained a third state: `checked="indeterminate"`, for a module
- * whose permissions are only partly selected. Two things had to be true and
- * neither was covered before:
- *
- * 1. The indeterminate state must be distinguishable from "checked" by
- *    SHAPE, not only by tint — CLAUDE.md §18.8 / NFR-004. The primitive
- *    used to render the same `CheckIcon` for both.
- * 2. Every one of the eleven existing call sites — all controlled, all
- *    boolean, none of which ever passes `'indeterminate'` — must behave
- *    exactly as before.
- *
- * ## What jsdom can and cannot prove here
- *
- * Which glyph is VISIBLE is decided by a Tailwind `group-data-[state=…]`
- * variant, and jsdom evaluates no stylesheet, so both glyph elements are in
- * the DOM in these tests regardless of state. What is asserted instead is
- * everything that actually carries the guarantee: the state Radix reports
- * to assistive technology (`aria-checked`, `data-state`), the existence of
- * a second, differently-shaped glyph element, and the complementary
- * visibility classes that select between them. Deleting the `MinusIcon`
- * branch from `checkbox.tsx` fails these tests; the same named-group idiom
- * is already proven in the rendered browser by `avatar.tsx` and `tabs.tsx`.
- */
 
 function glyphs(container: HTMLElement): {
   check: Element | null;
@@ -58,11 +32,8 @@ describe('Checkbox — indeterminate state (T003)', () => {
     const { check, indeterminate } = glyphs(container);
     expect(indeterminate).not.toBeNull();
     expect(check).not.toBeNull();
-    // Two distinct elements — a minus and a check — not one element retinted.
     expect(indeterminate).not.toBe(check);
 
-    // Complementary visibility: the check hides in the indeterminate state,
-    // the minus is hidden by default and shows only in it.
     expect(check?.getAttribute('class')).toContain(
       'group-data-[state=indeterminate]/checkbox-indicator:hidden',
     );
@@ -108,13 +79,6 @@ describe('Checkbox — indeterminate state (T003)', () => {
 });
 
 describe('Checkbox — regression of the existing boolean call sites (T004)', () => {
-  /*
-   * Every current caller uses exactly this shape: a controlled boolean
-   * `checked`, an `onCheckedChange` that narrows with `=== true`, an `id`
-   * paired with a `<Label htmlFor>`, and sometimes `disabled`. The nine
-   * files are listed in the delivery report; what they share is reproduced
-   * here once, because they share one primitive.
-   */
 
   it('renders no indicator at all while unchecked', () => {
     const { container } = render(
@@ -124,9 +88,6 @@ describe('Checkbox — regression of the existing boolean call sites (T004)', ()
     const box = screen.getByRole('checkbox', { name: 'Somente meus' });
     expect(box).toHaveAttribute('aria-checked', 'false');
     expect(box).toHaveAttribute('data-state', 'unchecked');
-    // Radix mounts the indicator only for checked/indeterminate, so neither
-    // glyph is in the document — the added minus cannot leak into the
-    // unchecked state.
     expect(container.querySelector('[data-slot="checkbox-indicator"]')).toBeNull();
     expect(glyphs(container).indeterminate).toBeNull();
     expect(glyphs(container).check).toBeNull();
@@ -145,8 +106,6 @@ describe('Checkbox — regression of the existing boolean call sites (T004)', ()
       'checked',
     );
     expect(glyphs(container).check).not.toBeNull();
-    // The minus element exists in the markup but is `hidden` by its own
-    // base class outside the indeterminate state.
     expect(glyphs(container).indeterminate?.getAttribute('class')).toContain('hidden');
   });
 
@@ -182,12 +141,6 @@ describe('Checkbox — regression of the existing boolean call sites (T004)', ()
     const box = screen.getByRole('checkbox', { name: 'Somente vencidos' });
     box.focus();
     expect(document.activeElement).toBe(box);
-    // Radix renders a real `<button type="button">`: Space/Enter activation
-    // is the browser's, not a hand-rolled keydown handler. jsdom does not
-    // translate a synthetic Space keyup into a click, so activation itself
-    // is asserted through the click path below — the element's nature is
-    // what makes the keyboard path equivalent, and that is what is checked
-    // here. `e2e/accessibility.spec.ts` exercises the real one.
     expect(box.tagName).toBe('BUTTON');
     expect(box).toHaveAttribute('type', 'button');
 

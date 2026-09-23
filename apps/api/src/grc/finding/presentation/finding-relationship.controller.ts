@@ -1,22 +1,3 @@
-/**
- * T072/005-audit-findings, US3 — `FindingRelationshipController`:
- * `GET`/`POST /findings/{findingId}/controls`, `DELETE
- * /findings/{findingId}/controls/{linkId}`, and the same three shapes for
- * `/risks` (`specs/005-audit-findings/contracts/audit.openapi.yaml`'s
- * "Finding Relationships" operations). Mirrors
- * `modules/risk/presentation/risk-relationship.controller.ts` exactly — a
- * separate controller file from `finding.controller.ts` (CRUD + lifecycle)
- * for the same reason `RiskRelationshipController` is separate from
- * `risk.controller.ts`.
- *
- * `listFindingControlLinks`/`listFindingRiskLinks` stay under
- * `finding:view` (already declared on `finding.controller.ts`); link/
- * unlink require `finding:link` (T009). No `DELETE ... -> 204`: unlike
- * `RiskRelationshipController`'s own unlink routes, `Finding` has no
- * `version` column to echo back via `ETag`, and the contract's own
- * `unlinkFindingFromControl`/`unlinkFindingFromRisk` return `200` with the
- * withdrawn link body — never `204`/empty (FR-016, quickstart.md §7).
- */
 import {
   Body,
   Controller,
@@ -65,10 +46,6 @@ export class FindingRelationshipController {
     private readonly unlinkFindingRiskUseCase: UnlinkFindingRiskUseCase,
   ) {}
 
-  // ---------------------------------------------------------------------
-  // Controls
-  // ---------------------------------------------------------------------
-
   @RequirePermission('finding:view')
   @Get('controls')
   async listControlLinks(
@@ -115,10 +92,6 @@ export class FindingRelationshipController {
     });
     return toFindingControlLinkResponse(unlinked);
   }
-
-  // ---------------------------------------------------------------------
-  // Risks
-  // ---------------------------------------------------------------------
 
   @RequirePermission('finding:view')
   @Get('risks')

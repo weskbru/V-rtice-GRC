@@ -1,10 +1,3 @@
-/**
- * T023/004-compliance-management — `UpdateFrameworkVersionUseCase`:
- * updates a version's `label`, only while `DRAFT` (`PATCH
- * /frameworks/{frameworkId}/versions/{versionId}`, `updateFrameworkVersion`
- * operation, FR-006). Refused with `422` once `PUBLISHED` — publishing
- * fixes the version's own identity, not only its requirements'.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -28,7 +21,6 @@ export interface UpdateFrameworkVersionInput {
   readonly actorUserId: string;
   readonly frameworkId: string;
   readonly versionId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
   readonly label: string;
 }

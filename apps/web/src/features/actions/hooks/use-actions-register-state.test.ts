@@ -1,20 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount-free evidence for `useActionsRegisterState`, mirroring
- * `use-register-state.test.ts`'s own approach: `next/navigation` is mocked
- * so `currentSearch` stands in for "the URL right now".
- *
- * The behaviour these tests exist to pin down is `onlyMine`'s own default:
- * it reads `true` on a bare `/actions` URL, `setOnlyMine(true)` DELETES the
- * `onlyMine` param rather than writing it, and `onlyMine=false` only ever
- * appears when the caller has actually turned the screen's own "somente
- * minhas ações" default off. A regression here — writing `onlyMine=true`
- * to the URL, or defaulting the parsed state to `false` — would silently
- * turn this screen back into "todas as ações" on first load, which is
- * exactly the regression SC-002 exists to prevent.
- */
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 

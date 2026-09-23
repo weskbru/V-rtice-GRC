@@ -1,9 +1,3 @@
-/**
- * T158/T159 — maps `RiskLifecycleState`
- * (`application/lifecycle/get-risk-lifecycle.usecase.ts`) to
- * `contracts/risks.openapi.yaml`'s `RiskLifecycleState` wire shape. The ONE
- * place this aggregate becomes a response body (ADR-009).
- */
 import { toApprovalResponse, type ApprovalResponse } from './approval-response.mapper';
 
 import type {

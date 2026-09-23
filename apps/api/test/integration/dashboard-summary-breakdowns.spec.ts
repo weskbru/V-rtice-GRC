@@ -1,29 +1,3 @@
-/**
- * `GetDashboardSummaryUseCase` — `breakdowns`, against a real Postgres
- * database and the real adapters of every owning module (never a mocked
- * port). Each test proves one rule the contract states in prose, in a way
- * that would FAIL if the rule were broken rather than merely pass when data
- * happens to line up:
- *
- *   1. Scope — a unit-scoped caller receives strictly smaller `actions`,
- *      `incidents` and `controls` counts than a globally-scoped caller over
- *      the same rows, with one row of each placed outside the narrow unit.
- *   2. `actions.dueSoon` — counts OPEN/IN_PROGRESS actions due in
- *      [today, today + 7) and excludes overdue, finished and later ones.
- *      The narrow unit is fresh, so the expected figure is exact.
- *   3. `controls.ineffective` — an ACTIVE control whose attested assessment
- *      is INEFFECTIVE counts; an ACTIVE one assessed EFFECTIVE does not, nor
- *      does a non-ACTIVE control assessed INEFFECTIVE.
- *   4. `indicators.breached` — only a definition's MOST RECENT measurement
- *      decides. Measured as a delta, because definitions and measurements
- *      are organization-wide and this database is shared with other files
- *      (the integration runner is single-fork and non-parallel, so a delta
- *      inside one test is deterministic).
- *   5. `compliance` — `byState` sums to `requirementCount`, the percentage
- *      the platform already publishes is exactly the one derivable from the
- *      same distribution (one calculator, not two), and a new requirement
- *      with no linked control moves both counts by one, into `NOT_MET`.
- */
 import { randomUUID } from 'node:crypto';
 
 import { IndicatorMetricKey } from '@prisma/client';
@@ -127,38 +101,36 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
     const narrow = await actor({ unitId: narrowUnit.id });
     const broad = await actor('global');
 
-    // --- Actions in the narrow unit: exactly two are due soon. -----------
     await createAction({
       orgUnitId: narrowUnit.id,
       responsibleUserId: narrow.id,
       status: 'OPEN',
       dueOn: utcDateOnly(3),
-    }); // due soon
+    });
     await createAction({
       orgUnitId: narrowUnit.id,
       responsibleUserId: narrow.id,
       status: 'IN_PROGRESS',
       dueOn: utcDateOnly(0),
-    }); // due today: inclusive
+    });
     await createAction({
       orgUnitId: narrowUnit.id,
       responsibleUserId: narrow.id,
       status: 'OPEN',
       dueOn: utcDateOnly(-2),
-    }); // overdue, not due soon
+    });
     await createAction({
       orgUnitId: narrowUnit.id,
       responsibleUserId: narrow.id,
       status: 'COMPLETED',
       dueOn: utcDateOnly(3),
-    }); // finished
+    });
     await createAction({
       orgUnitId: narrowUnit.id,
       responsibleUserId: narrow.id,
       status: 'OPEN',
       dueOn: utcDateOnly(7),
-    }); // window is exclusive at +7
-    // One more, outside the narrow unit.
+    });
     await createAction({
       orgUnitId: otherUnit.id,
       responsibleUserId: broad.id,
@@ -166,7 +138,6 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
       dueOn: utcDateOnly(2),
     });
 
-    // --- Incidents: two in the narrow unit, one outside. -----------------
     for (const [orgUnitId, status] of [
       [narrowUnit.id, 'OPEN'],
       [narrowUnit.id, 'IN_PROGRESS'],
@@ -187,7 +158,6 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
       });
     }
 
-    // --- Controls: three in the narrow unit, one outside. ----------------
     const today = utcDateOnly(0);
     async function control(
       orgUnitId: string,
@@ -217,10 +187,10 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
         });
       }
     }
-    await control(narrowUnit.id, 'ACTIVE', 'INEFFECTIVE'); // counts as ineffective
-    await control(narrowUnit.id, 'ACTIVE', 'EFFECTIVE'); // active, not ineffective
-    await control(narrowUnit.id, 'DRAFT', 'INEFFECTIVE'); // ineffective but not ACTIVE
-    await control(otherUnit.id, 'ACTIVE', 'INEFFECTIVE'); // outside the narrow unit
+    await control(narrowUnit.id, 'ACTIVE', 'INEFFECTIVE');
+    await control(narrowUnit.id, 'ACTIVE', 'EFFECTIVE');
+    await control(narrowUnit.id, 'DRAFT', 'INEFFECTIVE');
+    await control(otherUnit.id, 'ACTIVE', 'INEFFECTIVE');
 
     const narrowResult = await useCase.execute({ actorUserId: narrow.id });
     const broadResult = await useCase.execute({ actorUserId: broad.id });
@@ -246,7 +216,6 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
 
     expect(narrowResult.breakdowns.controls).toEqual({ total: 3, active: 2, ineffective: 1 });
 
-    // The broad caller sees at least the narrow rows plus the ones outside.
     const broadActions = broadResult.breakdowns.actions!;
     const sum = (record: Readonly<Record<string, number>>): number =>
       Object.values(record).reduce((total, count) => total + count, 0);
@@ -263,8 +232,6 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
   it('decides indicators.breached by the most recent measurement only', async () => {
     const owner = await actor('global');
 
-    // A metric key with no definition yet if one exists; otherwise reuse an
-    // existing definition, forced active. Either way the delta below holds.
     const defined = new Set(
       (await ctx.prisma.client.indicatorDefinition.findMany({ select: { metricKey: true } })).map(
         (row) => row.metricKey,
@@ -293,7 +260,6 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
 
     const hoursAgo = (hours: number): Date => new Date(Date.now() - hours * 3_600_000);
 
-    // An older breached measurement, then a NEWER one that is not breached.
     await ctx.prisma.client.indicatorMeasurement.create({
       data: { metricKey, breached: true, computedByUserId: owner.id, computedAt: hoursAgo(48) },
     });
@@ -302,14 +268,11 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
     });
     const beforeLatestBreach = await useCase.execute({ actorUserId: owner.id });
 
-    // Now the newest measurement breaches.
     await ctx.prisma.client.indicatorMeasurement.create({
       data: { metricKey, breached: true, computedByUserId: owner.id, computedAt: new Date() },
     });
     const afterLatestBreach = await useCase.execute({ actorUserId: owner.id });
 
-    // If an older breached measurement counted, the key would already be
-    // breached before the last insert and this delta would be 0.
     expect(afterLatestBreach.breakdowns.indicators!.breached).toBe(
       beforeLatestBreach.breakdowns.indicators!.breached + 1,
     );
@@ -345,24 +308,15 @@ describe('GetDashboardSummaryUseCase — breakdowns over real data', () => {
       },
     });
 
-    // Compliance is ORGANIZATION-WIDE (research.md D-8): an unmapped requirement
-    // left in a PUBLISHED version lowers the percentage every later spec file
-    // in this run reads. `indicator-current-value-organizational-scope` asserts
-    // an exact 100% and failed in the full run because of this fixture, so the
-    // requirement, version and framework are removed however the test ends.
     try {
       const after = (await useCase.execute({ actorUserId: author.id })).breakdowns.compliance!;
 
-      // One more requirement, and it lands in NOT_MET: no control is mapped.
       expect(after.requirementCount).toBe(before.requirementCount + 1);
       expect(after.byState.NOT_MET).toBe(before.byState.NOT_MET + 1);
 
-      // The distribution always accounts for every requirement.
       const total = Object.values(after.byState).reduce((sum, count) => sum + count, 0);
       expect(total).toBe(after.requirementCount);
 
-      // And the percentage the platform already publishes is exactly the one
-      // this distribution implies — one calculation, not two that could drift.
       const applicable = after.requirementCount - after.byState.NOT_APPLICABLE;
       const implied = applicable === 0 ? undefined : (after.byState.COMPLIANT / applicable) * 100;
       expect(await complianceSummary.getOrganizationWideCompliancePercentage()).toBe(implied);

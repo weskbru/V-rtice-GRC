@@ -1,15 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T052) — unit tests for `RunReportUseCase`.
- * Every port is a hand-rolled fake (`as unknown as <Port>`), the same
- * convention `indicator-calculation-service.spec.ts`/
- * `get-dashboard-planned-areas.spec.ts` already use.
- *
- * The central proof (FR-026/SC-006): a report with three `metricKey`s from
- * different source domains, run by a caller missing ONE of the three
- * source permissions, returns all three items — the two permitted ones
- * computed normally, the third `available: false` with no value — never a
- * thrown error that would discard the whole response.
- */
 import { IndicatorMetricKey } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -53,9 +41,6 @@ const CATALOG_METADATA: Record<string, { sourcePermission: string; scopeApplicab
 
 function buildUseCase(options: {
   readonly deniedPermissions?: ReadonlySet<string>;
-  /** `true` simulates no report definition existing for the requested id
-   * (`findById` resolves `undefined`) — distinct from simply omitting this
-   * option, which uses the default `REPORT` fixture. */
   readonly reportNotFound?: boolean;
 }): {
   useCase: RunReportUseCase;
@@ -144,7 +129,6 @@ describe('RunReportUseCase', () => {
     expect(control.available).toBe(false);
     expect(control.value).toBeUndefined();
     expect(control.valueByBucket).toBeUndefined();
-    // FR-026 still requires scopeApplicability even for an unavailable item.
     expect(control.scopeApplicability).toBe('ORGANIZATIONAL_UNIT');
 
     expect(asset.available).toBe(true);

@@ -1,12 +1,3 @@
-/**
- * 009-indicators-reports, T022 — the sole implementation of
- * `AuditEngagementMetricsPort`
- * (`shared/grc-ports/audit-engagement-metrics.port.ts`). Delegates to
- * `PrismaAuditEngagementRepository.list` — the SAME catalog query
- * `GET /audit-engagements` already runs — with `pageSize: 1` and a
- * `status` filter for the two open values, reading only the page's own
- * `total`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { AuditEngagementMetricsPort } from '../../../shared/grc-ports/audit-engagement-metrics.port';

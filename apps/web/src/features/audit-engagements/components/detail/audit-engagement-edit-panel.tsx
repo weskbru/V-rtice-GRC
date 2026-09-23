@@ -2,12 +2,12 @@
 
 import { DetailPanel } from '@pharos/design-system/components';
 
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { auditEngagements } from '@/lib/messages/audit-engagements';
+
 import { AuditEngagementForm } from '../audit-engagement-form';
 
 import type { AuditEngagement } from '../../types';
-
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { auditEngagements } from '@/lib/messages/audit-engagements';
 
 export interface AuditEngagementEditPanelProps {
   engagement: AuditEngagement;

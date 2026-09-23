@@ -1,12 +1,3 @@
-/**
- * T050-T052/004-compliance-management, User Story 3 (research.md D-11) —
- * end-to-end coverage of the observation-time compliance-state watermark:
- * no audit event on first computation, the event honestly states it
- * captures the moment of OBSERVATION rather than occurrence, and
- * concurrent readers de-duplicate via the conditional `UPDATE ... WHERE
- * ... IS DISTINCT FROM` so exactly one event is ever recorded for the
- * same real transition.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -70,8 +61,6 @@ describe('RequirementComplianceAuditMark — observation-time watermark (T049-T0
       email: `${uniqueTestMarker('watermark-actor')}@example.test`,
       primaryOrgUnitId: orgUnitId,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `compliance:map`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       [
@@ -183,17 +172,9 @@ describe('RequirementComplianceAuditMark — observation-time watermark (T049-T0
       },
     });
 
-    // First read: establishes the watermark at NOT_MET, no event.
     const firstRead = await getRequirement.execute(requirement.id);
     expect(firstRead.complianceState).toBe('NOT_MET');
 
-    // The control is attested EFFECTIVE BEFORE it is linked, so the
-    // SINGLE link write is what causes the requirement's compliance state
-    // to jump directly NOT_MET -> COMPLIANT (never through the
-    // intermediate NOT_PROVEN a link-before-attestation ordering would
-    // produce) — the cleanest reproduction of "the cause happened inside
-    // Controls, a transaction Compliance did not participate in"
-    // (research.md D-11).
     await attestControlEffective(orgUnit.id, control.id, actor.id);
     await linkUseCase.execute({
       actorUserId: actor.id,
@@ -201,17 +182,12 @@ describe('RequirementComplianceAuditMark — observation-time watermark (T049-T0
       controlId: control.id,
     });
 
-    // The next read observes the change and audits it.
     const secondRead = await getRequirement.execute(requirement.id);
     expect(secondRead.complianceState).toBe('COMPLIANT');
 
     const events = await ctx.prisma.client.auditEvent.findMany({
       where: { entityType: AuditEntityType.REQUIREMENT_COMPLIANCE_STATE, entityId: requirement.id },
     });
-    // Exactly one transition happened (NOT_MET -> COMPLIANT) — the link
-    // use case's own side-effect call already observes it (research.md
-    // D-11: writes that can affect compliance state audit it too), so a
-    // further identical read must not re-audit it.
     expect(events).toHaveLength(1);
     const changeEvent = events[0]!;
     expect(changeEvent.newValues).toMatchObject({
@@ -222,7 +198,6 @@ describe('RequirementComplianceAuditMark — observation-time watermark (T049-T0
     expect(changeEvent.action).toContain('observed');
     expect((changeEvent.newValues as { observedAt?: string }).observedAt).toBeDefined();
 
-    // Re-reading again with no further change must not add a second event.
     await getRequirement.execute(requirement.id);
     const eventsAfterRepeatRead = await ctx.prisma.client.auditEvent.findMany({
       where: { entityType: AuditEntityType.REQUIREMENT_COMPLIANCE_STATE, entityId: requirement.id },
@@ -246,12 +221,8 @@ describe('RequirementComplianceAuditMark — observation-time watermark (T049-T0
       },
     });
 
-    // Establish the watermark at NOT_MET first (no event).
     await getRequirement.execute(requirement.id);
 
-    // Attest EFFECTIVE before linking, same reasoning as the previous
-    // test — one clean NOT_MET -> COMPLIANT transition, caused by the
-    // link write.
     await attestControlEffective(orgUnit.id, control.id, actor.id);
     await linkUseCase.execute({
       actorUserId: actor.id,
@@ -259,11 +230,6 @@ describe('RequirementComplianceAuditMark — observation-time watermark (T049-T0
       controlId: control.id,
     });
 
-    // Two concurrent transactions read the SAME requirement, right after
-    // the SAME real change (research.md D-11's own named scenario). The
-    // link use case's own side effect may already have recorded the
-    // transition by the time these run — that is fine, and exactly the
-    // point: even so, no additional duplicate event is produced.
     await Promise.all([
       getRequirement.execute(requirement.id),
       getRequirement.execute(requirement.id),

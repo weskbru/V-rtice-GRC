@@ -1,12 +1,3 @@
-/**
- * PharosGRC Design System — components barrel.
- *
- * Platform-wide composed patterns (T045/T046). shadcn/ui-derived primitives
- * are generated directly into `apps/web/src/components/ui/` per plan.md's
- * project structure and are NOT re-exported from here — this package must
- * never depend on an application.
- */
-
 export * from './page-header';
 export * from './card-grid';
 export * from './empty-state';

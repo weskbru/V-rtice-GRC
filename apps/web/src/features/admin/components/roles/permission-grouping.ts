@@ -1,25 +1,3 @@
-/**
- * PharosGRC — Administration, shared permission-grouping helpers (T182, wave
- * 4). Groups a permission list so composing/reading a role's dozens of
- * `resource:action` identifiers stays legible.
- *
- * Two groupings, both over the catalogue as the server returns it — neither
- * renames, drops nor reorders an identifier:
- *
- * - `groupPermissionsByResource` — one group per `resource`. Still used by
- *   `RolePermissionsSummary` (the users screen's role-assignment dialog).
- * - `groupPermissionsByArea` — one group per platform AREA (the same areas
- *   the navigation shows: Riscos, Controles, Auditoria…), each holding its
- *   resources. Used by the roles list, the module filter, the detail panel
- *   and the role form (reading, editing and composing alike), so a role is
- *   read and composed in the vocabulary of the product rather than of the
- *   database. A resource this map does not know yet lands in `other` under
- *   its raw identifier — a catalogue entry added later is never hidden.
- *
- * `permissionMatchesQuery` / `filterPermissionsByQuery` are the search that
- * used to live inside `PermissionChecklist`, kept when that component was
- * retired with the create dialog it served.
- */
 import { admin } from '@/lib/messages/admin';
 
 import type { Permission } from '../../types';
@@ -29,7 +7,6 @@ export interface PermissionGroup {
   readonly permissions: readonly Permission[];
 }
 
-/** Groups `permissions` by `resource`, resources sorted alphabetically — never re-sorting permissions within a group (the catalogue's own order is preserved). */
 export function groupPermissionsByResource(
   permissions: readonly Permission[],
 ): readonly PermissionGroup[] {
@@ -46,15 +23,6 @@ export function groupPermissionsByResource(
 
 export type PermissionArea = keyof typeof admin.roles.permissionCatalog.areas;
 
-/**
- * Area order follows the sidebar (GRC modules first, administration last);
- * `other` always closes the list.
- *
- * Exported because the roles surface's module filter offers these same
- * areas in this same order (015 FR-013 — "creating a second taxonomy is
- * forbidden"). Deriving that list from the message catalogue's key order
- * instead would work only for as long as the two happened to agree.
- */
 export const PERMISSION_AREA_ORDER: readonly PermissionArea[] = [
   'risk',
   'action',
@@ -72,7 +40,6 @@ export const PERMISSION_AREA_ORDER: readonly PermissionArea[] = [
   'other',
 ];
 
-/** The area each resource belongs to. Key order doubles as resource order inside an area: the area's own subject first, its satellites after. */
 const RESOURCE_AREA: Readonly<Record<string, PermissionArea>> = {
   risk: 'risk',
   methodology: 'risk',
@@ -119,7 +86,6 @@ export function resourceLabel(resource: string): string {
   return admin.roles.permissionCatalog.resources[resource] ?? resource;
 }
 
-/** Readable verb for one permission, from its identifier's own verb (`control:test` → "Testar"); falls back to the raw verb. */
 export function permissionVerbLabel(permission: Permission): string {
   const separator = permission.identifier.indexOf(':');
   const verb =
@@ -127,21 +93,6 @@ export function permissionVerbLabel(permission: Permission): string {
   return admin.roles.permissionCatalog.verbs[verb] ?? verb;
 }
 
-/**
- * Whether one permission matches a free-text query.
- *
- * Migrated verbatim from `PermissionChecklist`, which owned this predicate
- * until the create dialog it lived in was replaced by the create panel. The
- * five fields it looks at are the point: the raw identifier and the (still
- * English, F-63) catalogue description, PLUS the pt-BR verb, resource and
- * module names. Without the pt-BR half, typing "Testar" would not find
- * `control:test` — whose `action` is `ASSESS` and whose description is in
- * English — and a reader searching in the language the screen is written in
- * would find nothing.
- *
- * An empty or blank query matches everything, so callers do not have to
- * special-case it.
- */
 export function permissionMatchesQuery(permission: Permission, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (needle === '') return true;
@@ -154,7 +105,6 @@ export function permissionMatchesQuery(permission: Permission, query: string): b
   ].some((text) => text.toLowerCase().includes(needle));
 }
 
-/** `permissions` narrowed to those matching `query`, in the catalogue's own order. Returns the input unchanged for a blank query. */
 export function filterPermissionsByQuery(
   permissions: readonly Permission[],
   query: string,
@@ -163,7 +113,6 @@ export function filterPermissionsByQuery(
   return permissions.filter((permission) => permissionMatchesQuery(permission, query));
 }
 
-/** Groups `permissions` by platform area, then by resource. Areas and resources follow a fixed product order; permissions keep the catalogue's own order. */
 export function groupPermissionsByArea(
   permissions: readonly Permission[],
 ): readonly PermissionAreaGroup[] {

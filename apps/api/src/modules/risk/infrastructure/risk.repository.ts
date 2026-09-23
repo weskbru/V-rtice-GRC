@@ -1,33 +1,3 @@
-/**
- * T088 — `RiskRepository`: the sole Prisma-backed implementation of
- * `RiskRepositoryPort`. Extends `ScopedRepository<Prisma.RiskWhereInput>`
- * (`shared/persistence/scoped-repository.ts`, ADR-004) so every method
- * below is compile-time required to apply the caller's organizational
- * `ScopeFilter` — there is no method on this class that queries `risk`
- * without going through `applyScope`/`withScope` (FR-025).
- *
- * ## `updateWithVersion` — why one `UPDATE ... WHERE id = ? AND version = ?`
- * is race-free with no explicit row lock (ADR-013)
- *
- * `updateMany({ where: { id, version: expectedVersion, ...scope } })` compiles
- * to a single SQL `UPDATE risks SET ..., version = version + 1 WHERE id = $1
- * AND version = $2 AND <scope predicate>`. PostgreSQL's MVCC + row-level
- * locking guarantees that if two concurrent transactions both attempt this
- * statement against the SAME row: whichever commits first wins and bumps
- * `version`; the second transaction's `UPDATE` blocks on the row lock until
- * the first commits, then PostgreSQL re-evaluates the `WHERE` clause against
- * the now-current row (`EvalPlanQual`) — since `version` has already moved
- * on, the second transaction's `version = expectedVersion` predicate no
- * longer matches, so it affects zero rows. `updateMany`'s `{ count }` is
- * exactly this signal: `count === 1` means this call's `expectedVersion` was
- * the winner; `count === 0` means either the row does not exist/is out of
- * scope, or someone else's write already moved `version` past what this
- * caller last read. `updateWithVersion` below distinguishes those two by a
- * follow-up scoped read — see its body. No `SELECT ... FOR UPDATE`, no
- * `SERIALIZABLE` isolation, and no extra lock statement are needed: ordinary
- * `READ COMMITTED` (PostgreSQL's default, unchanged here) already provides
- * this guarantee for a single-statement conditional `UPDATE`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -53,12 +23,6 @@ import type {
 } from '../domain/ports/risk-repository.port';
 import type { Prisma } from '@prisma/client';
 
-// T126 — the SAME `methodologyVersion`/`assessedByUser` selection
-// `RiskAssessmentRepository`'s own `ASSESSMENT_INCLUDE` uses, so
-// `toAssessmentRecord` (imported above) can map either payload shape.
-// `previousAssessment` is selected ONLY for its two derived levels — see
-// `RiskRecord.previousAssessmentLevels`'s doc comment for why a full nested
-// `AssessmentRecord` is not needed here.
 const CURRENT_ASSESSMENT_INCLUDE = {
   include: {
     methodologyVersion: { select: { id: true, versionNumber: true } },
@@ -76,9 +40,6 @@ const RISK_INCLUDE = {
   responsible: { select: { id: true, fullName: true, email: true } },
   causes: { orderBy: { sortOrder: 'asc' } },
   consequences: { orderBy: { sortOrder: 'asc' } },
-  // T126 — the risk's current assessment, loaded in the SAME query as the
-  // rest of the detail read (no separate repository call, no N+1 — see
-  // `RiskRecord.currentAssessment`'s doc comment).
   currentAssessment: CURRENT_ASSESSMENT_INCLUDE,
 } satisfies Prisma.RiskInclude;
 
@@ -131,17 +92,12 @@ export class RiskRepository
     return row ? toRiskRecord(row) : undefined;
   }
 
-  /** F-38 — see `RiskRepositoryPort.findOrgUnitIdUnscoped`'s doc comment.
-   * One extra indexed-by-PK `SELECT`, paid only by a caller that already
-   * knows a scoped lookup just returned nothing. */
   async findOrgUnitIdUnscoped(id: string): Promise<string | undefined> {
     return this.resolveOrganizationalUnitIgnoringScope(() =>
       this.prisma.client.risk.findUnique({ where: { id }, select: { orgUnitId: true } }),
     );
   }
 
-  /** Backs `RiskActionOriginAccessor.listOriginIdsInScope` (Fix 1) — a
-   * single scoped query, ids only, no relations loaded. */
   async listIdsInScope(scope: ScopeFilter): Promise<readonly string[]> {
     const rows = await this.withScope(scope, {}, (where) =>
       this.prisma.client.risk.findMany({ where, select: { id: true } }),
@@ -174,8 +130,6 @@ export class RiskRepository
 
     if (result.count > 0) {
       const updated = await this.findById(scope, id);
-      // Defensive only: a row this same transaction just updated cannot
-      // vanish from a `findById` scoped by the same filter a moment later.
       if (!updated) {
         return { outcome: 'NOT_FOUND' };
       }
@@ -197,9 +151,6 @@ export class RiskRepository
     };
   }
 
-  /** T124/US4 — see `RiskRepositoryPort.applyAssessmentResult`'s doc
-   * comment; the conditional-update mechanism is identical to
-   * `updateWithVersion` above, just against a disjoint field set. */
   async applyAssessmentResult(
     scope: ScopeFilter,
     id: string,
@@ -246,9 +197,6 @@ export class RiskRepository
     };
   }
 
-  /** T139/US5 — see `RiskRepositoryPort.applyTreatmentDecision`'s doc
-   * comment; identical conditional-update mechanism as `updateWithVersion`
-   * above, against the disjoint `currentTreatmentId` field. */
   async applyTreatmentDecision(
     scope: ScopeFilter,
     id: string,
@@ -261,8 +209,6 @@ export class RiskRepository
     });
   }
 
-  /** T140/T142/US5 — see `RiskRepositoryPort.touchVersion`'s doc comment;
-   * bumps `version` alone. */
   async touchVersion(
     scope: ScopeFilter,
     id: string,
@@ -273,10 +219,6 @@ export class RiskRepository
     });
   }
 
-  /** T156/T157/US6 — see `RiskRepositoryPort.applyLifecycleTransition`'s
-   * doc comment; identical conditional-update mechanism as
-   * `updateWithVersion` above, against the disjoint `status`/
-   * `pendingApprovalId`/`archivedAt` fields. */
   async applyLifecycleTransition(
     scope: ScopeFilter,
     id: string,
@@ -291,14 +233,6 @@ export class RiskRepository
     return this.conditionalVersionUpdate(scope, id, expectedVersion, data);
   }
 
-  /** T093 — see `RiskRepositoryPort.replaceCauses`'s doc comment. A plain
-   * `deleteMany` + `createMany` against the risk-owned child table, both
-   * executed against `this.prisma.client`, which resolves to the ambient
-   * transaction (`PrismaService.client`'s own doc comment) — so this always
-   * runs inside `ReplaceRiskStatementsUseCase`'s transaction, atomically
-   * with the `touchVersion` call that follows it. `createMany` is skipped
-   * for an empty `items` array (Prisma accepts `data: []`, but skipping is
-   * one fewer round trip for the common "clearing the list" case). */
   async replaceCauses(
     riskId: string,
     items: readonly string[],
@@ -316,9 +250,6 @@ export class RiskRepository
     return toStatementRecords(rows);
   }
 
-  /** T093 — see `RiskRepositoryPort.replaceConsequences`'s doc comment;
-   * identical mechanism as `replaceCauses` above, against the disjoint
-   * `RiskConsequence` table. */
   async replaceConsequences(
     riskId: string,
     items: readonly string[],
@@ -336,14 +267,6 @@ export class RiskRepository
     return toStatementRecords(rows);
   }
 
-  /** Shared conditional `UPDATE ... WHERE id = ? AND version = ? AND
-   * <scope>` mechanism, factored out of `updateWithVersion`/
-   * `applyAssessmentResult`/`applyTreatmentDecision`/`touchVersion`/
-   * `applyLifecycleTransition` — all differ only in which columns `data`
-   * sets; the race-free conditional-update semantics (see this file's
-   * header comment) and the "distinguish NOT_FOUND from VERSION_CONFLICT
-   * via a follow-up scoped read" logic are identical across every one of
-   * them. */
   private async conditionalVersionUpdate(
     scope: ScopeFilter,
     id: string,
@@ -398,11 +321,6 @@ function toUserRefOrUndefined(
   return row ? toUserRef(row) : undefined;
 }
 
-/** T126 — extracts the two derived levels from `row.currentAssessment`'s
- * `previousAssessment` relation (see `CURRENT_ASSESSMENT_INCLUDE`'s select),
- * or `undefined` when there is no current assessment or it has no
- * predecessor (FR-066: "null members mean there was no previous
- * assessment"). */
 function toPreviousAssessmentLevels(
   currentAssessment: RiskWithRelations['currentAssessment'],
 ): Pick<AssessmentRecord, 'inherentLevel' | 'residualLevel'> | undefined {

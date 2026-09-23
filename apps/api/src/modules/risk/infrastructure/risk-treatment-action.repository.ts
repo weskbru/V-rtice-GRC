@@ -1,11 +1,3 @@
-/**
- * 007-implementation-remediation, Frente A — the sole implementation of
- * `RiskTreatmentActionRepositoryPort`, reduced to the link table's own
- * columns (`riskId`/`treatmentDecisionId`/`actionId`) now that `Action`
- * (`grc/action`) owns every work-item field (data-model.md §1-§2). No scope
- * predicate anywhere in this file — same "the caller already authorized
- * the parent risk" reasoning `RiskAssessmentRepository` already uses.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -17,11 +9,6 @@ import type {
 } from '../domain/ports/risk-treatment-action-repository.port';
 import type { ActionStatus } from '@prisma/client';
 
-// Statuses that end an ACTION's lifecycle — mirrors `action.entity.ts`'s
-// own `LEGAL_TRANSITIONS` terminal set (`CANCELLED` has no outgoing edge;
-// `COMPLETED` only reopens). Duplicated here as a literal array (not
-// imported) deliberately kept minimal — `findDecisionIdsWithOutstandingActions`
-// only needs the SET of terminal statuses, never the transition table.
 const TERMINAL_ACTION_STATUSES: readonly ActionStatus[] = ['COMPLETED', 'CANCELLED'];
 
 function toLinkRecord(row: {

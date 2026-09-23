@@ -1,15 +1,3 @@
-/**
- * T150 — proves FR-029c end to end: rejecting a pending approval clears the
- * pending condition, records the decision (FR-029b), and leaves the risk in
- * EXACTLY the state it was already in — never a silent side effect on
- * `Risk.status`. Also exercises the mirror-image `APPROVED` path (applies
- * the gated transition, writes the linked `RiskLifecycleTransition` row)
- * and, per this task's explicit instruction, verifies the
- * `approvals_decided_by_requester_check` CHECK constraint (FR-029a) rejects
- * a self-approval AT THE DATABASE LEVEL — with a raw SQL statement that
- * bypasses `DecideApprovalUseCase`/`assertApproverDiffersFromRequester`
- * entirely, so this proof does not depend on the application layer at all.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -66,9 +54,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
     await ctx.close();
   });
 
-  /** Walks a fresh risk from DRAFT to ASSESSED (an assessment recorded,
-   * DRAFT_FIELDS_COMPLETE satisfied) so both `HAS_ASSESSMENT`-gated
-   * approval targets are legal from there. Returns the risk at that point. */
   async function buildAssessedRisk(): Promise<{
     riskId: string;
     version: number;
@@ -91,8 +76,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
     await grantUnitScopeFixture(ctx.prisma, { user: requester, orgUnitId: orgUnit.id });
 
     const owner = await createUserFixture(ctx.prisma, { email: `${marker}-owner@example.test` });
-    // F-CV-2: precondition owner — not the object of any assertion here
-    // (the SoD subject is `requester` vs. a separate `approver`, untouched).
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
     const category = await ctx.prisma.client.riskCategory.create({
       data: {
@@ -179,7 +162,7 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
     });
 
     expect(requested.status).toBe('PENDING');
-    expect(withPending.status).toBe('ASSESSED'); // FR-029c: unchanged by the request itself.
+    expect(withPending.status).toBe('ASSESSED');
     expect(withPending.pendingApprovalId).toBe(requested.id);
 
     const { approval: decided, risk: afterRejection } = await decideApprovalUseCase.execute({
@@ -196,8 +179,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
     expect(decided.decidedBy!.id).toBe(approver.id);
     expect(decided.justification).toBe('Faltam evidências para aceitar o risco.');
 
-    // The core proof: the risk's lifecycle STATE is exactly what it was
-    // before the request — REJECTED clears the CONDITION, not the state.
     expect(afterRejection.status).toBe('ASSESSED');
     expect(afterRejection.pendingApprovalId).toBeUndefined();
 
@@ -205,11 +186,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
     expect(persisted!.status).toBe('ASSESSED');
     expect(persisted!.pendingApprovalId).toBeUndefined();
 
-    // No NEW lifecycle transition row was written for the rejection —
-    // nothing transitioned (only the decision itself is the permanent
-    // record). Exactly the two transitions `buildAssessedRisk` itself
-    // performed (DRAFT -> IDENTIFIED -> ASSESSED) exist; none reference this
-    // approval.
     const transitionRows = await ctx.prisma.client.riskLifecycleTransition.findMany({
       where: { riskId },
     });
@@ -249,9 +225,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
     expect(afterApproval.status).toBe('ACCEPTED');
     expect(afterApproval.pendingApprovalId).toBeUndefined();
 
-    // `buildAssessedRisk` itself already wrote two DIRECT transitions
-    // (DRAFT -> IDENTIFIED -> ASSESSED); this decision adds exactly ONE
-    // more — the gated one, linked back to the approval.
     const transitionRows = await ctx.prisma.client.riskLifecycleTransition.findMany({
       where: { riskId },
     });
@@ -297,8 +270,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
   it('the requesting user cannot decide their own request, even holding risk:approve (application layer, FR-029a)', async () => {
     const { riskId, version, requester, requesterId, orgUnitId } = await buildAssessedRisk();
 
-    // Grant the REQUESTER `risk:approve` too — proves the refusal is the
-    // domain's identity check, not merely "this user lacks the permission".
     const selfApproveRole = await createRoleWithPermissionsFixture(ctx.prisma, ['risk:approve'], {
       name: `fixture-self-approve-role-${randomUUID()}`,
     });
@@ -322,7 +293,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
       }),
     ).rejects.toThrow();
 
-    // Unaffected by the refused attempt — still pending, risk unchanged.
     const persisted = await riskRepository.findById(globalScope(), riskId);
     expect(persisted!.status).toBe('ASSESSED');
     expect(persisted!.pendingApprovalId).toBe(requested.id);
@@ -347,9 +317,6 @@ describe('Risk approval decisions (T150, FR-029, FR-029a, FR-029b, FR-029c)', ()
       },
     });
 
-    // Raw SQL, bypassing `ApprovalRepository.decide`/`DecideApprovalUseCase`
-    // entirely: attempts to set decided_by_user_id EQUAL to
-    // requested_by_user_id directly against the database.
     await expect(
       ctx.prisma.client.$executeRawUnsafe(
         `UPDATE approvals SET status = 'APPROVED', decided_by_user_id = $1::uuid, decided_at = now() WHERE id = $2::uuid`,

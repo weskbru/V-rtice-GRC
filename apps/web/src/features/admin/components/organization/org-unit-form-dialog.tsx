@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, create/edit an organizational unit (T183,
- * FR-024, ADR-004). Reparenting (`edit` mode with a changed `parentId`) is
- * the dangerous operation named in the task brief: it rewrites the
- * materialized path of the unit AND its whole subtree, and can change who
- * can see what across the platform — so a SECOND, explicit confirmation
- * step (`ConfirmDialog`, stating the blast radius) gates it, on top of the
- * ordinary form submit. A plain rename/re-code (no `parentId` change) never
- * shows that second step. A cycle (moving a unit under its own descendant)
- * is excluded from the parent picker client-side (descendants are never
- * offered) AND refused by the server with 422 either way — surfaced
- * intelligibly rather than as a generic failure if it still occurs (e.g. a
- * stale client-side unit list).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ConfirmDialog, FormField } from '@pharos/design-system/components';
 import { Loader2, Waypoints } from 'lucide-react';
@@ -58,9 +44,7 @@ export interface OrgUnitFormDialogProps {
   mode: OrgUnitFormMode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Required for `create-child`. */
   parent?: OrgUnitNode;
-  /** Required for `edit`. */
   unit?: OrgUnitNode;
   allUnits: readonly OrgUnitNode[];
   onSaved: (unit: OrgUnitNode) => void;
@@ -116,7 +100,6 @@ export function OrgUnitFormDialog({
     onSaved(created);
   }
 
-  /** Returns `'saved'`, or `'needs-confirmation'` when reparenting requires the second, explicit confirmation step below — never both throws AND asks for confirmation in the same call. */
   async function submitEdit(
     values: OrgUnitFormValues,
     reparentConfirmed: boolean,
@@ -143,7 +126,7 @@ export function OrgUnitFormDialog({
     try {
       if (mode === 'edit') {
         const result = await submitEdit(values, false);
-        if (result === 'needs-confirmation') return; // the reparent ConfirmDialog takes over from here
+        if (result === 'needs-confirmation') return;
         handleOpenChange(false);
       } else {
         await submitCreate(values);

@@ -1,10 +1,3 @@
-/**
- * T010,T017-T022/006-assets-processes — `ProcessesModule`, this module's
- * own composition root. Identical in shape and reasoning to
- * `modules/assets/assets.module.ts` (FR-020) — see that file's header for
- * the full account this one does not repeat. Contributes the `PRC` prefix
- * to the GRC kernel's closed code-allocator registry.
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../core/audit/audit.module';
@@ -40,21 +33,7 @@ import { ProcessMetricsModule } from './process-metrics.module';
     OrganizationsModule,
     AuthorizationModule,
     ProcessDirectoryModule,
-    // 009-indicators-reports, T025 — `ProcessMetricsModule` binds
-    // `ProcessMetricsPort` to a fresh `PrismaProcessRepository`, letting
-    // `modules/indicators`'s Process provider reuse the SAME catalog query
-    // `GET /processes` already runs. `IndicatorsModule` imports
-    // `ProcessMetricsModule` directly rather than `ProcessesModule` itself
-    // (see `process-metrics.module.ts`'s own header for why it is no
-    // longer `@Global()`).
     ProcessMetricsModule,
-    // 013-incidents-problems-reverse-links —
-    // `IncidentProcessLinkReadModule` binds `IncidentProcessLinkReadPort`
-    // to `modules/incidents`' own adapter. This module imports it
-    // directly so `ListProcessIncidentLinksUseCase` (below) can inject
-    // that port without either module importing the other (CLAUDE.md
-    // §19.10 — a partial Nest test graph must not depend on global
-    // provider visibility).
     IncidentProcessLinkReadModule,
   ],
   controllers: [ProcessController],
@@ -65,9 +44,6 @@ import { ProcessMetricsModule } from './process-metrics.module';
     ListProcessesUseCase,
     DeactivateProcessUseCase,
     ReactivateProcessUseCase,
-    // 013-incidents-problems-reverse-links — read-only reverse of
-    // `IncidentProcessLink`, owned by `modules/incidents`; injected via
-    // `IncidentProcessLinkReadModule`, imported directly above.
     ListProcessIncidentLinksUseCase,
     { provide: ProcessRepositoryPort, useClass: PrismaProcessRepository },
     { provide: ProcessReferenceDataPort, useClass: PrismaProcessReferenceDataRepository },

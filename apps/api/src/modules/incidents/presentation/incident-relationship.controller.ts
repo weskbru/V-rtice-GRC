@@ -1,22 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `IncidentRelationshipController`:
- * `GET`/`POST /incidents/{incidentId}/risks`,
- * `DELETE /incidents/{incidentId}/risks/{linkId}`, the same three shapes
- * for `/assets` and `/processes`, and the READ-ONLY
- * `GET /incidents/{incidentId}/problems`
- * (`specs/008-incidents-problems/contracts/incidents.openapi.yaml`'s
- * "Incident Relationships" operations). Mirrors
- * `grc/finding/presentation/finding-relationship.controller.ts` exactly: a
- * separate controller file from the CRUD/lifecycle controller, `200` (not
- * `204`) with the withdrawn link body on unlink — `Incident` has no
- * `version` column to echo via `ETag` the way `Risk` does.
- *
- * All five routes are gated by `incident:link` (contract's own
- * "Requires `incident:link`..." wording on every write route; the four GET
- * list routes reuse `incident:view`, the same convention
- * `FindingRelationshipController` establishes for its own list routes —
- * the contract states no override for them).
- */
 import {
   Body,
   Controller,
@@ -80,10 +61,6 @@ export class IncidentRelationshipController {
     private readonly listIncidentProblemLinksUseCase: ListIncidentProblemLinksUseCase,
   ) {}
 
-  // ---------------------------------------------------------------------
-  // Risks
-  // ---------------------------------------------------------------------
-
   @RequirePermission('incident:view')
   @Get('risks')
   async listRiskLinks(
@@ -130,10 +107,6 @@ export class IncidentRelationshipController {
     });
     return toIncidentRiskLinkResponse(unlinked);
   }
-
-  // ---------------------------------------------------------------------
-  // Assets
-  // ---------------------------------------------------------------------
 
   @RequirePermission('incident:view')
   @Get('assets')
@@ -182,10 +155,6 @@ export class IncidentRelationshipController {
     return toIncidentAssetLinkResponse(unlinked);
   }
 
-  // ---------------------------------------------------------------------
-  // Processes
-  // ---------------------------------------------------------------------
-
   @RequirePermission('incident:view')
   @Get('processes')
   async listProcessLinks(
@@ -232,10 +201,6 @@ export class IncidentRelationshipController {
     });
     return toIncidentProcessLinkResponse(unlinked);
   }
-
-  // ---------------------------------------------------------------------
-  // Problems (READ-ONLY — Problem owns the write path, research.md D-14)
-  // ---------------------------------------------------------------------
 
   @RequirePermission('incident:view')
   @Get('problems')

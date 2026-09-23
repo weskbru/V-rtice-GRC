@@ -1,35 +1,3 @@
-/**
- * 008-incidents-problems — `IncidentsModule`, this module's own
- * composition root. Sits directly under `src/modules/incidents/`,
- * outside the `domain`/`application`/`infrastructure`/`presentation`
- * folders the boundary lint rules classify — exactly like
- * `assets.module.ts`/`controls.module.ts`, and for the same reason: this
- * is the one place allowed to bind a domain port to its infrastructure
- * implementation (ADR-011).
- *
- * ## Foundation, the origin accessor (spec.md FR-016), US1 and US3
- *
- * The module skeleton (tasks.md Fase 1/2) — schema, permission
- * definitions, audit field allow-list, `IncidentDirectoryModule` — landed
- * first; the foundation deliberately deferred `ActionOriginType.INCIDENT`
- * and its accessor rather than build a four-method, scope-filtered
- * registration untested at four in the morning (spec.md FR-016's own
- * dated note). `IncidentActionOriginAccessor` is that accessor, built the
- * next day with its own tests
- * (`test/integration/incident-problem-action-origin.spec.ts`) — see
- * that file's header for the live-scope proof and the refusal proof.
- *
- * `IncidentController` (US1: create/read/list/update/transition) and
- * `IncidentRelationshipController` (US3: the four relationship pairs,
- * built independently) both join here now (tasks.md T023-T027) —
- * `AuditModule` joins the imports (`AuditRecorder`, needed by every write
- * use case); `EntityCodeGeneratorPort`/`TransactionRunnerPort` are
- * declared by the GRC kernel (`grc/shared`) and bound to its Prisma
- * implementations here rather than reimplemented, the same reuse
- * `AssetsModule`'s own header documents — Incident contributes the `INC`
- * prefix to the kernel's closed registry (data-model.md §3), not a second
- * allocator.
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../core/audit/audit.module';
@@ -101,22 +69,9 @@ let collaborationRegistered = false;
     AuthorizationModule,
     OrganizationsModule,
     IncidentDirectoryModule,
-    // 013-incidents-problems-reverse-links — this module OWNS
-    // `IncidentRiskLink`/`IncidentAssetLink`/`IncidentProcessLink`, so it
-    // provides the `@Global()` reverse-read bindings `modules/risk`/
-    // `modules/assets`/`modules/processes` consume for their own
-    // `GET /{riskId,assetId,processId}/incidents` — mirrors this same
-    // module's own `IncidentDirectoryModule` import above.
     IncidentRiskLinkReadModule,
     IncidentAssetLinkReadModule,
     IncidentProcessLinkReadModule,
-    // 009-indicators-reports, T027 — `IncidentMetricsModule` binds
-    // `IncidentMetricsPort` to a fresh `PrismaIncidentRepository`, letting
-    // `modules/indicators`'s Incident provider reuse the SAME catalog
-    // query `GET /incidents` already runs. `IndicatorsModule` imports
-    // `IncidentMetricsModule` directly rather than `IncidentsModule`
-    // itself (see `incident-metrics.module.ts`'s own header for why it is
-    // no longer `@Global()`).
     IncidentMetricsModule,
   ],
   controllers: [IncidentController, IncidentRelationshipController],
@@ -124,15 +79,11 @@ let collaborationRegistered = false;
     IncidentEvidenceSubjectAccessor,
     IncidentActionOriginAccessor,
     IncidentParentRecordAccessor,
-    // US1 — create/read/list/update/transition (this task's own scope).
     CreateIncidentUseCase,
     GetIncidentUseCase,
     ListIncidentsUseCase,
     UpdateIncidentUseCase,
     TransitionIncidentUseCase,
-    // US3 — the five relationship links' write/read use cases (this
-    // module's own three: Risk, Asset, Process, plus the read-only
-    // Problem listing — see `application/links/`'s own file headers).
     LinkIncidentRiskUseCase,
     UnlinkIncidentRiskUseCase,
     ListIncidentRiskLinksUseCase,
@@ -159,26 +110,13 @@ export class IncidentsModule {
     private readonly actionOriginAccessor: IncidentActionOriginAccessor,
     private readonly parentRecordAccessor: IncidentParentRecordAccessor,
   ) {
-    // Registers this module's own `AuditEntityType.INCIDENT` field
-    // allow-list from its own file, without editing `core/audit/**`
-    // (ADR-011) — mirrors `AssetsModule`'s own
-    // `registerAssetAuditAllowlists()` call.
     registerIncidentAuditAllowlists();
 
-    // Idempotency guard mirrors `ControlRelationshipModule`'s own
-    // `collaborationRegistered` pattern — Nest may construct this module
-    // more than once across a test run's several application contexts.
     if (!collaborationRegistered) {
       collaborationRegistered = true;
       registerEvidenceSubjectResolver('INCIDENT', this.evidenceSubjectAccessor);
       registerActionOriginResolver('INCIDENT', this.actionOriginAccessor);
 
-      // CLAUDE.md §19.10 — `AttachableEntityType.INCIDENT`/
-      // `CommentableEntityType.INCIDENT` existed in the schema with no
-      // accessor ever registered against `core/comments/domain/
-      // entity-registry.ts`: a legal enum value nobody wired up. This is
-      // that registration, exercised by `test/integration/
-      // incident-problem-collaboration.spec.ts`.
       registerAttachableEntityType('INCIDENT', this.parentRecordAccessor);
       registerCommentableEntityType('INCIDENT', this.parentRecordAccessor);
     }

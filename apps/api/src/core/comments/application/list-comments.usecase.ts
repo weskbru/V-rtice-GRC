@@ -1,9 +1,3 @@
-/**
- * T192 — `ListCommentsUseCase`: `GET /comments` (FR-095, FR-098, FR-030).
- * See `core/files/application/list-attachments.usecase.ts`'s header — the
- * identical reasoning applies here for propagating the parent accessor's
- * own `NotFoundDomainError` as-is.
- */
 import { Injectable } from '@nestjs/common';
 
 import { createPageRequest } from '../../../shared/pagination/page-request';

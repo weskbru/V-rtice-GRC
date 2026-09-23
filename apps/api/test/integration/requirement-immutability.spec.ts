@@ -1,20 +1,3 @@
-/**
- * T028/T029/004-compliance-management — the two guards FR-004 relies on,
- * tested SEPARATELY so each can fail without masking the other
- * (research.md D-4):
- *
- *   T028: a raw SQL `UPDATE` against `requirements` of a PUBLISHED
- *   version, issued directly through Prisma with NO use case in the call
- *   path at all — only the `requirements_immutable_after_publish` database
- *   trigger (T006) can reject this. This is the actual guarantee FR-004
- *   depends on.
- *
- *   T029: the SAME edit, attempted through `UpdateRequirementUseCase` (the
- *   ordinary application path) — refused with `ValidationDomainError`
- *   BEFORE any SQL reaches the database, and the refusal itself is
- *   audited (`requirement.update_refused`, FR-004's own "a tentativa é
- *   auditada").
- */
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

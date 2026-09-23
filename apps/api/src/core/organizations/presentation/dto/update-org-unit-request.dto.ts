@@ -1,16 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `UpdateOrgUnitRequest`:
- * every property optional, `additionalProperties: false`, `minProperties:
- * 1` — enforced in `AdminOrgUnitsController` itself, the same pattern
- * `UpdateRiskRequestDto`'s header documents.
- *
- * `parentId` is deliberately typed `string | null | undefined` rather than
- * `string | undefined`: the DTO must distinguish "omitted" (leave the
- * current parent unchanged) from "explicitly `null`" (reparent to root) —
- * `class-validator`'s `@IsOptional()` only skips validation when the key
- * is absent OR `undefined`, so an explicit `null` still reaches `@IsUUID`
- * unless separately allowed, hence `@ValidateIf`.
- */
 import { IsOptional, IsString, IsUUID, Length, ValidateIf } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

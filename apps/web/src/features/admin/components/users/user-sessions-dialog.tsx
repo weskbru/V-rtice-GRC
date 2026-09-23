@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, revoke every session of a user (T181, FR-015,
- * FR-018). Signs the user out everywhere — stated plainly before
- * confirmation (task brief, FR-046).
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { LogOut } from 'lucide-react';
 import { useState } from 'react';

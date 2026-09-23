@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement register route (T076, T079), mirroring
- * `(app)/controls/page.tsx` exactly: `AuditEngagementCatalogView` reads
- * `useSearchParams()` (via `useEngagementCatalogState`), which Next.js
- * requires behind a `<Suspense>` boundary.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

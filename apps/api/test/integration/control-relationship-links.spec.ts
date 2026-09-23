@@ -1,20 +1,3 @@
-/**
- * T042/003-controls-management, User Story 3 — end-to-end coverage
- * against the real database for `ControlProcessLink`/`ControlAssetLink`:
- * ADR-020 part 4 (scope checked BEFORE the write, nothing written for an
- * out-of-scope target), part 1 (own audit entity type per link kind),
- * FR-023 (withdrawal preserves history), and the "vínculo duplicado" edge
- * case (an active duplicate is refused; a withdrawn pair may be relinked).
- *
- * The `GET risks` tests below also double as the proof that relocating
- * `RiskControlLinkReadPort`'s adapter into `modules/risk`
- * (`shared/grc-ports/risk-control-link-read.port.ts`, ADR-020 part 3)
- * changed nothing observable: `listRiskLinksUseCase` is resolved through
- * `ControlRelationshipModule`'s real DI graph, so it always exercises
- * whichever adapter is actually bound — these tests ran (and passed)
- * against the old in-module adapter before the move, and now exercise the
- * new one, with no test-side change beyond what follows.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -72,15 +55,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
       email: `${uniqueTestMarker('ctl-link-actor')}@example.test`,
       primaryOrgUnitId: orgUnitId,
     });
-    // `asset:view`/`process:view` — **FR-011** (006-assets-processes,
-    // ADR-020 part 5): linking a control to an asset or a process now
-    // requires authority on the REFERENCED side too, not only
-    // `control:edit` on the writing side. Before that change this fixture
-    // needed neither, because the referenced side was never checked — the
-    // same half-applied pattern F-46 left behind for `Risco→Ativo`/
-    // `Risco→Processo`. This is the deliberate behaviour change SC-006
-    // names as its only permitted exception, so the citation is here rather
-    // than in a commit message nobody reads from the test.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['control:edit', 'control:view', 'asset:view', 'process:view'],
@@ -168,7 +142,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
     const countAfter = await ctx.prisma.client.controlProcessLink.count();
     expect(countAfter).toBe(countBefore);
 
-    // A genuinely nonexistent process answers identically.
     await expect(
       linkProcessUseCase.execute({
         actorUserId: actor.id,
@@ -232,7 +205,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
       }),
     ).rejects.toThrow(ConflictDomainError);
 
-    // Withdraw — preserved, never deleted (FR-023).
     await unlinkProcessUseCase.execute({
       actorUserId: actor.id,
       controlId: control.id,
@@ -246,7 +218,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
     expect(withdrawnRow.unlinkedByUserId).toBe(actor.id);
     expect(withdrawnRow.linkedByUserId).toBe(actor.id);
 
-    // Withdrawing again is refused (422 — already withdrawn).
     await expect(
       unlinkProcessUseCase.execute({
         actorUserId: actor.id,
@@ -255,7 +226,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
       }),
     ).rejects.toThrow(ValidationDomainError);
 
-    // Re-linking the SAME pair is permitted and creates a NEW row.
     const secondLink = await linkProcessUseCase.execute({
       actorUserId: actor.id,
       controlId: control.id,
@@ -301,19 +271,12 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
     expect(audit).not.toBeNull();
     expect(audit!.action).toBe('control.asset_linked');
 
-    // No CONTROL_PROCESS_LINK audit row was produced for this asset link.
     const processAudit = await ctx.prisma.client.auditEvent.findFirst({
       where: { entityType: AuditEntityType.CONTROL_PROCESS_LINK, entityId: link.id },
     });
     expect(processAudit).toBeNull();
   });
 
-  // Controls sanitation (research.md D-11/D-R11): Controle->Ativo had only
-  // `link-usecase-target-scope-guard.spec.ts`'s structural text scan
-  // (asserts the source file CALLS `isOrgUnitWithinScope`) — nothing
-  // proved the RUNTIME refusal or that no row is written, unlike its
-  // sibling above (Controle->Processo, "ADR-020 part 4"). Mirrors that
-  // test exactly, for the asset side.
   it('ADR-020 part 4 — an asset outside the caller scope answers as nonexistent, and NOTHING is written', async () => {
     const orgUnit = await createOrgUnitFixture(ctx.prisma, {
       code: uniqueTestMarker('ctl-link-asset-scope-org'),
@@ -345,7 +308,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
     const countAfter = await ctx.prisma.client.controlAssetLink.count();
     expect(countAfter).toBe(countBefore);
 
-    // A genuinely nonexistent asset answers identically.
     await expect(
       linkAssetUseCase.execute({
         actorUserId: actor.id,
@@ -397,7 +359,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
     expect(links[0]!.risk.code).toBe(risk.code);
     expect(links[0]!.risk.title).toBe(risk.title);
 
-    // Reading did not create a second RiskControlLink row.
     const existingLinkCountAfter = await ctx.prisma.client.riskControlLink.count();
     expect(existingLinkCountAfter).toBe(existingLinkCountBefore + 1);
   });
@@ -438,11 +399,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
     });
 
     expect(links).toHaveLength(1);
-    // `RiskRefRecord` (shared/grc-ports/risk-control-link-read.port.ts) is
-    // exactly `{ id, code, title }` — never `description`, `status`,
-    // `ownerUserId`, `probability`, `impact` or any other `Risk` domain
-    // field (ADR-020 part 4's "porta que devolva a entidade inteira do
-    // outro domínio" prohibition).
     expect(Object.keys(links[0]!.risk).sort()).toEqual(['code', 'id', 'title']);
   });
 
@@ -464,7 +420,6 @@ describe('Control <-> process/asset relationship links (T042, ADR-020, FR-023-FR
       }),
     ).rejects.toThrow(NotFoundDomainError);
 
-    // A genuinely nonexistent control answers identically (FR-007).
     await expect(
       listRiskLinksUseCase.execute({
         actorUserId: actor.id,

@@ -2,36 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { requireSeedCredentials, signInAsWorkerAdmin } from './support/admin-session';
 
-/**
- * `specs/014-institutional-loader` — the institutional loader over a pending
- * navigation.
- *
- * The signal under test is Next's own `useLinkStatus`, reported by the
- * sidebar's links (`components/shell/navigation-pending.tsx`), so these tests
- * drive real sidebar navigations and control only how long the router's own
- * request takes: a route handler delays the RSC request for the destination
- * (the `RSC: 1` header the App Router sends when fetching a route payload),
- * which is exactly the condition the overlay exists for. Nothing here stubs
- * the component's state.
- *
- * The loader must NOT appear for a fast navigation. That is asserted by
- * measuring how long it waits before painting, not by racing a real fast
- * navigation — see the test's own comment.
- */
 const OVERLAY = '[data-navigation-pending]';
 
-/**
- * Disambiguates from the same destination reached elsewhere on the screen (the
- * dashboard's own "Acessar controles" card link, covered by its own test
- * below).
- */
 const sidebarLink = (page: Page, label: string) =>
   page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', {
     name: label,
     exact: true,
   });
 
-/** Delays the App Router's payload request for `pathname` — the real network condition, not a fake state. */
 async function delayRoutePayload(page: Page, pathname: string, ms: number): Promise<void> {
   await page.route(
     (url) => url.pathname === pathname,
@@ -46,13 +24,6 @@ async function delayRoutePayload(page: Page, pathname: string, ms: number): Prom
   );
 }
 
-/**
- * Marks "now" in the page and records when the overlay first appears, so the
- * gap between a click and the loader being painted can be measured instead of
- * inferred. A MutationObserver rather than polling: a flash shorter than a
- * poll interval would otherwise go unseen, which is exactly the defect the
- * delay exists to prevent.
- */
 async function watchOverlayTiming(page: Page): Promise<void> {
   await page.evaluate((selector) => {
     const w = window as unknown as { __overlayStartedAt?: number; __overlayFirstSeenAt?: number };
@@ -67,7 +38,6 @@ async function watchOverlayTiming(page: Page): Promise<void> {
   }, OVERLAY);
 }
 
-/** Milliseconds from the mark to the overlay's first paint; `null` if it never appeared. */
 const overlayPaintDelay = (page: Page): Promise<number | null> =>
   page.evaluate(() => {
     const w = window as unknown as { __overlayStartedAt?: number; __overlayFirstSeenAt?: number };
@@ -82,8 +52,6 @@ test.describe('Institutional loader over a pending navigation', () => {
 
   test.beforeEach(async ({ page }, testInfo) => {
     await signInAsWorkerAdmin(page, testInfo);
-    // Warm the destinations first: on a dev server a route's first visit is a
-    // compile, which is itself the slow case these tests control deliberately.
     for (const path of ['/controls', '/processes', '/assets']) {
       await page.goto(path, { waitUntil: 'networkidle' });
     }
@@ -99,7 +67,6 @@ test.describe('Institutional loader over a pending navigation', () => {
 
     const overlay = page.locator(OVERLAY);
     await expect(overlay).toBeVisible();
-    // A status, announced once — and the previous screen is still there beneath it.
     await expect(overlay.getByRole('status')).toHaveText('Carregando página…');
     await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
 
@@ -110,11 +77,6 @@ test.describe('Institutional loader over a pending navigation', () => {
   test('nothing is painted until a navigation outlasts the delay, so a quick one never flashes', async ({
     page,
   }) => {
-    // Asserting the DELAY itself, rather than racing a real fast navigation:
-    // on a dev server no route commits reliably inside 200ms, so "it did not
-    // flash" would be measuring this machine. A navigation shorter than the
-    // measured gap below cannot show anything — `pharos-loader.test.tsx`
-    // pins that consequence exactly, on fake timers.
     await delayRoutePayload(page, '/controls', 1200);
     await watchOverlayTiming(page);
 
@@ -123,8 +85,6 @@ test.describe('Institutional loader over a pending navigation', () => {
 
     const paintDelay = await overlayPaintDelay(page);
     expect(paintDelay).not.toBeNull();
-    // The mark is taken BEFORE the click, so this includes Playwright's own
-    // click latency — it can only over-report, never hide a missing delay.
     expect(paintDelay).toBeGreaterThanOrEqual(180);
   });
 
@@ -157,8 +117,6 @@ test.describe('Institutional loader over a pending navigation', () => {
     );
 
     await sidebarLink(page, 'Controles').click();
-    // Whatever the router decides to do with a failed payload (retry, full
-    // document load), the overlay must not outlive the attempt.
     await expect(page.locator(OVERLAY)).toHaveCount(0, { timeout: 15_000 });
   });
 
@@ -182,7 +140,6 @@ test.describe('Institutional loader over a pending navigation', () => {
 
     const overlay = page.locator(OVERLAY);
     await expect(overlay).toBeVisible();
-    // Exactly one indicator: no second loading system underneath or on top.
     await expect(overlay).toHaveCount(1);
     await expect(page.getByRole('heading', { level: 1, name: 'Riscos' })).toBeVisible();
     await expect(overlay).toHaveCount(0);
@@ -194,8 +151,6 @@ test.describe('Institutional loader over a pending navigation', () => {
     await sidebarLink(page, 'Controles').click();
     await expect(page.getByRole('heading', { level: 1, name: 'Controles' })).toBeVisible();
 
-    // The register's own row link — a `<Link>` rendered by a table cell, the
-    // category that had no coverage at all before this change.
     const firstRow = page.getByRole('link', { name: /^CTL-/ }).first();
     await expect(firstRow).toBeVisible();
     const detailHref = await firstRow.getAttribute('href');
@@ -206,7 +161,6 @@ test.describe('Institutional loader over a pending navigation', () => {
     await page.waitForURL(`**${detailHref ?? ''}`);
     await expect(page.locator(OVERLAY)).toHaveCount(0);
 
-    // Detail -> another screen, again from inside the content.
     await delayRoutePayload(page, '/assets', 1200);
     await sidebarLink(page, 'Ativos').click();
     await expect(page.locator(OVERLAY)).toBeVisible();
@@ -215,20 +169,12 @@ test.describe('Institutional loader over a pending navigation', () => {
   });
 
   test('navigation the product performs itself is covered too', async ({ page }) => {
-    /*
-     * After a successful create, the form navigates to the new record with
-     * `useNavigate()` — no link is involved, so only the provider's own
-     * transition can report this one. This is the scenario the per-link signal
-     * structurally cannot reach, which is why it is worth creating a real
-     * record to prove it.
-     */
     await page.goto('/assets/new', { waitUntil: 'networkidle' });
     await expect(page.getByRole('heading', { name: 'Novo ativo' })).toBeVisible();
     await page.getByLabel('Nome').fill(`Ativo do E2E do loader ${Date.now().toString()}`);
     await page.getByRole('combobox', { name: /Unidade organizacional/ }).click();
     await page.getByRole('option').first().click();
 
-    // Delay the destination the form is about to push to, whatever id it gets.
     await page.route(
       (url) => /^\/assets\/[0-9a-fA-F-]+$/.test(url.pathname),
       async (route) => {
@@ -251,13 +197,6 @@ test.describe('Institutional loader over a pending navigation', () => {
   test('a link inside the account menu is covered even though the menu unmounts it', async ({
     page,
   }) => {
-    /*
-     * The menu closes on select, so the link that started the navigation stops
-     * existing before it can report anything — measured directly: without the
-     * `insideDismissingOverlay` opt-in, a 2 s navigation from here showed
-     * nothing at all. These links hand the wait to the shell's own transition
-     * instead, and stay real anchors while doing it.
-     */
     await delayRoutePayload(page, '/profile', 1200);
 
     await page.getByRole('button', { name: /Menu da conta/ }).focus();
@@ -297,7 +236,6 @@ test.describe('Institutional loader over a pending navigation', () => {
     for (let index = 0; index < 3; index += 1) {
       const arc = arcs.nth(index);
       await expect(arc).toHaveCSS('animation-name', 'none');
-      // Static, but complete: every signal visible rather than a dark symbol.
       await expect(arc).toHaveCSS('opacity', '1');
     }
   });

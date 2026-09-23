@@ -5,12 +5,6 @@ import { FindingRemediationAction } from './finding-remediation-action';
 
 import type { Finding } from '../types';
 
-/**
- * Component-mount evidence for T077 (`FindingRemediationAction`,
- * 005-audit-findings, US2, FR-009, research.md D-10) — the first, and only
- * missing, direct `OPEN -> IN_REMEDIATION` transition (quickstart.md §4).
- */
-
 const { startRemediationMock, getFindingMock } = vi.hoisted(() => ({
   startRemediationMock: vi.fn(),
   getFindingMock: vi.fn(),

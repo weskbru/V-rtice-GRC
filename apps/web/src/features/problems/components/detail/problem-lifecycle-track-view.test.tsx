@@ -5,20 +5,6 @@ import { ProblemLifecycleTrackView } from './problem-lifecycle-track-view';
 
 import type { ProblemLifecycleTrackModel } from './problem-lifecycle-track';
 
-/**
- * Component-mount evidence for the "Ciclo de vida" track view
- * (019-problem-detail-experience, Fase B). Mirrors
- * `incident-lifecycle-track-view.test.tsx`'s own coverage exactly.
- *
- * `ProblemDetail` does not record which of the two possible origins
- * (`OPEN`/`IN_ANALYSIS`) a cancellation came from
- * (`problem-lifecycle-track.ts`'s own header comment) — so the rendered
- * `CANCELLED` node must never visually assert one. This suite proves the
- * cancelled block is NOT a descendant of the main track's own `<ol>` (which
- * is what would tie it to a specific column), and always carries the honest
- * context sentence instead of a connector.
- */
-
 function buildModel(withCancelled: boolean): ProblemLifecycleTrackModel {
   return {
     main: [
@@ -45,10 +31,6 @@ describe('ProblemLifecycleTrackView', () => {
     expect(cancelledBlocks.length).toBeGreaterThan(0);
 
     for (const block of cancelledBlocks) {
-      // The main track's nodes live inside an <ol aria-label="Posições…">;
-      // the cancelled block must not be a descendant of that list, which is
-      // the structural guarantee that it cannot inherit a specific column's
-      // position.
       const enclosingList = block.closest('ol');
       expect(enclosingList).toBeNull();
     }

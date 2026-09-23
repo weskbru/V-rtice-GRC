@@ -1,16 +1,3 @@
-/**
- * T042/005-audit-findings, User Story 2 — matches
- * `contracts/audit.openapi.yaml`'s `CreateFindingFromEngagementRequest`
- * exactly: the SAME fields as `grc-foundation.openapi.yaml`'s own
- * `CreateFindingRequest`, minus `orgUnitId` — deliberately absent (never
- * accepted here; `additionalProperties: false` rejects it as unknown),
- * since it is derived server-side from the engagement's own `orgUnitId`
- * (FR-008). Reuses `USER_MESSAGES.dto.findings.*` — the exact same
- * field-level messages `CreateFindingRequestDto` already uses, since the
- * validation rules themselves are identical (research.md D-5: `origin` is
- * still chosen freely from the three existing `FindingOrigin` values, no
- * new one introduced).
- */
 import {
   IsIn,
   IsOptional,

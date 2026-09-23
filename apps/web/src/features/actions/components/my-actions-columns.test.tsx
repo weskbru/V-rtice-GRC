@@ -5,13 +5,6 @@ import { buildMyActionsColumns, MY_ACTIONS_COLUMN_IDS } from './my-actions-colum
 
 import type { Action } from '../types';
 
-/**
- * T058/002-shared-grc-foundation, US2 — pure-function evidence, mirroring
- * `risk-register-columns.test.tsx`'s own approach: `ColumnDef.cell` is a
- * plain function of `{ row: { original } }`, exercised directly with no
- * `DataTable`/TanStack table instance needed.
- */
-
 const baseAction: Action = {
   id: 'action-1',
   code: 'ACT-2026-0001',

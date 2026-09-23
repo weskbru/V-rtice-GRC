@@ -1,23 +1,3 @@
-/**
- * `ActionAuditController`: `GET /actions/{actionId}/audit-events` per
- * `contracts/grc-foundation.openapi.yaml`'s `listActionAuditEvents`
- * operation. Mirrors `modules/risk/presentation/audit.controller.ts`'s
- * `AuditController` shape exactly — see that file's header and D-12
- * (`docs/local-environment.md`) for the full "why not `core/audit`"
- * reasoning this file's own placement in `grc/action/presentation/`
- * follows identically (this capability owns `Action`'s current existence
- * and organizational scope, `core/audit` must never import `grc/**`).
- *
- * A SEPARATE controller from `ActionController` (not a fourth method on
- * it) purely so the generated `operationId`
- * (`${ControllerName}_${methodName}`, `apps/api/src/infrastructure/openapi/
- * document.ts`'s default Nest Swagger factory) reads
- * `ActionAuditController_list` — distinguishable from `ActionController`'s
- * own `_list` (`listActions`) in `apps/api/openapi.json` and in
- * `test/contract/information-disclosure.spec.ts`'s sweep, the same way
- * `modules/risk`'s `AuditController` is its own class rather than a method
- * on `RiskController`.
- */
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 
 import { NoPermissionRequired } from '../../../core/authorization/presentation/permission.guard';
@@ -44,16 +24,6 @@ export interface ActionAuditEventsPageResponse {
 export class ActionAuditController {
   constructor(private readonly listActionAuditEventsUseCase: ListActionAuditEventsUseCase) {}
 
-  /**
-   * `@NoPermissionRequired()`, not `@RequirePermission` — this route's
-   * authorization is `action:view` (404 if absent/out of scope) AND
-   * `audit:view` (403 if absent), a shape `PermissionGuard`'s single
-   * `identifier` + single refusal code cannot express. Both are checked, in
-   * the contract's own stated order, inside `ListActionAuditEventsUseCase`
-   * — see this file's header and that use case's header for the full
-   * reasoning. The route still requires a valid session
-   * (`@NoPermissionRequired()` never bypasses `SessionGuard`).
-   */
   @NoPermissionRequired()
   @Get('audit-events')
   async list(

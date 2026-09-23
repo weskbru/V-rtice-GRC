@@ -1,14 +1,3 @@
-/**
- * T042/T043/005-audit-findings, User Story 2 — maps `FindingRecord`
- * (`grc/finding/domain/ports/finding-repository.port.ts`) to the wire shape
- * `contracts/audit.openapi.yaml`'s `FindingSummary` schema describes: a
- * purpose-fit projection of `Finding`, NOT the exhaustive shape
- * `grc-foundation.openapi.yaml`'s own `Finding` schema owns — a local,
- * minimal copy for a resource owned elsewhere, the same precedent every
- * prior phase's contract already sets (that schema's own description).
- * Used by both `createFindingFromEngagement`'s `201` body and
- * `listAuditEngagementFindings`'s `data[]`.
- */
 import type { FindingRecord } from '../../../../grc/finding/domain/ports/finding-repository.port';
 import type {
   FindingCategory,

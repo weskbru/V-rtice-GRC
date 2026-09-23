@@ -1,51 +1,15 @@
 'use client';
 
-/**
- * PharosGRC — incident register compact summary row (008-incidents-
- * problems, US1, CLAUDE.md §18.5, §19.7), joining the shared exploration
- * frame Risks/Controls/Audits/Assets/Processes already established.
- *
- * ## Why `GET /dashboard/summary`, not `GET /incidents` with `pageSize: 1`
- *
- * Coordinator decision (2026-09-14): every OTHER module's own summary reads
- * `meta.total` of its own register query, once per tile. Incidents instead
- * reads `dashboardApi.getSummary()`'s `breakdowns.incidents.byStatus` — ONE
- * request for every tile on this strip, never N requests of `pageSize: 1`,
- * never a second, independently maintained calculator (CLAUDE.md §19.7). The
- * five status counts arrive zero-filled together; the one arithmetic here —
- * "open" is `OPEN` alone, "total" sums all five — adds numbers that arrived
- * in a single response, the same discipline `features/dashboard/summary.ts`'s
- * own `sumOf`/`bucketTotal` document and this component reuses directly.
- *
- * ## Permission-gated absence, not a zero (CLAUDE.md §19.7, dashboard's own
- * "permission-aware by omission")
- *
- * `breakdowns.incidents` is present only when the caller holds the read
- * permission this block is scoped to. While the request is in flight this
- * component renders NOTHING (not a skeleton) — unlike `RiskRegisterSummary`/
- * `AssetRegisterSummary`, which show a skeleton immediately because their
- * own register endpoint requires the exact permission that got the caller
- * onto the screen in the first place. This screen's KPI source is a
- * DIFFERENT, independently-gated endpoint, so a skeleton that might vanish
- * once the block turns out absent would be a worse experience than nothing
- * appearing until the answer is known. Once the response arrives: if the
- * block is present, the strip renders with real figures; if absent, the
- * strip renders nothing at all — never a row of zeros standing in for "you
- * may not see this".
- *
- * A failed request degrades to one quiet message in place of the strip — it
- * must never hide or block the register underneath it.
- */
 import { AlertCircle, CheckCircle2, Loader2, Siren } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import type { DashboardBreakdowns, DashboardSummaryResponse } from '@/features/dashboard/types';
-import type { ComponentType, SVGProps } from 'react';
 
 import { RegisterSummaryCard } from '@/components/register/register-summary-card';
 import { dashboardApi } from '@/features/dashboard/api';
 import { sumOf } from '@/features/dashboard/summary';
 import { incidents } from '@/lib/messages/incidents';
+
+import type { DashboardBreakdowns, DashboardSummaryResponse } from '@/features/dashboard/types';
+import type { ComponentType, SVGProps } from 'react';
 
 export interface IncidentRegisterSummaryProps {
   className?: string;
@@ -143,15 +107,11 @@ export function IncidentRegisterSummary({
   }
 
   if (data === null) {
-    // Still in flight — see this component's own header comment for why no
-    // skeleton is shown here, unlike the registers whose summary reads their
-    // own (already-guaranteed) permission.
     return <></>;
   }
 
   const breakdown = data.breakdowns?.incidents;
   if (!breakdown) {
-    // Permission-gated absence: no strip, never a row of zeros.
     return <></>;
   }
 

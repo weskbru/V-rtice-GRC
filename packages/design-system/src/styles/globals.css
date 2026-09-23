@@ -1,122 +1,68 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/*
- * Tailwind 4 auto-detects template files relative to whichever app's build
- * actually runs (apps/web already covers its own src/ automatically). This
- * package's own component sources live outside that tree, so they are
- * explicitly added as an extra scan root — otherwise utility classes used
- * only inside `packages/design-system/src/components/**` (e.g.
- * `bg-risk-critical-bg`) would never be generated into the compiled CSS.
- */
 @source '../components';
-
-/*
- * PharosGRC Design System — shared Tailwind entry point (T043).
- *
- * Consumers (apps/web) import this via the package's `./styles` export
- * instead of depending on `tailwindcss` directly, so the token layer and the
- * shadcn/ui base layer are defined once (Constitution X). Tailwind CSS 4 is
- * CSS-first: there is no `tailwind.config.js` — the theme lives entirely in
- * the `:root` custom properties below and the `@theme inline` mapping that
- * exposes them as utility classes (`bg-background`, `text-risk-critical-fg`,
- * ...). Every color value here has a hex/measured-contrast twin in
- * `../tokens/colors.ts` — the two must be changed together.
- *
- * Surface hierarchy (CLAUDE.md §18, "too much white/gray with insufficient
- * visual distinction"): `background` (page canvas) and `card`/`popover`
- * ("surface") are two genuinely different values, not both plain white —
- * cards read as a distinct layer without a shadow. `muted`/`secondary`
- * serve the "sunken" role (recessed panels, table stripes, input wells —
- * slightly *darker* than the canvas). `surfaceRaised` is the fourth tier
- * (dialogs, dropdowns, popovers) — same fill as `card` today, meant to be
- * differentiated by a border and `--shadow-md`/`--shadow-lg` rather than a
- * distinct fill color, per the "borders over stacked shadows" direction.
- */
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
   --radius: 0.5rem;
 
-  /* Base surfaces (light) — see tokens/colors.ts `surfaceLight` for measured ratios */
-  --background: #f5f7fa; /* page canvas */
-  --foreground: #17212b; /* 15.18:1 on background, 16.29:1 on card */
-  --card: #ffffff; /* default surface */
+  --background: #f5f7fa;
+  --foreground: #17212b;
+  --card: #ffffff;
   --card-foreground: #17212b;
   --popover: #ffffff;
   --popover-foreground: #17212b;
-  --surface-raised: #ffffff; /* elevated layer (dialog/dropdown) — see header note */
+  --surface-raised: #ffffff;
   --surface-raised-foreground: #17212b;
 
-  /*
-   * `--primary` (fill role: buttons, active nav background, selection) vs
-   * `--primary-on-surface` (text/icon/ring role: links, focus rings, accents
-   * drawn on top of a surface) are deliberately two tokens — see F-30
-   * (docs/deferred-findings.md). In light mode both are Primary Navy, since
-   * navy on a light surface works either way; they diverge in dark mode
-   * below, which is the actual defect F-30 found.
-   */
-  --primary: #17324d; /* Primary Navy — 13.13:1 with white foreground */
+  --primary: #17324d;
   --primary-foreground: #ffffff;
-  --primary-on-surface: #17324d; /* 12.23:1 on background, 13.13:1 on card */
+  --primary-on-surface: #17324d;
 
-  --secondary: #e6eaf0; /* sunken surface */
+  --secondary: #e6eaf0;
   --secondary-foreground: #17212b;
-  --muted: #e6eaf0; /* sunken surface — table stripe, input well, recessed panel */
-  --muted-foreground: #5b6875; /* 5.31:1 on background, 5.7:1 on card */
-  /* Those ratios hold ONLY at full opacity. An alpha modifier on this token
-   * (e.g. `text-muted-foreground/80`) drops it below AA: measured 3.70:1 on
-   * card, 3.50:1 on background, 3.24:1 on muted/secondary at /80 — all under
-   * the 4.5:1 normal-text threshold. This was shipped twice (EmptyValue,
-   * the risk register's own NotSetValue) before being caught by axe. Use
-   * the token at full opacity and lean on size/weight/style (text-xs,
-   * italic) for de-emphasis instead of opacity. */
-  --accent: #eceff1; /* brand-tinted hover wash (8% Primary Navy over white) */
+  --muted: #e6eaf0;
+  --muted-foreground: #5b6875;
+  --accent: #eceff1;
   --accent-foreground: #17212b;
-  --destructive: #c83a3a; /* approved Error */
-  --destructive-foreground: #ffffff; /* 5.09:1 */
-  --border: #d9e0e7; /* decorative divider only, see globals.css note below */
-  --input: #40566d; /* Slate Blue — interactive control boundary, 7.06:1 vs background (exceeds the 3:1 UI-boundary target) */
-  --ring: var(--primary-on-surface); /* focus ring — 12.23:1 vs background */
+  --destructive: #c83a3a;
+  --destructive-foreground: #ffffff;
+  --border: #d9e0e7;
+  --input: #40566d;
+  --ring: var(--primary-on-surface);
 
-  /* Semantic status — subtle (badge/alert) + solid (strong emphasis) pairings.
-   * Solid backgrounds are the exact approved palette values; solid
-   * foregrounds are whichever of white/text-primary clears 4.5:1 against
-   * that specific hue (Warning's solid is too light for white text). */
   --status-success-bg: #effbf6;
-  --status-success-fg: #10754f; /* 5.38:1 */
+  --status-success-fg: #10754f;
   --status-success-border: #c0eddc;
   --status-success-solid-bg: #16855b;
-  --status-success-solid-fg: #ffffff; /* 4.63:1 */
+  --status-success-solid-fg: #ffffff;
 
   --status-warning-bg: #fbf7ef;
-  --status-warning-fg: #7e5907; /* 5.92:1 */
+  --status-warning-fg: #7e5907;
   --status-warning-border: #eddfc0;
   --status-warning-solid-bg: #c98a00;
-  --status-warning-solid-fg: #17212b; /* 5.52:1 — white on this hue is only 2.95:1 */
+  --status-warning-solid-fg: #17212b;
 
   --status-danger-bg: #fbefef;
-  --status-danger-fg: #6b1a1a; /* 10.46:1 */
+  --status-danger-fg: #6b1a1a;
   --status-danger-border: #edc0c0;
   --status-danger-solid-bg: #c83a3a;
-  --status-danger-solid-fg: #ffffff; /* 5.09:1 */
+  --status-danger-solid-fg: #ffffff;
 
   --status-info-bg: #eff5fb;
-  --status-info-fg: #134272; /* 9.33:1 */
+  --status-info-fg: #134272;
   --status-info-border: #c0d6ed;
   --status-info-solid-bg: #2878c8;
-  --status-info-solid-fg: #ffffff; /* 4.55:1 */
+  --status-info-solid-fg: #ffffff;
 
   --status-neutral-bg: #edeff2;
-  --status-neutral-fg: #29323c; /* 11.28:1 */
+  --status-neutral-fg: #29323c;
   --status-neutral-border: #d9e0e7;
   --status-neutral-solid-bg: #3f4750;
-  --status-neutral-solid-fg: #ffffff; /* 9.42:1 */
+  --status-neutral-solid-fg: #ffffff;
 
-  /* Risk severity — one per RiskLevel (data-model.md). A distinct axis from
-   * status above even where hues coincide by design (LOW=Success,
-   * MEDIUM=Warning, CRITICAL=Error; HIGH has its own dedicated hue). */
   --risk-low-bg: #effbf6;
   --risk-low-fg: #10754f;
   --risk-low-border: #c0eddc;
@@ -130,10 +76,10 @@
   --risk-medium-solid-fg: #17212b;
 
   --risk-high-bg: #fbf3ef;
-  --risk-high-fg: #743711; /* 8.34:1 */
+  --risk-high-fg: #743711;
   --risk-high-border: #edd1c0;
   --risk-high-solid-bg: #d96b27;
-  --risk-high-solid-fg: #17212b; /* 4.72:1 */
+  --risk-high-solid-fg: #17212b;
 
   --risk-critical-bg: #fbefef;
   --risk-critical-fg: #6b1a1a;
@@ -141,21 +87,12 @@
   --risk-critical-solid-bg: #c83a3a;
   --risk-critical-solid-fg: #ffffff;
 
-  /* Interaction states — brand-tinted (Primary Navy) rather than plain
-   * black, so hover/active carry a trace of identity (CLAUDE.md §18.5). */
   --hover-overlay: rgb(23 50 77 / 0.05);
   --active-overlay: rgb(23 50 77 / 0.09);
   --disabled-opacity: 0.5;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
-  /* Tints — a soft surface plus a strong foreground per hue, for identity
-   * chips (an icon on a tinted square) where several neighbouring areas need
-   * to be told apart at a glance. Identity only: never status, never the sole
-   * carrier of meaning — the chip always sits beside its own text label.
-   * Generated in OKLCH at fixed lightness/chroma per role so every hue weighs
-   * the same; foreground vs its own background measured >= 5.6:1 (light) and
-   * >= 7.9:1 (dark), so the icon clears WCAG non-text contrast with margin. */
   --tint-teal-bg: #d6f8f7;
   --tint-teal-fg: #096868;
   --tint-blue-bg: #e8f1ff;
@@ -173,36 +110,23 @@
   --tint-green-bg: #e0f7e4;
   --tint-green-fg: #006e30;
 
-  /* Brand mark fills — the two inks of the positive symbol
-   * (`apps/web/public/brand/pharos-mark.svg`). Consumed by `PharosLoader`,
-   * which draws the mark inline so its signal arcs can animate. */
   --brand-mark-ink: #17324d;
   --brand-mark-signal: #2878c8;
 
-  /* Categorical data-viz slots — identity series in a part-to-whole chart
-   * where the categories are NOT good/bad (status tokens stay reserved for
-   * that). Hues and order from the data-viz reference palette; the first
-   * three validate on ALL pairs in both modes (a donut drops zero segments,
-   * so any two can become neighbours), and `--viz-muted` is the de-emphasis
-   * gray for the category that means "no longer active". */
   --viz-categorical-1: #2a78d6;
   --viz-categorical-2: #eb6834;
   --viz-categorical-3: #1baf7a;
   --viz-muted: #8b95a1;
 
-  /* Chart series (Recharts) — reuse the semantic hues at their solid weight */
-  --chart-1: #17324d; /* primary */
-  --chart-2: #16855b; /* success / risk low */
-  --chart-3: #c98a00; /* warning / risk medium */
-  --chart-4: #d96b27; /* risk high */
-  --chart-5: #c83a3a; /* danger / risk critical */
+  --chart-1: #17324d;
+  --chart-2: #16855b;
+  --chart-3: #c98a00;
+  --chart-4: #d96b27;
+  --chart-5: #c83a3a;
 
-  /* Page-level layout (tokens/spacing.ts `layout`) — content column width and
-   * horizontal page gutter, wired into the shell (Wave 2, CLAUDE.md §18).
-   * Single definition, not per-theme, same as --radius above. */
-  --layout-content-max-width: 80rem; /* 1280px */
-  --layout-page-padding-x-sm: 1rem; /* 16px — space.lg */
-  --layout-page-padding-x-lg: 2rem; /* 32px — space['2xl'] */
+  --layout-content-max-width: 80rem;
+  --layout-page-padding-x-sm: 1rem;
+  --layout-page-padding-x-lg: 2rem;
 }
 
 .dark {
@@ -215,17 +139,9 @@
   --surface-raised: oklch(27.4% 0.006 286.033);
   --surface-raised-foreground: oklch(96.7% 0.001 286.375);
 
-  /*
-   * F-30's actual fix: Primary Navy measures ~1.13-1.35:1 against these dark
-   * backgrounds — as a *filled button background* it would be nearly
-   * invisible, not merely low-contrast text. `--primary` here is therefore
-   * a brighter tint of the same ~210° brand hue (not Primary Navy
-   * unchanged), and `--primary-on-surface`/`--ring` are lighter again, for
-   * the text/icon/ring role drawn directly on a dark surface.
-   */
-  --primary: #2878c8; /* 4.55:1 with white foreground; 3.89:1 vs background, 3.27:1 vs card (pop) */
+  --primary: #2878c8;
   --primary-foreground: #ffffff;
-  --primary-on-surface: #6ca6e0; /* 6.89:1 vs background, 5.79:1 vs card */
+  --primary-on-surface: #6ca6e0;
 
   --secondary: oklch(27.4% 0.006 286.033);
   --secondary-foreground: oklch(96.7% 0.001 286.375);
@@ -234,40 +150,40 @@
   --accent: oklch(27.4% 0.006 286.033);
   --accent-foreground: oklch(96.7% 0.001 286.375);
   --destructive: #e16b6b;
-  --destructive-foreground: #440e0e; /* 4.96:1 */
+  --destructive-foreground: #440e0e;
   --border: oklch(27.4% 0.006 286.033);
-  --input: oklch(55.2% 0.016 285.938); /* 3.67:1 vs background — meets the 3:1 UI-boundary target */
-  --ring: var(--primary-on-surface); /* 6.89:1 vs background — F-30 fix */
+  --input: oklch(55.2% 0.016 285.938);
+  --ring: var(--primary-on-surface);
 
   --status-success-bg: #154734;
-  --status-success-fg: #b1f1d9; /* 8.30:1 */
+  --status-success-fg: #b1f1d9;
   --status-success-border: #257e5d;
   --status-success-solid-bg: #3deba9;
-  --status-success-solid-fg: #084a31; /* 6.71:1 */
+  --status-success-solid-fg: #084a31;
 
   --status-warning-bg: #473715;
-  --status-warning-fg: #f1ddb1; /* 8.61:1 */
+  --status-warning-fg: #f1ddb1;
   --status-warning-border: #7e6225;
   --status-warning-solid-bg: #f4b834;
-  --status-warning-solid-fg: #4e3704; /* 6.28:1 */
+  --status-warning-solid-fg: #4e3704;
 
   --status-danger-bg: #471515;
-  --status-danger-fg: #ebb7b7; /* 8.65:1 */
+  --status-danger-fg: #ebb7b7;
   --status-danger-border: #7e2525;
   --status-danger-solid-bg: #e16b6b;
-  --status-danger-solid-fg: #440e0e; /* 4.96:1 */
+  --status-danger-solid-fg: #440e0e;
 
   --status-info-bg: #152e47;
-  --status-info-fg: #b2d1f0; /* 8.77:1 */
+  --status-info-fg: #b2d1f0;
   --status-info-border: #25527e;
   --status-info-solid-bg: #4294e6;
-  --status-info-solid-fg: #0a2948; /* 4.64:1 */
+  --status-info-solid-fg: #0a2948;
 
   --status-neutral-bg: #20242a;
-  --status-neutral-fg: #e5e8ec; /* 12.68:1 */
+  --status-neutral-fg: #e5e8ec;
   --status-neutral-border: #3f4750;
   --status-neutral-solid-bg: #9aa5b1;
-  --status-neutral-solid-fg: #1a1e23; /* 6.69:1 */
+  --status-neutral-solid-fg: #1a1e23;
 
   --risk-low-bg: #154734;
   --risk-low-fg: #b1f1d9;
@@ -282,10 +198,10 @@
   --risk-medium-solid-fg: #4e3704;
 
   --risk-high-bg: #472815;
-  --risk-high-fg: #f1c9b1; /* 8.68:1 */
+  --risk-high-fg: #f1c9b1;
   --risk-high-border: #7e4725;
   --risk-high-solid-bg: #ea803e;
-  --risk-high-solid-fg: #492108; /* 5.09:1 */
+  --risk-high-solid-fg: #492108;
 
   --risk-critical-bg: #471515;
   --risk-critical-fg: #ebb7b7;
@@ -316,7 +232,6 @@
   --tint-green-bg: #14361d;
   --tint-green-fg: #92dca1;
 
-  /* The inverse symbol (`pharos-mark-inverse.svg`) is single-ink white. */
   --brand-mark-ink: #ffffff;
   --brand-mark-signal: #ffffff;
 
@@ -439,15 +354,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /*
-   * Typography scale (tokens/typography.ts `typeScale`) — mirrored here as
-   * real `text-*` utilities (text-caption, text-body, text-h1, ...) so the
-   * named scale that module documents actually exists in the compiled CSS.
-   * It previously did not: the module's own header claimed this mapping
-   * while globals.css defined none of it, so every `text-h1`-shaped class
-   * anyone wrote would have silently done nothing. Additive only — Tailwind's
-   * default text-xs..text-9xl utilities are untouched and still work.
-   */
   --text-caption: 0.75rem;
   --text-caption--line-height: 1rem;
   --text-caption--font-weight: 500;
@@ -489,15 +395,6 @@
   --text-display--font-weight: 700;
   --text-display--letter-spacing: -0.02em;
 
-  /*
-   * Elevation (tokens/elevation.ts) — mirrored as the same names Tailwind's
-   * own shadow-xs/sm/md/lg/xl utilities already use, so every existing call
-   * site across shadcn primitives and design-system components (Button,
-   * Card, Dialog, Popover, DropdownMenu, Select, Input, ...) inherits the
-   * restrained, brand-appropriate shadow scale automatically — no call site
-   * changes. Single definition (not per-theme): dark mode is meant to pair
-   * these with a visible `border` rather than a different shadow.
-   */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
@@ -513,50 +410,12 @@
     @apply bg-background text-foreground;
   }
 
-  /*
-   * The authenticated shell owns the viewport (`components/shell/app-shell.tsx`):
-   * it is exactly one `svh` tall and `<main>` is the single region that scrolls
-   * page content. This rule states that ownership instead of leaving it to
-   * depend on an unwritten precondition — "nothing else in `<body>` ever has
-   * height" — which nothing enforced and anything that portals into `<body>`
-   * could break: a popper, the toast region, the dev overlay, a browser
-   * extension. When one of them did, the document itself became scrollable and
-   * the user got the reported defect: a second scrollbar on the right, and
-   * scrolling past the end of `<main>` chaining into a large empty area below
-   * the shell.
-   *
-   * Keyed on the shell's own `data-app-shell` marker, so the public pages
-   * (login, mandatory password change) keep scrolling normally on a short
-   * viewport — they have no shell and must not be locked.
-   */
   html:has(body [data-app-shell]),
   html:has(body [data-app-shell]) body {
     overflow: hidden;
   }
 }
 
-/*
- * Note on --border vs --input: `--border` is a decorative divider (table row
- * rules, card outlines) that is never the sole means of identifying a
- * component — WCAG 1.4.11 does not apply to it, and it is kept light for a
- * calm, dense table/register aesthetic. `--input` is the boundary of an
- * interactive control (Input, Select, Textarea, Checkbox) where the border
- * IS load-bearing, so it is measurably >=3:1 against the background in both
- * themes (see tokens/colors.ts `surfaceLight.input` / `surfaceDark.input`).
- */
-
-/*
- * PharosLoader — the institutional loading indicator (`components/pharos-loader.tsx`,
- * `specs/014-institutional-loader`). The lighthouse stays lit; its three signal arcs
- * light up outward in sequence, hold, fade out together faster than they arrived, and
- * rest before the next cycle. Opacity only — no rotation, scale or movement — on three
- * small paths, so the loop is cheap wherever it runs.
- *
- * One 2 s cycle, shared by the three arcs so they can never drift apart:
- *   0–10 %  rest (arcs dark)       10–22 % arc 1 in      26–38 % arc 2 in
- *   42–54 % arc 3 in               54–76 % full signal   76–86 % all out
- *   86–100 % rest
- */
 @keyframes pharos-signal-1 {
   0%,
   10% {
@@ -607,7 +466,6 @@
     opacity: 0;
     animation-duration: 2s;
     animation-iteration-count: infinite;
-    /* Decelerating arrivals; the per-keyframe easing applies between each pair of stops. */
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
   .pharos-loader-signal-1 {
@@ -620,8 +478,6 @@
     animation-name: pharos-signal-3;
   }
 
-  /* Reduced motion: no loop at all — the complete, static symbol. The state stays legible
-   * through the label the component always renders next to it. */
   @media (prefers-reduced-motion: reduce) {
     .pharos-loader-signal {
       animation: none;

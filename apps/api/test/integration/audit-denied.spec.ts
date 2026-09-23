@@ -1,20 +1,3 @@
-/**
- * T040b — proves FR-037's `DENIED`-audit requirement end-to-end, against a
- * real Nest application and real PostgreSQL: a permission refusal and an
- * out-of-scope organizational access each write a `DENIED` `audit_event`
- * row carrying actor, action and entity. Nothing here is mocked —
- * `PermissionGuard`, `PermissionResolverService`, `OrgScopeEnforcerService`
- * and both `AuditPermissionDenialRecorder`/`AuditOrgScopeDenialRecorder`
- * run for real, via Nest DI (`support/test-app.ts`), against the real
- * `PrismaService`.
- *
- * Follows this harness's established convention (see
- * `support/database-roles.ts`'s `resetMutableTestData` doc comment and
- * `support/env.ts`'s `uniqueTestMarker`) of scoping every assertion by a
- * unique marker — here, the fixture actor's/candidate's own freshly
- * generated id — rather than assuming `audit_event` (never truncated
- * between test files) is empty.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -38,15 +21,9 @@ import { buildIntegrationTestingModule, type IntegrationTestContext } from './su
 
 import type { ExecutionContext } from '@nestjs/common';
 
-/** Fixture controller carrying the decorator metadata `PermissionGuard`
- * reads via `Reflector` — the same pattern `test/unit/permission.guard.spec.ts`
- * uses, exercised here against the REAL guard/resolver/recorder chain
- * instead of fakes. */
 class FixtureController {
   @RequirePermission('risk:view')
-  gatedRoute(): void {
-    /* fixture only */
-  }
+  gatedRoute(): void {}
 }
 
 /* eslint-disable @typescript-eslint/unbound-method -- Reflect-metadata
@@ -69,10 +46,6 @@ function runAsRequest<T>(actorUserId: string | undefined, fn: () => Promise<T>):
       userAgent: 'vitest-integration',
       method: 'GET',
       path: '/test/audit-denied',
-      // `exactOptionalPropertyTypes` forbids passing `actorUserId: undefined`
-      // explicitly (RequestContextData declares it optional, meaning
-      // "absent", not "present with value undefined") — so the
-      // unauthenticated case omits the key entirely via the spread below.
       ...(actorUserId !== undefined ? { actorUserId } : {}),
     },
     fn,
@@ -98,11 +71,6 @@ describe('DENIED audit-outcome emission (FR-037, T040a/T040b)', () => {
 
   describe('a permission refusal', () => {
     it('is refused with ForbiddenDomainError AND writes a DENIED audit_event row carrying actor, action and entity', async () => {
-      // A brand-new user with zero roles/permissions — PermissionResolverService
-      // resolves an empty effective-permission set for them, so the real
-      // guard genuinely denies `risk:view`, with no fixture Permission/Role
-      // rows needed (the resolver checks SET MEMBERSHIP, not that the
-      // identifier exists as a seeded row).
       const actor = await createUserFixture(ctx.prisma);
 
       await expect(
@@ -119,12 +87,9 @@ describe('DENIED audit-outcome emission (FR-037, T040a/T040b)', () => {
 
       expect(rows).toHaveLength(1);
       const row = rows[0]!;
-      expect(row.actorUserId).toBe(actor.id); // actor
-      expect(row.action).toBe('authorization.denied.permission_denied'); // action
-      expect(row.entityType).toBe(AuditEntityType.PERMISSION); // entity (type)
-      // `entity_id` is `@db.Uuid` — a `resource:action` string identifier
-      // is carried in the allow-listed `newValues.identifier` instead (see
-      // `AuditPermissionDenialRecorder`'s comment on this decision).
+      expect(row.actorUserId).toBe(actor.id);
+      expect(row.action).toBe('authorization.denied.permission_denied');
+      expect(row.entityType).toBe(AuditEntityType.PERMISSION);
       expect(row.entityId).toBeNull();
       expect(row.newValues).toEqual({ identifier: 'risk:view' });
       expect(row.actorLabel).toBe(actor.fullName);
@@ -136,14 +101,6 @@ describe('DENIED audit-outcome emission (FR-037, T040a/T040b)', () => {
         runAsRequest(undefined, () => permissionGuard.canActivate(createExecutionContext())),
       ).rejects.toThrow();
 
-      // Scoped by a fresh correlation-free marker is not possible here (no
-      // actor id to key on) — instead assert on the specific, just-created
-      // row via the reason-specific action name plus a narrow time window
-      // is unnecessary: query by action AND absence of actorUserId AND the
-      // entity id unique to this permission, which is stable but shared
-      // across runs — so this test only asserts that AT LEAST one such row
-      // exists, which is sufficient to prove the NO_ACTOR path is wired,
-      // without depending on table emptiness.
       const rows = await ctx.prisma.client.auditEvent.findMany({
         where: {
           entityType: AuditEntityType.PERMISSION,
@@ -166,9 +123,6 @@ describe('DENIED audit-outcome emission (FR-037, T040a/T040b)', () => {
       const accessibleUnit = await createOrgUnitFixture(ctx.prisma);
       const outOfScopeUnit = await createOrgUnitFixture(ctx.prisma);
 
-      // The candidate record: a User row whose organizational unit is
-      // `outOfScopeUnit` — deliberately NOT the unit the acting user's
-      // scope grants.
       const candidate = await createUserFixture(ctx.prisma, {
         primaryOrgUnitId: outOfScopeUnit.id,
       });
@@ -197,10 +151,10 @@ describe('DENIED audit-outcome emission (FR-037, T040a/T040b)', () => {
 
       expect(rows).toHaveLength(1);
       const row = rows[0]!;
-      expect(row.actorUserId).toBe(actingUser.id); // actor
-      expect(row.action).toBe('organization.denied.out_of_scope'); // action
-      expect(row.entityType).toBe(AuditEntityType.USER); // entity (type)
-      expect(row.entityId).toBe(candidate.id); // entity (identifier)
+      expect(row.actorUserId).toBe(actingUser.id);
+      expect(row.action).toBe('organization.denied.out_of_scope');
+      expect(row.entityType).toBe(AuditEntityType.USER);
+      expect(row.entityId).toBe(candidate.id);
       expect(row.organizationalUnitId).toBe(outOfScopeUnit.id);
       expect(row.actorLabel).toBe(actingUser.fullName);
     });

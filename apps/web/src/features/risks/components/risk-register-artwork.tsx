@@ -2,7 +2,6 @@ import { useId } from 'react';
 
 import styles from './risk-register-artwork.module.css';
 
-/** Editorial navigation landscape. Decorative and independent of risk data. */
 export function RiskRegisterArtwork(): React.JSX.Element {
   const id = useId().replace(/:/g, '');
   return (
@@ -37,7 +36,6 @@ export function RiskRegisterArtwork(): React.JSX.Element {
             <stop offset="1" stopColor="var(--landscape-ridge)" stopOpacity=".02" />
           </linearGradient>
         </defs>
-        {/* Distant ridges stay above the indicator row, where their depth is visible. */}
         <path
           d="M0 165 C104 151 155 167 228 146 S337 112 383 130 C426 144 458 96 494 105 Q535 117 584 82 L619 63 Q633 61 647 50 L668 69 680 72 Q705 99 733 69 L762 52 781 32 Q789 35 801 48 L813 50 837 72 Q858 87 880 80 L910 67 927 70 940 64 Q966 81 981 96 L1017 85 1050 66 1077 55 1093 63 Q1147 103 1200 93 V280 H0Z"
           fill={`url(#${id}-distance)`}

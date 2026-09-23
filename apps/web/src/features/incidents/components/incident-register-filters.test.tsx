@@ -5,12 +5,6 @@ import { IncidentRegisterFilters } from './incident-register-filters';
 
 import type { OrgUnitNode } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for `IncidentRegisterFilters`'s active-filter chip
- * row (CLAUDE.md §18.11 "Filtros ativos são visíveis?") — pins that the chip
- * row reflects exactly the filters the caller reports as applied, and that
- * removing one chip calls back with that field cleared, never another.
- */
 const { listOrgUnitsMock } = vi.hoisted(() => ({ listOrgUnitsMock: vi.fn() }));
 
 vi.mock('../api', () => ({
@@ -75,7 +69,6 @@ describe('IncidentRegisterFilters', () => {
     await waitFor(() => expect(listOrgUnitsMock).toHaveBeenCalled());
 
     expect(screen.getByText('Status: Aberto')).toBeInTheDocument();
-    // Two selected severities collapse to a count chip, never two chips.
     expect(screen.getByText('Severidade (2)')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByText('Unidade organizacional: PharosGRC')).toBeInTheDocument(),

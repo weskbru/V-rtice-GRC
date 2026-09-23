@@ -7,11 +7,6 @@ import { RiskReviewSchedule } from './risk-review-schedule';
 
 import type { RiskDetail } from '../types';
 
-/**
- * Component-mount evidence for T132 (`RiskReviewSchedule`, FR-070). `../api`
- * is mocked at the network boundary.
- */
-
 const { updateRiskMock } = vi.hoisted(() => ({ updateRiskMock: vi.fn() }));
 
 vi.mock('../api', () => ({
@@ -58,10 +53,6 @@ describe('RiskReviewSchedule', () => {
   });
 
   it('formats a date-only next review date as the same calendar day regardless of local timezone (the off-by-one bug this project already fixed once)', () => {
-    // `new Date('2026-01-02')` parses as UTC midnight; in any timezone
-    // behind UTC, formatting it with `toLocaleDateString()` renders
-    // 01/01/2026 instead of 02/01/2026. This component must go through
-    // `formatDateOnly` (`../date.ts`), never `new Date(...).toLocaleDateString()`.
     render(
       <RiskReviewSchedule
         risk={{ ...baseRisk, nextReviewOn: '2026-01-02' }}

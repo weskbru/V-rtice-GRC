@@ -1,11 +1,3 @@
-/**
- * T184/T192 — shared helper for `WithdrawCommentUseCase`, mirroring
- * `core/files/application/attachment-access.ts` exactly. See that file's
- * header for the full rationale: converts any refusal from the parent
- * accessor into a fresh `NotFoundDomainError` keyed by the COMMENT's own
- * id, so "this comment id does not exist" and "this comment id exists but
- * its parent is not accessible to you" produce identical response bytes.
- */
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';
 import { getCommentableEntityAccessor } from '../domain/entity-registry';
 

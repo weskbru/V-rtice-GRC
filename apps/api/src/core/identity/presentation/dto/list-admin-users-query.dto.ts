@@ -1,7 +1,3 @@
-/**
- * T180 — `GET /admin/users`'s query parameters
- * (`contracts/admin.openapi.yaml`).
- */
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsUUID, Max, MaxLength, Min } from 'class-validator';
 

@@ -1,9 +1,3 @@
-/**
- * T167/US7 — D-11 coverage for `GET /risks/{riskId}/history`
- * (`docs/local-environment.md` D-11): the stated authorization rule
- * (`risk:view` + scope), a `401` for an unauthenticated caller, and the
- * declared `{data, meta}` response shape with real pagination values.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -70,7 +64,6 @@ describe('GET /risks/{riskId}/history (T167, D-11, ADR-006, FR-105)', () => {
     orgUnitId = orgUnit.id;
     const owner = await createUserFixture(prisma, { email: `${marker}-owner@example.test` });
     ownerUserId = owner.id;
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const category = await prisma.client.riskCategory.create({
       data: {
@@ -187,11 +180,6 @@ describe('GET /risks/{riskId}/history (T167, D-11, ADR-006, FR-105)', () => {
 
     expect(outOfScopeResponse.status).toBe(404);
     expect(nonexistentResponse.status).toBe(404);
-    // Byte-identical PROBLEM SHAPE (type/title/status) for an out-of-scope
-    // risk and a genuinely nonexistent one — `detail`/`instance`/
-    // `correlationId` legitimately differ (they name/carry the DIFFERENT
-    // risk id and per-request correlation id each response was for), but
-    // nothing distinguishes "exists, out of scope" from "does not exist".
     const nonexistentProblem = nonexistentResponse.body as ProblemBody;
     expect(outOfScopeResponse.body).toMatchObject({
       type: nonexistentProblem.type,

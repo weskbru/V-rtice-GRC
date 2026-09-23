@@ -1,15 +1,3 @@
-/**
- * T020/003-controls-management — `ListControlsUseCase`: the read side of
- * `GET /controls` (`listControlCatalog` operation, FR-007, SC-008). No
- * transaction and no audit entry — reads are not audited (ADR-005),
- * mirroring `ListRisksUseCase`'s own reasoning.
- *
- * `referenceDate` is resolved ONCE, here, and handed to
- * `ControlQueryPort.listCatalog` — never read a second time inside the
- * query implementation — so every row on the SAME page is evaluated
- * against the SAME "now" (D-2's own "no clock read hidden inside the
- * rule" discipline, applied at the request boundary).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

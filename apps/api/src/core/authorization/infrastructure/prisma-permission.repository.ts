@@ -1,16 +1,3 @@
-/**
- * `PermissionRepositoryPort` implementation backed by PostgreSQL via
- * `PrismaService` (T036, ADR-003). Lives in
- * `core/authorization/infrastructure` because `PrismaService`
- * (`infrastructure/prisma/prisma.service.ts`) is the top-level
- * `infrastructure` element, which only `core-infrastructure`/
- * `core-presentation` may import under the ADR-011 boundary rules.
- *
- * No caching here — that is `PermissionResolverService`'s job, one layer
- * up, via the separate `PermissionCachePort`. This class always talks to
- * PostgreSQL and is therefore, by construction, the "identical answer on a
- * cache miss" the resolver's contract requires.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -19,9 +6,6 @@ import {
   type PermissionRecord,
 } from '../domain/ports/permission-repository.port';
 
-/** The one row `permission_cache_state` will ever hold (see the
- * `20260905130100_authorization_scope_cache_counters` migration, which
- * seeds it). */
 const SINGLETON_ROW_ID = 'singleton';
 
 @Injectable()
@@ -36,11 +20,6 @@ export class PrismaPermissionRepository extends PermissionRepositoryPort {
       select: { permission: { select: { identifier: true } } },
     });
 
-    // A user commonly holds one role, occasionally several with overlapping
-    // permissions — de-duplicate with a Set rather than relying on the
-    // query (a `DISTINCT` across a joined result is markedly more awkward
-    // to express correctly in Prisma than de-duplicating a small array
-    // in-process).
     const identifiers = new Set(
       rolePermissions.map((rolePermission) => rolePermission.permission.identifier),
     );

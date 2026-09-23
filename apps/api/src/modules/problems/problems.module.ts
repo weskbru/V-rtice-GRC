@@ -1,35 +1,3 @@
-/**
- * 008-incidents-problems — `ProblemsModule`, this module's own
- * composition root. Mirrors `IncidentsModule`'s own header — see that
- * file for the reasoning (foundation scope, then the origin accessor
- * built the next day) this one deliberately does not repeat.
- *
- * Imports `IncidentDirectoryModule` (`@Global()`, registered by
- * `modules/incidents`'s own composition root) explicitly — not merely
- * relying on `app.module.ts`'s import order — so `IncidentDirectoryPort`
- * is resolvable from this module's own injector the moment Fase 5's
- * `LinkProblemIncidentUseCase` (tasks.md T053f) is added, without either
- * module importing the other (research.md D-14, ADR-011). `@Global()`
- * registration happens once regardless of how many places import it, so
- * importing it here and from `AppModule` is not a duplication hazard.
- *
- * US2 (create/read/list/update/transition, this pass): adds
- * `AuditModule` (for `AuditRecorder`, every business write's own
- * transaction-scoped audit event) and the GRC kernel's shared
- * `EntityCodeGeneratorPort`/`TransactionRunnerPort` bindings — the same
- * two shared-kernel bindings `ControlsModule`'s own header explains
- * (`modules/** -> grc/**` is a permitted direction; Problems contributes
- * the `PRB` prefix to the kernel's closed registry, it does not
- * contribute a second allocator or a second transaction runner).
- *
- * `ProblemController` (catalogue/lifecycle, operations 1-2/4-5 of
- * contracts/problems.openapi.yaml) is registered here. Link routes
- * (operations 3, 6-9 — Problem<->Risk, Problem<->Incident) are a SEPARATE
- * controller/use-case set, `ProblemRelationshipController` — built by the
- * parallel relationship front (coordinator instruction 2026-09-11) and
- * registered below, alongside this pass's own lifecycle wiring, once both
- * landed in the same working tree.
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../core/audit/audit.module';
@@ -91,19 +59,7 @@ let collaborationRegistered = false;
     AuthorizationModule,
     OrganizationsModule,
     IncidentDirectoryModule,
-    // 013-incidents-problems-reverse-links — this module OWNS
-    // `ProblemRiskLink`, so it provides the `@Global()` reverse-read
-    // binding `modules/risk` consumes for its own
-    // `GET /risks/{riskId}/problems` — mirrors
-    // `modules/incidents`' own `IncidentRiskLinkReadModule` import.
     ProblemRiskLinkReadModule,
-    // 009-indicators-reports, T028 — `ProblemMetricsModule` binds
-    // `ProblemMetricsPort` to a fresh `PrismaProblemRepository`, letting
-    // `modules/indicators`'s Problem provider reuse the SAME catalog query
-    // `GET /problems` already runs. `IndicatorsModule` imports
-    // `ProblemMetricsModule` directly rather than `ProblemsModule` itself
-    // (see `problem-metrics.module.ts`'s own header for why it is no
-    // longer `@Global()`).
     ProblemMetricsModule,
   ],
   controllers: [ProblemController, ProblemRelationshipController],
@@ -116,8 +72,6 @@ let collaborationRegistered = false;
     ProblemEvidenceSubjectAccessor,
     ProblemActionOriginAccessor,
     ProblemParentRecordAccessor,
-    // US3 — the fifth link (Problem<->Incident, N:M, owned here) plus
-    // Problem<->Risk (see `application/links/`'s own file headers).
     LinkProblemRiskUseCase,
     UnlinkProblemRiskUseCase,
     ListProblemRiskLinksUseCase,
@@ -147,12 +101,6 @@ export class ProblemsModule {
       registerEvidenceSubjectResolver('PROBLEM', this.evidenceSubjectAccessor);
       registerActionOriginResolver('PROBLEM', this.actionOriginAccessor);
 
-      // CLAUDE.md §19.10 — `AttachableEntityType.PROBLEM`/
-      // `CommentableEntityType.PROBLEM` existed in the schema (the
-      // registry's own worked-example comment even names `PROBLEM`
-      // specifically) with no accessor ever registered. This is that
-      // registration, exercised by `test/integration/
-      // incident-problem-collaboration.spec.ts`.
       registerAttachableEntityType('PROBLEM', this.parentRecordAccessor);
       registerCommentableEntityType('PROBLEM', this.parentRecordAccessor);
     }

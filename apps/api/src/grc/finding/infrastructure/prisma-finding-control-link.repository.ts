@@ -1,12 +1,3 @@
-/**
- * T060/005-audit-findings, US3 — the sole implementation of
- * `FindingControlLinkRepositoryPort`. No scope predicate anywhere in this
- * file — the caller (`LinkFindingControlUseCase`/`UnlinkFindingControlUseCase`)
- * has already resolved and scope-checked the parent `Finding` (and the
- * referenced `Control`, via `ControlDirectoryPort`) before any of these
- * run, the same reasoning `PrismaRiskControlLinkRepository`'s own header
- * documents for its sibling.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

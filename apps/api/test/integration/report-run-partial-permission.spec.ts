@@ -1,21 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T055) — SC-006, read from the real
- * database rather than through HTTP (`test/contract/reports.spec.ts`'s own
- * "SC-006" test already proves the HTTP-level `200` + shape; this file
- * proves the same rule at the application layer, against real seeded
- * domain data, mirroring `indicator-current-value-organizational-scope
- * .spec.ts`'s own "call the use case directly against a real Nest testing
- * module" convention).
- *
- * A `ReportDefinition` referencing three `IndicatorMetricKey` values from
- * three different source domains (Risk, Asset, Control), executed by a
- * caller holding `risk:view`/`asset:view` but NOT `control:view` — the
- * third metric's own `sourcePermission` (`indicator-metric-catalog.ts`).
- * `RunReportUseCase.execute` must return all three items, never throw:
- * the two permitted items computed with real, non-trivial values (seeded
- * below, not zero by accident), and the third `available: false` with
- * neither `value` nor `valueByBucket` populated (spec.md FR-026, SC-006).
- */
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 import { CacheModule } from '../../src/infrastructure/cache/cache.module';
@@ -61,17 +43,12 @@ describe('RunReportUseCase — partial source-permission integration (SC-006, T0
     });
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
-      // Deliberately NOT `control:view` — CONTROL_INACTIVE_COUNT's own
-      // `sourcePermission` (data-model.md §3), the third metric below.
       ['report:create', 'report:view', 'risk:view', 'asset:view'],
       { name: uniqueTestMarker('fixture-report-partial-role') },
     );
     await assignRoleFixture(ctx.prisma, { user: actor, role });
     await grantUnitScopeFixture(ctx.prisma, { user: actor, orgUnitId: orgUnit.id });
 
-    // Real, non-zero seed data for the two permitted metrics — a report
-    // that only ever saw zeros would never distinguish "computed" from
-    // "silently defaulted".
     await ctx.prisma.client.risk.create({
       data: {
         code: uniqueTestMarker('risk-partial'),
@@ -91,8 +68,6 @@ describe('RunReportUseCase — partial source-permission integration (SC-006, T0
         isActive: false,
       },
     });
-    // Real data for the THIRD (forbidden) metric too — proves there is
-    // something real to withhold, not an accidentally-empty count.
     await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control-partial'),

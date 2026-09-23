@@ -1,12 +1,3 @@
-/**
- * D-11 coverage for `/evidence` and `/evidence/{evidenceId}[/archive]`
- * (T017/T019/T020/T023/T024, 002-shared-grc-foundation US1):
- * `listEvidence`, `createEvidence`, `getEvidence`, `updateEvidence`,
- * `archiveEvidence` — the declared shape, the stated permission per route,
- * 401 for an unauthenticated caller, Invariant E1 (FR-002, revised),
- * organizational-scope non-disclosure (SC-005), and semantic audit events
- * (FR-028/FR-029/FR-030).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -136,10 +127,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
     return response.body as EvidenceBody;
   }
 
-  // -------------------------------------------------------------------
-  // createEvidence
-  // -------------------------------------------------------------------
-
   describe('POST /evidence', () => {
     it('succeeds for a caller holding evidence:create and returns the declared Evidence shape', async () => {
       const { agent } = await agentWithPermissions(['evidence:create', 'evidence:view']);
@@ -209,14 +196,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
       expect(response.status).toBe(422);
     });
 
-    // Assurance fix (confirmed breach): a REAL, out-of-scope org unit and a
-    // NONEXISTENT org unit id used to produce two different 422 messages,
-    // letting a scope-limited caller probe for the existence of an
-    // organizational unit — exactly what this endpoint's own contract
-    // promises never happens ("Answered as not-found so the response
-    // cannot confirm existence"). Asserts message EQUALITY, not merely
-    // status equality — the class of defect the audit found no existing
-    // test anywhere asserted.
     it('a real out-of-scope orgUnitId and a nonexistent orgUnitId produce the byte-identical 422 message', async () => {
       const { agent } = await agentWithPermissions(['evidence:create'], orgUnitId);
 
@@ -249,10 +228,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
       expect(auditRow?.organizationalUnitId).toBe(orgUnitId);
     });
   });
-
-  // -------------------------------------------------------------------
-  // getEvidence / listEvidence
-  // -------------------------------------------------------------------
 
   describe('GET /evidence/{evidenceId}', () => {
     it('succeeds for a caller holding evidence:view', async () => {
@@ -293,10 +268,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
       const unknownBody = unknownResponse.body as ProblemBody;
       expect(outOfScopeBody.title).toBe(unknownBody.title);
       expect(outOfScopeBody.status).toBe(unknownBody.status);
-      // `detail` legitimately differs only by the id itself — the SHAPE and
-      // every other field must be identical, which the two assertions
-      // above already establish; the `type` URI (the stable, machine part
-      // of the problem document) must match exactly.
       expect((outOfScopeResponse.body as { type: string }).type).toBe(
         (unknownResponse.body as { type: string }).type,
       );
@@ -333,10 +304,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
       expect(after).toBeGreaterThan(before);
     });
   });
-
-  // -------------------------------------------------------------------
-  // updateEvidence
-  // -------------------------------------------------------------------
 
   describe('PATCH /evidence/{evidenceId}', () => {
     it('succeeds for a caller holding evidence:edit and updates the declared fields', async () => {
@@ -404,10 +371,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
       expect(response.status).toBe(422);
     });
   });
-
-  // -------------------------------------------------------------------
-  // archiveEvidence
-  // -------------------------------------------------------------------
 
   describe('POST /evidence/{evidenceId}/archive', () => {
     it('succeeds for a caller holding evidence:administer and preserves the record (never deleted)', async () => {
@@ -493,16 +456,6 @@ describe('Evidence contract (T017/T019/T020/T023/T024, US1, D-11)', () => {
       expect(response.status).toBe(404);
     });
   });
-
-  // -------------------------------------------------------------------
-  // The design correction this task exists to apply: a file reaches
-  // evidence through the generic attachment mechanism (`entityType:
-  // EVIDENCE`), created strictly AFTER the evidence exists — never
-  // through a `fileId` column, which could never be populated (see
-  // `schema.prisma`'s own `Evidence` section header). This is the
-  // concrete proof the corrected mechanism actually works end to end,
-  // not merely that the migration applied.
-  // -------------------------------------------------------------------
 
   describe('POST /attachments with entityType: EVIDENCE (the corrected file mechanism)', () => {
     it('attaches a file to an existing evidence record', async () => {

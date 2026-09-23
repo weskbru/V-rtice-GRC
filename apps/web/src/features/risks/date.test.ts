@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { formatDateOnly, parseDateOnly, todayDateOnly } from './date';
 
-/**
- * Regression test for a real off-by-one bug caught during T096/T097
- * screenshot verification: `new Date('2026-01-02')` parses a date-only
- * string as UTC midnight, which renders as 01/01/2026 in any timezone
- * behind UTC. `Risk.identifiedOn`/`nextReviewOn`/`lastAssessedOn` are
- * `date`, not `date-time` (data-model.md §8), so they must always be
- * interpreted as a local calendar date.
- */
 describe('formatDateOnly / parseDateOnly', () => {
   it('formats a date-only string as the same calendar day regardless of the local timezone', () => {
     const parsed = parseDateOnly('2026-01-02');

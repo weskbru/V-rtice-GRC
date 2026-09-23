@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem register empty states, mirroring
- * `risk-register-empty.tsx`'s own two-situation discipline (CLAUDE.md
- * §18.11): "no problem exists yet" (create action) vs. "filters exclude
- * every problem" (clear-filters action) are never collapsed into one
- * generic empty screen.
- */
 import { EmptyState } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

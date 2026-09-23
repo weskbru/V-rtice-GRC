@@ -1,78 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Controls section (T146, US5, FR-076 to FR-078,
- * ADR-008).
- *
- * ## Decision: controls, processes AND assets all live in this one section
- *
- * `RiskDetail` carries `controls`, `processes` and `assets` as three
- * separate arrays (`risks.openapi.yaml`'s `RiskDetail`) — three explicitly
- * modelled relationships (ADR-008: "not a generic polymorphic link table"),
- * never conflated into one generic "links" list. But `GET
- * /risks/{riskId}/controls` is the ONLY one of the three that also has a
- * standalone list endpoint (`listRiskControlLinks`, with an
- * `includeWithdrawn` history mode) — `platform.openapi.yaml` defines no
- * `GET /risks/{riskId}/processes` or `.../assets` at all. The current
- * process/asset links are therefore visible ONLY through `GET
- * /risks/{riskId}` itself. Rather than sourcing controls from one endpoint
- * and processes/assets from a different one (a screen where the SAME kind
- * of data — "what is currently linked" — arrives through two different
- * mechanisms depending on which of the three it is), this component reads
- * all three uniformly from the already-loaded `risk` prop, and a
- * link/unlink of any of the three re-reads the whole risk afterward
- * (`onChanged`, mirroring `AssessmentForm.onAssessed`/
- * `RiskTreatmentSection.onTreated`) rather than each kind refreshing itself
- * through a different path. All three follow the identical link/unlink UI
- * pattern (a registry picker to add, a confirm-before-remove to withdraw),
- * so building one parameterized subsection and instantiating it three times
- * avoids writing the same interaction three subtly different ways
- * (CLAUDE.md §13.8).
- *
- * Permissions are NOT uniform across the three, per the contract's own
- * prose: controls are gated by `risk:treat` ("controls ... influence
- * residual risk", FR-078 — the same permission that governs treatment
- * decisions); processes and assets are gated by `risk:edit`. `canTreat`/
- * `canEdit` are therefore two distinct props, never one shared flag.
- *
- * ## `families` (016-risk-detail-experience §4.4, R-6)
- *
- * The risk detail screen's regrouped navigation puts Controles in "Resposta"
- * and Processos/Ativos in "Relacionamentos" — two different sections now,
- * not one "Controles" tab that quietly also rendered process/asset links
- * (R-6's own finding). Rather than fork this component in two, `families`
- * selects which of the three subsections to render, defaulting to all
- * three so every OTHER existing caller (this component's own test suite
- * included) keeps its current behaviour unchanged. The endpoints, the
- * permissions, the link/unlink flows and every loading/error/empty state
- * stay byte-for-byte the same regardless of which families are requested —
- * this is a rendering split, never a behavioural one.
- *
- * ## Unlink is destructive from the user's point of view (FR-076, FR-102)
- *
- * A link is withdrawn (`unlinkedAt`/`unlinkedByUserId` stamped), never
- * deleted — but the CURRENT list, which is all this section shows, loses
- * the row immediately and irreversibly from THIS view. `ConfirmDialog`
- * gates every unlink, and its description states plainly that the link is
- * not erased — it remains in the audited history
- * (`GET /risks/{riskId}/controls?includeWithdrawn=true`, not yet surfaced
- * in the UI in this phase) — only that it stops counting as a current
- * relationship.
- *
- * ## `gateLinkBehindAction` (016-risk-detail-experience, Área 3, 2026-09-17)
- *
- * "Controles" (now in "Resposta") gets the same "list first, link behind an
- * action" treatment as `RiskTreatmentSection`. "Processos e Ativos" (in
- * "Relacionamentos") explicitly does NOT — the coordinator's own blast-
- * radius warning for this rodada: `RelationshipSubsection` is the ONE
- * generic component behind all three families, so a change to its default
- * behaviour would silently reach an area nobody asked to change. This prop
- * defaults to `false`, keeping every existing caller (processes, assets,
- * and this component's own pre-existing tests) byte-for-byte unchanged —
- * only `RiskControlsSection`'s own `controls` instantiation below passes
- * `true`. The picker/"Vincular" block itself is not touched by this flag —
- * only whether it renders immediately or behind a trigger.
- */
 import { ConfirmDialog, SearchablePicker } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -98,22 +25,13 @@ import { risksApi } from '../api';
 import type { ReferenceDataRef, RegistrySearchResult, RiskDetail, UserRef } from '../types';
 import type { SearchablePickerOption } from '@pharos/design-system/components';
 
-/**
- * Structural shape shared by `risks.relationships.controls/processes/assets`
- * — declared explicitly (as `string`, not inferred via `typeof
- * risks.relationships.controls`) so all three catalogs satisfy it; a
- * `typeof`-derived type would infer each literal string ("Controles", ...)
- * as its own type and make the other two catalogs incompatible with it.
- */
 interface RelationshipMessages {
   readonly sectionTitle: string;
   readonly sectionDescription: string;
   readonly pickerLabel: string;
   readonly pickerPlaceholder: string;
   readonly pickerNoOptions: string;
-  /** Front H: placeholder text inside the picker's own search input. */
   readonly pickerSearchPlaceholder: string;
-  /** Front H: accessible name for the picker's trigger button. */
   readonly pickerAriaLabel: string;
   readonly empty: string;
   readonly linkAction: string;
@@ -145,18 +63,9 @@ interface RelationshipSubsectionProps<TLink extends RelationshipLink> {
   canLink: boolean;
   links: readonly TLink[];
   getRef: (link: TLink) => ReferenceDataRef;
-  /**
-   * Front H: called with the user's live search text — once with `''` when
-   * the picker opens, then again on every debounced keystroke
-   * (`SearchablePicker`'s own responsibility, not this component's). Never
-   * called once and cached: a bigger single fetch would still run out
-   * past whatever size it used, just one page further down — searching is
-   * the only fix that does not run out.
-   */
   fetchRegistry: (query: string) => Promise<RegistrySearchResult<ReferenceDataRef>>;
   onLink: (registryItemId: string) => Promise<void>;
   onUnlink: (linkId: string) => Promise<void>;
-  /** See this file's own `gateLinkBehindAction` doc comment above. Defaults to `false` — every pre-existing caller renders the picker immediately, exactly as before this prop existed. */
   gateLinkBehindAction?: boolean;
 }
 
@@ -341,16 +250,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
                 size="sm"
                 disabled={!selectedOption || linking}
                 onClick={() => void handleLink()}
-                // Three of this exact button ("Vincular") render at once on
-                // this screen — one per relationship kind (controls,
-                // processes, assets) — with no surrounding row/table
-                // context to disambiguate them the way per-row "Desvincular"
-                // buttons have (CLAUDE.md's accessible-name-collision
-                // warning). `aria-label` gives each one the SAME distinct
-                // name its own picker already uses (`messages.pickerLabel`,
-                // e.g. "Vincular controle") while the visible text stays the
-                // short "Vincular" — a real, fixed accessibility gap, not
-                // merely an under-specified test locator.
                 aria-label={messages.pickerLabel}
               >
                 {linking ? (
@@ -402,22 +301,16 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
   );
 }
 
-/** Which of the three relationship subsections to render — see this file's own `families` doc comment above. */
 export type RiskRelationshipFamily = 'controls' | 'processes' | 'assets';
 
 const ALL_FAMILIES: readonly RiskRelationshipFamily[] = ['controls', 'processes', 'assets'];
 
 export interface RiskControlsSectionProps {
   risk: RiskDetail;
-  /** The risk's current `ETag` (ADR-013) — required by every link/unlink call. */
   etag: string;
-  /** Controls are gated by `risk:treat` (FR-078). */
   canTreatControls: boolean;
-  /** Processes and assets are gated by `risk:edit` — a distinct permission from controls, per the contract. */
   canEditRelationships: boolean;
-  /** Called after any successful link/unlink. Like `AssessmentForm.onAssessed`, none of these responses carry the risk's full updated state, so the caller re-reads the whole risk rather than this section reconciling `controls`/`processes`/`assets` locally. */
   onChanged: () => void;
-  /** Which subsections to render. Defaults to all three — every caller before 016-risk-detail-experience keeps its current behaviour unchanged. */
   families?: readonly RiskRelationshipFamily[];
 }
 

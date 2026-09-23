@@ -1,13 +1,3 @@
-/**
- * T193 — D-11 contract coverage for `/notifications` (FR-101, FR-030):
- * every operation requires only an authenticated session (verified with a
- * ZERO-permission user, per D-11's own callout that this exact assertion
- * is the one whose absence let a 403-for-everyone endpoint ship
- * undetected), an unauthenticated caller gets 401, the success shape
- * matches the contract (`{data, meta, unreadCount}` for the list), and a
- * notification addressed to a DIFFERENT user 404s rather than disclosing
- * its existence.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -57,9 +47,6 @@ describe('/notifications contract coverage (T193, D-11, FR-101, FR-030)', () => 
     appOrigin = ctx.app.get(AppConfigService).app.appOrigin;
     const prisma = ctx.app.get(PrismaService);
 
-    // Deliberately a ZERO-permission user (no role assigned at all) — the
-    // contract states "no additional permission", so this is the exact
-    // caller D-11 requires the assertion be made against.
     const recipient = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('nf-recipient')}@example.test`,
     });

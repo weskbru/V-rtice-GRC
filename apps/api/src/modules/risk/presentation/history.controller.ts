@@ -1,10 +1,3 @@
-/**
- * T167/US7 — `HistoryController`: `GET /risks/{riskId}/history` per
- * `contracts/risks.openapi.yaml`'s `getRiskHistory` operation (ADR-006,
- * FR-105, US7 AS1). Requires `risk:view` and scope, exactly like
- * `RiskController.findById`/`AssessmentController.list` — an out-of-scope
- * or nonexistent risk is the SAME `404` (ADR-009).
- */
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 
 import { RequirePermission } from '../../../core/authorization/presentation/permission.guard';

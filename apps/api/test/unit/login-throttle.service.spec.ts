@@ -1,26 +1,3 @@
-/**
- * Assurance fix — unit tests for `LoginThrottleService` (FR-008, D-6).
- * Before this fix, `apps/api/test/` contained ZERO references to this
- * service; a brute-force account lockout was silent in the audit trail
- * (indistinguishable from a single wrong password) and completely
- * untested. Pure unit tests against fake, in-memory ports — no NestJS
- * container, no database, no real cache/clock — mirroring
- * `test/unit/scope-resolver.spec.ts`'s own "fake the ports, exercise the
- * real service" shape.
- *
- * Coverage required by the audit:
- *   - N failed attempts locks the account, and the lock is audited
- *     (`auth.account_locked`, `LOCAL_CREDENTIAL`, `DENIED`) — the primary
- *     gap.
- *   - the lock expires after its window (simulated via a `lockedUntil`
- *     already in the past, never a real wall-clock wait).
- *   - an unknown email never creates a lock (FR-007 non-disclosure).
- *   - the per-origin cap trips across DISTINCT accounts sharing an IP.
- *   - the 429 refusal is generic and IDENTICAL text whether the reason is
- *     the per-account lock or the shared per-origin ceiling (regression
- *     guard on FR-007 — a distinct wording per reason would itself leak
- *     which one applied).
- */
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -55,9 +32,6 @@ const NOT_USED = (): never => {
   throw new Error('Not used by this test.');
 };
 
-/** One `LocalCredential` row, keyed by email — deliberately mutable so
- * `recordFailedAttempt` on `FakeUserDirectory` can update it the exact
- * same way the real Prisma-backed port does. */
 interface FakeAccount {
   userId: string;
   credentialId: string;
@@ -113,7 +87,6 @@ class FakeUserDirectory extends UserDirectoryPort {
     return Promise.resolve();
   }
 
-  // -- Unused by LoginThrottleService — never exercised by this test ----
   findIdentitySummary(): Promise<UserIdentitySummary | undefined> {
     return NOT_USED();
   }
@@ -221,7 +194,6 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
       lockedUntil: undefined,
     });
 
-    // Two failures — below threshold: no lock, no audit event yet.
     await service.recordFailedAttempt({ email: 'locked@example.test', ipAddress: '10.0.0.1' });
     await service.recordFailedAttempt({ email: 'locked@example.test', ipAddress: '10.0.0.1' });
     expect(events).toHaveLength(0);
@@ -229,7 +201,6 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
       service.assertNotThrottled({ email: 'locked@example.test', ipAddress: '10.0.0.1' }),
     ).resolves.toBeUndefined();
 
-    // Third failure crosses `accountAttempts` (3) — locks and audits.
     await service.recordFailedAttempt({ email: 'locked@example.test', ipAddress: '10.0.0.1' });
 
     expect(events).toHaveLength(1);
@@ -240,12 +211,9 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
     expect(event.outcome).toBe(AuditOutcome.DENIED);
     expect(event.newValues).toMatchObject({ failedAttempts: 3 });
     expect(event.newValues?.lockedUntil).toBeInstanceOf(Date);
-    // No credential material or attempted password beyond what
-    // `auth.login_failed` already records (the actor's own email).
     expect(event.newValues).not.toHaveProperty('passwordHash');
     expect(JSON.stringify(event.newValues)).not.toMatch(/password/i);
 
-    // The account is now refused BEFORE credential verification.
     await expect(
       service.assertNotThrottled({ email: 'locked@example.test', ipAddress: '10.0.0.1' }),
     ).rejects.toBeInstanceOf(RateLimitedDomainError);
@@ -260,20 +228,12 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
       lockedUntil: new Date(Date.now() + 60_000),
     });
 
-    // `assertNotThrottled` would normally refuse this before it reaches
-    // here in the real login flow — this call exercises
-    // `recordFailedAttempt` directly to prove it, on its own, never
-    // double-fires the semantic event once already above threshold.
     await service.recordFailedAttempt({
       email: 'already-locked@example.test',
       ipAddress: '10.0.0.2',
     });
 
     const lockEvents = events.filter((e) => e.action === 'auth.account_locked');
-    // `failedAttempts` (4) is still >= `accountAttempts` (3), so
-    // `justLocked` remains true on every subsequent failure — this
-    // documents that behavior explicitly rather than silently relying on
-    // `assertNotThrottled` alone to prevent re-entry in production.
     expect(lockEvents.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -283,7 +243,7 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
       userId: 'user-3',
       credentialId: 'credential-3',
       failedAttempts: 3,
-      lockedUntil: new Date(Date.now() - 1_000), // one second in the past
+      lockedUntil: new Date(Date.now() - 1_000),
     });
 
     await expect(
@@ -293,7 +253,6 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
 
   it('an unknown email never creates a lock and is never audited, however many times it fails (FR-007)', async () => {
     const { service, directory, events } = buildService();
-    // No `addAccount` call — this email has no `LocalCredential` row at all.
 
     for (let i = 0; i < SETTINGS.accountAttempts + 5; i += 1) {
       const result = await service.recordFailedAttempt({
@@ -327,23 +286,15 @@ describe('LoginThrottleService (assurance fix — audit + tests for account lock
       lockedUntil: undefined,
     });
 
-    // `originAttempts` (5) failures from the SAME ip, split across TWO
-    // different accounts — well below EITHER account's own
-    // `accountAttempts` (3) individually, so this is exclusively the
-    // per-origin dimension tripping, not a per-account lock.
     for (let i = 0; i < SETTINGS.originAttempts; i += 1) {
       const email = i % 2 === 0 ? 'victim-a@example.test' : 'victim-b@example.test';
       await service.recordFailedAttempt({ email, ipAddress: sharedIp });
     }
 
-    // A THIRD, entirely uninvolved account attempting from the SAME
-    // address is now refused too — the ceiling is per-origin, not
-    // per-account.
     await expect(
       service.assertNotThrottled({ email: 'unrelated@example.test', ipAddress: sharedIp }),
     ).rejects.toBeInstanceOf(RateLimitedDomainError);
 
-    // The exact same account, from a DIFFERENT address, is unaffected.
     await expect(
       service.assertNotThrottled({ email: 'unrelated@example.test', ipAddress: '203.0.113.9' }),
     ).resolves.toBeUndefined();

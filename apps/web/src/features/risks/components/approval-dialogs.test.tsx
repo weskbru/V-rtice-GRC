@@ -7,13 +7,6 @@ import { ApprovalDecisionDialog, RequestApprovalDialog } from './approval-dialog
 
 import type { Approval, AvailableRiskTransition } from '../types';
 
-/**
- * Component-mount evidence for T161 (`RequestApprovalDialog`/
- * `ApprovalDecisionDialog`, FR-029, FR-029a to FR-029d, ADR-006). `../api`
- * is mocked at the network boundary, matching `risk-treatment-section.test.tsx`'s
- * own convention.
- */
-
 const { requestApprovalMock, decideApprovalMock } = vi.hoisted(() => ({
   requestApprovalMock: vi.fn(),
   decideApprovalMock: vi.fn(),

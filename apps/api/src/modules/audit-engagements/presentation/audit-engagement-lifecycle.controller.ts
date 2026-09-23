@@ -1,19 +1,3 @@
-/**
- * T040/005-audit-findings, User Story 1 — `AuditEngagementLifecycleController`:
- * `POST /audits/{auditId}/start`, `POST /audits/{auditId}/complete`,
- * `POST /audits/{auditId}/cancel` (`startAuditEngagement`,
- * `completeAuditEngagement`, `cancelAuditEngagement` — operations 9-11 of
- * 11, the last amended into `contracts/audit.openapi.yaml` for FR-004a).
- *
- * Unlike `ControlLifecycleController`'s single `POST /transitions` route
- * (one endpoint serving every `(from, to)` pair, gated dynamically because
- * a static permission cannot fit all of them), every legal `AuditEngagement`
- * transition is gated by the SAME single permission, `audit-engagement:transition`
- * (data-model.md §10, `audit-engagement-permissions.ts`) — so each
- * transition gets its own route with a plain, static `@RequirePermission`,
- * mirroring `RiskLifecycleController`'s own per-transition-route shape
- * rather than Control's dynamic one.
- */
 import {
   Body,
   Controller,
@@ -50,8 +34,6 @@ export class AuditEngagementLifecycleController {
     private readonly cancelAuditEngagementUseCase: CancelAuditEngagementUseCase,
   ) {}
 
-  /** `startAuditEngagement`. `PLANNING -> IN_PROGRESS`, refused `422` with
-   * no scope link (FR-003). */
   @RequirePermission('audit-engagement:transition')
   @Post('start')
   @HttpCode(HttpStatus.OK)
@@ -74,7 +56,6 @@ export class AuditEngagementLifecycleController {
     return toAuditEngagementResponse(record);
   }
 
-  /** `completeAuditEngagement`. `IN_PROGRESS -> COMPLETED`, terminal. */
   @RequirePermission('audit-engagement:transition')
   @Post('complete')
   @HttpCode(HttpStatus.OK)
@@ -97,9 +78,6 @@ export class AuditEngagementLifecycleController {
     return toAuditEngagementResponse(record);
   }
 
-  /** `cancelAuditEngagement` (FR-004a). `PLANNING -> CANCELLED` or
-   * `IN_PROGRESS -> CANCELLED`, terminal, requires a non-empty
-   * `justification`. */
   @RequirePermission('audit-engagement:transition')
   @Post('cancel')
   @HttpCode(HttpStatus.OK)
@@ -115,11 +93,6 @@ export class AuditEngagementLifecycleController {
     const record = await this.cancelAuditEngagementUseCase.execute({
       actorUserId: session.userId,
       auditEngagementId: auditId,
-      // `CancelAuditEngagementRequestDto.justification` is DTO-optional
-      // (see that file's own header) — the empty-string fallback lets
-      // `assertCancellationJustificationProvided` (called inside the use
-      // case) refuse an omitted justification with `422`, never a `400`
-      // this controller would otherwise have to throw itself.
       justification: body.justification ?? '',
       expectedVersion,
     });

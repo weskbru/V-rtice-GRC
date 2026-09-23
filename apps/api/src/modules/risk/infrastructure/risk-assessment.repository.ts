@@ -1,11 +1,3 @@
-/**
- * T124 — the sole Prisma-backed implementation of
- * `RiskAssessmentRepositoryPort`. No `ScopedRepository` base here — see that
- * port's doc comment for why: access to `riskId` is already authorized by
- * the caller via `RiskRepositoryPort.findById(scope, riskId)` before either
- * method below is ever called, and `risk_assessments` has no `orgUnitId`
- * column of its own to scope against directly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -70,10 +62,6 @@ export class RiskAssessmentRepository implements RiskAssessmentRepositoryPort {
     const [rows, total] = await Promise.all([
       this.prisma.client.riskAssessment.findMany({
         where,
-        // `assessedOn DESC` (data-model.md §9's index) then `id DESC` as a
-        // UUIDv7 insertion-order tiebreak for same-day reassessments — see
-        // the Prisma model's own comment for why no separate `createdAt`
-        // column is needed for this.
         orderBy: [{ assessedOn: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -86,12 +74,6 @@ export class RiskAssessmentRepository implements RiskAssessmentRepositoryPort {
   }
 }
 
-/** Exported so `risk.repository.ts` can map the `currentAssessment` relation
- * nested in `RiskRepository`'s own `findById` include tree onto the SAME
- * `AssessmentRecord` shape, rather than duplicating this conversion — one
- * business concept (an assessment), one mapping from its Prisma row
- * (CLAUDE.md §13.8, ADR-009's "one mapper" discipline extended to this
- * inward Prisma-to-domain conversion). */
 export function toAssessmentRecord(row: AssessmentWithRelations): AssessmentRecord {
   return {
     id: row.id,

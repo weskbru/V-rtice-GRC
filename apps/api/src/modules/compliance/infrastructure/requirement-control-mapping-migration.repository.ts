@@ -1,20 +1,3 @@
-/**
- * T036/004-compliance-management, User Story 2 — the sole Prisma-backed
- * implementation of `RequirementControlMappingMigrationRepositoryPort`.
- * `create` writes the migration row, every item row and every `COPIED`
- * item's new `RequirementControlLink` rows in one call — always invoked
- * from inside `ExecuteMappingMigrationUseCase`'s own
- * `transactionRunner.run(...)` scope (ADR-005), so every write below and
- * the use case's own single `REQUIREMENT_CONTROL_MAPPING_MIGRATION` audit
- * event land in one transaction (SC-004: the whole execution is atomic).
- *
- * `RequirementControlMappingMigrationItem.sourceRequirementIds` is a plain
- * `uuid[]` column, not an FK set (schema's own doc comment — a snapshot,
- * not a live relation, mirroring `RiskAssessment.controlsConsidered`), so
- * resolving each item's `sourceRequirements` refs for the detail view
- * needs one extra batch `Requirement` lookup keyed by the union of every
- * id across every item — never one query per item.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -81,9 +64,6 @@ export class RequirementControlMappingMigrationRepository implements Requirement
       },
     });
 
-    // One `RequirementControlLink` row per `COPIED` item's resolved
-    // control — no per-link audit event (SC-004: the migration's own
-    // single event, recorded by the use case, covers all of them).
     const linkRows: Prisma.RequirementControlLinkCreateManyInput[] = input.items.flatMap((item) =>
       item.controlIdsToLink.map((controlId) => ({
         requirementId: item.targetRequirementId,

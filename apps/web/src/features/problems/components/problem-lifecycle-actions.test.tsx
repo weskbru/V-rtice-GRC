@@ -5,33 +5,6 @@ import { ProblemLifecycleActions } from './problem-lifecycle-actions';
 
 import type { ProblemDetail } from '../types';
 
-/**
- * Component-mount evidence for `ProblemLifecycleActions`
- * (019-problem-detail-experience, Fase B) — written when this component lost
- * its own `Card` wrapper and its "Nenhuma transição disponível" sentence
- * (both moved to/retired by `ProblemLifecycleSection`, its new caller).
- * `../api` is mocked at the network boundary.
- *
- * The central assertion, unchanged from before this phase and NOT weakened
- * by it (the coordinator's explicit instruction): an illegal transition is
- * never rendered as a disabled/refused button — it is simply absent. A
- * `CLOSED`/`CANCELLED` problem, or a caller without `problem:transition`,
- * therefore renders nothing from THIS component, and every other status
- * renders EXACTLY the buttons `availableProblemTransitions` names, never
- * more, never fewer.
- *
- * ## Scope of "renders nothing" (Fase B)
- *
- * This component is mounted here in isolation, exactly as it always was —
- * `toBeEmptyDOMElement()` below is true because THIS component still
- * returns `null` under the same two conditions it always effectively had
- * (`!canTransition || availableTransitions.length === 0`), not because a
- * surrounding card disappears. Since this phase, the caller
- * (`components/detail/problem-lifecycle-section.tsx`) embeds this component
- * inside a persistent "Ciclo de vida" card that keeps rendering the
- * read-only track regardless of what this component returns — that
- * composition is that suite's own concern, not this one's.
- */
 const { transitionMock } = vi.hoisted(() => ({
   transitionMock: vi.fn(),
 }));

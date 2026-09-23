@@ -9,23 +9,6 @@ import { IncidentDetailView } from './incident-detail-view';
 
 import type { IncidentDetail } from '@/features/incidents/types';
 
-/**
- * Component-mount evidence for the incident detail screen's two-level
- * navigation and deep-link resolution (018-incident-detail-experience, Fase
- * 2+3). Central assertions:
- *
- *   - all four groups are reachable, with the exact labels the catalog
- *     declares;
- *   - `?section=` naming an unknown id falls back silently to "Visão
- *     geral", never an error, never nothing selected;
- *   - exactly ONE request fires on mount (`getById`) — unlike Risk, there is
- *     no second lifecycle request to make (no such endpoint exists for
- *     Incident, see `status.ts`'s own header comment).
- *
- * `next/navigation` is mocked the same way `risk-detail-view.test.tsx`
- * already does — `currentSearch` stands in for "the URL right now".
- */
-
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 
@@ -42,12 +25,6 @@ const { getByIdMock } = vi.hoisted(() => ({
 vi.mock('@/features/incidents/api', () => ({
   incidentsApi: {
     getById: getByIdMock,
-    // No other section is opened by these tests — every other method a
-    // section's own component might call never resolving is fine, mirroring
-    // `risk-detail-view.test.tsx`'s own convention for tabs it does not
-    // examine the content of. `listOrgUnits`/`searchUsers` are `IncidentForm`
-    // (mode="edit")'s own reference-data calls, exercised only by the edit-
-    // panel test below, which never advances past opening the panel.
     transition: vi.fn(() => new Promise(() => undefined)),
     listOrgUnits: vi.fn(() => new Promise(() => undefined)),
     searchUsers: vi.fn(() => new Promise(() => undefined)),
@@ -103,8 +80,6 @@ describe('IncidentDetailView', () => {
     for (const label of ['Visão geral', 'Resposta', 'Relacionamentos', 'Registro']) {
       expect(screen.getByRole('tab', { name: label })).toBeInTheDocument();
     }
-    // Never Risk's own fifth group — Incidents has no "Análise" (the user's
-    // explicit instruction against copying Risk's group shape verbatim).
     expect(screen.queryByRole('tab', { name: 'Análise' })).not.toBeInTheDocument();
   });
 
@@ -150,15 +125,10 @@ describe('IncidentDetailView', () => {
     renderView(['incident:view']);
     await screen.findByRole('heading', { name: 'Indisponibilidade do portal de clientes' });
 
-    // `getAllBy*` — `DetailLayout` renders its aside twice in the DOM (once
-    // for the wide, `xl`+ layout, once for the narrow one), toggled with
-    // `hidden`/responsive `display`, per its own doc comment; jsdom applies
-    // no real CSS layout to hide either copy from a query.
     expect(screen.getAllByRole('heading', { name: 'Relacionamentos' }).length).toBeGreaterThan(0);
     for (const label of ['Riscos', 'Ativos', 'Processos', 'Problemas']) {
       expect(screen.getAllByRole('link', { name: `${label} Ver` }).length).toBeGreaterThan(0);
     }
-    // Still exactly one request — the aside added no request of its own.
     expect(getByIdMock).toHaveBeenCalledTimes(1);
   });
 
@@ -169,10 +139,6 @@ describe('IncidentDetailView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
 
-    // Radix marks the rest of the page `aria-hidden` while the modal Sheet
-    // is open (mirrors `risk-detail-view.test.tsx`'s own identical note) —
-    // this only asserts the panel itself opened, not that the read-only
-    // page underneath remains in the accessibility tree while it is open.
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText('Editar incidente').length).toBeGreaterThan(0);
   });
@@ -185,10 +151,6 @@ describe('IncidentDetailView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await screen.findByRole('dialog');
 
-    // "Ciclo de vida" is part of the SAME "Visão geral" section that used to
-    // be swapped out for the form — its continued presence in the DOM
-    // proves the overlay opened alongside the read-only page, not instead
-    // of it.
     expect(screen.getAllByText('Ciclo de vida').length).toBeGreaterThan(0);
   });
 });

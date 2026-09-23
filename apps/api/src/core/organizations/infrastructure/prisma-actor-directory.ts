@@ -1,8 +1,3 @@
-/**
- * `ActorDirectoryPort` implementation (T178/T179). See that port's header
- * for why this capability reads the `users` table directly rather than
- * depending on `core/identity`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

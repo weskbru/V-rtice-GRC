@@ -2,12 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { apiClient, setUnauthorizedHandler } from './api-client';
 
-/**
- * Evidence for T077's `skipUnauthorizedHandler` seam: calls that own their
- * own 401 handling (login, change-own-password, logout) must not also
- * trigger the global session-expiry flow, while every other 401 still does.
- */
-
 function problemResponse(status: number): Response {
   return new Response(JSON.stringify({ title: 'Problem', status }), {
     status,
@@ -174,8 +168,6 @@ describe('api-client multipart upload (US9, T195)', () => {
     expect(url).toBe('/api/v1/attachments');
     expect(init.method).toBe('POST');
     expect(init.body).toBe(formData);
-    // The browser must generate the multipart boundary itself — this
-    // client never sets Content-Type for a FormData body.
     expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
   });
 

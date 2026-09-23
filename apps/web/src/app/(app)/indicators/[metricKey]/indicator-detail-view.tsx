@@ -1,23 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — indicator detail screen (009-indicators-reports, T060,
- * US1/US2/US6). `PageHeader`, not `EntityHeader`: an `IndicatorMetricKey`
- * is a fixed catalog entry, not a coded GRC record — most keys never gain
- * an `IndicatorDefinition` (data-model.md §1, optional configuration), so
- * there is no stable `code` to anchor an `EntityHeader` on for the common
- * case. When a definition DOES exist, its `code`/owner/threshold render as
- * plain metadata text under the description instead.
- *
- * Two sections via `EntityTabs` (`@pharos/design-system`) rather than
- * stacked sections — the same tab vocabulary every other detail screen in
- * this product already uses (CLAUDE.md §18.12) — both tabs always visible
- * (never `visible: false`): unlike a genuinely sensitive section
- * (`risk-audit-section.tsx`'s own trail), a `UNIT`-scoped caller's
- * inability to use "Histórico" is not something to hide; it is an
- * explained, expected state rendered INSIDE that tab
- * (`IndicatorHistorySection`'s own header).
- */
 import {
   EmptyState,
   EntityTabs,
@@ -58,10 +40,6 @@ export function IndicatorDetailView({ metricKey }: IndicatorDetailViewProps): Re
   const [problem, setProblem] = useState<ErrorStateProblem | undefined>(undefined);
   const [reloadToken, setReloadToken] = useState(0);
 
-  // Loading is DERIVED (never a separate `setLoading(true)` at the top of
-  // the effect below, `react-hooks/set-state-in-effect`) — the same
-  // `resolvedRequestKey !== requestKey` pattern `IncidentCatalogView`/
-  // `IndicatorHistorySection` already use.
   const requestKey = `${metricKey}|${reloadToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
   const loading = resolvedRequestKey !== requestKey;

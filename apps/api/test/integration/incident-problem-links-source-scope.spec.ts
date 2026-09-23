@@ -1,35 +1,3 @@
-/**
- * 008-incidents-problems, US3 — organizational scope on the SOURCE side of
- * all five link pairs (Incident->Risk, Incident->Asset, Incident->Process,
- * Problem->Risk, Problem->Incident).
- *
- * `incident-problem-relationship-links.spec.ts` (T045/T049/T053b) already
- * proves ADR-020 parts 4/5 — the TARGET's organizational scope and the
- * REFERENCED-side permission — for all five pairs, with the actor always
- * scoped to the SAME unit as the source Incident/Problem. That file never
- * constructs an actor scoped to a DIFFERENT unit than the source record
- * itself, so it cannot show whether `list`/`link`/`unlink` refuse an actor
- * who can see one organizational unit but not the one the Incident/Problem
- * actually belongs to. Tracked as tasks.md T067 ("NÃO FEITO" — no
- * `incidents-scope.spec.ts`/`problems-scope.spec.ts` and no equivalent
- * anywhere else), reconciled against the code below: all five link use
- * cases resolve the SOURCE record — through `resolveInScopeIncident`
- * (Incident) or `ProblemRepositoryPort.findById(scope, ...)` (Problem) —
- * BEFORE touching the target, so this is a real, previously-unexercised
- * code path, not a duplicate of what already runs.
- *
- * Every write assertion follows this repository's row-count discipline
- * (`finding-risk-link.spec.ts`/`incident-problem-relationship-links.spec.ts`):
- * an error of the right TYPE is not proof that nothing was written — row
- * count/row state is checked directly, before and after.
- *
- * FR-030 non-disclosure: an out-of-scope source and a nonexistent source id
- * must produce the byte-identical `NotFoundDomainError` message, and the
- * DENIED audit row (`organization.denied.out_of_scope`) must carry the
- * REAL organizational unit of the out-of-scope record — proving the
- * refusal is a genuine scope decision, not an accidental "not found" that
- * would also fire for a typo'd id.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -95,7 +63,6 @@ interface SourceScopeScenario {
   attemptList(actorUserId: string, sourceId: string): Promise<readonly LinkedRecord[]>;
   attemptLink(actorUserId: string, sourceId: string): Promise<LinkedRecord>;
   attemptUnlink(actorUserId: string, sourceId: string, linkId: string): Promise<LinkedRecord>;
-  /** Creates one active link, using the legitimate in-scope actor. */
   createExistingLink(): Promise<string>;
   countLinks(): Promise<number>;
   findLinkRow(linkId: string): Promise<{ unlinkedAt: Date | null } | null>;
@@ -103,16 +70,6 @@ interface SourceScopeScenario {
 
 type ScenarioBuilder = (ctx: IntegrationTestContext) => Promise<SourceScopeScenario>;
 
-/**
- * `AuditRecorder.record` reads `actorUserId` from `AuditContextPort`
- * (backed by `RequestContextStore`), NOT from any value passed by the
- * calling use case (see `AuditRecorder.record`'s own doc comment) — a
- * usecase called directly, with no ambient request context, produces a
- * `DENIED` row with `actorUserId: null`. `audit-denied.spec.ts` (T040b)
- * establishes the pattern this helper mirrors: wrap the call in
- * `RequestContextStore.run(...)` so the row is attributable the same way
- * an HTTP request populates it via middleware.
- */
 function runAsActor<T>(actorUserId: string, fn: () => Promise<T>): Promise<T> {
   return RequestContextStore.run(
     {
@@ -215,21 +172,6 @@ async function createProcessFixture(ctx: IntegrationTestContext, orgUnitId: stri
   });
 }
 
-/**
- * Every scenario builder below creates:
- *   - `sourceOrgUnit` — where the Incident/Problem actually lives.
- *   - `otherOrgUnit` — where the OUT-OF-SCOPE actor is scoped instead.
- *   - `actorInScope` — scoped to `sourceOrgUnit`, holds the link
- *     permission plus the target's view permission. Used only to create
- *     the pre-existing link the unlink scenario needs.
- *   - `actorOutOfScope` — scoped to `otherOrgUnit` ONLY, but holds the
- *     EXACT SAME permissions as `actorInScope`. Any refusal this actor
- *     receives is therefore attributable to organizational scope alone,
- *     never to a missing permission or an out-of-scope TARGET (the
- *     target is always placed inside `sourceOrgUnit` — in scope for
- *     `actorInScope` and irrelevant to `actorOutOfScope`'s refusal, since
- *     the source check runs strictly before the target check).
- */
 const buildIncidentRiskScenario: ScenarioBuilder = async (ctx) => {
   const sourceOrgUnit = await createOrgUnitFixture(ctx.prisma, {
     code: uniqueTestMarker('inc-risk-src-org'),
@@ -499,12 +441,6 @@ describe(
           nonexistentError = error;
         }
 
-        // Both refusals are the SAME error class, following the SAME
-        // message template — never raw string equality between the two
-        // messages, which necessarily differ (each embeds the id the
-        // caller itself supplied). This is the same reasoning
-        // `risk-scope.spec.ts` documents for its own `detail` comparison:
-        // echoing back an id the client already typed discloses nothing.
         expect(outOfScopeError).toBeInstanceOf(NotFoundDomainError);
         expect(nonexistentError).toBeInstanceOf(NotFoundDomainError);
         expect((outOfScopeError as NotFoundDomainError).message).toBe(
@@ -514,9 +450,6 @@ describe(
           `${scenario.sourceEntityLabel} ${nonexistentId} não foi encontrado(a).`,
         );
 
-        // Control: the SAME actor CAN list when scoped correctly — proves
-        // the refusal above is genuinely about scope, not e.g. a
-        // permission the fixture forgot to grant.
         const inScopeResult = await scenario.attemptList(
           scenario.actorInScopeId,
           scenario.sourceId,
@@ -555,8 +488,6 @@ describe(
           `${scenario.sourceEntityLabel} ${nonexistentId} não foi encontrado(a).`,
         );
 
-        // The row-count proof: an error of the right TYPE is not, by
-        // itself, proof that nothing was written.
         const countAfter = await scenario.countLinks();
         expect(countAfter).toBe(countBefore);
       },
@@ -592,7 +523,6 @@ describe(
           `${scenario.sourceEntityLabel} ${nonexistentId} não foi encontrado(a).`,
         );
 
-        // Never unlinked — the row this actor was never allowed to reach.
         const row = await scenario.findLinkRow(linkId);
         expect(row).not.toBeNull();
         expect(row?.unlinkedAt).toBeNull();

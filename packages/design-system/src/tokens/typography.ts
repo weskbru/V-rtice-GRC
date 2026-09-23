@@ -1,12 +1,3 @@
-/**
- * PharosGRC Design System — typography tokens.
- *
- * An enterprise GRC platform reads dense tabular and form content for long
- * sessions; the scale favors a restrained number of steps with a clear
- * hierarchy over a large decorative range. Mirrored as `--text-*` /
- * `--font-weight-*` keys in the Tailwind 4 `@theme` layer.
- */
-
 export const fontFamily = {
   sans: [
     'Inter',
@@ -36,11 +27,6 @@ export interface TypeStep {
   letterSpacing?: string;
 }
 
-/**
- * Named scale, small to large. `body` is the default reading size (16px) —
- * every pairing that renders it against `surfaceLight.background` /
- * `surfaceDark.background` meets 4.5:1 (see colors.ts `foreground`).
- */
 export const typeScale: Record<
   'caption' | 'bodySm' | 'body' | 'bodyLg' | 'h4' | 'h3' | 'h2' | 'h1' | 'display',
   TypeStep

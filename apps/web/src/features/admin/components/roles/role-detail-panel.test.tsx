@@ -1,32 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Unit and component-mount evidence for `RoleDetailPanel`
- * (015-roles-permissions-surface FR-009 to FR-012, FR-026).
- *
- * ## Migrated coverage (D-07, T049)
- *
- * Two behaviours reach this file from components this phase removes:
- *
- * 1. `deleteBlockedReason` — the four cases `role-admin-columns.test.tsx`
- *    guarded. The rule moved here with the affordance it explains and was
- *    renamed `roleDeleteBlockedReason`; the rule itself did not change, and
- *    neither did its wording, so the assertions are the same four.
- * 2. The restriction NOTES `role-details-dialog.test.tsx` guarded — the
- *    system-role restriction taking precedence over the assigned-users one,
- *    and neither appearing for a deletable custom role. In the dialog they
- *    were prose paragraphs; here the same two facts are stated beside the
- *    "Excluir" control they actually govern (012 §2.5: the restriction is
- *    written out, never merely enforced by a dimmed control).
- *
- * `RoleDetailPanel` in jsdom renders its INLINE (non-modal) mode:
- * `useWideViewport` reads `matchMedia`, whose jsdom stub answers
- * `matches: true`. The overlay mode's focus trap and `Escape` belong to
- * `Sheet` and are covered in the browser (`e2e/admin-roles.spec.ts`), which
- * is the only place they are real.
- */
-
 const { listPermissionsMock, updateRoleMock, listUsersMock } = vi.hoisted(() => ({
   listPermissionsMock: vi.fn(),
   updateRoleMock: vi.fn(),
@@ -92,7 +66,6 @@ beforeEach(() => {
   listPermissionsMock.mockResolvedValue([]);
 });
 
-/** Migrated verbatim from `role-admin-columns.test.tsx` — same four cases, same expected wording. */
 describe('roleDeleteBlockedReason (migrated from deleteBlockedReason)', () => {
   it('returns null for a deletable custom role with no assignments', () => {
     expect(roleDeleteBlockedReason(role({ isSystem: false, assignedUserCount: 0 }))).toBeNull();
@@ -138,10 +111,7 @@ describe('RoleDetailPanel — the delete affordance and its stated reasons', () 
 
     const deleteButton = within(panel).getByRole('button', { name: 'Excluir' });
     expect(deleteButton).toBeDisabled();
-    // 012 §2.5 — the restriction is explained in words, not only enforced.
     expect(within(panel).getByText('Papel do sistema')).toBeInTheDocument();
-    // The system restriction takes precedence: the role is ALSO assigned to
-    // five people, and that reason must not appear alongside it.
     expect(within(panel).queryByText('Atribuído a 5 usuários')).not.toBeInTheDocument();
 
     fireEvent.click(deleteButton);
@@ -165,8 +135,6 @@ describe('RoleDetailPanel — authorization gating of the panel actions (FR-026)
     expect(within(panel).queryByRole('button', { name: 'Editar papel' })).not.toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument();
 
-    // Reading is NOT gated: the same rule the removed row menu carried —
-    // "Ver detalhes" was always available, "Editar"/"Excluir" were not.
     expect(within(panel).getByText('Analisa e trata riscos operacionais.')).toBeInTheDocument();
     expect(
       within(panel).getByRole('button', { name: 'Ver identificadores técnicos' }),
@@ -181,11 +149,6 @@ describe('RoleDetailPanel — authorization gating of the panel actions (FR-026)
     expect(within(panel).getByRole('button', { name: 'Excluir' })).toBeInTheDocument();
   });
 
-  /**
-   * F-68 — `role:administer` is what the platform can delegate; owning a
-   * SEEDED role is not. So the permission still opens the panel's actions,
-   * and the word offered changes with what the server will actually accept.
-   */
   it('replaces "Editar papel" with "Ver definição" on a system role, and writes why', () => {
     renderPanel(role({ isSystem: true }), { canManageRoles: true });
     const panel = screen.getByRole('complementary', { name: 'Detalhes do papel' });
@@ -212,8 +175,6 @@ describe('RoleDetailPanel — authorization gating of the panel actions (FR-026)
     expect(within(panel).queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Voltar' })).toBeInTheDocument();
 
-    // And it goes back to reading without asking anything to be discarded:
-    // nothing could have been changed.
     fireEvent.click(within(panel).getByRole('button', { name: 'Voltar' }));
     expect(within(panel).getByRole('button', { name: 'Ver definição' })).toBeInTheDocument();
   });
@@ -238,16 +199,12 @@ describe('RoleDetailPanel — header', () => {
     );
     const systemPanel = screen.getByRole('complementary', { name: 'Detalhes do papel' });
     expect(within(systemPanel).getByText('Sistema')).toBeInTheDocument();
-    // FR-035 — `user:administer` is one of the three access-administration
-    // permissions, so this role reads as privileged.
     expect(within(systemPanel).getByText('Privilegiado')).toBeInTheDocument();
     unmount();
 
     renderPanel(role({ isSystem: false, permissions: [permission('risk:administer', 'risk')] }));
     const customPanel = screen.getByRole('complementary', { name: 'Detalhes do papel' });
     expect(within(customPanel).getByText('Personalizado')).toBeInTheDocument();
-    // FR-035 / SC-005 — `risk:administer` administers RISKS, not access.
-    // Marking it privileged would empty the signal (spec.md D-01).
     expect(within(customPanel).queryByText('Privilegiado')).not.toBeInTheDocument();
   });
 
@@ -267,23 +224,11 @@ describe('RoleDetailPanel — header', () => {
   });
 });
 
-/**
- * NFR-006 as it applies to the panel's own editor. `useRoleEditor` is
- * mounted while READING as well — unmounting it would unmount the `Sheet`
- * around it below `xl`, closing the overlay the moment "Editar papel" was
- * pressed — so the catalogue request is gated by its `enabled` flag instead.
- *
- * That gate was unguarded until now: removing `!enabled` from the hook's
- * effect left the whole 015 suite green, because no test opened the panel on
- * a CUSTOM role and then asserted that nothing had been fetched. Written
- * here when the create panel made `enabled` load-bearing in a second place.
- */
 describe('RoleDetailPanel — reading costs no catalogue request (NFR-006)', () => {
   it('fetches the permission catalogue only once editing actually starts', async () => {
     renderPanel(role({ isSystem: false }), { canManageRoles: true });
     const panel = screen.getByRole('complementary', { name: 'Detalhes do papel' });
 
-    // Reading a custom role: the whole catalogue is of no use yet.
     await waitFor(() => expect(listPermissionsMock).not.toHaveBeenCalled());
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Editar papel' }));
@@ -292,16 +237,6 @@ describe('RoleDetailPanel — reading costs no catalogue request (NFR-006)', () 
   });
 });
 
-/**
- * ADR-022 — the panel names a role in pt-BR, and keeps the value the server
- * stores one click away instead of one grep away.
- *
- * The traceability half is the point of this block: a screen that shows only
- * "Administrador da Plataforma" leaves an administrator unable to name the
- * role they are reading when they open an API response, an audit entry or a
- * runbook. It rides the SAME control that reveals `risk:view` beside each
- * permission (FR-016) — one technical-disclosure mode for the panel, not two.
- */
 describe('RoleDetailPanel — the role name, and the stored name behind it', () => {
   it('heads the panel with the pt-BR name of a seeded role', () => {
     renderPanel(role({ name: 'Compliance Manager', isSystem: true }));
@@ -316,15 +251,12 @@ describe('RoleDetailPanel — the role name, and the stored name behind it', () 
     renderPanel(role({ name: 'Compliance Manager', isSystem: true }));
     const panel = screen.getByRole('complementary', { name: 'Detalhes do papel' });
 
-    // Closed by default: the identifier is available on demand, never by
-    // default (FR-016, and the same rule applied to the name).
     expect(within(panel).queryByText('Compliance Manager')).not.toBeInTheDocument();
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Ver identificadores técnicos' }));
 
     expect(within(panel).getByText('Nome técnico:')).toBeInTheDocument();
     expect(within(panel).getByText('Compliance Manager')).toBeInTheDocument();
-    // The heading did not change: the label is not replaced by the identifier.
     expect(
       within(panel).getByRole('heading', { name: 'Gestor de Compliance' }),
     ).toBeInTheDocument();
@@ -345,8 +277,6 @@ describe('RoleDetailPanel — the role name, and the stored name behind it', () 
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Ver identificadores técnicos' }));
 
-    // Shown for a custom role too: seeing the label and the stored value
-    // agree is itself the answer to "is this a translation?".
     expect(within(panel).getByText('Nome técnico:')).toBeInTheDocument();
     expect(
       within(panel).getAllByText('Equipe de Resposta — Filial SP').length,

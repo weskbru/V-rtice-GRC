@@ -1,18 +1,3 @@
-/**
- * T024/T025/004-compliance-management — proves, against the real test
- * database:
- *
- *   T024: `FrameworkVersion`'s two-edge reachability (research.md D-3,
- *   FR-002/FR-006) — `DRAFT` is reached at creation, `PUBLISHED` is
- *   reached by publication, no operation reverts `PUBLISHED -> DRAFT`, and
- *   creating a new version does not alter or invalidate the previous one.
- *   The same discipline `FindingStatus` (Fase 1) and the `Control`
- *   lifecycle draft (Fase 2) needed a correction to acquire.
- *
- *   T025: publishing a version with zero requirements is refused with a
- *   `ValidationDomainError` (FR-005, edge case "versão publicada sem
- *   cláusulas"), and the version remains `DRAFT`, unchanged.
- */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CacheModule } from '../../src/infrastructure/cache/cache.module';
@@ -89,14 +74,6 @@ describe('FrameworkVersion lifecycle and publish precondition (004-compliance-ma
     expect(published.publishedAt).toBeDefined();
     expect(published.publishedBy?.id).toBe(actorUserId);
 
-    // No operation in this contract reverts PUBLISHED -> DRAFT — the
-    // lifecycle module itself declares no such transition
-    // (`framework-version-lifecycle.ts`), so there is no use case call to
-    // even attempt here. This is a structural guarantee, verified by
-    // `canPublishFrameworkVersion`'s own exhaustive unit coverage — this
-    // integration test instead confirms the REAL row, read back from the
-    // database, still reports PUBLISHED and was never altered by a second
-    // publish attempt.
     await expect(
       publishFrameworkVersionUseCase.execute({
         actorUserId,
@@ -106,7 +83,6 @@ describe('FrameworkVersion lifecycle and publish precondition (004-compliance-ma
       }),
     ).rejects.toBeInstanceOf(ValidationDomainError);
 
-    // Creating the next version does not alter or invalidate v1 (FR-006).
     const v2 = await createFrameworkVersionUseCase.execute({
       actorUserId,
       frameworkId: framework.id,

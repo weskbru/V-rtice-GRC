@@ -1,31 +1,3 @@
-/**
- * T126 — the sole Prisma-backed implementation of
- * `RiskMethodologyRepositoryPort`.
- *
- * ## JSONB in, typed `MethodologyConfiguration` out
- *
- * `probabilityScale`/`impactScale`/`matrix`/`levelBands` are stored as
- * `Json` (Prisma's `JsonValue`, effectively `unknown`). Every read here
- * casts them to their typed shape with a single `as unknown as X` — trusted
- * because nothing can reach this table without first passing
- * `validateMethodologyConfiguration` (`domain/methodology.schema.ts`) in
- * `PublishMethodologyVersionUseCase`/the seed, and the append-only
- * privilege revocation on this table (see the baseline migration's header)
- * means no OTHER write path can have stored a differently-shaped value
- * since.
- *
- * ## `listVersions`/`findActiveVersion` scope to the ACTIVE methodology
- * only (interpretive decision)
- *
- * `contracts/platform.openapi.yaml` names no methodology id in either
- * `/risk-methodology` or `/risk-methodology/versions` — this release has no
- * "create a second methodology" endpoint (only "publish a new version of
- * the existing one"), so "the methodology" and "the active methodology" are
- * the same thing in practice. Both methods below resolve
- * `findActiveMethodologyId()` first and scope to it. If a future phase adds
- * multiple methodologies, this is the one place that would need to change
- * to accept an explicit methodology id.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

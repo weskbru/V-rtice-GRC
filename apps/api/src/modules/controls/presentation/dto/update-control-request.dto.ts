@@ -1,11 +1,3 @@
-/**
- * T023/003-controls-management — matches `contracts/controls.openapi.yaml`'s
- * `UpdateControlRequest`: every property optional (partial update),
- * `additionalProperties: false`, `minProperties: 1` enforced by the
- * controller (see `control.controller.ts`, mirroring
- * `UpdateRiskRequestDto`'s identical convention and the identical reason
- * given there — a single call site, no dedicated custom validator class).
- */
 import { IsIn, IsOptional, IsString, IsUUID, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

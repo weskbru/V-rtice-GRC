@@ -5,14 +5,6 @@ import { ProcessRegisterSummary } from './process-register-summary';
 
 import type { Page } from '../types';
 
-/**
- * Component-mount evidence for `ProcessRegisterSummary` (T046/T051, CLAUDE.md
- * §19.7) — `processesApi.listCatalog` is mocked at the network boundary,
- * mirroring `control-register-summary.test.tsx`'s own approach. Each mocked
- * call resolves a distinct `meta.total`, keyed by the `isActive` filter it
- * received, so a wrong filter (e.g. showing the inactive count under
- * "Processos em uso") fails an assertion rather than passing by coincidence.
- */
 const { listCatalogMock } = vi.hoisted(() => ({ listCatalogMock: vi.fn() }));
 
 vi.mock('../api', () => ({

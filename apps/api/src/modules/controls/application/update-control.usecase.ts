@@ -1,23 +1,3 @@
-/**
- * T020/003-controls-management — `UpdateControlUseCase`: partial
- * business-content update with per-field audit (`PATCH
- * /controls/{controlId}`, `updateControl` operation, FR-008) and
- * optimistic-lock conflict detection (ADR-013). Mirrors
- * `modules/risk/application/update-risk.usecase.ts`'s structure — see that
- * file's header for the transaction-boundary/`UpdateControlInput`-shape
- * reasoning this one does not repeat.
- *
- * ## No lifecycle-status gate on editability
- *
- * Unlike Risk's `assertBusinessContentEditable` (which locks `CLOSED`/
- * `ARCHIVED`), neither the spec nor the contract restricts `PATCH` by the
- * control's current `status` — a `RETIRED` control stays "integralmente
- * legível" (FR-006) and the contract's `updateControl` description names
- * no status precondition. This is a considered decision, not an omission:
- * introducing a restriction the spec never asked for would be exactly the
- * "não implementar funcionalidades que não estejam especificadas" CLAUDE.md
- * §2 warns against.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -45,7 +25,6 @@ import type { ControlFrequency, ControlNature, ControlType } from '@prisma/clien
 export interface UpdateControlInput {
   readonly actorUserId: string;
   readonly controlId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
   readonly name?: string | undefined;
   readonly description?: string | undefined;
@@ -126,12 +105,6 @@ export class UpdateControlUseCase {
       newValues.orgUnitId = input.orgUnitId;
     }
 
-    // The assignment line must be resolved against the org unit the
-    // control will HAVE after this update, not the one it had before —
-    // `changes.orgUnitId` already carries the new value at this point if
-    // it is changing (the block above runs first). Mirrors
-    // `UpdateRiskUseCase`'s identical "resolve lazily, against the final
-    // unit" reasoning.
     const finalOrgUnitId = changes.orgUnitId ?? current.orgUnit?.id;
     let assignableUnitIds: ReadonlySet<string> | undefined;
     const resolveAssignableUnitIds = async (): Promise<ReadonlySet<string>> => {
@@ -154,9 +127,6 @@ export class UpdateControlUseCase {
         newValues.ownerUserId = input.ownerUserId;
       }
     } else if (changes.orgUnitId !== undefined && current.owner) {
-      // Owner left untouched by this request, but the control is moving
-      // units: the existing owner must still be assignable in the
-      // destination unit.
       await this.assertOwnerAssignable(current.owner.id, await resolveAssignableUnitIds());
     }
 
@@ -201,10 +171,6 @@ export class UpdateControlUseCase {
         );
       }
 
-      // Only audit when something actually changed — an idempotent PATCH
-      // re-submitting the current values still succeeds (200), but leaves
-      // no misleading "nothing changed" audit row (same discipline
-      // `UpdateRiskUseCase` documents).
       if (Object.keys(newValues).length > 0) {
         await this.auditRecorder.record({
           action: 'control.updated',

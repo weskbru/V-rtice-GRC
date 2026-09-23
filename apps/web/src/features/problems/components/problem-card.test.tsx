@@ -5,12 +5,6 @@ import { ProblemCard } from './problem-card';
 
 import type { ProblemSummary } from '../types';
 
-/**
- * Component-mount evidence for `ProblemCard` (CLAUDE.md §18.12) — the card
- * anatomy this register's family requires: código → título → badges →
- * three metadata fields (Unidade, Responsável, Identificado em) →
- * "Atualizado em", and no description row — `ProblemSummary` carries none.
- */
 const baseProblem: ProblemSummary = {
   id: 'problem-1',
   code: 'PRB-2026-0001',
@@ -20,10 +14,6 @@ const baseProblem: ProblemSummary = {
   orgUnit: { id: 'org-1', code: 'ORG-1', name: 'PharosGRC' },
   owner: { id: 'user-1', fullName: 'Bruno Lima' },
   identifiedOn: '2026-03-10',
-  // Midday UTC, not midnight — a midnight timestamp renders as the PREVIOUS
-  // calendar day in any timezone behind UTC (`formatTimestampDate`'s own
-  // doc comment in `risks/date.ts`); midday is safely within the same local
-  // day everywhere this suite might run.
   updatedAt: '2026-03-20T12:00:00.000Z',
 };
 

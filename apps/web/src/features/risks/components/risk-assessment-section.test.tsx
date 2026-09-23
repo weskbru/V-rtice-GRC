@@ -7,14 +7,6 @@ import { RiskAssessmentSection } from './risk-assessment-section';
 
 import type { RiskAssessment, RiskDetail, RiskMethodologyVersion } from '../types';
 
-/**
- * Component-mount evidence for the redesigned Assessment section
- * (016-risk-detail-experience, Área 2, 2026-09-17 — T130, FR-069, FR-093,
- * ADR-006). `../api` is mocked at the network boundary; `AssessmentHistory`
- * is now always mounted here (§4's "history stays last, unconditional"), so
- * `listAssessments` is mocked alongside `getActiveMethodology`.
- */
-
 const { getActiveMethodologyMock, listAssessmentsMock, updateRiskMock } = vi.hoisted(() => ({
   getActiveMethodologyMock: vi.fn(),
   listAssessmentsMock: vi.fn(),
@@ -151,9 +143,6 @@ describe('RiskAssessmentSection', () => {
       screen.getByText('Controles compensatórios reduzem substancialmente a exposição.'),
     ).toBeInTheDocument();
 
-    // Consumes the `currentAssessment` already inlined on `RiskDetail` — it
-    // never issues its own `GET /risks/{riskId}/assessments` call (that
-    // request belongs to `AssessmentHistory`, mocked separately above).
     await screen.findByRole('table');
   });
 
@@ -180,11 +169,6 @@ describe('RiskAssessmentSection', () => {
     expect(getActiveMethodologyMock).toHaveBeenCalledTimes(1);
   });
 
-  // 2026-09-17, Área 2 — the matrix used to render NOTHING while
-  // `methodology` was `null` and the fetch had not yet failed: a real
-  // silent-loading defect, not a hypothetical one. This proves the fix: an
-  // explicit, announced loading state exists between mount and either
-  // outcome.
   it('shows an explicit loading state for the matrix while the methodology request is in flight — never silence', async () => {
     let resolveMethodology!: (value: RiskMethodologyVersion) => void;
     getActiveMethodologyMock.mockReset();
@@ -227,8 +211,6 @@ describe('RiskAssessmentSection', () => {
     ).toBeInTheDocument();
   });
 
-  // Área 2, point 3 — progressive disclosure: a compact comparative summary
-  // here, the full editable list stays exclusively in its own leaf section.
   it('shows a Causas/Consequências summary (first items + count) and jumps to the full section on request', () => {
     const onViewCausesConsequences = vi.fn();
     render(
@@ -250,7 +232,6 @@ describe('RiskAssessmentSection', () => {
 
     expect(screen.getByText('Fornecedor único')).toBeInTheDocument();
     expect(screen.getByText('Falta de contrato')).toBeInTheDocument();
-    // Only the first two, plus a count — never the third causa rendered twice.
     expect(screen.queryByText('Terceira causa')).not.toBeInTheDocument();
     expect(screen.getByText('+ 1 outra')).toBeInTheDocument();
     expect(screen.getByText('Nenhuma registrada.')).toBeInTheDocument();
@@ -259,9 +240,6 @@ describe('RiskAssessmentSection', () => {
     expect(onViewCausesConsequences).toHaveBeenCalledTimes(1);
   });
 
-  // Área 2, point 4 — the two forms that used to sit permanently open are now
-  // behind an explicit action, and each one collapses again once its own
-  // submit succeeds ("estado primeiro -> ação quando solicitada").
   it('keeps "Registrar nova avaliação"/"Alterar próxima revisão" behind an action, revealing each form only on request', () => {
     render(
       <RiskAssessmentSection
@@ -293,7 +271,6 @@ describe('RiskAssessmentSection', () => {
     expect(
       screen.queryByRole('button', { name: risks.assessment.actions.recordNew }),
     ).not.toBeInTheDocument();
-    // The review action has no such gate — unaffected by `canAssess`.
     expect(
       screen.getByRole('button', { name: risks.assessment.actions.changeNextReview }),
     ).toBeInTheDocument();

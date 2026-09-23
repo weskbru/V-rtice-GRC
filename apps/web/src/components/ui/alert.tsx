@@ -9,10 +9,6 @@ const alertVariants = cva(
       variant: {
         default: "bg-card text-card-foreground",
         destructive:
-          // Full opacity, not /90: --destructive on --card measures 5.09:1
-          // (WCAG AA needs 4.5:1 for this text-sm description); the /90
-          // alpha modifier this used to carry dropped it to 4.35:1, a real
-          // contrast failure.
           "bg-card text-destructive *:data-[slot=alert-description]:text-destructive [&>svg]:text-current",
       },
     },

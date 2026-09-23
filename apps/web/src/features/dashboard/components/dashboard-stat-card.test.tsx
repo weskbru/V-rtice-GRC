@@ -4,15 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 import { DashboardStatCard } from './dashboard-stat-card';
 
-/**
- * Component-mount evidence for the "o que requer atenção agora" widgets.
- *
- * The assertions that matter are the ones a list tile could not make: that a
- * zero is visibly quieter than a figure that needs action (and not by colour
- * alone — the chip state is asserted as data, the number as text), that "no
- * data" never renders as "0", and that there is no link where the platform
- * has no destination to offer.
- */
 function renderCard(props: Partial<Parameters<typeof DashboardStatCard>[0]> = {}) {
   return render(
     <DashboardStatCard
@@ -48,11 +39,6 @@ describe('DashboardStatCard', () => {
     expect(container.querySelector('[data-tone="red"]')).not.toBeNull();
   });
 
-  /**
-   * "0 ações atrasadas" is good news. The card mutes its chip so the cards
-   * that DO need action are the ones still in colour — and the number 0
-   * beside it says the same thing in words.
-   */
   it('mutes a card whose figure is zero', () => {
     const { container } = renderCard({ value: 0 });
 
@@ -78,8 +64,6 @@ describe('DashboardStatCard', () => {
       '/actions',
     );
 
-    // Pending approvals genuinely has no register query that reproduces it,
-    // so its card must render without a link rather than with a broken one.
     rerender(
       <DashboardStatCard
         title="Aprovações pendentes"

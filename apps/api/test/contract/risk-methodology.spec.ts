@@ -1,23 +1,3 @@
-/**
- * T126 gap-coverage — `GET /risk-methodology`, `GET /risk-methodology/versions`
- * and `POST /risk-methodology/versions` per `contracts/platform.openapi.yaml`
- * (line ~484 onward). Added after the fact: the original US4 dispatch shipped
- * `MethodologyController` with zero contract tests, which is exactly how two
- * real defects reached a working build undetected —
- *
- *   1. `GET /risk-methodology` was missing `@NoPermissionRequired()`, so
- *      `PermissionGuard`'s deny-by-default rule (`MISSING_PERMISSION_
- *      DECLARATION`) refused EVERY caller with 403, regardless of role. The
- *      endpoint had never worked.
- *   2. `GET /risk-methodology/versions` returned `PageResponse`'s internal
- *      shape (`items`/flat `page`/`pageSize`/...) instead of the contract's
- *      `{data, meta}` envelope.
- *
- * Both are now fixed (see `methodology.controller.ts`'s own header comment).
- * The tests below are written to fail against the pre-fix code — verified by
- * temporarily reintroducing each bug during this dispatch (see the
- * implementation report) — not merely to pass against the current one.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -82,13 +62,6 @@ interface ProblemBody {
   readonly title: string;
 }
 
-/** A 5x5 scale (values 1-5) with two contiguous, non-overlapping bands
- * (LOW 1-12, HIGH 13-25) covering the full [1,25] product range — the
- * minimum shape `validateMethodologyConfiguration` (`methodology.schema.ts`)
- * accepts while also satisfying `CreateMethodologyVersionRequestDto`'s own
- * `@ArrayMinSize(2)` on `levelBands` (a single band, valid at the use-case
- * level, is rejected by the HTTP-facing DTO before this test's subject —
- * the controller/guard — is ever reached). */
 const SCALE_1_TO_5 = [1, 2, 3, 4, 5].map((value) => ({ value, label: `P${String(value)}` }));
 const LEVEL_BANDS = [
   { level: 'LOW', minScore: 1, maxScore: 12 },
@@ -119,10 +92,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
     ctx = await buildContractTestApp();
     appOrigin = ctx.app.get(AppConfigService).app.appOrigin;
 
-    // Guarantees an active methodology version exists for the whole file —
-    // idempotent for the METHODOLOGY row itself (data-model.md: "exactly
-    // one active", global-unique), same fixture US4's integration suite
-    // uses (see that fixture's own doc comment).
     const prisma = ctx.app.get(PrismaService);
     const seedActor = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('risk-methodology-seed')}@example.test`,
@@ -134,10 +103,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
     await ctx.close();
   });
 
-  /** A real, logged-in user holding NO role and therefore NO permission at
-   * all — deliberately not an administrator: this is the exact caller
-   * whose 403 the missing `@NoPermissionRequired()` bug inflicted on every
-   * request, so it is the one caller this suite must prove succeeds. */
   async function loginAsNoPermissionActor(): Promise<ReturnType<typeof request.agent>> {
     const prisma = ctx.app.get(PrismaService);
     const fixture = await createLocalUserFixture(prisma, {
@@ -153,10 +118,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
     return agent;
   }
 
-  /** A real, logged-in user holding SOME permission (`risk:view`) but NOT
-   * `methodology:administer` — proves the `POST` refusal is specific to
-   * the missing permission, not merely to having none at all (mirrors
-   * `risk-permissions.spec.ts`'s own `loginAsUnprivilegedActor`). */
   async function loginAsWrongPermissionActor(): Promise<ReturnType<typeof request.agent>> {
     const prisma = ctx.app.get(PrismaService);
     const fixture = await createLocalUserFixture(prisma, {
@@ -176,7 +137,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
     return agent;
   }
 
-  /** A real, logged-in user holding `methodology:administer`. */
   async function loginAsMethodologyAdmin(): Promise<ReturnType<typeof request.agent>> {
     const prisma = ctx.app.get(PrismaService);
     const fixture = await createLocalUserFixture(prisma, {
@@ -272,8 +232,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
       const prisma = ctx.app.get(PrismaService);
       const agent = await loginAsNoPermissionActor();
 
-      // Two more versions on top of whatever the file-level seed already
-      // created, so this test's own known ids can be asserted present.
       const publisher = await createLocalUserFixture(prisma, {
         email: `${uniqueTestMarker('risk-methodology-versions-publisher')}@example.test`,
       });
@@ -290,9 +248,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
       expect(response.status).toBe(200);
       const body = response.body as MethodologyVersionPageBody;
 
-      // The envelope itself: `data`/`meta`, NOT `PageResponse`'s internal
-      // `items`/flat `page`/`pageSize`/... — the exact shape the second
-      // original defect returned instead.
       expect(body).toHaveProperty('data');
       expect(body).toHaveProperty('meta');
       expect(body).not.toHaveProperty('items');
@@ -309,7 +264,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
       expect(ids).toContain(extraA.id);
       expect(ids).toContain(extraB.id);
 
-      // Newest first (contract: "A page of versions, newest first").
       const versionNumbers = body.data.map((v) => v.versionNumber);
       const sorted = [...versionNumbers].sort((a, b) => b - a);
       expect(versionNumbers).toEqual(sorted);
@@ -342,11 +296,6 @@ describe('Risk methodology endpoints (GET /risk-methodology, GET/POST /risk-meth
     });
 
     it('refuses an unauthenticated caller with 401', async () => {
-      // `Origin` set (same-origin) so this exercises SessionGuard's own
-      // 401, not `CsrfMiddleware`'s unrelated 403 for a missing/mismatched
-      // Origin on a state-changing request (ADR-002) — the two are
-      // deliberately distinct rejections, and this test's subject is the
-      // former.
       const response = await request(ctx.app.getHttpServer())
         .post('/api/v1/risk-methodology/versions')
         .set('Origin', appOrigin)

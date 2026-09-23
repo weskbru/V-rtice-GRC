@@ -1,12 +1,3 @@
-/**
- * PharosGRC Design System — elevation (shadow) tokens.
- *
- * Restrained shadows for a calm, dense interface: cards and popovers lift
- * slightly, modals lift more. Dark mode pairs the same shadows with a
- * visible `border` token (see colors.ts) rather than relying on shadow alone,
- * since box-shadow reads poorly on dark surfaces.
- */
-
 export const elevation = {
   none: 'none',
   xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',

@@ -5,23 +5,6 @@ import { RoleFilterBar } from './role-filter-bar';
 
 import type { RoleFilterBarProps } from './role-filter-bar';
 
-/**
- * PharosGRC — the roles surface's search and filters, as this SCREEN composes
- * them (015-roles-permissions-surface FR-005, FR-005a, NFR-005).
- *
- * `FilterBar`'s own disclosure contract is proved once, for all ten screens
- * that compose it, in `components/design-system-register-chrome.test.tsx`.
- * What is this screen's own — and what is asserted here — is the composition:
- * that the two selects are behind the disclosure, that the chips stay OUTSIDE
- * it so a closed panel never hides which filters are narrowing the list, that
- * the badge and the chips are built from the same three fields, and that the
- * chip labels are the ones the shared builders produce.
- *
- * Everything below is observable behaviour — roles, accessible names,
- * `aria-expanded` — never a class name, so a visual change that keeps the
- * behaviour keeps these green.
- */
-
 const MODULES = [
   { area: 'risk', label: 'Riscos' },
   { area: 'control', label: 'Controles' },
@@ -54,7 +37,6 @@ describe('RoleFilterBar — the filters behind the disclosure', () => {
   it('keeps the search box on screen and the two selects behind the toggle', () => {
     renderBar();
 
-    // Search is never hidden: it is the control a reader reaches for first.
     expect(screen.getByLabelText('Buscar papéis')).toBeInTheDocument();
 
     expect(screen.queryByRole('combobox', { name: 'Tipo' })).not.toBeInTheDocument();
@@ -120,8 +102,6 @@ describe('RoleFilterBar — the state a closed panel must not hide', () => {
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
 
     const chips = screen.getByRole('group', { name: 'Filtros ativos' });
-    // The exact strings the shared builders compose — `searchChip` for the
-    // term, `singleValueChip` for each single-value select.
     expect(within(chips).getByText('Busca: "auditor"')).toBeInTheDocument();
     expect(within(chips).getByText('Tipo: Sistema')).toBeInTheDocument();
     expect(within(chips).getByText('Módulo: Riscos')).toBeInTheDocument();
@@ -168,8 +148,6 @@ describe('RoleFilterBar — the state a closed panel must not hide', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Remover filtro: Busca: "auditor"' }));
 
-    // A debounced `onSearchChange('')` would leave the chip a third of a
-    // second behind the click that removed it.
     expect(onClearSearch).toHaveBeenCalledTimes(1);
     expect(onSearchChange).not.toHaveBeenCalled();
   });
@@ -192,8 +170,6 @@ describe('RoleFilterBar — the state a closed panel must not hide', () => {
   });
 
   it('never shows a module chip for an area no loaded role reaches', () => {
-    // The URL can name an area that the current page of roles does not
-    // reach; a chip reading "Módulo: undefined" would be worse than none.
     renderBar({ module: 'compliance', hasActiveFilters: true, activeFilterCount: 1 });
 
     expect(screen.queryByRole('group', { name: 'Filtros ativos' })?.textContent ?? '').not.toMatch(

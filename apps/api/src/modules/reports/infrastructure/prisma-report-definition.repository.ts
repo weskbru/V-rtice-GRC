@@ -1,13 +1,3 @@
-/**
- * 009-indicators-reports, Fase 2 (T014) + Fase 7 (T051/T054) —
- * `PrismaReportDefinitionRepository`: the sole Prisma-backed implementation
- * of `ReportDefinitionRepositoryPort`. No `ScopeFilter` anywhere
- * (research.md D-8) — mirrors
- * `modules/indicators/infrastructure/prisma-indicator-definition.repository.ts`
- * exactly: every method reads/writes `report_definitions` unconditionally,
- * gated only by the caller's own `report:view`/`report:create` permission
- * check (`ReportController`'s own `@RequirePermission` decorators).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -60,10 +50,6 @@ export class PrismaReportDefinitionRepository implements ReportDefinitionReposit
     return toReportDefinitionRecord(row);
   }
 
-  /** `PATCH /reports/{reportId}` (T068 prep). `updateMany` + a `count`
-   * check, no `P2025` try/catch — the same technique
-   * `PrismaIndicatorDefinitionRepository.update` uses for its own
-   * unscoped table. */
   async update(
     id: string,
     changes: UpdateReportDefinitionChanges,

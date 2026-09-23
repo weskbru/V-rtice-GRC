@@ -1,10 +1,3 @@
-/**
- * T016/005-audit-findings — the sole implementation of
- * `FrameworkVersionDirectoryPort` (`shared/grc-ports/framework-version-directory.port.ts`,
- * ADR-020 part 3). `modules/compliance` OWNS the `framework_versions` table,
- * so this adapter is the one place in the platform allowed to query it on
- * behalf of another module (`modules/audit-engagements`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

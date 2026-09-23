@@ -1,23 +1,3 @@
-/**
- * T041/T044/T045/T046/005-audit-findings — contract coverage for the
- * engagement operations of `contracts/audit.openapi.yaml`: the 11 User
- * Story 1 operations (`listAuditEngagements`, `createAuditEngagement`,
- * `getAuditEngagement`, `updateAuditEngagement`, `listAuditScope`,
- * `addFrameworkVersionToScope`, `addRequirementToScope`,
- * `addControlToScope`, `startAuditEngagement`, `completeAuditEngagement`,
- * `cancelAuditEngagement`), PLUS the two User Story 2 operations this task
- * closes (`listAuditEngagementFindings`, `createFindingFromEngagement` —
- * `GET`/`POST /audits/{auditId}/findings`). Uses the real `AppModule`
- * (`buildContractTestApp`) — this task owns `audit-engagements.module.ts`'s
- * own controller wiring, so (unlike `control-catalog.spec.ts`) no
- * per-module test-app override is needed.
- *
- * Every 404 assertion below checks BOTH the HTTP status and the problem
- * body's `status`/`title`, mirroring `control-catalog.spec.ts`'s own
- * "identical 404 problem bodies" test — status/title alone is what proves
- * indistinguishability without the test depending on the exact `detail`
- * copy.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -171,11 +151,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     return { id: body.id, version: response.headers.etag!, body };
   }
 
-  /** A `FrameworkVersion` + `Requirement` pair, both `PUBLISHED` (FR-006's
-   * own precondition for a legal scope target). `agent` needs
-   * `compliance:administer` (create/publish) and `compliance:view`
-   * (the ADR-020 part 5 referenced-side check `LinkAuditScopeTo*UseCase`
-   * applies). */
   async function createPublishedFrameworkVersionWithRequirement(
     agent: ReturnType<typeof request.agent>,
   ): Promise<{ frameworkId: string; versionId: string; requirementId: string }> {
@@ -211,8 +186,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     return { frameworkId, versionId, requirementId };
   }
 
-  /** A `DRAFT` `FrameworkVersion` — never a legal scope target
-   * (research.md D-2's "regra adicional"). */
   async function createDraftFrameworkVersion(
     agent: ReturnType<typeof request.agent>,
   ): Promise<{ frameworkId: string; versionId: string }> {
@@ -235,10 +208,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     return { frameworkId, versionId };
   }
 
-  /** An `ACTIVE` `Control` in `unitId` — seeded directly (no admin endpoint
-   * creates an already-`ACTIVE` control in one call; `control-catalog.spec.ts`/
-   * `compliance-mapping-and-state.spec.ts` both seed this dependency the
-   * same way). */
   async function createActiveControlFixture(unitId: string = orgUnitId): Promise<string> {
     const prisma = ctx.app.get(PrismaService);
     const control = await prisma.client.control.create({
@@ -253,10 +222,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     return control.id;
   }
 
-  /** Scopes a fresh engagement with an `ACTIVE` control and starts it —
-   * `agent` needs `ALL_ENGAGEMENT_PERMISSIONS` plus `control:view`. Returns
-   * the id and the ETag AFTER starting (the version a subsequent
-   * `complete`/`cancel` call needs). */
   async function startInProgressEngagement(
     agent: ReturnType<typeof request.agent>,
   ): Promise<{ id: string; version: string }> {
@@ -273,9 +238,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     return { id, version: startResponse.headers.etag! };
   }
 
-  /** A valid `CreateFindingFromEngagementRequest` body (`origin` chosen
-   * from the three pre-existing `FindingOrigin` values, research.md D-5 —
-   * no new one introduced). */
   function findingFromEngagementBody(
     overrides: Record<string, unknown> = {},
   ): Record<string, unknown> {
@@ -313,9 +275,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     await ctx.close();
   });
 
-  // -----------------------------------------------------------------
-  // POST /audits (createAuditEngagement)
-  // -----------------------------------------------------------------
   describe('POST /audits (createAuditEngagement)', () => {
     it('creates an engagement in PLANNING with a server-generated code, and returns Location/ETag', async () => {
       const agent = await agentWithPermissions(['audit-engagement:create']);
@@ -397,9 +356,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // GET /audits (listAuditEngagements)
-  // -----------------------------------------------------------------
   describe('GET /audits (listAuditEngagements)', () => {
     it('lists engagements within the caller scope, paginated', async () => {
       const agent = await agentWithPermissions([
@@ -446,9 +402,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // GET /audits/{auditId} (getAuditEngagement)
-  // -----------------------------------------------------------------
   describe('GET /audits/{auditId} (getAuditEngagement)', () => {
     it('returns the engagement with an ETag carrying its version', async () => {
       const agent = await agentWithPermissions([
@@ -519,9 +472,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // PATCH /audits/{auditId} (updateAuditEngagement)
-  // -----------------------------------------------------------------
   describe('PATCH /audits/{auditId} (updateAuditEngagement)', () => {
     it('updates a field, echoes the new ETag, and audits previous/new values', async () => {
       const agent = await agentWithPermissions([
@@ -636,10 +586,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // GET/POST /audits/{auditId}/scope... (listAuditScope,
-  // addFrameworkVersionToScope, addRequirementToScope, addControlToScope)
-  // -----------------------------------------------------------------
   describe('Audit scope (listAuditScope, addFrameworkVersionToScope, addRequirementToScope, addControlToScope)', () => {
     it('adds a published framework version, a requirement and an active control to scope, and lists the union newest first', async () => {
       const agent = await agentWithPermissions([
@@ -681,7 +627,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
       expect(listResponse.status).toBe(200);
       const entries = listResponse.body as readonly AuditScopeEntryBody[];
       expect(entries).toHaveLength(3);
-      // Newest first.
       expect(entries[0]!.id).toBe((addControlResponse.body as AuditScopeEntryBody).id);
     });
 
@@ -813,9 +758,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // POST /audits/{auditId}/start (startAuditEngagement)
-  // -----------------------------------------------------------------
   describe('POST /audits/{auditId}/start (startAuditEngagement)', () => {
     it('refuses to start an engagement with no scope link — 422, and status remains PLANNING (FR-003)', async () => {
       const agent = await agentWithPermissions(ALL_ENGAGEMENT_PERMISSIONS);
@@ -866,7 +808,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
         .set('Origin', appOrigin)
         .send({ controlId: await createActiveControlFixture() });
 
-      // Bump the version out from under the stale token.
       await agent
         .patch(`/api/v1/audits/${id}`)
         .set('Origin', appOrigin)
@@ -881,9 +822,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // POST /audits/{auditId}/complete (completeAuditEngagement)
-  // -----------------------------------------------------------------
   describe('POST /audits/{auditId}/complete (completeAuditEngagement)', () => {
     it('is refused unless the engagement is IN_PROGRESS — 422', async () => {
       const agent = await agentWithPermissions(ALL_ENGAGEMENT_PERMISSIONS);
@@ -917,7 +855,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
       expect(body.status).toBe('COMPLETED');
       expect(body.completedAt).not.toBeNull();
 
-      // Terminal: neither start nor a second complete succeeds afterward.
       const secondComplete = await agent
         .post(`/api/v1/audits/${id}/complete`)
         .set('Origin', appOrigin)
@@ -926,9 +863,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // POST /audits/{auditId}/cancel (cancelAuditEngagement, FR-004a)
-  // -----------------------------------------------------------------
   describe('POST /audits/{auditId}/cancel (cancelAuditEngagement, FR-004a)', () => {
     it('cancels a PLANNING engagement with a justification — 200, terminal', async () => {
       const agent = await agentWithPermissions(ALL_ENGAGEMENT_PERMISSIONS);
@@ -1019,10 +953,6 @@ describe('Audit engagements (US1, operations 1-11)', () => {
     });
   });
 
-  // -----------------------------------------------------------------
-  // GET/POST /audits/{auditId}/findings (listAuditEngagementFindings,
-  // createFindingFromEngagement — User Story 2, operations 12-13)
-  // -----------------------------------------------------------------
   describe('GET/POST /audits/{auditId}/findings (listAuditEngagementFindings, createFindingFromEngagement)', () => {
     it('creates a finding from an IN_PROGRESS engagement with auditEngagementId set, and the engagement lists it (T044, SC-001)', async () => {
       const agent = await agentWithPermissions([

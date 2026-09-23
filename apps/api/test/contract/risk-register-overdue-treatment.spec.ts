@@ -1,11 +1,3 @@
-/**
- * Gap-coverage required by this dispatch: `GET /risks`'s `overdueTreatment`
- * field and `overdueTreatment` filter (`contracts/risks.openapi.yaml`) now
- * reflect genuine `risk_treatment_actions` data (T141, US5) instead of the
- * pre-US5 hardcoded `false`/zero-matches stub —
- * `risk-query.service.ts`'s own header explains why that stub was
- * previously correct and what changed.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -82,8 +74,6 @@ describe('GET /risks — overdueTreatment field and filter reflect real treatmen
       email: `${uniqueTestMarker('ovd-reg-owner')}@example.test`,
     });
     ownerUserId = owner.id;
-    // F-CV-2: precondition owner, not the object of this file's assertions
-    // (overdueTreatment data/filter) — minimum eligibility only.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
   });
 
@@ -166,14 +156,6 @@ describe('GET /risks — overdueTreatment field and filter reflect real treatmen
       .send({ title: 'Ação concluída', responsibleUserId: ownerUserId, dueOn: '2018-01-01' });
     const action = actionResponse.body as { id: string };
 
-    // 007-implementation-remediation, Frente A — `Action`'s lifecycle table
-    // (data-model.md §4, FR-011 to FR-016) has no `OPEN -> COMPLETED` edge;
-    // completion always passes through `IN_PROGRESS` first
-    // (`grc/action/domain/action.entity.ts`'s `LEGAL_TRANSITIONS`). This
-    // route used to write `risk_treatment_actions.status` directly with no
-    // legality check, so a direct OPEN-to-COMPLETED PATCH used to succeed —
-    // it is now illegal by design, the same table every other Action-backed
-    // workflow already enforced.
     const inProgressResponse = await agent
       .patch(`/api/v1/risks/${risk.id}/treatment-actions/${action.id}`)
       .set('Origin', appOrigin)

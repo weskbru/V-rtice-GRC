@@ -1,11 +1,3 @@
-/**
- * T022/006-assets-processes — `ProcessController`: the six operations of
- * `contracts/processes.openapi.yaml`. Identical in shape to
- * `modules/assets/presentation/asset.controller.ts` (FR-020) — see that
- * file's header for the full account this one does not repeat, including
- * why no `If-Match`/`ETag`/`Cache-Control: no-store` appears anywhere
- * here.
- */
 import {
   BadRequestException,
   Body,
@@ -185,13 +177,6 @@ export class ProcessController {
     return toProcessDetailResponse(record);
   }
 
-  /**
-   * 013-incidents-problems-reverse-links — READ-ONLY reverse of
-   * `IncidentProcessLink`: `modules/processes` never writes this table
-   * (`modules/incidents`'s `link-incident-process.usecase.ts` owns that
-   * write path). Requires `process:view` and scope, resolved by
-   * `GetProcessUseCase` exactly like `findById` above.
-   */
   @RequirePermission('process:view')
   @Get(':processId/incidents')
   async listIncidentLinks(
@@ -208,7 +193,6 @@ export class ProcessController {
   }
 }
 
-/** `UpdateProcessRequest`'s `minProperties: 1`. */
 function assertUpdateBodyNotEmpty(body: UpdateProcessRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

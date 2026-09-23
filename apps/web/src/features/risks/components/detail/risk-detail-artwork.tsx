@@ -2,7 +2,6 @@ import { useId } from 'react';
 
 import styles from './risk-detail-visual.module.css';
 
-/** Atmospheric terrain, deliberately independent of risk state and navigation. */
 export function RiskDetailArtwork(): React.JSX.Element {
   const id = useId().replace(/:/g, '');
   return (

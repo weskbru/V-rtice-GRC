@@ -1,10 +1,3 @@
-/**
- * 009-indicators-reports, T024 — the sole implementation of
- * `AssetMetricsPort` (`shared/grc-ports/asset-metrics.port.ts`). Delegates
- * to `PrismaAssetRepository.list` — the SAME catalog query
- * `GET /assets` already runs — with `pageSize: 1` and `isActive: false`,
- * reading only the page's own `total`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { AssetMetricsPort } from '../../../shared/grc-ports/asset-metrics.port';

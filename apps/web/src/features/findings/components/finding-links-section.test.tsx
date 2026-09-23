@@ -3,13 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FindingLinksSection } from './finding-links-section';
 
-/**
- * Component-mount evidence for T078 (`FindingLinksSection`,
- * 005-audit-findings, US3, FR-013 to FR-016, ADR-020, FR-012/SC-005). `../api`
- * is mocked at the network boundary, mirroring `finding-close-dialog
- * .test.tsx`'s own pattern.
- */
-
 const {
   listControlLinksMock,
   listRiskLinksMock,
@@ -86,10 +79,6 @@ describe('FindingLinksSection', () => {
       <FindingLinksSection findingId="finding-1" findingStatus="OPEN" canLinkPermission={true} />,
     );
 
-    // The picker's own trigger accessible name is `pickerAriaLabel`
-    // ("Selecionar controle"), and it searches server-side as the user
-    // types (Front H) — see the identical fix in the e2e specs and in
-    // `risk-controls-section.test.tsx`/`requirement-controls-section.test.tsx`.
     fireEvent.click(await screen.findByRole('combobox', { name: 'Selecionar controle' }));
     fireEvent.change(screen.getByPlaceholderText('Buscar controle por nome ou código'), {
       target: { value: 'segregação' },
@@ -130,7 +119,6 @@ describe('FindingLinksSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Desvincular' }));
 
     const dialog = await screen.findByRole('dialog');
-    // Never "excluir"/"remover permanentemente" anywhere in this confirmation.
     expect(within(dialog).queryByText(/excluir/i)).not.toBeInTheDocument();
     expect(
       within(dialog).getByText(/não é apagado: ele continua registrado no histórico/i),
@@ -156,23 +144,8 @@ describe('FindingLinksSection', () => {
   });
 });
 
-/**
- * S-08 (`F-61`, `A4-F05`) — `FindingsPanel` mounts one `FindingLinksSection`
- * per finding, and this section used to fetch its controls AND its risks the
- * instant it mounted, regardless of whether the finding was ever scrolled
- * into view. Measured against a populous org unit this produced 150-350
- * requests on a single page load. These tests stub a real
- * `IntersectionObserver` (this project's own Vitest/jsdom setup polyfills
- * only `ResizeObserver` — see `vitest.setup.ts` — so every OTHER test in
- * this file already exercises this component's fallback path, not a mocked
- * "always intersecting" observer) to prove the fetch is genuinely gated on
- * intersection, not merely delayed.
- */
 describe('FindingLinksSection viewport gating (S-08)', () => {
   let observed: { callback: IntersectionObserverCallback; element: Element } | null;
-  // Only `observe`'s recorded callback is ever exercised — the rest of the
-  // real `IntersectionObserver` interface is unused surface this fake must
-  // still implement to type-check as one.
   /* eslint-disable @typescript-eslint/no-empty-function -- deliberate no-op stub methods, not a mistake */
   class FakeIntersectionObserver implements IntersectionObserver {
     readonly root: Element | Document | null = null;
@@ -194,9 +167,6 @@ describe('FindingLinksSection viewport gating (S-08)', () => {
   }
   /* eslint-enable @typescript-eslint/no-empty-function */
 
-  // The hook's own observer callback never reads its second (`observer`)
-  // argument, so every simulated intersection below reuses this one stub
-  // instance rather than constructing a fresh, unused `FakeIntersectionObserver`.
   const unusedObserverArg = new FakeIntersectionObserver(() => undefined);
 
   beforeEach(() => {
@@ -213,12 +183,10 @@ describe('FindingLinksSection viewport gating (S-08)', () => {
       <FindingLinksSection findingId="finding-1" findingStatus="OPEN" canLinkPermission={false} />,
     );
 
-    // Let the mount effect run (it registers the observer synchronously).
     await Promise.resolve();
     expect(observed).not.toBeNull();
     expect(listControlLinksMock).not.toHaveBeenCalled();
     expect(listRiskLinksMock).not.toHaveBeenCalled();
-    // The pending state reads the same as "loading" — no distinct empty/error state before intersection.
     expect(screen.getByText('Carregando controles vinculados…')).toBeInTheDocument();
     expect(screen.getByText('Carregando riscos vinculados…')).toBeInTheDocument();
   });

@@ -1,9 +1,3 @@
-/**
- * PharosGRC frontend — Action API wrapper (T056, 002-shared-grc-foundation,
- * US2). A thin, typed layer over `apiClient`, mirroring `features/evidence
- * /api.ts`'s own shape. `Action` carries no optimistic-concurrency field
- * (data-model.md §4) — no `ETag`/`If-Match` handling needed here.
- */
 import { apiClient } from '@/lib/api-client';
 
 import type {
@@ -18,9 +12,6 @@ import type {
   UserRef,
 } from './types';
 
-/** Builds `GET /actions`'s query string, omitting any filter the caller
- * did not set — the same convention `risksApi`'s own
- * `buildRegisterQueryString` establishes. */
 function buildListQueryString(query: ListActionsQuery): string {
   const params = new URLSearchParams();
   params.set('page', String(query.page));
@@ -54,15 +45,6 @@ export const actionsApi = {
     return apiClient.post<Action>(`/actions/${actionId}/transitions`, body);
   },
 
-  /**
-   * `GET /actions/{actionId}/audit-events` — mirrors `risksApi
-   * .listAuditEvents`'s own contract exactly (`features/risks/api.ts`),
-   * scoped to `Action` instead of `Risk`. As of this writing (008/009's
-   * successor work), this route is being built by a separate, concurrent
-   * task alongside this one and may not exist yet in a given environment —
-   * `ActionAuditSection` (the only caller) handles a `404`/`403` from this
-   * call explicitly rather than assuming the route is live.
-   */
   listActionAuditEvents(
     actionId: string,
     page: number,
@@ -73,22 +55,6 @@ export const actionsApi = {
     );
   },
 
-  // -------------------------------------------------------------------
-  // Reference data for `ActionEditForm` — this module's own copy of the
-  // shared `/users` lookup, mirroring `incidentsApi.listUsers`/`problemsApi
-  // .listUsers`'s own doc comment (each business module declares its own,
-  // per CLAUDE.md §2/§4 — never a cross-module import of another feature's
-  // API client).
-  // -------------------------------------------------------------------
-
-  /**
-   * `GET /users?q=` — searches the directory server-side (S-10: a fixed
-   * `pageSize=100` with no search silently hid every user past the first
-   * page; this project's own development database already has more than
-   * 100). `q` empty returns the first page unfiltered, exactly like before
-   * the fix, so `UserPicker`'s own "load a first page on open" behaviour
-   * still works with no query typed yet.
-   */
   async searchUsers(q: string): Promise<{ data: readonly UserRef[]; isPartial: boolean }> {
     const params = new URLSearchParams({ pageSize: '20' });
     if (q) params.set('q', q);

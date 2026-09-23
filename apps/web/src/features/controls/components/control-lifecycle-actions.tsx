@@ -1,49 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control detail, lifecycle action bar (T047, US1, D-6).
- *
- * Renders exactly what `GET /controls/{controlId}/lifecycle` returns —
- * this component contains no transition table and no precondition logic
- * of its own (same discipline as `RiskLifecycleActions`, ADR-006 applied
- * here to Controls). Unlike Risk, there is no approval-gated transition in
- * this domain: every transition here is either applied directly
- * (`control:edit`) or is the terminal retirement (`control:administer`) —
- * `POST /controls/{controlId}/transitions` re-evaluates the same
- * declarative table server-side regardless.
- *
- * Retirement into `RETIRED` requires `justification` (US1 AS3) — the
- * dialog marks that field required only when the target is `RETIRED`,
- * honestly reflecting the contract rather than always demanding it.
- *
- * ## No longer its own card, no longer its own fetch
- * (021-control-detail-experience, Fase B)
- *
- * Before this phase, this component owned BOTH a `GET .../lifecycle` fetch
- * and a page-level `Card` — the entire "Ciclo de vida" surface, mounted
- * above the tabs. `ControlLifecycleSection` (`components/detail/`) now owns
- * both: the fetch (`useControlLifecycle`, lifted to `ControlDetailView`'s
- * own level, since the "Ciclo de vida" card's track visual needs the same
- * `ControlLifecycleState`) and the card casing, alongside the track
- * (`ControlLifecycleTrackView`) and the control's conditional outcome facts
- * (`retiredAt`/`retiredBy`/`retirementReason`). This component is now a
- * PLAIN button row — `availableTransitions` arrives as a prop instead of
- * being fetched here, and the "Nenhuma transição disponível" sentence is
- * preserved (unlike Problem's/Incident's/Action's own equivalent, which
- * retired that sentence as redundant with their track) because the
- * coordinator's own instruction for this phase was explicit that the
- * per-transition "Pendências para esta transição" text is real information
- * this module has that the others do not, and nothing about this
- * component's actual rendered behaviour — which buttons appear, which
- * pendencies show, when the dialog opens — changes in this phase, only
- * where the data it renders comes from.
- *
- * The illegal-transition guarantee is UNCHANGED: a transition absent from
- * `availableTransitions` is never offered, not even disabled — the same
- * omission-not-disabling discipline this component always had, now proven
- * against a prop instead of an internal fetch result
- * (`control-lifecycle-actions.test.tsx`).
- */
 import { FormField } from '@pharos/design-system/components';
 import { ArrowRightCircle, Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -70,11 +26,8 @@ import type { AvailableControlTransition } from '../types';
 
 export interface ControlLifecycleActionsProps {
   controlId: string;
-  /** The control's current `ETag` — required by `POST .../transitions`. */
   etag: string;
-  /** `ControlLifecycleState.availableTransitions`, fetched once at the page level (`useControlLifecycle`, `components/detail/`) — see this file's own header comment for why the fetch moved out of this component. */
   availableTransitions: readonly AvailableControlTransition[];
-  /** Called after a successful transition. The caller re-reads both the whole control AND the lifecycle (`useControlLifecycle`'s own `reload`), mirroring `RiskLifecycleActions`'/`ControlLifecycleSection`'s own `onChanged`. */
   onChanged: () => void;
 }
 

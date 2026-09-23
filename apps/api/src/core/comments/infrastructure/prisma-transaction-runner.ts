@@ -1,8 +1,3 @@
-/**
- * T192 — the sole `TransactionRunnerPort` implementation for
- * `core/comments`, thin by design (see `shared/persistence/
- * transaction-runner.port.ts` and every other module's own copy).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

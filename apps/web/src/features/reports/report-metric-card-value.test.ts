@@ -4,12 +4,6 @@ import { buildReportItemMetricCardValue } from './report-metric-card-value';
 
 import type { ReportRunItem } from './types';
 
-/**
- * Pure-function evidence for `buildReportItemMetricCardValue` (009-indicators-reports, T061) —
- * the FR-026/SC-006 rule this task exists to enforce: an item with `available: false` maps to
- * `MetricCard`'s distinct `unavailable` state, never a `single`/`0`, and never throws even when
- * `value`/`valueByBucket` are both absent (the exact shape the server sends for that case).
- */
 function baseItem(overrides: Partial<ReportRunItem>): ReportRunItem {
   return {
     metricKey: 'CONTROL_INACTIVE_COUNT',

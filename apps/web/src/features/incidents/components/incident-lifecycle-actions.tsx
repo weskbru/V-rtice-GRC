@@ -1,36 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident lifecycle action bar (008-incidents-problems, US1).
- *
- * Renders ONLY the transitions `availableIncidentTransitions(incident
- * .status)` returns — an illegal move is never offered as a disabled or
- * greyed-out button that then gets refused on click; it is simply absent
- * (CLAUDE.md's own acceptance question, and the coordinator's explicit
- * instruction: "make the legal transitions obvious and the illegal ones
- * unavailable rather than offered-then-refused"). A terminal status
- * (`CLOSED`/`CANCELLED`) therefore renders no actions at all, which is
- * itself the correct, honest state — not a control pretending something is
- * missing.
- *
- * `start` (`OPEN -> IN_PROGRESS`) is the one transition with no
- * confirmation dialog and no required field (`confirmKey: undefined`) —
- * applied immediately on click, mirroring `MyActionsView.applyTransition`'s
- * own direct-call pattern for every transition except reopen. Every other
- * option opens `IncidentTransitionDialog`, which is the sole place any of
- * them is actually submitted.
- *
- * ## No longer its own card (018-incident-detail-experience, Fase 2+3)
- *
- * This used to be a full-width `Card` holding nothing but this button row —
- * measured at 1120×118px for two 74×36px buttons, 96% empty space. It is
- * now a plain row, embedded inside `IncidentLifecycleSection`'s own "Ciclo
- * de vida" card alongside the track visual and any outcome facts. The
- * return-`null` conditions below (`!canTransition || options.length === 0`)
- * are UNCHANGED — only the surrounding chrome moved. The enclosing card
- * keeps rendering the track regardless of what this component returns; see
- * `incident-lifecycle-section.tsx`'s own header comment.
- */
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 

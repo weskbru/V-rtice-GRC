@@ -1,11 +1,3 @@
-/**
- * Unit tests for the pure assignment-line rule
- * (`src/core/organizations/domain/assignment-line.ts`) — no I/O, no Prisma,
- * no database. See that file's own header for the rule and for the defect
- * (F-34) it exists to close: the assignment line of unit U is U itself,
- * every ANCESTOR of U (parsed from its own materialized path) and every
- * DESCENDANT of U (supplied by the caller, already expanded).
- */
 import { describe, expect, it } from 'vitest';
 
 import {

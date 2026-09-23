@@ -1,20 +1,3 @@
-/**
- * PharosGRC — small icon+label caption naming an `IndicatorOverviewItem`'s
- * business domain (indicators-round, S1 ownership, coordinator PLAN.md §2).
- *
- * Every card on the redesigned `/indicators` screen shows this above its
- * own name, so a manager scanning eleven cards can tell "Riscos" from
- * "Achados" from the icon alone before reading a single word — the same
- * "identidade visual reconhecível" principle `navigation-registry.ts`'s own
- * icons already serve in the sidebar (CLAUDE.md §18.11). Icons mirror that
- * registry's own choices for the nine domains that have a sidebar entry
- * (`RISK`→`ShieldAlert`, `ACTION`→`ListChecks`, `PROBLEM`→`AlertTriangle`,
- * `INCIDENT`→`Siren`, `CONTROL`→`ShieldCheck`, `ASSET`→`Warehouse`,
- * `PROCESS`→`Workflow`, `COMPLIANCE`→`ScrollText`, `AUDIT`→`Gavel`) and the
- * existing per-metric-key catalog's own choice for `FINDING` (`Search`,
- * `features/indicators/metric-visuals.ts`'s `INDICATOR_METRIC_ICON`) — never
- * a fresh, uncoordinated icon set.
- */
 import {
   AlertTriangle,
   Gavel,
@@ -54,7 +37,6 @@ export interface IndicatorDomainCaptionProps {
   readonly className?: string;
 }
 
-/** Icon + domain name, e.g. "🛡 Riscos" — always paired (never icon-only), so the domain is never conveyed by shape/color alone (CLAUDE.md §18.8). */
 export function IndicatorDomainCaption({
   domain,
   className,

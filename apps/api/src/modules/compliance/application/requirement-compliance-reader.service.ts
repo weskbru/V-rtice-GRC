@@ -1,49 +1,3 @@
-/**
- * T027/T049/004-compliance-management — gathers the real inputs
- * `calculateRequirementComplianceState` (research.md D-8) needs, and
- * populates `Requirement.applicability`, for every use case that serves a
- * `Requirement` representation. Also owns the observation-time audit
- * comparison (research.md D-11, User Story 3, T049-T052): every
- * computation performed here — single or batched — is immediately
- * compared against `RequirementComplianceAuditMark` and, when it differs,
- * recorded as a `REQUIREMENT_COMPLIANCE_STATE` audit event. This is the
- * single point every future caller of `deriveForOne`/`deriveForMany`
- * inherits the D-11 guarantee from automatically, with no call site of
- * its own needing to know the mechanism exists.
- *
- * ## Why the audit side effect lives HERE, not in each calling use case
- *
- * D-11 requires the comparison to run "a cada leitura que o expõe... e
- * como efeito colateral de toda escrita [...] que pode afetar" —
- * `GetRequirementUseCase`, `ListRequirementsUseCase`, the
- * compliance-summary use case, AND every User Story 2/3 write that
- * touches a requirement's compliance inputs (link/unlink, declare/revoke,
- * migrate) all call `deriveForOne`/`deriveForMany` already, to serve their
- * own response or to trigger this exact side effect. Embedding it in the
- * one shared gathering step means none of those callers needs its own
- * copy of the watermark-comparison logic — the same reasoning D-8's
- * single calculator exists for, applied one layer up.
- *
- * ## Best-effort, never part of the read/write contract (D-11's own text)
- *
- * The audit-mark write (and the event it may emit) runs inside its own
- * `transactionRunner.run(...)` scope, wrapped in try/catch: a failure here
- * is logged and swallowed, never surfaced as a failure of the
- * read/write the caller actually asked for — "a resposta nunca depende do
- * resultado dessa escrita" (D-11). This also means a `GET` that computes
- * `complianceState` keeps returning it correctly even if the bookkeeping
- * write fails for any reason (e.g. a losing concurrent writer, or a
- * transient DB error) — bookkeeping best-effort, not part of the read.
- *
- * ## Real batching for `deriveForMany` (research.md D-10)
- *
- * Unlike an earlier draft of this file (which called `deriveForOne` once
- * per row), the batch path below resolves applicability, linked-control
- * ids, control directory entries and control effectiveness each in ONE
- * round trip for the whole set of rows — the "uma leitura em lote" D-10
- * requires so a 500-requirement compliance summary (SC-008) stays well
- * inside its 2-second budget.
- */
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -84,10 +38,6 @@ export class RequirementComplianceReaderService {
     registerComplianceAuditAllowlists();
   }
 
-  /** Derives `{ applicability, complianceState }` for a single
-   * requirement. `referenceDate` mirrors `ControlEffectivenessService`'s
-   * own discipline of never reading the clock inside a derived-state
-   * rule — one "now" per request, supplied by the caller. */
   async deriveForOne(
     requirementId: string,
     referenceDate: Date,
@@ -109,9 +59,6 @@ export class RequirementComplianceReaderService {
     return { applicability, complianceState };
   }
 
-  /** Batch variant for a listing or a whole-version aggregate (research.md
-   * D-10) — one round trip per input type for the whole set of `rows`,
-   * never one per row. */
   async deriveForMany(
     rows: readonly RequirementRow[],
     referenceDate: Date,
@@ -141,12 +88,6 @@ export class RequirementComplianceReaderService {
     return results;
   }
 
-  /** Resolves `{ isActive, effectiveness }` for every currently-linked
-   * control of every id in `requirementIds`, in three round trips total
-   * regardless of how many requirements are given: one for the links
-   * themselves, one batched `ControlDirectoryPort.findManyById`, one
-   * batched `ControlEffectivenessPort.getEffectivenessBatch` (research.md
-   * D-9/D-10). */
   private async resolveLinkedControls(
     requirementIds: readonly string[],
     referenceDate: Date,
@@ -186,8 +127,6 @@ export class RequirementComplianceReaderService {
     return result;
   }
 
-  /** research.md D-11 — the single-requirement observation comparison.
-   * Best-effort: any failure is logged and swallowed (see file header). */
   private async auditObservation(
     requirementId: string,
     state: RequirementComplianceState,
@@ -217,7 +156,6 @@ export class RequirementComplianceReaderService {
     }
   }
 
-  /** Batched counterpart of `auditObservation`, for `deriveForMany`. */
   private async auditObservations(
     results: ReadonlyMap<string, RequirementDerivedFields>,
     observedAt: Date,

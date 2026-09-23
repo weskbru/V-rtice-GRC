@@ -1,33 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — process detail, linked risks/controls/incidents tabs (T047,
- * FR-008, ADR-020 part 4; incidents added by
- * 013-incidents-problems-reverse-links).
- *
- * Unlike `ControlLinksSection`'s `RelationshipSubsection` (which issues its
- * own `GET .../risks|processes|assets` calls), `ProcessDetail.risks`/
- * `.controls` arrive ALREADY embedded in the single `GET /processes/{processId}`
- * response this screen already fetched (`features/processes/types.ts`'s own
- * `ProcessDetail` — no separate endpoint exists to fail independently of that
- * one load). There is therefore genuinely only one load-failure state to
- * show here — the detail view's own top-level `ErrorState` already covers
- * it — so `ProcessLinkedRisksSection`/`ProcessLinkedControlsSection` own no
- * network call and no error state of their own, only the empty state each
- * tab's own message key already names
- * (`processes.linkedRisks.empty`/`processes.linkedControls.empty`).
- *
- * `ProcessLinkedIncidentsSection` below is the one exception: mirrors
- * `features/assets/components/asset-linked-entities-section.tsx`'s own
- * `AssetLinkedIncidentsSection` exactly, for `Process` instead of `Asset`
- * (FR-020) — self-fetches `GET /processes/{processId}/incidents`, a table
- * `modules/incidents` owns and never embeds in `ProcessDetail`, while
- * keeping THIS screen's own plain, card-less visual family.
- *
- * Read-only by design (FR-008): the link is created and withdrawn
- * exclusively from the Risk/Control/Incident module's own contract, never
- * from here — no link/unlink affordance appears on this screen.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 

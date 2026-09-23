@@ -1,12 +1,3 @@
-/**
- * T033/003-controls-management, User Story 2 — `ControlAssessmentController`:
- * `contracts/controls.openapi.yaml`'s
- * `/controls/{controlId}/assessments[/{assessmentId}][/attestation[/decision]]`
- * paths (operations 7-11: `listControlAssessments`,
- * `createControlAssessment`, `getControlAssessment`,
- * `requestControlAssessmentAttestation`,
- * `decideControlAssessmentAttestation`).
- */
 import {
   Body,
   Controller,

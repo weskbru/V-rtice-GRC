@@ -1,14 +1,3 @@
-/**
- * `OrgUnitAdminRepositoryPort` implementation backed by PostgreSQL via
- * `PrismaService` (T178, ADR-004). Lives in
- * `core/organizations/infrastructure` because `PrismaService` is the
- * top-level `infrastructure` element, which only `core-infrastructure`/
- * `core-presentation` may import under the ADR-011 boundary rules.
- *
- * Every write here participates in whatever transaction is ambient on
- * `PrismaService`'s `AsyncLocalStorage` (opened by `OrgUnitAdminService`
- * via `TransactionRunnerPort`) — this class never opens one itself.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

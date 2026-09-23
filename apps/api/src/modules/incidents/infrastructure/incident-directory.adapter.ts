@@ -1,10 +1,3 @@
-/**
- * 008-incidents-problems, foundation — the sole implementation of
- * `IncidentDirectoryPort` (`shared/grc-ports/incident-directory.port.ts`).
- * `modules/incidents` OWNS the `incidents` table, so this adapter is the
- * one place in the platform allowed to query it on behalf of another
- * module. Mirrors `PrismaControlDirectoryAdapter` exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

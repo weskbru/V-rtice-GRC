@@ -6,20 +6,6 @@ import { buildProblemLifecycleTrack } from './problem-lifecycle-track';
 
 import type { ProblemDetail, ProblemStatus } from '../../types';
 
-/**
- * Pure-logic evidence for the "Ciclo de vida" track model
- * (019-problem-detail-experience, Fase B) — the honesty constraints this
- * module exists to enforce (see its own header comment): `IN_ANALYSIS` is
- * NEVER marked completed, `CANCELLED` only ever appears as a node when the
- * problem's CURRENT status actually is `CANCELLED`, and `OPEN`/`RESOLVED`/
- * `CLOSED` are only "completed" when a real timestamp on the payload proves
- * it, never inferred from status order alone. Mirrors
- * `incident-lifecycle-track.test.ts`'s own coverage exactly, `IN_PROGRESS`
- * renamed to `IN_ANALYSIS` — see `problem-lifecycle-track.ts`'s own header
- * comment for why this is a second, independent copy rather than a shared
- * caller of that suite.
- */
-
 function facts(
   status: ProblemStatus,
   overrides: { resolvedAt?: string | null; closedAt?: string | null } = {},
@@ -40,7 +26,6 @@ describe('buildProblemLifecycleTrack', () => {
     const model = buildProblemLifecycleTrack(problem, availableProblemTransitions('OPEN'));
 
     expect(nodeState(model, 'OPEN')).toBe('current');
-    // OPEN -> IN_ANALYSIS is a legal, offered transition.
     expect(nodeState(model, 'IN_ANALYSIS')).toBe('available');
     expect(nodeState(model, 'RESOLVED')).toBe('unavailable');
     expect(nodeState(model, 'CLOSED')).toBe('unavailable');
@@ -94,9 +79,6 @@ describe('buildProblemLifecycleTrack', () => {
       ),
     ).toBe('completed');
 
-    // Defensive case: a CLOSED problem should always carry resolvedAt in
-    // practice (CLOSED is only reachable from RESOLVED), but the model must
-    // not silently assume it — only the timestamp itself proves the fact.
     const closedWithoutResolvedAt = facts('CLOSED', { closedAt: '2026-01-03T10:00:00.000Z' });
     expect(
       nodeState(
@@ -114,9 +96,6 @@ describe('buildProblemLifecycleTrack', () => {
     );
     expect(cancelledModel.cancelled).toEqual({ status: 'CANCELLED', state: 'current' });
 
-    // OPEN and IN_ANALYSIS both offer CANCELLED as a legal target transition
-    // — that must never surface as a rendered node on a problem that has not
-    // actually been cancelled.
     const open = facts('OPEN');
     expect(
       buildProblemLifecycleTrack(open, availableProblemTransitions('OPEN')).cancelled,

@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new framework route (US1). `FrameworkForm` navigates to
- * `/compliance/{id}` on a successful create — this route stays a thin
- * composition of the page chrome and the reusable form.
- */
 import { PageHeader } from '@pharos/design-system/components';
 
 import { FrameworkForm } from '@/features/compliance/components/framework-form';

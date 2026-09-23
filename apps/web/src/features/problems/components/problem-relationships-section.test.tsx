@@ -8,23 +8,6 @@ import {
 
 import type { ProblemIncidentLinkResponse, ProblemRiskLinkResponse } from '../types';
 
-/**
- * Component-mount evidence for the problem detail's Riscos/Incidentes
- * relationship sections (019-problem-detail-experience, Fase D —
- * progressive disclosure). `../api` is mocked at the network boundary.
- *
- * Central assertions, mirroring
- * `incident-relationships-section.test.tsx`'s own `gateLinkBehindAction`
- * coverage exactly:
- *
- *   - the picker is absent until the caller clicks the intent button, and
- *     appears immediately after;
- *   - the empty state is never silent — the intent trigger renders directly
- *     under the empty-state sentence, for a caller who can link;
- *   - "Incluir vínculos desfeitos" stays reachable in the header regardless
- *     of whether the picker is open.
- */
-
 const { listRiskLinksMock, listRiskOptionsMock, linkRiskMock, unlinkRiskMock } = vi.hoisted(() => ({
   listRiskLinksMock: vi.fn(),
   listRiskOptionsMock: vi.fn(),

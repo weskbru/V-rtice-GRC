@@ -1,24 +1,5 @@
 'use client';
 
-/**
- * PharosGRC application shell — top header (T073, FR-039, FR-040).
- *
- * Wave 2 (CLAUDE.md §18): the header previously carried only a bare page
- * label, a bell and an account chip, wasting a full band on every screen.
- * It now has a deliberate two-sided composition:
- *
- * - Left — page identity: the active nav entry's own icon (so the header
- *   echoes the sidebar's own visual language rather than inventing a second
- *   one) plus its label, with a small section eyebrow above it
- *   (`navigation-sections.ts` — the same grouping the sidebar renders) when
- *   the current page belongs to a labelled section. This is "primary
- *   context", not a marketing strapline: it tells the user where they are
- *   in the platform, one level up from the page title alone.
- * - Right — the utility cluster: theme toggle, then notifications and
- *   account grouped together (a subtle divider marks the seam), matching
- *   how the two clusters differ in kind (page-wide preference vs.
- *   this-session/this-account).
- */
 import { usePathname } from 'next/navigation';
 
 import { shell } from '@/lib/messages/shell';
@@ -81,10 +62,6 @@ export function Header(): React.JSX.Element {
               {sectionLabel}
             </span>
           ) : null}
-          {/* Kept as a `nav`/`ol`/`li` landmark, unchanged from before this
-           * wave, even though it carries a single item — the icon/eyebrow
-           * above are presentational context around it, not additional
-           * trail levels. */}
           <nav aria-label={shell.header.breadcrumbAriaLabel}>
             <ol className="flex items-center gap-1 text-sm font-semibold text-foreground">
               <li className="truncate">{label}</li>

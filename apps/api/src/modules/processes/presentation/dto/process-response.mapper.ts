@@ -1,9 +1,3 @@
-/**
- * T022/006-assets-processes — maps `ProcessRecord`/`ProcessSummaryRecord`
- * to the wire shapes `contracts/processes.openapi.yaml`'s
- * `ProcessSummary`/`ProcessDetail` describe. Identical in shape to
- * `modules/assets/presentation/dto/asset-response.mapper.ts` (FR-020).
- */
 import type {
   ProcessLinkedControlRecord,
   ProcessLinkedRiskRecord,

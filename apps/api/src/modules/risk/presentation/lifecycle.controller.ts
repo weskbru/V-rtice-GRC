@@ -1,18 +1,3 @@
-/**
- * T158/T159 — `LifecycleController`: `GET /risks/{riskId}/lifecycle`,
- * `POST /risks/{riskId}/transitions`, `GET`/`POST
- * /risks/{riskId}/approvals` and `POST
- * /risks/{riskId}/approvals/{approvalId}/decision` per
- * `contracts/risks.openapi.yaml`'s "Risk Lifecycle" operations (ADR-006,
- * FR-029/FR-029a-d, FR-079 to FR-085).
- *
- * `POST /transitions` is deliberately `@NoPermissionRequired()`, not
- * `@RequirePermission(...)` — see `PerformTransitionUseCase`'s own header
- * for why a single route serving every `(from, to)` pair cannot carry one
- * static permission, and how the real, per-pair check is performed one
- * layer down instead. Every OTHER route here has one fixed, contract-stated
- * permission and uses the standard decorator.
- */
 import {
   Body,
   Controller,
@@ -67,8 +52,6 @@ export class LifecycleController {
     private readonly approvalRepository: ApprovalRepositoryPort,
   ) {}
 
-  /** FR-080/FR-082 — the current state, any pending-approval condition, and
-   * the transitions valid from here AND permitted to this caller. */
   @RequirePermission('risk:view')
   @Get('lifecycle')
   async getLifecycle(
@@ -82,11 +65,6 @@ export class LifecycleController {
     return toRiskLifecycleStateResponse(state);
   }
 
-  /** See this file's header for why this route is `@NoPermissionRequired()`
-   * rather than a static `@RequirePermission`. `@HttpCode(HttpStatus.OK)`
-   * because the contract's `transitionRisk` operation declares `200`, not
-   * Nest's `@Post()` default of `201` (this endpoint applies an existing
-   * risk's transition — nothing is "created"). */
   @NoPermissionRequired()
   @Post('transitions')
   @HttpCode(HttpStatus.OK)
@@ -112,25 +90,6 @@ export class LifecycleController {
     return toLifecycleTransitionResponse(transition);
   }
 
-  /**
-   * FR-029b/SC-016 — every approval request and decision for this risk,
-   * newest first.
-   *
-   * `risk:view` + scope: `GetRiskUseCase` reads the parent risk first (the
-   * SAME scope/existence check `AssessmentController.list`/
-   * `TreatmentController.listTreatments`/
-   * `RiskRelationshipController.listControlLinks` all apply before
-   * touching their own repository) — `approvals` has no `orgUnitId` of its
-   * own to scope against, exactly like those other risk-child tables.
-   * Previously this method called `approvalRepository.listByEntity`
-   * directly, with no scope check at all: an out-of-scope risk (or one
-   * this caller's role never grants `risk:view` over at all, since
-   * `@RequirePermission` alone answers only "does this caller hold
-   * `risk:view` ANYWHERE", never "over THIS risk") returned 200 with the
-   * real approval history — a governance-activity disclosure, and a
-   * byte-identical-404 (ADR-009) violation, fixed here by routing through
-   * the same use case every sibling list endpoint already uses.
-   */
   @RequirePermission('risk:view')
   @Get('approvals')
   async listApprovals(
@@ -143,9 +102,6 @@ export class LifecycleController {
     return approvals.map(toApprovalResponse);
   }
 
-  /** FR-029 — requires `risk:transition` (requesting), never
-   * `risk:approve` (deciding) — the segregation-of-duties split
-   * `domain/risk-lifecycle.ts`'s own header explains. */
   @RequirePermission('risk:transition')
   @Post('approvals')
   @HttpCode(HttpStatus.CREATED)
@@ -173,10 +129,6 @@ export class LifecycleController {
     return toApprovalResponse(approval);
   }
 
-  /** FR-029a — requires `risk:approve` (deciding), never `risk:transition`
-   * (requesting). Segregation of duties (approver != requester) is enforced
-   * inside `DecideApprovalUseCase`, in the domain, regardless of what
-   * permission the caller holds. */
   @RequirePermission('risk:approve')
   @Post('approvals/:approvalId/decision')
   @HttpCode(HttpStatus.OK)

@@ -31,12 +31,6 @@ function Command({
 }
 
 function CommandDialog({
-  // CLAUDE.md §11.1 / assurance-audit Fix 4: these were the shadcn
-  // scaffold's own hardcoded English defaults ("Command Palette" / "Search
-  // for a command to run..."), never localized. This primitive has zero
-  // importers today (dormant), but its defaults must still never be
-  // English the moment a future screen wires it up without its own
-  // `title`/`description` override.
   title = common.commandPalette.defaultTitle,
   description = common.commandPalette.defaultDescription,
   children,

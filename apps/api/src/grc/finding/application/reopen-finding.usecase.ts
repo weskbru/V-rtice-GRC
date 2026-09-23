@@ -1,30 +1,3 @@
-/**
- * T071a/002-shared-grc-foundation, US3 — `ReopenFindingUseCase`
- * (`reopenFinding`, FR-027, FR-028). `finding:close` — reopening reverses
- * a closure, so it answers to the same authority
- * (contracts/grc-foundation.openapi.yaml's own description).
- *
- * Legal only from `CLOSED` — enforced by
- * `finding.entity.ts#assertFindingCanBeReopened`, a NARROWER precondition
- * than the general transition table (which also allows `OPEN ->
- * IN_REMEDIATION` as a state-diagram edge; see that function's own header
- * for why reopening specifically requires an actual prior closure to
- * reverse). Reopening a finding that was never closed is `422`, the
- * adversarial case this task requires. Requires a non-empty `reason`.
- *
- * The previous closure is preserved in the audit trail, never in a live
- * column: `closedAt`/`closedByUserId`/`closureJustification` are CLEARED
- * back to `null` on the live row (mirroring
- * `TransitionActionUseCase`'s own `COMPLETED -> OPEN` shape), while this
- * same audit event's `previousValues` carries what they were — so "this
- * finding was closed once, by whom, and why" stays reconstructable
- * (SC-003) even though the live row no longer says so. `reason` itself is
- * not a persisted column on `Finding` at all (data-model.md §5 declares
- * none) — it lives ONLY in `finding.reopened`'s `newValues`, which is why
- * `'reopenReason'` had to be added to `AuditEntityType.FINDING`'s field
- * allow-list (`grc/shared/domain/grc-audit-allowlist.ts`) for this event
- * to actually carry it instead of being silently dropped.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -66,8 +39,6 @@ export class ReopenFindingUseCase {
     assertReopenReasonProvided(input.reason);
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the finding actually exists outside `scope`.
     const current = await this.findingRepository.findById(scope, input.findingId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

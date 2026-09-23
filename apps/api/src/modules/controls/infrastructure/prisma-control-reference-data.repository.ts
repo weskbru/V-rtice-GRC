@@ -1,12 +1,3 @@
-/**
- * T020/003-controls-management — the sole implementation of
- * `ControlReferenceDataPort`. Deliberate direct `PrismaService` queries
- * against `organizational_units`/`users`, mirroring
- * `modules/risk/infrastructure/prisma-risk-reference-data.repository.ts`
- * and `grc/evidence/infrastructure/prisma-evidence-reference-data.repository.ts`
- * exactly — see either file's header for why reading these shared tables
- * directly is established precedent, not a new privilege.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

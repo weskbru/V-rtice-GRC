@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { navigationRegistry } from './navigation-registry';
 
-/**
- * Component-mount-free evidence for T071 (the navigation registry, FR-041,
- * SC-011). Asserts the shape a future module's single new entry depends on.
- */
-
 describe('navigationRegistry', () => {
   it('has no duplicate ids', () => {
     const ids = navigationRegistry.map((entry) => entry.id);
@@ -158,21 +153,6 @@ describe('navigationRegistry', () => {
     'admin-organization',
   ];
 
-  /**
-   * FR-043 used to be asserted as "there is at least one planned entry, and
-   * it is well-formed". That held only while some module was still unbuilt.
-   * The last one ("Planos de Ação") was removed when Action stopped being
-   * described as a planned module (CLAUDE.md §1/§4/§17), which would have
-   * turned the old assertion red for a correct change — proof that it was
-   * measuring the registry's contents rather than its contract.
-   *
-   * What the contract actually says: every entry is EITHER implemented with
-   * a real `href`, OR planned with no `href` — never an implemented entry
-   * pointing nowhere, and never a planned entry pretending to be a link.
-   * That holds with zero planned entries and with twenty, and it fails for
-   * real the moment a malformed entry is added. The renderer's own half of
-   * FR-043 lives in `sidebar-planned-entry.test.tsx`.
-   */
   it('gives every entry the shape its own status requires (FR-043)', () => {
     for (const entry of navigationRegistry) {
       if (entry.status === 'implemented') {

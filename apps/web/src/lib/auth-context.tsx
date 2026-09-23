@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC frontend — authenticated identity context (T072, T077, T078).
- *
- * `AppShell` (`src/components/shell/app-shell.tsx`) is the single mount
- * point: `(app)/layout.tsx` resolves the session server-side (forwarding the
- * request's cookie, per ADR-014) and seeds this context so every screen
- * under `(app)/` reads the signed-in user, their advisory permission set
- * (`src/lib/permissions.ts`) and session metadata without re-fetching on
- * every navigation.
- *
- * This context is a read model only. It never decides what a user may do —
- * per ADR-003 that is the server's job on every request, unconditionally.
- */
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 import { apiClient } from './api-client';
@@ -22,16 +9,9 @@ import type { ReactNode } from 'react';
 
 export interface AuthContextValue {
   readonly user: OwnProfile;
-  /** Effective `resource:action` permissions (ADR-003). Prefer `usePermissions()` over reading this directly. */
   readonly permissions: readonly string[];
   readonly scope: EffectiveScope;
   readonly session: SessionMetadata;
-  /**
-   * Re-fetches `GET /auth/session` and replaces the context value. Used
-   * after in-place re-authentication (`SessionExpiredDialog`) so the shell
-   * reflects the freshly issued session without a full page reload — the
-   * page underneath, and anything the user typed on it, is never touched.
-   */
   refresh: () => Promise<void>;
 }
 
@@ -46,7 +26,6 @@ export function AuthProvider({ initialSession, children }: AuthProviderProps): R
   const [session, setSession] = useState<CurrentSession>(initialSession);
 
   const refresh = useCallback(async () => {
-    // Session-expiry handling itself must never be re-triggered by this call.
     const next = await apiClient.get<CurrentSession>('/auth/session', {
       skipUnauthorizedHandler: true,
     });
@@ -67,7 +46,6 @@ export function AuthProvider({ initialSession, children }: AuthProviderProps): R
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/** Reads the current user's identity, advisory permissions and session metadata. Must be called under `AppShell` (i.e. within `(app)/`). */
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {

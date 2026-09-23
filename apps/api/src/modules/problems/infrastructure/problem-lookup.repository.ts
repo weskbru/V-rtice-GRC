@@ -1,12 +1,3 @@
-/**
- * 008-incidents-problems, foundation — the sole implementation of
- * `ProblemLookupPort` (`domain/ports/problem-lookup.port.ts`). A plain
- * `PrismaService`-backed query, not yet built on a shared
- * `ProblemScopedRepository` base — Fase 4 (tasks.md) introduces that base
- * when the full `ProblemRepositoryPort` (create/list/update) arrives, the
- * same order `modules/controls`/`modules/assets` already followed
- * (a narrow lookup port before the full scoped-repository base existed).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

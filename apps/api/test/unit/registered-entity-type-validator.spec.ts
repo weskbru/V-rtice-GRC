@@ -1,30 +1,3 @@
-/**
- * F-22 defect 1 — unit tests proving `entityType` is validated against the
- * LIVE attachable/commentable entity-type registry
- * (`core/comments/domain/entity-registry.ts`), not a hand-maintained
- * literal array evaluated once at import time.
- *
- * `PROBE_RECORD` is real, permanent residue from T206a's throwaway probe
- * module (F-22's "Permanent residue" note): it exists as a genuine
- * `AttachableEntityType`/`CommentableEntityType` Prisma enum member with NO
- * bootstrap registration in production code, which is exactly what a
- * second real business module's entity type looks like the moment it is
- * added to `schema.prisma` but before its module's constructor has
- * registered an accessor for it. Using it here — rather than standing up a
- * second throwaway module — proves the same property T206a's probe
- * proved, without paying that cost again.
- *
- * These tests exercise the DTO classes directly with `class-validator`'s
- * own `validate()`, i.e. the exact mechanism the global `ValidationPipe`
- * (`infrastructure/http/validation.ts`) runs before a controller method
- * body ever executes — this is the HTTP boundary the defect lived at.
- */
-// `ListCommentsQueryDto`/`ListAttachmentsQueryDto` decorate `page`/
-// `pageSize` with class-transformer's `@Type(() => Number)`, which reads
-// design-time type metadata via `Reflect.getMetadata` — polyfilled by
-// `reflect-metadata`, which `src/main.ts` imports first for the real
-// application but nothing does for a standalone unit test importing a DTO
-// module directly.
 import 'reflect-metadata';
 
 import { randomUUID } from 'node:crypto';
@@ -52,9 +25,6 @@ function fakeAccessor(): ParentRecordAccessor {
 
 function buildCreateCommentDto(entityType: string): CreateCommentRequestDto {
   const dto = new CreateCommentRequestDto();
-  // Deliberate double-cast: exercising an entity type the DTO's own
-  // TypeScript type does not (yet) admit is the whole point of this test —
-  // `class-validator` sees the raw runtime value, not the compile-time type.
   dto.entityType = entityType as unknown as CreateCommentRequestDto['entityType'];
   dto.entityId = randomUUID();
   dto.body = 'Comentário de teste.';
@@ -160,13 +130,6 @@ describe('entityType validated against the LIVE registry, not a hand-maintained 
   });
 
   it('the timing fix: registering AFTER this test file has already been imported still works (proves the check is not a decoration-time snapshot)', async () => {
-    // This file's own `import` statements above already loaded
-    // create-comment-request.dto.ts and its decorators long before this
-    // test body runs. A decoration-time-evaluated `@IsIn(...)` could never
-    // see a registration that happens later, in a DIFFERENT test's
-    // `beforeEach`/module constructor — which is exactly F-22's failure
-    // mode. Registering here, well after import, and succeeding proves
-    // `validate()` is consulting the LIVE registry at call time.
     registerCommentableEntityType('PROBE_RECORD', fakeAccessor());
     const errors = await validate(buildCreateCommentDto('PROBE_RECORD'));
     expect(errors).toHaveLength(0);

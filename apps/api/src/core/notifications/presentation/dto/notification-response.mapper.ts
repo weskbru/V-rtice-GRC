@@ -1,7 +1,3 @@
-/**
- * T193 — maps `NotificationRecord` to `contracts/platform.openapi.yaml`'s
- * `Notification` schema.
- */
 import type { NotificationRecord } from '../../domain/ports/notification-repository.port';
 
 export interface NotificationResponse {

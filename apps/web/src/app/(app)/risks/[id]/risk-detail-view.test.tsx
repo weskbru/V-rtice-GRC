@@ -9,31 +9,6 @@ import { RiskDetailView } from './risk-detail-view';
 
 import type { RiskDetail, RiskLifecycleState } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for the risk detail screen's two-level
- * navigation, executive summary, contextual aside and deep-link resolution
- * (016-risk-detail-experience, FR-093, FR-094, FR-030). Central assertions:
- *
- *   - all five groups/fifteen leaf sections are reachable, section
- *     visibility is by OMISSION (FR-030/FR-094), never disabling;
- *   - `?section=<id>` lands directly on the right group/leaf, and an
- *     unknown/unauthorized id falls back silently to "Visão geral";
- *   - exactly two requests fire on mount (`getRisk`, `getLifecycle`).
- *
- * `next/navigation` is mocked the same way `use-register-state.test.ts`
- * already does — `currentSearch` stands in for "the URL right now".
- *
- * `useRouter` stays mocked (023-detail-nav-performance did NOT remove it —
- * `useDetailSection` itself no longer imports `useRouter` at all, see that
- * hook's own header comment for why `router.replace()` was the 467ms this
- * fix removed, but `RiskEditPanel`'s `RiskForm` reaches `useRouter`
- * transitively through `useNavigate()`, `@/components/shell/navigation-
- * pending`, for actual screen-to-screen navigation, unrelated to this
- * fix). `window.history.replaceState` is swapped for a `vi.fn()` below,
- * mirroring `use-detail-section.test.ts`'s own mocking pattern, to assert
- * on the mechanism `useDetailSection` uses now.
- */
-
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn(),
@@ -89,23 +64,15 @@ vi.mock('@/features/risks/api', () => ({
   risksApi: {
     getRisk: getRiskMock,
     getLifecycle: getLifecycleMock,
-    // Assessment tab content — not exercised by this suite (its own
-    // component tests cover it); never resolving is fine, mirroring the
-    // pre-016 suite's own convention.
     getActiveMethodology: getActiveMethodologyMock,
     listAssessments: listAssessmentsMock,
     listTreatmentActions: listTreatmentActionsMock,
     listUsers: listUsersMock,
-    // `RiskForm` (mode="edit", inside the edit panel) — never interacted
-    // with beyond opening the panel, so never resolving is fine.
     listCategories: listCategoriesMock,
     listTypes: listTypesMock,
     listOrigins: listOriginsMock,
     listOrgUnits: listOrgUnitsMock,
     searchUsers: searchUsersMock,
-    // "Registro" › Histórico/Auditoria — reached by the deep-link tests
-    // below; never resolving is fine, mirroring every other section this
-    // suite does not examine the content of.
     listHistory: listHistoryMock,
     listAuditEvents: listAuditEventsMock,
   },
@@ -155,21 +122,6 @@ function renderView(permissions: readonly string[]): void {
   );
 }
 
-/**
- * Selects a leaf tab by name, driving Radix's "activate on focus" behaviour
- * explicitly — mirrors the pre-016 suite's own helper inline.
- *
- * `.focus()` is wrapped in `act()` explicitly (023-detail-nav-performance):
- * `useDetailSection`'s selection now updates local React state synchronously
- * on this same activation, and a bare `tab.focus()` — a raw DOM call, not
- * one of Testing Library's own `fireEvent.*` helpers — schedules that update
- * outside of Testing Library's own batching, so a query run immediately
- * afterward could observe React's pre-update DOM. `fireEvent.click(tab)`
- * right after contributes no additional selection of its own (Radix's
- * `Trigger` wires activation to `onMouseDown`/`onFocus`, never `onClick` —
- * confirmed by reading the installed `@radix-ui/react-tabs` source), it
- * exists only for parity with the pre-016 helper's own two-event shape.
- */
 function selectTab(name: string): void {
   const tab = screen.getByRole('tab', { name });
   act(() => {
@@ -256,16 +208,8 @@ describe('RiskDetailView', () => {
     renderView(['risk:view']);
     await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
 
-    // 023-detail-nav-performance: `useDetailSection` now holds a local,
-    // synchronous mirror of the section, so — unlike the old
-    // `router.replace()`-only mechanism this comment used to describe — the
-    // resulting tab selection is provable in THIS SAME test, with no
-    // `currentSearch` mutation required to simulate "having arrived there".
     selectTab('Análise');
     expect(screen.getByRole('tab', { name: 'Avaliação', selected: true })).toBeInTheDocument();
-    // The durable, deep-linkable URL is still written, via the native
-    // History API rather than `router.replace()` (see `useDetailSection`'s
-    // own header comment for why that distinction is the entire fix).
     expect(replaceStateMock).toHaveBeenCalledWith(null, '', '/risks/risk-1?section=assessment');
   });
 
@@ -406,12 +350,6 @@ describe('RiskDetailView', () => {
     await screen.findByRole('heading', { name: 'Falha no fornecedor crítico' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    // Radix marks the rest of the page `aria-hidden` while the modal Sheet
-    // is open (same behaviour `risk-controls-section.test.tsx` already
-    // documents for its own confirm dialog) — so this only asserts the
-    // panel itself, not that the read-only page underneath is still in the
-    // accessibility tree, which it deliberately is not while the overlay is
-    // open.
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText('Editar risco').length).toBeGreaterThan(0);
   });

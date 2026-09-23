@@ -1,15 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk register card view (US3, CLAUDE.md §18).
- *
- * The grid frame itself — list semantics, responsive columns, the
- * loading/error/empty contract — is `CardGrid` from `@pharos/design-system`,
- * shared with every other register that shows cards. What stays here is the
- * part that is genuinely about risks: which card to render, and a skeleton
- * shaped like that card so the grid does not visibly jump when real records
- * arrive.
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,14 +13,11 @@ export interface RiskCardGridProps {
   risks: readonly RiskSummary[];
   riskLevelBasis: RiskLevelBasis;
   isLoading: boolean;
-  /** Rendered instead of the grid when there are no results. */
   emptyContent: React.ReactNode;
-  /** Set when the request failed; render an error state instead of the grid. */
   error?: ErrorStateProblem;
   errorAction?: React.ReactNode;
 }
 
-/** Matches a real `RiskCard`'s approximate height so the loading state does not visibly jump once real cards arrive. */
 function RiskCardSkeleton(): React.JSX.Element {
   return (
     <div className="flex h-full flex-col gap-3 rounded-lg border border-border bg-card p-4">

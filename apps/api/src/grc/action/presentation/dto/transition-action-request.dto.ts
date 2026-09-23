@@ -1,12 +1,3 @@
-/**
- * T053/002-shared-grc-foundation, US2 — matches
- * `contracts/grc-foundation.openapi.yaml`'s `TransitionActionRequest`
- * exactly. `reason` is optional at the DTO/shape level (`400`) — its
- * REQUIREDNESS when `to = OPEN` is a business rule (Invariant A2),
- * enforced at `422` by `action.entity.ts#assertReopenReasonProvided`, not
- * here (the same `400`-shape/`422`-business-rule split every other
- * invariant in this feature follows).
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

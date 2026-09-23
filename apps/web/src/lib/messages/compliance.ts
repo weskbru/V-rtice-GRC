@@ -1,23 +1,3 @@
-/**
- * PharosGRC — Compliance (pt-BR), 004-compliance-management.
- *
- * Third business-module message area (CLAUDE.md §1, §9/§18.12 — follows the
- * convention `risks.ts`/`controls.ts` already established). Field labels
- * mirror `specs/004-compliance-management/data-model.md` and
- * `contracts/compliance.openapi.yaml`.
- *
- * ADR-017's own vocabulary, kept unmistakable throughout this catalog: a
- * **Framework** is a norm (ISO 27001, a decree, an internal policy); a
- * **Requisito** ("cláusula") is one clause of a specific **versão** of that
- * norm; a **Controle** is what the organization does about it — the
- * requirement↔control mapping is built by this catalog's own
- * `controlMapping` section, and the two words are never conflated.
- *
- * All 23 contract operations are wired server-side. This catalog covers the
- * full module: the normative library (US1), requirement↔control mapping and
- * mapping migration between versions (US2), and applicability declaration
- * with the calculated compliance state (US3).
- */
 import type {
   FrameworkListSortField,
   FrameworkOrigin,
@@ -32,7 +12,6 @@ const FRAMEWORK_ORIGIN_LABELS: Record<FrameworkOrigin, string> = {
   INTERNAL_POLICY: 'Política interna',
 };
 
-/** Mirrors `enum FrameworkVersionStatus` (research.md D-3) — a two-state, one-way lifecycle. */
 const FRAMEWORK_VERSION_STATUS_LABELS: Record<FrameworkVersionStatus, string> = {
   DRAFT: 'Rascunho',
   PUBLISHED: 'Publicada',
@@ -43,13 +22,6 @@ const FRAMEWORK_VERSION_STATUS_VARIANT: Record<FrameworkVersionStatus, StatusVar
   PUBLISHED: 'success',
 };
 
-/**
- * Mirrors `enum RequirementComplianceState` (data-model.md §7, FR-017 to
- * FR-020) — the requirement's DERIVED, calculated compliance state. Five
- * distinct words, never collapsed to three, and never conveyed by colour
- * alone (CLAUDE.md §18.8) — `NOT_PROVEN` and `PARTIALLY_MET` deliberately
- * share the 'warning' colour but never the same icon or label.
- */
 const REQUIREMENT_COMPLIANCE_STATE_LABELS: Record<RequirementComplianceState, string> = {
   NOT_APPLICABLE: 'Não aplicável',
   NOT_MET: 'Não atendido',
@@ -66,12 +38,6 @@ const REQUIREMENT_COMPLIANCE_STATE_VARIANT: Record<RequirementComplianceState, S
   COMPLIANT: 'success',
 };
 
-/**
- * A one-line explanation of each compliance state, for use wherever the
- * badge alone would leave the auditor-relevant distinction unclear — most
- * of all `NOT_MET` ("não atendido": zero controles ligados) versus
- * `NOT_PROVEN` ("não comprovado": mapeado, mas sem comprovação vigente).
- */
 const REQUIREMENT_COMPLIANCE_STATE_DESCRIPTIONS: Record<RequirementComplianceState, string> = {
   NOT_APPLICABLE:
     'Esta cláusula foi declarada não aplicável e não entra no cálculo de conformidade.',
@@ -88,7 +54,6 @@ const FRAMEWORK_SORT_LABELS: Record<FrameworkListSortField, string> = {
   updatedAt: 'Atualizado em',
 };
 
-/** Mirrors `enum MappingMigrationOutcome` (data-model.md §5, research.md D-6) — the per-target-requirement result of a mapping migration. */
 const MAPPING_MIGRATION_OUTCOME_LABELS: Record<MappingMigrationOutcome, string> = {
   COPIED: 'Transportado',
   PENDING_DECISION: 'Pendente de decisão',
@@ -97,9 +62,6 @@ const MAPPING_MIGRATION_OUTCOME_LABELS: Record<MappingMigrationOutcome, string> 
 
 const MAPPING_MIGRATION_OUTCOME_VARIANT: Record<MappingMigrationOutcome, StatusVariant> = {
   COPIED: 'success',
-  // Deliberately NOT 'neutral': a pending decision is unfinished work, not
-  // an inert fact — the instruction this catalog must honour is "shown as
-  // work still to do, not as success".
   PENDING_DECISION: 'warning',
   SKIPPED_ALREADY_MAPPED: 'neutral',
 };
@@ -122,26 +84,6 @@ export const compliance = {
     control: 'Controle',
   },
 
-  /**
-   * `/compliance` — the framework register (US1), joined to the shared
-   * exploration frame (CLAUDE.md §18.12): collapsible `FilterBar` + chip
-   * row, `ResultsToolbar` (count + `SortSelect` + `ViewToggle`), Cards or
-   * `DataTable`, shared `PaginationFooter` — the same composition
-   * Risks/Controls/Assets/Processes/Audits already use. No quick-view side
-   * panel: the code/title are already the record's own direct link, exactly
-   * like `AssetCard`/`AuditEngagementCard`.
-   *
-   * Deliberately no KPI strip (coordinator decision, 2026-09-14): the only
-   * cross-module figure this catalogue could read
-   * (`breakdowns.compliance` — REQUIREMENT-level conformity, organization-
-   * wide) describes a different aggregate than what this screen lists
-   * (FRAMEWORKS). There is no global, filterable requirement register for a
-   * "não conformes" tile to link into — requirements only ever list scoped
-   * to one `FrameworkVersion` (`RequirementListSection`, nested three levels
-   * under a framework) — so a requirement-conformity tile on a framework
-   * list would either lie about what it counts or link nowhere real. Ship
-   * honest: no strip, rather than an invented framework-level metric.
-   */
   register: {
     pageTitle: 'Biblioteca normativa',
     pageDescription:
@@ -169,7 +111,6 @@ export const compliance = {
       valueChip: (label: string, value: string): string => `${label}: ${value}`,
       removeLabel: (label: string): string => `Remover filtro: ${label}`,
     },
-    /** Cards is the primary view (CLAUDE.md §18); the table remains for dense comparison. */
     view: {
       groupLabel: 'Modo de visualização',
       cards: 'Cards',
@@ -177,7 +118,6 @@ export const compliance = {
       table: 'Tabela',
       tableLabel: 'Visualização em tabela',
     },
-    /** `FrameworkCard`/`FrameworkCardGrid` — no quick-view side panel, so the card's own click targets navigate straight to `/compliance/{id}`. */
     card: {
       regionLabel: 'Frameworks',
       originLabel: 'Origem',
@@ -196,7 +136,6 @@ export const compliance = {
       },
       customSortOption: (fieldLabel: string, directionLabel: string): string =>
         `${fieldLabel} — ${directionLabel}`,
-      /** Every field × direction `listFrameworks`'s own `sort` enum accepts — the full cartesian product, declared as data (mirrors `incidents.ts`'s/`assets.ts`'s own `results.sortOptions`). */
       sortOptions: {
         'code:asc': 'Código — crescente',
         'code:desc': 'Código — decrescente',
@@ -221,7 +160,6 @@ export const compliance = {
     },
   },
 
-  /** Framework create/edit form. */
   frameworkForm: {
     createTitle: 'Cadastrar framework',
     createDescription:
@@ -273,7 +211,6 @@ export const compliance = {
     unsavedNote: 'As alterações só são salvas ao confirmar o formulário.',
   },
 
-  /** `/compliance/[frameworkId]` — framework detail (US1). */
   frameworkDetail: {
     loading: 'Carregando framework…',
     notFoundTitle: 'Framework não encontrado',
@@ -319,7 +256,6 @@ export const compliance = {
     },
   },
 
-  /** Framework version create/edit form. */
   versionForm: {
     createTitle: 'Nova versão',
     createDescription: (frameworkName: string): string =>
@@ -351,7 +287,6 @@ export const compliance = {
       'Já existe uma versão deste framework com este identificador — escolha outro.',
   },
 
-  /** `/compliance/[frameworkId]/versions/[versionId]` — version detail (US1). */
   versionDetail: {
     loading: 'Carregando versão…',
     notFoundTitle: 'Versão não encontrada',
@@ -396,7 +331,6 @@ export const compliance = {
     },
   },
 
-  /** Requirement create/edit form (`RequirementInlineForm`) — permitted only while the parent version is `DRAFT` (FR-004). */
   requirements: {
     sectionDescription:
       'O requisito é a cláusula da norma — distinto do controle, que é o que a organização faz a respeito dela.',
@@ -438,7 +372,6 @@ export const compliance = {
     complianceStateLabel: 'Estado de conformidade',
   },
 
-  /** `RequirementListSection` — the "Requisitos" tab of the version detail screen (US1/US3, operation 10). */
   requirementList: {
     description:
       'As cláusulas desta versão, com seu estado de conformidade calculado a partir dos controles ligados.',
@@ -468,7 +401,6 @@ export const compliance = {
     },
   },
 
-  /** `/compliance/[frameworkId]/versions/[versionId]/requirements/[requirementId]` — requirement detail (US2/US3). */
   requirementDetail: {
     loading: 'Carregando requisito…',
     notFoundTitle: 'Requisito não encontrado',
@@ -493,13 +425,6 @@ export const compliance = {
     },
   },
 
-  /**
-   * `RequirementControlsSection` — the requirement's own N:M mapping to
-   * controls (US2, ADR-020). Link/unlink is permitted regardless of the
-   * requirement's own version status or applicability declaration (FR-004
-   * governs the clause's text, not its mappings) — this section is never
-   * gated by `versionIsDraft` the way the requirement text form is.
-   */
   controlMapping: {
     sectionDescription:
       'Os controles que a organização mantém para satisfazer esta cláusula. Um controle pode satisfazer cláusulas de normas diferentes sem nunca ser duplicado.',
@@ -519,7 +444,6 @@ export const compliance = {
     linkSuccess: 'Controle vinculado.',
     linkError: 'Não foi possível vincular o controle. Tente novamente.',
     alreadyLinkedError: 'Este controle já está vinculado a esta cláusula.',
-    /** 422: the referenced control does not exist, or lies outside the caller's organizational scope — deliberately indistinguishable (FR-022). */
     outOfScopeError:
       'Este controle não pôde ser vinculado — ele não existe ou está fora do seu escopo organizacional.',
     unlinkAction: 'Desvincular',
@@ -535,17 +459,11 @@ export const compliance = {
     withdrawnAt: (date: string): string => `Desvinculado em ${date}`,
   },
 
-  /**
-   * `RequirementApplicabilitySection` (US3, FR-015/FR-016). A requirement
-   * with no active declaration is applicable by default — that state is
-   * shown as plainly as an active declaration, never left implicit.
-   */
   applicability: {
     defaultNotice:
       'Esta cláusula é aplicável (padrão) — nenhuma declaração de não aplicabilidade está ativa.',
     activeNotice:
       'Esta cláusula foi declarada não aplicável e não entra no cálculo de conformidade da versão.',
-    /** Shown alongside `activeNotice` when the requirement also carries a control link — the edge case the spec names explicitly: not a contradiction. */
     activeWithLinksNotice:
       'Esta cláusula tem controle vinculado, mas continua fora do cálculo de conformidade enquanto a declaração de não aplicável estiver ativa — o vínculo é mantido porque a organização pode ter o controle por outra razão.',
     declaredBy: (name: string, date: string): string => `Declarado por ${name} em ${date}`,
@@ -586,7 +504,6 @@ export const compliance = {
     revokedBadge: 'Revogada',
   },
 
-  /** `ComplianceSummaryCard` — the version's calculated aggregate compliance state (US3, FR-020). */
   complianceSummary: {
     cardTitle: 'Estado de conformidade',
     cardDescription:
@@ -602,13 +519,6 @@ export const compliance = {
     computedAt: (date: string): string => `Calculado em ${date}`,
   },
 
-  /**
-   * `MappingMigrationPanel`/`MappingMigrationDialog` (US2, FR-012 to
-   * FR-014). The compliance manager decides every correspondence by hand —
-   * this screen never proposes one from matching `externalRef` or text
-   * (research.md D-6), and a target left without a chosen source comes back
-   * `PENDING_DECISION`, always shown as unfinished work, never as success.
-   */
   mappingMigration: {
     sectionDescription:
       'Transporta o mapeamento requisito↔controle de outra versão deste framework para esta versão. Cada correspondência é decidida por quem executa a migração — o sistema nunca infere uma.',
@@ -650,13 +560,6 @@ export const compliance = {
     },
     executeSuccess: 'Migração executada com sucesso.',
     resultTitle: 'Resultado da migração',
-    // Deliberately not "Fechar": Radix's own dialog-close (X) button already
-    // carries that exact accessible name via its sr-only text
-    // (`common.dialog.closeLabel`) — a second control with the identical
-    // name would be an accessible-name collision (the same class of defect
-    // `risks/components/risk-controls-section.tsx`'s own `aria-label`
-    // comment documents), not merely an inconvenience for this script's own
-    // locators.
     resultCloseAction: 'Concluir',
     resultPendingNotice: (count: number): string =>
       count === 1
@@ -671,7 +574,6 @@ export const compliance = {
     noSources: '—',
   },
 
-  /** `/compliance/[frameworkId]/versions/[versionId]/mapping-migrations/[migrationId]` — one migration's full per-requirement detail (SC-004). */
   mappingMigrationDetail: {
     loading: 'Carregando migração…',
     notFoundTitle: 'Migração não encontrada',
@@ -686,7 +588,6 @@ export const compliance = {
     },
   },
 
-  /** Navigation entry (T063). */
   navigation: {
     label: 'Compliance',
   },

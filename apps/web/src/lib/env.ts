@@ -1,19 +1,3 @@
-/**
- * apps/web environment validation (T048).
- *
- * Deliberately narrow: apps/web only ever needs `API_INTERNAL_URL` (the
- * ADR-014 rewrite target — server-side only, never exposed to the browser
- * bundle) and `APP_ORIGIN` (the base URL Playwright and any absolute-URL
- * construction use). Every other variable in `.env.example` belongs to
- * `apps/api/src/infrastructure/config/env.schema.ts`, which is the
- * authoritative, full-surface validator for the API process — this file is
- * not a competing copy of it, just the two names this process itself reads.
- *
- * Mirrors quickstart.md's naming (docs/local-environment.md D-5) and fails
- * loudly and synchronously: importing this module throws immediately if the
- * configuration is missing or malformed, so `next.config.ts` cannot silently
- * fall back to a wrong or hard-coded proxy target.
- */
 import { z } from 'zod';
 
 const webEnvSchema = z.object({
@@ -30,11 +14,6 @@ const webEnvSchema = z.object({
 
 export type WebEnv = z.infer<typeof webEnvSchema>;
 
-/**
- * Validates `process.env` and returns the two variables apps/web needs.
- * Throws with every violation listed (not just the first) so a
- * misconfigured environment fails fast and completely.
- */
 export function loadWebEnv(source: NodeJS.ProcessEnv = process.env): WebEnv {
   const result = webEnvSchema.safeParse(source);
 

@@ -1,12 +1,3 @@
-/**
- * 013-incidents-problems-reverse-links — `ListProcessIncidentLinksUseCase`:
- * the read-only reverse side of `IncidentProcessLink`, backing
- * `GET /processes/{processId}/incidents`. `modules/processes` never writes
- * to this table — `modules/incidents` (`link-incident-process.usecase.ts`)
- * owns that write path.
- *
- * Mirrors `modules/assets`' own `ListAssetIncidentLinksUseCase` exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { IncidentProcessLinkReadPort } from '../../../shared/grc-ports/incident-process-link-read.port';

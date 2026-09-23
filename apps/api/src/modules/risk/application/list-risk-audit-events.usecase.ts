@@ -1,50 +1,3 @@
-/**
- * T168/US7 — `ListRiskAuditEventsUseCase`: the application-layer side of
- * `GET /risks/{riskId}/audit-events`
- * (`contracts/risks.openapi.yaml`'s `listRiskAuditEvents` operation).
- *
- * ## Why this — not a plain `@RequirePermission` — decides 404 vs 403
- *
- * The contract's own prose states TWO independent gates with DIFFERENT
- * refusal codes: "A caller without `audit:view` who can otherwise see the
- * risk receives `403` ... A caller who cannot see the risk at all receives
- * `404`". A single `@RequirePermission(identifier)` decorator can only
- * express ONE permission and always refuses with `403`
- * (`PermissionGuard`) — it cannot express "missing THIS permission is a
- * 404, missing THAT one is a 403". `AuditController` therefore marks this
- * route `@NoPermissionRequired()` (still requires a valid session — only
- * the PERMISSION check is skipped) and this use case performs both real
- * checks itself, in the order the contract states them:
- *
- * 1. `risk:view`, checked directly via `PermissionResolverService` (never
- *    the guard) — missing it, OR the risk being out of scope, OR the risk
- *    not existing at all, are all folded into the SAME
- *    `NotFoundDomainError` (byte-identical 404, ADR-009): "cannot see the
- *    risk at all" is deliberately one outcome, not three distinguishable
- *    ones.
- * 2. `audit:view`, checked only once step 1 has succeeded — missing it is
- *    `ForbiddenDomainError` (403): the risk's existence is already known to
- *    this caller, so refusing with 403 rather than 404 discloses nothing
- *    new (US7 AS4, the contract's own reasoning).
- *
- * This mirrors `PerformTransitionUseCase`'s own `@NoPermissionRequired()` +
- * per-request permission check pattern (`lifecycle.controller.ts`) — the
- * SAME shape of problem (one route, non-uniform permission logic) that
- * pattern already exists in this codebase to solve.
- *
- * ## Scope for the "child records" (contract: "the risk and its child
- * records")
- *
- * Limited, deliberately, to the SAME five categories
- * `RiskHistoryQueryService`/ADR-006 cover: the risk itself plus its
- * assessments, treatment decisions, lifecycle transitions and approvals.
- * Treatment actions and control/process/asset links are NOT included in
- * this pass — see the implementation report for why (CLAUDE.md §2: no
- * unspecified functionality; this task's own scope names five categories,
- * matching the History view it complements).
- *
- * No transaction and no audit entry — reads are not audited (ADR-005).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -64,10 +17,6 @@ import type {
 } from '../../../core/audit/domain/ports/audit-event-reader.port';
 
 const RISK_ENTITY_LABEL = 'Risco';
-/** Comfortably exceeds any plausible single risk's lifetime total — see
- * `risk-history.service.ts`'s identical `ALL_ROWS_PAGE_SIZE` for the same
- * reasoning; this use case reuses the same two paginated repositories
- * purely to enumerate child ids, not to render them. */
 const ALL_ROWS_PAGE_SIZE = 10_000;
 
 export interface ListRiskAuditEventsInput {

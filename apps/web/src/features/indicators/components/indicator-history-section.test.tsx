@@ -1,13 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `IndicatorHistorySection` (T060,
- * 009-indicators-reports, US2) — covers the phase's own explicit
- * acceptance criterion: a `UNIT`-scoped caller sees the scope restriction
- * explained as an expected state, never a broken/error surface, and never
- * even attempts the request (research.md D-6).
- */
 const { listMeasurementsMock, createMeasurementMock, feedbackSuccessMock, feedbackErrorMock } =
   vi.hoisted(() => ({
     listMeasurementsMock: vi.fn(),
@@ -88,10 +81,6 @@ describe('IndicatorHistorySection — GLOBAL scope', () => {
 
     renderSection({ scopeGlobal: true, hasThreshold: true });
 
-    // Two occurrences: the "latest measurement" summary above the table
-    // (the caller's own quick-glance status of the most recent point) and
-    // the table's own "Rompimento de limiar" column — a single measurement
-    // is both the latest and the only row here.
     await waitFor(() => expect(screen.getAllByText('Limiar rompido')).toHaveLength(2));
     expect(screen.getByText('Ada Analyst')).toBeInTheDocument();
   });

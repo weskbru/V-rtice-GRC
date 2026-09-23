@@ -1,31 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report creation form (009-indicators-reports, T061, US5), mirroring
- * `features/compliance/components/framework-form.tsx`'s conflict-free shape (CLAUDE.md §18.12):
- * name, description, plus a checklist of the closed `IndicatorMetricKey` catalog. Create-only —
- * `updateReportDefinition` exists in the contract but is deliberately not implemented
- * (`ReportController`'s own header comment), so there is no edit form to share this component
- * with.
- *
- * The metric checklist reuses `indicators.metricKeyLabels` (`lib/messages/indicators.ts`) rather
- * than declaring a second copy of the eleven labels — the coordinator's own instruction for this
- * task, and consistent with `metric-visuals.ts`'s own header on when duplication vs. reuse applies
- * (labels are catalog data meant to be shared; icons/colors are a purely cosmetic mapping that
- * gets duplicated instead).
- *
- * F-56 (`docs/deferred-findings.md`): `name`/`description` are the D-21 shape
- * (`login-form.tsx`'s own header comment has the full mechanism, mirrored by
- * `framework-form.tsx`'s identical fix) — text fields reachable as the
- * literal first paint of `/reports/new`, enabled immediately (no
- * `loadingReferenceData`-style gate). A value typed before hydration
- * commits can be silently discarded the instant hydration catches up, via
- * `register()`'s unstable ref-callback identity. Both fields use a plain
- * `useRef` instead of `register()`, read directly from the DOM at submit
- * time — see `handleFormSubmit` below. `metricKeys` stays on
- * `react-hook-form`'s `Controller`: a `Checkbox` cannot be toggled before
- * its own JS hydrates, so it was never exposed to this defect.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -56,7 +30,6 @@ export interface ReportFormProps {
   onCreated: (report: ReportDefinition) => void;
 }
 
-/** `name`/`description` field-level errors, tracked outside `react-hook-form` — see the module header comment (F-56). */
 interface UncontrolledFieldErrors {
   name?: string;
   description?: string;
@@ -67,9 +40,6 @@ export function ReportForm({ onCreated }: ReportFormProps): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<UncontrolledFieldErrors>({});
-  // F-56 — plain object refs, stable across renders (unlike `register()`'s
-  // ref-callback), so React attaches once at mount and never rewrites the
-  // DOM. See the module header comment for the full mechanism.
   const nameRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -116,15 +86,6 @@ export function ReportForm({ onCreated }: ReportFormProps): React.JSX.Element {
     }
   }
 
-  /**
-   * F-56 — replaces `form.handleSubmit(onSubmit)`: `name`/`description`
-   * are read directly from the DOM (never from `react-hook-form`'s tracked
-   * state, which pre-hydration typing can leave stale — see the module
-   * header comment), `metricKeys` still comes from `react-hook-form`.
-   * Errors for `name`/`description` go to local `fieldErrors`;
-   * `metricKeys` keeps using `form.setError` so its existing
-   * `Controller`-driven `FormField` is untouched.
-   */
   function handleFormSubmit(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     form.clearErrors('metricKeys');

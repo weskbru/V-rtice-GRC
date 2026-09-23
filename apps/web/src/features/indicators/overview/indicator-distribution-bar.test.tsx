@@ -25,7 +25,6 @@ describe('IndicatorDistributionBar', () => {
     const { container } = render(<IndicatorDistributionBar segments={SEGMENTS} />);
     const track = container.firstElementChild as HTMLElement;
 
-    // 3 non-zero segments (LOW, MEDIUM, CRITICAL) — HIGH (count: 0) renders no span at all.
     expect(track.children).toHaveLength(3);
     expect(
       Array.from(track.children).some((el) => el.getAttribute('title')?.startsWith('Alto')),

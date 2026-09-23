@@ -1,12 +1,3 @@
-/**
- * 008-incidents-problems, US2 — matches
- * `contracts/problems.openapi.yaml`'s `UpdateProblemRequest` exactly:
- * `minProperties: 1` is enforced at the controller
- * (`assertUpdateBodyNotEmpty`, mirroring `finding.controller.ts`'s own
- * function). **`status`/`orgUnitId`/`rootCause` are deliberately not
- * declared here at all** — not declaring them IS the rejection, via the
- * global `ValidationPipe`'s `forbidNonWhitelisted`.
- */
 import { IsIn, IsOptional, IsString, IsUUID, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

@@ -1,14 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Unit evidence for `indicatorsApi` (009-indicators-reports, T062) — the
- * only piece of this module with logic worth a dedicated test:
- * `buildDefinitionListQueryString` inside `listDefinitions`, which must
- * omit `isActive` entirely when the caller did not choose a value (never
- * emit `isActive=undefined`). Mocks `@/lib/api-client` the same way
- * `app/(public)/login/login-form.test.tsx` does, since this module has no
- * React tree to mount.
- */
 const { getMock, postMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   postMock: vi.fn(),

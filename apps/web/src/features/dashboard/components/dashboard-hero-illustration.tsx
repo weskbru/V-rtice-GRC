@@ -6,7 +6,6 @@ export interface DashboardHeroIllustrationProps {
   className?: string;
 }
 
-/** Decorative landscape only. The tower keeps its aspect ratio independently of the hills. */
 export function DashboardHeroIllustration({
   className,
 }: DashboardHeroIllustrationProps): React.JSX.Element {
@@ -34,7 +33,6 @@ export function DashboardHeroIllustration({
             <stop offset="1" stopColor="var(--hero-mountain)" stopOpacity=".09" />
           </linearGradient>
         </defs>
-        {/* Long, irregular curved ridges: atmospheric perspective, never polygonal peaks. */}
         <path
           fill={paint('distance')}
           d="M0 151 C80 140 120 154 186 139 S280 111 336 123 S427 107 474 114 C528 123 560 78 594 89 S651 130 693 111 C736 90 762 45 791 57 S839 106 870 93 C910 76 934 112 963 97 S1034 53 1062 68 S1140 113 1200 101 V180 H0Z"
@@ -53,7 +51,6 @@ export function DashboardHeroIllustration({
           d="M0 178 C203 165 322 185 480 171 S688 165 789 163 S987 179 1200 163 V180 H0Z"
         />
       </svg>
-      {/* Fixed-ratio local scene keeps beam, lantern and rock footing aligned at every width. */}
       <svg viewBox="0 0 760 190" focusable="false" className={styles.lighthouse}>
         <defs>
           <linearGradient id={`${id}-beam`} x1="1" y1=".5" x2="0" y2=".5">
@@ -80,7 +77,6 @@ export function DashboardHeroIllustration({
           fill={paint('beam')}
           filter={paint('soft')}
         />
-        {/* Promontory and individually rounded stones anchor the tower. */}
         <path
           d="M379 187 C395 179 414 181 426 173 C437 163 448 174 458 166 C467 149 481 157 490 151 C502 135 514 149 524 147 C533 136 549 138 558 147 C568 134 581 142 587 153 C600 148 608 161 619 160 C630 150 641 166 650 170 C669 167 683 180 705 187Z"
           fill={paint('rock')}
@@ -100,7 +96,6 @@ export function DashboardHeroIllustration({
           strokeWidth="1.1"
           opacity=".6"
         />
-        {/* Corbel, gallery floor and fine railing. */}
         <path d="M513 66 H545 L540 73 H518Z" fill="var(--hero-shadow)" />
         <path d="M510 63 H548 V67 H510Z" fill="var(--hero-detail)" />
         <path
@@ -109,7 +104,6 @@ export function DashboardHeroIllustration({
           stroke="var(--hero-detail)"
           strokeWidth=".9"
         />
-        {/* Glazed lantern, roof, cupola and finial. */}
         <path d="M520 39 H538 V61 H520Z" fill="var(--hero-light)" opacity=".85" />
         <path
           d="M520 39 H525 V61 H520Z M533 39 H538 V61 H533Z"

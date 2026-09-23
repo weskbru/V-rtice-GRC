@@ -1,9 +1,3 @@
-/**
- * T019/006-assets-processes — the sole implementation of
- * `ProcessReferenceDataPort`. Identical in shape to
- * `modules/assets/infrastructure/prisma-asset-reference-data.repository.ts`
- * (FR-020).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

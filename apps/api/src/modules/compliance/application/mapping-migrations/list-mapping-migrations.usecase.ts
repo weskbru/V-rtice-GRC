@@ -1,9 +1,3 @@
-/**
- * T036/004-compliance-management, User Story 2 —
- * `ListMappingMigrationsUseCase`. `GET
- * /frameworks/{frameworkId}/versions/{versionId}/mapping-migrations`
- * (`listMappingMigrations` operation).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

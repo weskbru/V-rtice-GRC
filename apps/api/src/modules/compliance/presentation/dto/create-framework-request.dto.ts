@@ -1,12 +1,3 @@
-/**
- * T030/004-compliance-management — matches
- * `contracts/compliance.openapi.yaml`'s `CreateFrameworkRequest` exactly:
- * `additionalProperties: false` (global `ValidationPipe`'s
- * `forbidNonWhitelisted`) means this class is also, by construction, where
- * "code/version are server-owned and rejected as unknown properties" is
- * enforced — not declaring the property IS the rejection, the same
- * discipline `CreateControlRequestDto`'s own header documents.
- */
 import { IsIn, IsString, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

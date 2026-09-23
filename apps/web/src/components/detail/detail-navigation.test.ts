@@ -10,16 +10,6 @@ import {
 
 import type { DetailGroup } from './detail-navigation';
 
-/**
- * Pure-logic evidence for the shared two-level navigation model
- * (originally 016-risk-detail-experience §4.4, promoted in
- * 018-incident-detail-experience) — visibility-by-omission and deep-link
- * resolution, with no rendering involved. Moved verbatim from
- * `features/risks/components/detail/risk-navigation.test.ts`: same cases,
- * only the imported names changed to match the promoted, domain-neutral
- * module.
- */
-
 function buildGroups(overrides?: { auditVisible?: boolean }): readonly DetailGroup[] {
   return [
     {

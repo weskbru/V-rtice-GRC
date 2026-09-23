@@ -1,10 +1,3 @@
-/**
- * T192 — `CommentController`: `/comments` (`contracts/
- * platform.openapi.yaml`'s Comments paths, FR-095, FR-098, FR-100). See
- * `AttachmentController`'s header for why `list` carries
- * `@NoPermissionRequired()` while `create`/`withdraw` carry a static
- * `@RequirePermission(...)` — the identical reasoning applies here.
- */
 import {
   Body,
   Controller,

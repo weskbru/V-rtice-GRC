@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, activate/deactivate user (T181, FR-011,
- * FR-015, FR-017). Deactivating a user is destructive from the caller's
- * point of view — it immediately kills every session the user holds — so
- * this states that plainly BEFORE confirmation (task brief; `ConfirmDialog`,
- * FR-046).
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Power, ShieldOff } from 'lucide-react';
 import { useState } from 'react';

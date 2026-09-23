@@ -2,13 +2,6 @@ import { z } from 'zod';
 
 import { admin } from '../messages/admin';
 
-/**
- * Client-side shape/presence validation for the Administration forms
- * (T181–T183). Mirrors the request shapes in `contracts/admin.openapi.yaml`
- * on shape only — full business validation (email uniqueness, password
- * policy, cycle detection, ...) happens exclusively on the server and
- * arrives as 409/422 field errors, exactly like `lib/validation/risk.ts`.
- */
 export const NONE_SELECT_VALUE = '__none__';
 
 export function toNullable(value: string): string | null {
@@ -45,16 +38,6 @@ export const resetPasswordFormSchema = z
 
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordFormSchema>;
 
-/**
- * Shared by composing a role and by editing one (`useRoleEditor`).
- *
- * The maxima are the server's own, mirrored on shape: `WriteRoleRequestDto`
- * and `UpdateRoleRequestDto` both declare `Length(1, 100)` on `name` and
- * `Length(1, 500)` on `description`, so a longer value is refused by the API
- * whatever this schema says. Naming the limit here turns that refusal from an
- * opaque 400 into a field error next to the field — it never becomes the only
- * protection (015 FR-033).
- */
 export const ROLE_NAME_MAX_LENGTH = 100;
 export const ROLE_DESCRIPTION_MAX_LENGTH = 500;
 

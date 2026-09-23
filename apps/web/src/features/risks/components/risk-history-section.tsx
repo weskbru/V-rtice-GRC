@@ -1,47 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, History section (T170, US7, FR-105, ADR-007).
- *
- * Consumes `GET /risks/{riskId}/history` — a merged, chronological,
- * attributed account of assessments, treatment decisions, lifecycle
- * transitions, approvals and ownership changes (`RiskHistoryQueryService`'s
- * own header comment has the full reasoning for what is merged and why).
- * Available to anyone who can see the risk at all (`risk:view`, already
- * required to reach this screen) — unlike `RiskAuditSection`, this section
- * carries no additional permission gate.
- *
- * ## The recorded-instant vs. asserted-date distinction (F-9) is never flattened
- *
- * Every entry carries `occurredAt` — the instant the platform RECORDED it,
- * always present, and what the server orders the timeline by. Only
- * `ASSESSMENT` entries also carry `assessedOn` — the date the ASSESSOR
- * asserts and can backdate. This component passes both straight through to
- * `ActivityHistory` (`@pharos/design-system`, T169) as two SEPARATELY
- * labeled facts (`recordedAtLabel`/`assertedDateLabel`) rather than
- * collapsing them into one "date" column — exactly the "quiet dishonesty"
- * the task brief warns a GRC audit trail cannot afford. `occurredAt` is
- * formatted with `toLocaleString` (date AND time — a genuine instant);
- * `assessedOn` is formatted with `formatDateOnly` (date only, matching its
- * `@db.Date` storage, per `RiskAssessment.assessedOn`'s own convention
- * elsewhere in this app) — the two therefore look visibly different even
- * on the rare occasion they name the same calendar day.
- *
- * ## The `type` filter is exposed (a deliberate choice, not the default)
- *
- * The contract's `type` query parameter is real and genuinely narrows a
- * long-lived risk's history (FR-105 lists five kinds of change this single
- * chronology already merges) — a reviewer tracing, say, only the approval
- * trail of a risk with dozens of assessments benefits from filtering rather
- * than scrolling. Exposed as a `MultiSelectFilter` (`@pharos/design-system`,
- * already the register's own filter primitive, T109) offering every
- * `RiskHistoryEntryType` the contract declares — including the four
- * `RiskHistoryQueryService` does not populate yet (`LEVEL_CHANGE`,
- * `TREATMENT_ACTION`, `CONTROL_LINK`, `FIELD_CHANGE`) — so this filter
- * needs no update the day that service starts emitting one of them; an
- * option that currently matches nothing behaves exactly like any other
- * filter with zero results, which is not a defect.
- */
 import { ActivityHistory, MultiSelectFilter } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -82,8 +40,6 @@ function toActivityEntry(entry: RiskHistoryEntry): ActivityHistoryEntry {
     id: entry.id,
     kindLabel: risks.history.typeLabels[entry.type],
     occurredAtLabel: new Date(entry.occurredAt).toLocaleString('pt-BR'),
-    // F-9 — a SEPARATE, distinctly labeled fact; never merged with
-    // `occurredAtLabel` above even when both name the same calendar day.
     assertedDateLabel: entry.assessedOn ? formatDateOnly(entry.assessedOn) : null,
     actorName: entry.actor.fullName,
     summary: entry.summary,
@@ -100,9 +56,6 @@ export function RiskHistorySection({ riskId }: RiskHistorySectionProps): React.J
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
 
-  // Derived "loading" — mirrors `AssessmentHistory`/`TreatmentHistory`'s own
-  // convention exactly: never `setLoading(true)` synchronously in the
-  // effect body (`react-hooks/set-state-in-effect`).
   const requestKey = `${riskId}|${selectedTypes.join(',')}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
   const loading = resolvedRequestKey !== requestKey;

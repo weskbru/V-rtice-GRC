@@ -4,15 +4,6 @@ import { availableIncidentTransitions } from './status';
 
 import type { IncidentStatus } from './types';
 
-/**
- * PharosGRC — `availableIncidentTransitions` unit coverage (008-incidents-
- * problems, US1). This table is the ONLY thing standing between "the
- * illegal moves are simply absent" and "offered, then refused" (the
- * coordinator's explicit non-negotiable) — every legal edge from
- * `incidents.openapi.yaml`'s own `transitionIncident` description is
- * asserted present, and both terminal statuses are asserted to offer
- * nothing at all.
- */
 describe('availableIncidentTransitions', () => {
   it('OPEN offers start (no required field) and cancel (requires cancellationReason)', () => {
     const options = availableIncidentTransitions('OPEN');

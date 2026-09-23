@@ -53,12 +53,6 @@ import type {
   TrendChartSeriesDef,
 } from '@pharos/design-system/components';
 
-/**
- * Component-mount evidence for T045/T046 (`packages/design-system`).
- * Verifies every domain component actually renders through the real
- * Tailwind/token pipeline apps/web consumes, without throwing.
- */
-
 describe('PageHeader', () => {
   it('renders a title, description and actions', () => {
     render(
@@ -129,11 +123,6 @@ describe('StatusBadge', () => {
     expect(badge.parentElement?.querySelector('svg')).not.toBeNull();
   });
 
-  // T203, F-2: badge-shaped content is present at first render (a table
-  // cell, a header chip) or replaced wholesale rather than mutated in
-  // place — `role="status"` on it cannot reliably keep the announcement
-  // promise that role makes, so it carries none. `LoadingState` is the
-  // platform's one live-region component; see its own doc comment.
   it('never claims to be a live region (role="status") — see LoadingState for why', () => {
     render(<StatusBadge variant="danger" label="Atrasado" />);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -159,9 +148,6 @@ describe('RiskLevelBadge', () => {
 
   it('still renders the same accessible name as before the labels-prop refactor (D-10)', () => {
     render(<RiskLevelBadge level="CRITICAL" basis="inherent" labels={risks.riskLevelBadge} />);
-    // No role="status" (T203, F-2) — `aria-label` is still asserted through
-    // `getByLabelText`, which does not require a live-region (or any
-    // particular) role to resolve the accessible name.
     expect(screen.getByLabelText('Nível de risco: Inerente: Crítico')).toBeInTheDocument();
   });
 
@@ -172,9 +158,6 @@ describe('RiskLevelBadge', () => {
 });
 
 describe('RiskMatrix', () => {
-  // A deliberately non-5x5 shape (3 probability rows x 4 impact columns) —
-  // FR-061: an organization's configured methodology must never be assumed
-  // to be 5x5.
   const probabilityScale: RiskMatrixScaleLevel[] = [
     { value: 1, label: 'Baixa' },
     { value: 2, label: 'Média' },
@@ -251,22 +234,18 @@ describe('RiskMatrix', () => {
       />,
     );
 
-    // Inherent cell (Alta x Crítico, score 12): accessible name carries an
-    // "(Inerente)" suffix distinct from the residual one below.
     expect(
       screen.getByRole('img', {
         name: 'Probabilidade Alta, Impacto Crítico: pontuação 12, nível Crítico (Inerente)',
       }),
     ).toBeInTheDocument();
 
-    // Residual cell (Média x Moderado, score 4): its own, differently-worded suffix.
     expect(
       screen.getByRole('img', {
         name: 'Probabilidade Média, Impacto Moderado: pontuação 4, nível Médio (Residual)',
       }),
     ).toBeInTheDocument();
 
-    // An unhighlighted cell carries neither suffix.
     expect(
       screen.getByRole('img', {
         name: 'Probabilidade Baixa, Impacto Baixo: pontuação 1, nível Baixo',
@@ -335,10 +314,6 @@ describe('RiskScore', () => {
     expect(screen.getByText('Risco residual ainda não avaliado.')).toBeInTheDocument();
   });
 
-  // T203, F-2: this message is present at first render on every
-  // never-assessed risk and never changes while mounted — `role="status"`
-  // over it would promise an announcement it cannot reliably deliver. See
-  // `StatusBadge`/`LoadingState`'s doc comments for the platform-wide rule.
   it('never claims to be a live region (role="status") for the not-yet-assessed message', () => {
     render(<RiskScore score={null} level={null} basis="inherent" labels={labels} />);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -428,10 +403,6 @@ describe('TrendChart', () => {
     emptyState: 'Nenhum ponto histórico registrado ainda.',
   };
 
-  // F-28 (docs/deferred-findings.md): the dashboard's own charts once passed
-  // an accessibility scan only because it measured the sr-only table before
-  // the chart's SVG rendered. This asserts the accessible table itself
-  // carries the real data, in the same render pass as the chart.
   it('renders an always-present accessible table with the same values the chart draws', () => {
     render(<TrendChart points={points} seriesDefs={seriesDefs} labels={labels} />);
     const table = screen.getByRole('table', { name: 'Histórico do indicador' });
@@ -508,12 +479,6 @@ describe('ConfirmDialog', () => {
         onConfirm={vi.fn()}
       />,
     );
-    // Rendered via Radix `Dialog.Portal` into `document.body`, outside RTL's
-    // own `container` — and the dialog's own close (X) button always
-    // carries an icon, so asserting "a `<svg>` exists" would pass either
-    // way. The title-adjacent icon is identified by its variant-tone class
-    // instead (`TITLE_ICON_TONE.sensitive`), which only renders when a
-    // caller passes `icon`.
     expect(document.querySelector('svg.text-status-warning-fg')).not.toBeNull();
   });
 });
@@ -532,7 +497,6 @@ describe('FormField', () => {
     expect(describedBy).toBeTruthy();
     expect(screen.getByText('Texto de apoio').id).toBe(describedBy?.split(' ')[0]);
     expect(screen.getByText('Campo obrigatório')).toBeInTheDocument();
-    // The required indicator is never color-only — an sr-only text marker backs the visible "*".
     expect(screen.getByText('(obrigatório)')).toBeInTheDocument();
   });
 
@@ -548,9 +512,6 @@ describe('FormField', () => {
         {(field) => <input {...field} />}
       </FormField>,
     );
-    // The control's accessible name is still exactly the label text — a
-    // caller matching by exact label (`getByLabel('Categoria')`) keeps
-    // working whether or not the optional marker is shown.
     expect(screen.getByRole('textbox', { name: 'Categoria' })).toBeInTheDocument();
     expect(screen.getByText('(opcional)')).toBeInTheDocument();
   });
@@ -587,7 +548,6 @@ describe('ReadOnlyField', () => {
     expect(screen.getByText('Unidade organizacional')).toBeInTheDocument();
     const value = screen.getByText('PharosGRC');
     expect(value.tagName).toBe('DD');
-    // No shadcn input/select classes (border, shadow, focus ring) leaked in.
     expect(value.className).not.toMatch(/border|shadow|ring/);
   });
 
@@ -663,12 +623,6 @@ describe('EntityTabs', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // Assurance-audit Fix 2: a tab strip that overflows its container gets no
-  // visual cue at all otherwise — no fade, no chevron, no scrollbar hint —
-  // reproduced at 1440px ("Achados" invisible at the default scroll
-  // position) and 768px (6 of 12 tabs visible, including the two newest:
-  // Evidência and Achados). jsdom does no real layout, so `scrollWidth`/
-  // `clientWidth` are mocked directly to exercise both branches.
   it('renders no scroll affordance when the tab strip fits its container', () => {
     render(
       <EntityTabs
@@ -754,8 +708,6 @@ describe('EntityTabs', () => {
     }
   });
 
-  // 016-risk-detail-experience R-11 — controlled mode, additive to the
-  // uncontrolled behaviour every test above this one already covers.
   it('lets a caller drive selection with value/onValueChange, reporting the click without switching on its own', () => {
     const onValueChange = vi.fn();
     render(
@@ -773,17 +725,9 @@ describe('EntityTabs', () => {
 
     expect(screen.getByText('conteúdo A')).toBeInTheDocument();
     const tabB = screen.getByRole('tab', { name: 'Aba B' });
-    // Radix activates a tab on FOCUS by default ("automatic" activation,
-    // matching a real click, which also moves focus) — jsdom's
-    // `fireEvent.click` does not itself move focus, so it is driven
-    // explicitly here, mirroring every other tab-selection test in this
-    // codebase (e.g. `risk-detail-view.test.tsx`'s own `selectTab` helper).
     tabB.focus();
     fireEvent.click(tabB);
 
-    // Controlled: the click is reported, but nothing switches until the
-    // caller itself passes a new `value` — exactly like a controlled
-    // `<input>`'s `onChange` never updating `value` on its own.
     expect(onValueChange).toHaveBeenCalledWith('b');
     expect(screen.getByText('conteúdo A')).toBeInTheDocument();
     expect(screen.queryByText('conteúdo B')).not.toBeInTheDocument();
@@ -806,11 +750,6 @@ describe('EntityTabs', () => {
     expect(screen.getByText('conteúdo A')).toBeInTheDocument();
   });
 
-  // 016-risk-detail-experience P3/P4 — the outer/inner navigation levels
-  // need visually distinct treatment, and the outer one needs to fit a
-  // frozen five-label contract at 390px without ever overflowing OR
-  // letting a label's own text spill past its box (V1, measured twice: an
-  // equal-width grid left "Relacionamentos" wider than its cell).
   it('wraps a "compact" tab strip onto multiple lines BELOW sm ONLY — identical to "default" at sm and wider (V1/V2)', () => {
     render(
       <EntityTabs
@@ -826,15 +765,6 @@ describe('EntityTabs', () => {
     );
 
     const list = screen.getByRole('tablist');
-    // `max-sm:` only — jsdom does not evaluate media queries, so the only
-    // thing a test CAN assert is that the narrow-only classes are present
-    // ALONGSIDE, never in place of, the row `size="default"` uses at every
-    // width. No `gridTemplateColumns` (or any other grid) at all any more —
-    // an equal-width grid was exactly the defect this guards against: it
-    // does not overflow the PAGE, but it forces every tab's TEXT into a
-    // column too narrow for a long label, which then spills into the
-    // neighbour and reads as one glued word despite real space between the
-    // boxes themselves.
     expect(list.className).toContain('max-sm:flex-wrap');
     expect(list.className).toContain('max-sm:w-full');
     expect(list.className).not.toContain('grid');
@@ -893,12 +823,6 @@ describe('EntityTabs', () => {
     expect(list.className).toContain('bg-muted');
   });
 
-  // 017-risk-overview-polish — a level-1 group tab may carry a small
-  // decorative `icon`. The E2E suite locates dozens of tabs by
-  // `getByRole('tab', { name: <label> })`; an icon that leaked into the
-  // accessible name (an accessible SVG, or a visible text node beside it)
-  // would break every one of them, so this is the guarantee the feature
-  // stands or falls on.
   it("keeps a tab's accessible name exactly its label when an icon is supplied — the icon never joins the name", () => {
     render(
       <EntityTabs
@@ -910,17 +834,10 @@ describe('EntityTabs', () => {
 
     const tab = screen.getByRole('tab', { name: 'Visão geral' });
     expect(tab).toBeInTheDocument();
-    // The icon renders (it is a real, visible scan aid)...
     expect(tab.querySelector('svg')).toBeInTheDocument();
-    // ...but is hidden from the accessibility tree, so it never becomes
-    // part of the computed accessible name above.
     expect(tab.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  // The user's own hierarchy rule: icons distinguish level-1 groups only,
-  // never a level-2 leaf strip. Gating this inside `EntityTabs` itself
-  // (rather than trusting every future `subordinate` caller to leave `icon`
-  // off) makes the hierarchy impossible to violate by accident.
   it('ignores an icon passed to a "subordinate" (level-2) tab — hierarchy is enforced by the component, not by caller discipline', () => {
     render(
       <EntityTabs
@@ -954,10 +871,6 @@ describe('DetailLayout', () => {
     expect(screen.getByText('DLSUMMARY')).toBeInTheDocument();
     expect(screen.getByText('DLNAV')).toBeInTheDocument();
     expect(screen.getByText('DLCHILDREN')).toBeInTheDocument();
-    // `asideLead`/`aside` each render twice on purpose — once for the
-    // narrow layout, once inside the `xl`+ sticky column — toggled with
-    // CSS, not conditionally mounted (P11's own doc comment on
-    // `DetailLayout` explains why).
     expect(screen.getAllByText('DLLEAD')).toHaveLength(2);
     expect(screen.getAllByText('DLASIDE')).toHaveLength(2);
   });
@@ -974,15 +887,6 @@ describe('DetailLayout', () => {
       </DetailLayout>,
     );
 
-    // `asideLead`/`aside` each render TWICE (once for the narrow layout,
-    // once inside the `xl`+ sticky column — see `DetailLayout`'s own doc
-    // comment) and the sticky column's copy sits BEFORE the main column in
-    // raw DOM order even though `xl:order-2` only ever places it there
-    // visually at `xl`+. jsdom does not evaluate media queries, so this
-    // filters out that desktop-only copy by its distinguishing wrapper
-    // class, leaving exactly the narrow-viewport reading order a screen
-    // reader would actually encounter (a `display:none` ancestor removes
-    // its subtree from the accessibility tree entirely).
     const narrowOrder = Array.from(container.querySelectorAll('[data-testid]'))
       .filter((el) => !el.closest('[class*="xl:sticky"]'))
       .map((el) => el.getAttribute('data-testid'));
@@ -996,15 +900,9 @@ describe('DetailLayout', () => {
 
     expect(screen.getByText('DLHEADER_2')).toBeInTheDocument();
     expect(screen.getByText('DLNAV_2')).toBeInTheDocument();
-    // No `xl:order-2` sticky wrapper at all when `aside`/`asideLead` are
-    // both omitted, and no wrapper `div` for `summary` either — not merely
-    // an aside/summary that renders empty.
     expect(container.querySelector('[class*="order-2"]')).toBeNull();
   });
 
-  // Corrected 2026-09-17: the sticky aside column was a plain `<div>` — no
-  // landmark, so a screen reader user had no way to jump to it or even
-  // know it existed.
   it('gives the sticky aside column ONE named complementary landmark, when asideLabel is passed', () => {
     render(
       <DetailLayout
@@ -1017,11 +915,6 @@ describe('DetailLayout', () => {
     );
 
     const landmarks = screen.getAllByRole('complementary', { name: 'Contexto de teste' });
-    // Exactly one, never two — `asideLead`/`aside` render twice in the DOM
-    // (narrow copy + sticky copy), but only the STICKY copy is a landmark;
-    // the narrow copies stay plain, unlandmarked `<div>`s (this component's
-    // own doc comment explains why two same-named landmarks would be worse
-    // than the one this asserts).
     expect(landmarks).toHaveLength(1);
     expect(landmarks[0]!.className).toContain('xl:sticky');
   });
@@ -1182,7 +1075,6 @@ describe('ActivityHistory', () => {
     expect(screen.getByText('NEW_9f3')).toBeInTheDocument();
     expect(screen.getByText('NEWVALUE_9f3')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'LOADMORE_9f3' })).toBeInTheDocument();
-    // No real pt-BR/English copy leaked in from a hardcoded default anywhere.
     expect(screen.queryByText(/carregando|loading|nada por aqui/i)).not.toBeInTheDocument();
   });
 });
@@ -1200,9 +1092,6 @@ describe('AuditTimeline', () => {
     outcomeLabel: (outcome) => (outcome === 'SUCCESS' ? 'Sucesso (teste)' : 'Negado (teste)'),
     outcomeVariant: (outcome) => (outcome === 'SUCCESS' ? 'success' : 'danger'),
     changedFieldsLabel: 'Campos alterados (teste)',
-    // Identity passthrough — most stories below don't care about field
-    // labelling specifically; the dedicated `fieldLabel`/`resolveFieldValue`
-    // stories further down override this.
     fieldLabel: (key) => key,
     ipAddressLabel: 'IP (teste)',
     userAgentLabel: 'Agente (teste)',
@@ -1236,7 +1125,6 @@ describe('AuditTimeline', () => {
     render(<AuditTimeline items={[baseEntry]} labels={labels} />);
     const badge = screen.getByText('Sucesso (teste)');
     expect(badge.parentElement?.querySelector('svg')).not.toBeNull();
-    // Technical identifiers are rendered verbatim — never translated.
     expect(screen.getByText('risk.accepted')).toBeInTheDocument();
     expect(screen.getByText('RISK')).toBeInTheDocument();
   });
@@ -1245,10 +1133,6 @@ describe('AuditTimeline', () => {
     render(<AuditTimeline items={[baseEntry]} labels={labels} />);
     expect(screen.getByText(labels.changedFieldsLabel)).toBeInTheDocument();
     expect(screen.getByText('ownerUserId:')).toBeInTheDocument();
-    // Previous and new values render as two separately styled spans (struck
-    // through/muted vs. bold-foreground, FR-091) rather than one flat text
-    // run — asserted as two independent matches instead of one spanning
-    // regex.
     expect(screen.getByText('user-1')).toBeInTheDocument();
     expect(screen.getByText('user-2')).toBeInTheDocument();
   });
@@ -1320,19 +1204,8 @@ describe('AuditTimeline', () => {
     expect(screen.getByText('CORR_a1')).toBeInTheDocument();
     expect(screen.getByText('CORRVAL_a1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'LOADMORE_a1' })).toBeInTheDocument();
-    // No real pt-BR/English copy leaked in from a hardcoded default anywhere.
     expect(screen.queryByText(/carregando|loading|nada por aqui/i)).not.toBeInTheDocument();
   });
-
-  // -----------------------------------------------------------------------
-  // Product owner UAT finding: a changed field must read as a pt-BR
-  // sentence a risk manager understands, not a database column name next to
-  // a raw UUID. These stories exercise the REAL `risks.audit` catalog
-  // (`@/lib/messages/risks`) — the actual `fieldLabel`/`buildValueResolver`
-  // wiring `RiskAuditSection` hands `AuditTimeline` — rather than a
-  // synthetic test double, so a regression in the real label/resolution
-  // catalog fails here too.
-  // -----------------------------------------------------------------------
 
   const knownCategoryId = '01a071be-cd75-7571-93f1-8865c5c3d224';
 
@@ -1401,8 +1274,6 @@ describe('AuditTimeline', () => {
         labels={{ ...risks.audit, resolveFieldValue }}
       />,
     );
-    // The resolved placeholder renders in its own span, the new-value half
-    // of the before/after pair every other changed-field row renders.
     expect(screen.getByText(/Registro não encontrado \(deleted-category-id\)/)).toBeInTheDocument();
   });
 
@@ -1454,23 +1325,11 @@ describe('AuditTimeline', () => {
       />,
     );
     expect(screen.getByText('Situação:')).toBeInTheDocument();
-    // Both sides of the before/after pair render as two separately styled
-    // spans (struck-through/muted previous value vs. bold-foreground new
-    // value, FR-091) — asserted independently rather than as one
-    // spanning regex.
     expect(screen.getByText(risks.statusLabels.DRAFT)).toBeInTheDocument();
     expect(screen.getByText(risks.statusLabels.IDENTIFIED)).toBeInTheDocument();
   });
 
   it('formats a date-only audited field as a calendar date even when the raw audit payload carries a full UTC-midnight ISO instant, never "Invalid Date"', () => {
-    // Verified against a real `risk.updated` audit row while fixing this
-    // defect: the audit payload captures the entity's raw Prisma field
-    // value at write time — a `@db.Date` column serializes as
-    // `"2026-09-30T00:00:00.000Z"`, NOT the `"YYYY-MM-DD"` string the REST
-    // DTO mapper narrows it to elsewhere. `formatDateOnly`'s own
-    // `split('-')` breaks on the un-truncated string, so this specifically
-    // exercises that real shape rather than the tidier one this catalog
-    // happens to use in most of its own examples.
     const resolveFieldValue = risks.audit.buildValueResolver(emptyReferenceData());
     render(
       <AuditTimeline
@@ -1488,14 +1347,6 @@ describe('AuditTimeline', () => {
     expect(screen.getByText(/30\/09\/2026/)).toBeInTheDocument();
     expect(screen.queryByText(/Invalid Date/i)).not.toBeInTheDocument();
   });
-
-  // -----------------------------------------------------------------------
-  // Product owner UAT finding: `controlsConsidered`/`causes`/`consequences`
-  // are arrays in every real `audit_event` row (confirmed via
-  // `jsonb_typeof`, never the boolean an earlier version of this catalog
-  // assumed) — an unhandled array fell through to `AuditTimeline`'s generic
-  // `JSON.stringify` fallback and showed the reader a raw `[]`.
-  // -----------------------------------------------------------------------
 
   it('renders an empty allow-listed array as "Nenhum", never the raw "[]"', () => {
     const resolveFieldValue = risks.audit.buildValueResolver(emptyReferenceData());
@@ -1571,9 +1422,7 @@ describe('CommentThread', () => {
     loadingMoreLabel: 'Carregando mais comentários…',
   };
 
-  function noop(): void {
-    // Intentionally empty — several stories below never invoke a handler.
-  }
+  const noop = (): void => undefined;
 
   it('renders comments as a real, navigable list — not a stack of divs', () => {
     const items: CommentThreadItem[] = [
@@ -1618,11 +1467,7 @@ describe('CommentThread', () => {
         onSubmit={noop}
       />,
     );
-    // The literal markup is visible as TEXT...
     expect(screen.getByText(payload)).toBeInTheDocument();
-    // ...and no <img> element was ever created from it — React escaped it
-    // into a text node rather than parsing it as HTML (never
-    // dangerouslySetInnerHTML, never a markdown/HTML renderer).
     expect(document.querySelector('img')).toBeNull();
     expect((window as unknown as { __pwned?: boolean }).__pwned).toBeUndefined();
   });
@@ -1790,9 +1635,7 @@ describe('CommentThread', () => {
 });
 
 describe('AttachmentList', () => {
-  function noop(): void {
-    // Intentionally empty — several stories below never invoke a handler.
-  }
+  const noop = (): void => undefined;
 
   const labels: AttachmentListLabels = {
     caption: 'Anexos de teste',
@@ -1952,9 +1795,6 @@ describe('AttachmentList', () => {
     );
     expect(screen.getByRole('list', { name: 'CAPTION_b3e' })).toBeInTheDocument();
     expect(screen.getByText('FILENAME_b3e')).toBeInTheDocument();
-    // The uploader/date/size/content-type line is one text node split by
-    // separators — assert on the containing element's full text content
-    // instead of an exact node match.
     expect(screen.getByText(/UPLOADER_b3e/)).toHaveTextContent(
       'UPLOADER_b3e · UPLOADEDAT_b3e · SIZE_b3e · CONTENTTYPE_b3e',
     );
@@ -1975,24 +1815,6 @@ describe('SearchablePicker', () => {
     triggerAriaLabel: 'TRIGGERARIA_sp1',
   };
 
-  /**
-   * Regression test for the CI-found defect (2026-09-11): an option's
-   * label and description render as two SEPARATE sibling text nodes
-   * (`flex-col`, a free line-break for sighted users) — without an
-   * explicit `aria-label` on the item, the accessible-name algorithm
-   * concatenates their contributions with NOTHING between them, so a
-   * screen reader announced e.g. "Controle fora do
-   * escopoCTL-2026-0001", one fused, illegible string. Neither type-check
-   * nor lint caught this; only exercising the rendered option's REAL
-   * computed accessible name did — this test exists so it cannot return
-   * unnoticed. Uses `toHaveAccessibleName` (backed by
-   * `dom-accessibility-api`, the same accname-spec implementation real
-   * assistive tech vendors implement against) rather than reading
-   * `textContent`, which would not have caught the original defect (the
-   * concatenation the test guards against is specifically an
-   * ACCESSIBLE-NAME computation hazard, not a rendering one — the option
-   * always LOOKED like two lines; it never announced like two words).
-   */
   it('gives an option with a label and a description one legible accessible name, never the two fused', async () => {
     render(
       <SearchablePicker
@@ -2014,9 +1836,6 @@ describe('SearchablePicker', () => {
     const option = await screen.findByRole('option', { name: /Controle fora do escopo/ });
 
     expect(option).toHaveAccessibleName('Controle fora do escopo CTL-2026-0001');
-    // The visible rendering is unchanged by the accessible-name fix — both
-    // pieces still appear on screen as two separate lines, not merged into
-    // one visible string either.
     expect(screen.getByText('Controle fora do escopo')).toBeInTheDocument();
     expect(screen.getByText('CTL-2026-0001')).toBeInTheDocument();
   });
@@ -2039,15 +1858,6 @@ describe('SearchablePicker', () => {
   });
 });
 
-/**
- * T005–T008 (015-roles-permissions-surface) — the two structural shells the
- * roles surface is built from. Neither carries a user-facing string of its
- * own (D-10), so every label below is a test-owned marker: if one of these
- * components ever defaults a string internally, the assertion that only the
- * caller's marker appears is what catches it.
- *
- * Markers deliberately avoid a two-character prefix (F-45/F-54).
- */
 describe('DetailPanel', () => {
   it('renders the caller header, body and footer, and nothing of its own', () => {
     render(
@@ -2064,8 +1874,6 @@ describe('DetailPanel', () => {
     expect(within(region).getByText('PANELHEADER_dp1')).toBeInTheDocument();
     expect(within(region).getByText('PANELBODY_dp1')).toBeInTheDocument();
     expect(within(region).getByText('PANELFOOTER_dp1')).toBeInTheDocument();
-    // No close control was asked for, so none exists — and with it, no
-    // nameless icon button.
     expect(within(region).queryByRole('button', { name: /fechar/i })).not.toBeInTheDocument();
   });
 
@@ -2098,8 +1906,6 @@ describe('DetailPanel', () => {
     expect(body?.className).toContain('min-h-0');
     expect(header?.className).toContain('shrink-0');
     expect(footer?.className).toContain('shrink-0');
-    // A flex child that cannot shrink below its content is what makes a
-    // "scrolling body" silently grow the whole panel instead.
     expect(header?.className).not.toContain('overflow-y-auto');
   });
 
@@ -2195,8 +2001,6 @@ describe('DetailPanel', () => {
     expect(
       screen.queryByRole('complementary', { name: 'PANELREGION_dp7' }),
     ).not.toBeInTheDocument();
-    // Without the restore, this is `<body>` — the exact WCAG SC 2.4.3
-    // failure D-15 records for the dialog primitives.
     expect(document.activeElement).toBe(opener);
   });
 
@@ -2257,8 +2061,6 @@ describe('DisclosureGroup', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const region = screen.getByRole('region', { name: /GROUPTITLE_dg2/ });
     expect(within(region).getByText('GROUPBODY_dg2')).toBeInTheDocument();
-    // The pairing that makes the control a disclosure rather than a button
-    // with a coincidental panel next to it.
     expect(toggle.getAttribute('aria-controls')).toBe(region.getAttribute('id'));
   });
 
@@ -2347,8 +2149,6 @@ describe('DisclosureGroup', () => {
     const toggle = screen.getByRole('button', { name: /GROUPTITLE_dg8/ });
     toggle.focus();
     expect(document.activeElement).toBe(toggle);
-    // A native <button>, so Enter/Space activation is the platform's, not a
-    // hand-rolled keydown handler that would have to be re-proven per key.
     expect(toggle.tagName).toBe('BUTTON');
     expect(toggle).toHaveAttribute('type', 'button');
   });

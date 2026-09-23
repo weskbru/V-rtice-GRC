@@ -1,10 +1,3 @@
-/**
- * T069/002-shared-grc-foundation, US3 — the sole implementation of
- * `FindingReferenceDataPort`. Mirrors
- * `grc/evidence/infrastructure/prisma-evidence-reference-data.repository.ts`
- * exactly — see that file's header for why reading these shared tables
- * directly is consistent, established precedent.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

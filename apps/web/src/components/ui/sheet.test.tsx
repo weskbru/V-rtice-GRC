@@ -11,22 +11,6 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { common } from '@/lib/messages/common';
 
-/**
- * T002 (015-roles-permissions-surface) — `SheetContent` focus restoration,
- * the exact counterpart of `dialog.test.tsx`'s S-03 coverage.
- *
- * `Sheet` is built on the same `@radix-ui/react-dialog` primitive as
- * `Dialog`, and inherited the same defect: modal content hard-codes
- * `onCloseAutoFocus` to focus a registered `Sheet.Trigger`, and its
- * `preventDefault()` also discards `FocusScope`'s generic "restore whatever
- * had focus before" fallback. No caller in this platform renders a Radix
- * trigger, so nothing was registered and focus fell to `<body>` on every
- * close — WCAG SC 2.4.3. This is the measured impediment that made 012 §2.4
- * choose `Dialog` over `Sheet`; these tests are what keep it removed.
- *
- * Non-vacuity: delete the `<FocusRestoreAnchor …/>` line from `sheet.tsx`
- * and all four tests below fail with `document.activeElement` = `<body>`.
- */
 
 function SheetHarness(): React.JSX.Element {
   const [open, setOpen] = useState(false);
@@ -39,9 +23,6 @@ function SheetHarness(): React.JSX.Element {
         <SheetContent>
           <SheetTitle>Detalhe do papel</SheetTitle>
           <SheetDescription>Permissões concedidas.</SheetDescription>
-          {/* The autoFocus pattern that defeated the previous, commit-phase
-              capture in `dialog.tsx` (S-03 (a)) — reproduced here so the
-              sheet cannot regress into it either. */}
           <textarea autoFocus aria-label="Observação" />
           <button type="button" onClick={() => setOpen(false)}>
             Cancelar
@@ -82,9 +63,6 @@ describe('SheetContent — focus restoration (T002)', () => {
     render(<SheetHarness />);
     const trigger = screen.getByRole('button', { name: 'Abrir painel' });
 
-    // `fireEvent.click` does not move focus by itself the way a real
-    // activation does; focusing first is what makes the precondition this
-    // test protects (the real trigger had focus) actually hold.
     trigger.focus();
     fireEvent.click(trigger);
     const field = await screen.findByLabelText('Observação');
@@ -140,8 +118,6 @@ describe('SheetContent — focus restoration (T002)', () => {
     );
     await waitFor(() => expect(document.activeElement).toBe(menuTrigger));
 
-    // The menu was gone long before the sheet closed — so this could only
-    // have worked by resolving the trigger at CAPTURE time.
     expect(menu).not.toBeInTheDocument();
   });
 });

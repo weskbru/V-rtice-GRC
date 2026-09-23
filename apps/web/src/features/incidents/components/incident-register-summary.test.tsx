@@ -5,15 +5,6 @@ import { IncidentRegisterSummary } from './incident-register-summary';
 
 import type { DashboardSummaryResponse } from '@/features/dashboard/types';
 
-/**
- * Component-mount evidence for `IncidentRegisterSummary` (CLAUDE.md §18.5,
- * §19.7) — `dashboardApi.getSummary` is mocked at the network boundary. This
- * register's summary reads a PERMISSION-GATED cross-module endpoint, unlike
- * every sibling register's own `pageSize: 1` self-query — these tests exist
- * specifically to pin the behavioural difference the header comment
- * documents: an absent `breakdowns.incidents` block renders no strip at all,
- * never zeros standing in for "you may not see this".
- */
 const { getSummaryMock } = vi.hoisted(() => ({ getSummaryMock: vi.fn() }));
 
 vi.mock('@/features/dashboard/api', () => ({
@@ -37,7 +28,6 @@ describe('IncidentRegisterSummary', () => {
     );
     render(<IncidentRegisterSummary />);
 
-    // 5 + 3 + 2 + 7 + 1 = 18, computed from the one response, not a second request.
     await waitFor(() => expect(screen.getByText('18')).toBeInTheDocument());
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();

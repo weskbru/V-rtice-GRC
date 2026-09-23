@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control assessment form (T048, US2, FR-009 to FR-011).
- *
- * No `If-Match`: `POST /controls/{controlId}/assessments` is a new,
- * independently-keyed row and does not write to `controls.version`
- * (contract's own "Optimistic locking is scoped to the control's own row"
- * clause) — unlike `AssessmentForm` (Risk), this form never needs an
- * `etag` prop.
- *
- * The assessor is taken from the session server-side and is never
- * accepted here — there is no field for it, by construction
- * (`CreateControlAssessmentRequest`).
- */
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -39,7 +26,6 @@ import type { ControlAssessmentResult } from '../types';
 
 export interface ControlAssessmentFormProps {
   controlId: string;
-  /** Only `ACTIVE` controls accept new assessments (D-6, FR-006) — the caller passes the control's current status so this form can explain, rather than silently fail, when it is not. */
   controlIsActive: boolean;
   onAssessed: () => void;
 }

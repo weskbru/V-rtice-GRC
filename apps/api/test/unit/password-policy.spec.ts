@@ -1,7 +1,3 @@
-/**
- * T054 — unit tests for the pure password policy domain service (FR-006).
- * No I/O, no NestJS testing module.
- */
 import { describe, expect, it } from 'vitest';
 
 import { validatePassword } from '../../src/core/identity/domain/password-policy';
@@ -19,7 +15,7 @@ describe('validatePassword (T054, FR-006)', () => {
   });
 
   it('accepts a password exactly at the minimum length', () => {
-    const exact = 'Abcdefg1!xyz'; // 12 chars, three classes
+    const exact = 'Abcdefg1!xyz';
     expect(exact).toHaveLength(12);
     expect(validatePassword(exact, settings)).toHaveLength(0);
   });
@@ -35,12 +31,10 @@ describe('validatePassword (T054, FR-006)', () => {
   });
 
   it('accepts a password with exactly three of the four character classes', () => {
-    // lowercase + uppercase + digit, no symbol.
     expect(validatePassword('Abcdefgh1234', settings)).toHaveLength(0);
   });
 
   it('rejects a password with only two character classes', () => {
-    // lowercase + digit only.
     const violations = validatePassword('abcdefgh1234', settings);
     expect(violations.map((v) => v.code)).toContain('MISSING_COMPLEXITY');
   });
@@ -57,7 +51,7 @@ describe('validatePassword (T054, FR-006)', () => {
 
   it('respects a stricter configured minimum length', () => {
     const strict = { minLength: 20, requireComplexity: false };
-    expect(validatePassword('Abcdefghijklmnopqr1!', strict)).toHaveLength(0); // 21 chars
+    expect(validatePassword('Abcdefghijklmnopqr1!', strict)).toHaveLength(0);
     expect(validatePassword('Abcdefghijklmnopq1!', strict).map((v) => v.code)).toContain(
       'TOO_SHORT',
     );

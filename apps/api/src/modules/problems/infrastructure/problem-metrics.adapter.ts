@@ -1,13 +1,3 @@
-/**
- * 009-indicators-reports, T028 — the sole implementation of
- * `ProblemMetricsPort` (`shared/grc-ports/problem-metrics.port.ts`).
- * Delegates to `PrismaProblemRepository.list` — the SAME catalog query
- * `GET /problems` already runs — once per `ProblemSeverity` value (each
- * call's own `status` filter narrowed to `OPEN_PROBLEM_STATUSES`,
- * `pageSize: 1`), reading only each page's own `total`. Four small,
- * indexed calls, run in parallel — never a fifth, hand-rolled aggregate
- * query.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ProblemMetricsPort } from '../../../shared/grc-ports/problem-metrics.port';
@@ -52,13 +42,6 @@ export class ProblemMetricsAdapter implements ProblemMetricsPort {
     );
   }
 
-  /**
-   * `GET /dashboard/summary`'s `breakdowns.problems.byStatus` — the SAME
-   * pattern as `getOpenCountBySeverity` above (one `list` call per value,
-   * `pageSize: 1`, reading only `total`), but over all five
-   * `ProblemStatus` values with no `status` filter restricting to the open
-   * subset.
-   */
   async getCountByStatus(scope: ScopeFilter): Promise<Readonly<Record<ProblemStatus, number>>> {
     const counts = await Promise.all(
       PROBLEM_STATUSES.map((status) =>

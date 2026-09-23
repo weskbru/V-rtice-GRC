@@ -1,11 +1,3 @@
-/**
- * T019/006-assets-processes — the sole implementation of
- * `AssetReferenceDataPort`. Deliberate direct `PrismaService` queries
- * against `organizational_units`/`users`, mirroring
- * `modules/controls/infrastructure/prisma-control-reference-data.repository.ts`
- * exactly — see that file's header for why reading these shared tables
- * directly is established precedent, not a new privilege.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

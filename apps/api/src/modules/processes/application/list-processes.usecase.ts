@@ -1,9 +1,3 @@
-/**
- * T017/006-assets-processes — `ListProcessesUseCase`: identical in shape to
- * `modules/assets/application/list-assets.usecase.ts` (FR-020) — see that
- * file's header for the full account this one does not repeat, including
- * why this closes "Vazamento 1" for `GET /processes`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

@@ -1,9 +1,3 @@
-/**
- * T180/D-11 — `/admin/roles[/**]` and `/admin/permissions`: success-shape
- * and business-rule coverage for an administrator holding
- * `role:administer`. 403/401 are covered exhaustively elsewhere (see
- * `admin-permissions.spec.ts`/`admin-unauthenticated.spec.ts`).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -32,10 +26,6 @@ describe('Admin role and permission administration (T180, US8)', () => {
     appOrigin = appConfig.app.appOrigin;
 
     const prisma = ctx.app.get(PrismaService);
-    // `role:administer`/`risk:view`/`risk:create` `Permission` rows must
-    // exist before any test creates/updates a role referencing them by
-    // identifier — the test database is migrated but never seeded (F-5,
-    // docs/deferred-findings.md), unlike `pharos_grc` (development).
     await createPermissionFixture(prisma, 'risk:view');
     await createPermissionFixture(prisma, 'risk:create');
     const role = await createRoleWithPermissionsFixture(prisma, ['role:administer'], {
@@ -246,23 +236,6 @@ describe('Admin role and permission administration (T180, US8)', () => {
     expect(refused.status).toBe(422);
   });
 
-  /**
-   * F-68, 2026-09-14 — this test used to end with
-   * `descriptionOnly.status === 200`, because the service refused `name` and
-   * `permissionIdentifiers` on a system role and ACCEPTED `description`. The
-   * seed reconciles that field on every run, so the product wrote a field it
-   * did not own and the audit trail recorded an edit the database did not
-   * keep. The platform now owns a system role whole, and the third
-   * expectation is inverted accordingly — the contract's `updateRole`
-   * description says the same.
-   *
-   * This file keeps asserting STATUS only, which is what it is for (shape
-   * and business-rule coverage, D-11). `specs/015 STATE.md` §16.1 item 3
-   * recorded that status alone cannot tell "422 because system role" from
-   * "422 for anything else"; that gap is closed by
-   * `test/integration/system-role-immutability.spec.ts`, which reads the
-   * RFC 9457 body, not by making this file do two jobs.
-   */
   it('refuses every write to a system role — name, description and permission set alike (422) — and refuses deleting it', async () => {
     const prisma = ctx.app.get(PrismaService);
     const systemRole = await prisma.client.role.create({
@@ -291,7 +264,6 @@ describe('Admin role and permission administration (T180, US8)', () => {
       .send({ description: 'Descrição atualizada.' });
     expect(descriptionAttempt.status).toBe(422);
 
-    // And the row is untouched by all three.
     const stored = await prisma.client.role.findUniqueOrThrow({ where: { id: systemRole.id } });
     expect(stored.name).toBe(systemRole.name);
     expect(stored.description).toBe('Original.');

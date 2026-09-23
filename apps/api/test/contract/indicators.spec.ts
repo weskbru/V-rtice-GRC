@@ -1,29 +1,3 @@
-/**
- * 009-indicators-reports, Fase 3 (T015-T017) + Fase 8 (T068) — coverage for
- * US1's three operations: `GET /indicators` (`listIndicatorDefinitions`),
- * `POST /indicators` (`createIndicatorDefinition`), and
- * `GET /indicators/{metricKey}/current` (`getIndicatorCurrentValue`) — the
- * feature's MVP checkpoint (tasks.md Fase 3) — plus, added by T068, the
- * contract's three remaining operations: `GET /indicators/metric-keys`
- * (`listIndicatorMetricKeys`), `GET /indicators/{definitionId}`
- * (`getIndicatorDefinition`) and `PATCH /indicators/{definitionId}`
- * (`updateIndicatorDefinition`).
- *
- * Every response here is additionally checked against
- * `contracts/indicators.openapi.yaml` by the module-level payload validator
- * (`installResponseValidation`, `openapi-documents.ts`'s `Indicators`
- * entry) — no test in this file needs to hand-assert every field the
- * schema already requires.
- *
- * `IndicatorMetricKey` is a closed, eleven-value enum with `metricKey
- * UNIQUE` on `indicator_definitions` (data-model.md §1) — once created, a
- * definition for a key can never be created again in this same test-run's
- * database (the contract suite's own `globalSetup` resets mutable tables
- * once per `pnpm test:contract` invocation, never per test). Every `it()`
- * that CREATES a definition below therefore uses a key no other `it()` in
- * this file also creates one for — see each `describe` block's own
- * comment for the allocation.
- */
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -150,10 +124,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
     return { agent, userId: fixture.user.id };
   }
 
-  /** Same as `agentWithPermissions`, but grants a `GLOBAL` `OrgScopeGrant`
-   * instead of a `UNIT` one (research.md D-6) — the History sub-resource
-   * (`POST`/`GET .../measurements`) requires this, on top of the usual
-   * `indicator:edit`/`indicator:view`. */
   async function agentWithGlobalScope(
     permissions: readonly PermissionIdentifier[],
   ): Promise<{ agent: ReturnType<typeof request.agent>; userId: string }> {
@@ -187,12 +157,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       ...overrides,
     };
   }
-
-  // -------------------------------------------------------------------
-  // createIndicatorDefinition (T016) — this describe block is the ONLY
-  // one that creates `CONTROL_INACTIVE_COUNT`/`ASSET_INACTIVE_COUNT`
-  // definitions (see this file's own header on key allocation).
-  // -------------------------------------------------------------------
 
   describe('POST /indicators', () => {
     it('succeeds for a caller holding indicator:create and returns the declared shape', async () => {
@@ -264,8 +228,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
 
     it('rejects a second definition for an already-configured metricKey — 422', async () => {
       const { agent } = await agentWithPermissions(['indicator:create', 'indicator:view']);
-      // `CONTROL_INACTIVE_COUNT` is not otherwise created by any successful
-      // request in this file — safe to consume here.
       const first = await agent
         .post('/api/v1/indicators')
         .set('Origin', appOrigin)
@@ -314,10 +276,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // listIndicatorDefinitions (T015)
-  // -------------------------------------------------------------------
-
   describe('GET /indicators', () => {
     it('responds with the {data, meta} envelope, never {items}', async () => {
       const { agent } = await agentWithPermissions(['indicator:create', 'indicator:view']);
@@ -350,12 +308,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // getIndicatorCurrentValue (T017) — none of these tests create an
-  // `IndicatorDefinition`: US1's own guarantee is that this operation
-  // works whether or not one exists for the key (FR-001).
-  // -------------------------------------------------------------------
 
   describe('GET /indicators/{metricKey}/current', () => {
     it('computes a SINGLE_VALUE, ORGANIZATIONAL_UNIT metric for a caller holding indicator:view + the source permission', async () => {
@@ -454,9 +406,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       expect(withDefinitionBody.definition).not.toBeNull();
       expect(withDefinitionBody.definition?.thresholdComparator).toBe('GTE');
 
-      // `ACTION_OVERDUE_COUNT` is never created by any `it()` in this file
-      // — guaranteed to have no `IndicatorDefinition` (see this file's own
-      // header on key allocation).
       const { agent: readerNoDefinition } = await agentWithPermissions([
         'indicator:view',
         'action:view',
@@ -468,14 +417,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       expect((withoutDefinition.body as IndicatorCurrentValueBody).definition).toBeNull();
     });
   });
-
-  // -------------------------------------------------------------------
-  // createIndicatorMeasurement (T033, Fase 4/US2) — no per-key uniqueness
-  // constraint on `indicator_measurements` (data-model.md §2), so any
-  // `it()` below may freely create a point for any `IndicatorMetricKey`
-  // without colliding with another `it()`, unlike `POST /indicators`
-  // above.
-  // -------------------------------------------------------------------
 
   describe('POST /indicators/{metricKey}/measurements', () => {
     it('computes and permanently records one point for a GLOBAL-scope caller holding indicator:edit', async () => {
@@ -492,9 +433,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       expect(typeof body.breached).toBe('boolean');
       expect(body.computedAt).toBeTruthy();
       expect(body.computedBy.id).toBeTruthy();
-      // Invariant M1 — `CONTROL_INACTIVE_COUNT` is `SINGLE_VALUE`
-      // (data-model.md §3): `value` is a number or `null`, never both
-      // populated with `valueByBucket`.
       expect(typeof body.value === 'number' || body.value === null).toBe(true);
       expect(body.valueByBucket).toBeNull();
     });
@@ -552,33 +490,18 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
 
     it('declares no PATCH/PUT/DELETE on this resource — routing 404/405, never 403 (SC-002)', async () => {
       const { agent } = await agentWithGlobalScope(['indicator:edit']);
-      // The exact registered collection path — `contracts/indicators.
-      // openapi.yaml` declares only `get`/`post` for it (SC-002: no update
-      // path of any kind exists for `IndicatorMeasurement`). A synthetic
-      // `/measurements/{id}` sub-path would be a weaker test: it is 404 for
-      // ANY verb simply because that path segment was never registered at
-      // all, which proves nothing about THIS resource specifically.
       const path = '/api/v1/indicators/CONTROL_INACTIVE_COUNT/measurements';
 
       const patchResponse = await agent.patch(path).set('Origin', appOrigin).send({});
       const putResponse = await agent.put(path).set('Origin', appOrigin).send({});
       const deleteResponse = await agent.delete(path).set('Origin', appOrigin);
 
-      // A routing miss (the verb/path combination was never registered) is
-      // 404 or 405 — NEVER 403. A `403` here would mean the route exists
-      // and was refused by authorization, which is exactly the
-      // distinction this test exists to rule out (task instructions,
-      // T038).
       for (const response of [patchResponse, putResponse, deleteResponse]) {
         expect([404, 405]).toContain(response.status);
         expect(response.status).not.toBe(403);
       }
     });
   });
-
-  // -------------------------------------------------------------------
-  // listIndicatorMeasurements (T034, Fase 4/US2)
-  // -------------------------------------------------------------------
 
   describe('GET /indicators/{metricKey}/measurements', () => {
     it('responds with the {data, meta} envelope, chronological oldest-first, for a GLOBAL-scope caller', async () => {
@@ -646,13 +569,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // getIndicatorDefinition (T068) — `RISK_TREATMENT_OVERDUE_COUNT` is
-  // never created by any OTHER `it()` in this file (see this file's own
-  // header on key allocation) — safe to consume here, once, for the
-  // whole describe block.
-  // -------------------------------------------------------------------
-
   describe('GET /indicators/{definitionId}', () => {
     let definitionId: string;
 
@@ -702,22 +618,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // updateIndicatorDefinition (T068) — `COMPLIANCE_PERCENTAGE` for the
-  // general field-edit/metricKey-immutability/404/403 scenarios and
-  // `AUDIT_ENGAGEMENT_OPEN_COUNT` for the Invariant T1 scenarios, both
-  // never created by any OTHER `it()` in this file (see this file's own
-  // header on key allocation) — `RISK_TOTAL_BY_LEVEL` is deliberately NOT
-  // used here: `test/contract/information-disclosure.spec.ts`'s own sweep
-  // creates a definition for that key and documents, in its own comment,
-  // that no other file in this suite ever does. Each key is created ONCE,
-  // in this describe block's own
-  // `beforeAll`, and several `it()`s below deliberately chain off the same
-  // record's evolving state (documented at each step) rather than
-  // re-creating it per assertion — `IndicatorDefinition.metricKey` is
-  // UNIQUE, so a second POST for either key would fail with 422.
-  // -------------------------------------------------------------------
 
   describe('PATCH /indicators/{definitionId}', () => {
     let generalDefinitionId: string;
@@ -865,19 +765,6 @@ describe('Indicator contract (US1, 009-indicators-reports)', () => {
       expect(body.thresholdValue).toBeNull();
     });
   });
-
-  // -------------------------------------------------------------------
-  // listIndicatorMetricKeys (T068) — placed LAST in this file so every
-  // OTHER describe block's own successful `POST /indicators` calls have
-  // already run: `hasDefinition` below is asserted against keys whose
-  // configured/unconfigured state this file's own header already fixes
-  // (`CONTROL_INACTIVE_COUNT` configured early; `ACTION_OVERDUE_COUNT`
-  // never configured by any successful request in this file, and never
-  // will be — `test/contract/information-disclosure.spec.ts`'s own header
-  // separately reserves `RISK_TOTAL_BY_LEVEL`, and this file's own
-  // `PATCH /indicators/{definitionId}` describe block above documents
-  // every OTHER key it consumes).
-  // -------------------------------------------------------------------
 
   describe('GET /indicators/metric-keys', () => {
     it('returns the closed catalog as a bare array, with hasDefinition reflecting real state', async () => {

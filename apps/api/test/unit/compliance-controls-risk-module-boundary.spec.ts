@@ -1,20 +1,3 @@
-/**
- * T017/004-compliance-management (SC-007, FR-024) — a static,
- * filesystem-level proof that `modules/compliance` never imports
- * `modules/controls` or `modules/risk`, and neither imports it back,
- * complementing (not replacing) `eslint-plugin-boundaries`
- * (`apps/api/eslint.config.mjs`). Every dependency Compliance has on
- * Controls crosses `shared/grc-ports/` (`ControlDirectoryPort`,
- * `ControlEffectivenessPort`) — never a direct import, in either
- * direction (research.md D-9).
- *
- * Same method as `controls-risk-module-boundary.spec.ts`
- * (003-controls-management, T012): a plain text scan of import specifiers,
- * with relative ones RESOLVED to an absolute path before being classified.
- * Extended to three pairwise checks (compliance<->controls,
- * compliance<->risk) rather than the original's two, since this module
- * introduces a third business module into the same boundary graph.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -25,10 +8,6 @@ const RISK_MODULE_ROOT = path.join(SRC_ROOT, 'modules', 'risk');
 const CONTROLS_MODULE_ROOT = path.join(SRC_ROOT, 'modules', 'controls');
 const COMPLIANCE_MODULE_ROOT = path.join(SRC_ROOT, 'modules', 'compliance');
 
-/** Recursively lists every `.ts` file under `dir` (test files included —
- * a cross-module import inside a test file living under `src/modules/**`
- * would be exactly as real a boundary violation as one in application
- * code). */
 function listTsFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) {
     return [];
@@ -46,10 +25,6 @@ function listTsFiles(dir: string): string[] {
   return files;
 }
 
-/** Every import/export specifier string literal in `contents` — covers
- * `import ... from '...'`, side-effect `import '...'` and `export ...
- * from '...'`, which is every ES module import shape this codebase uses
- * (no dynamic `import()`/CommonJS `require` in `src/modules/**`). */
 function extractSpecifiers(contents: string): string[] {
   const pattern = /(?:import|export)(?:[^'";]*from)?\s*['"]([^'"]+)['"]/g;
   const specifiers: string[] = [];
@@ -62,11 +37,6 @@ function extractSpecifiers(contents: string): string[] {
   return specifiers;
 }
 
-/** Resolves every RELATIVE specifier in `file` to an absolute path
- * (extension-less — good enough to test whether it falls under a given
- * module's directory tree, which is all this test needs). Non-relative
- * specifiers (package imports, e.g. `@nestjs/common`, `@prisma/client`)
- * cannot resolve into `src/modules/**` at all and are skipped. */
 function resolvedImportTargets(file: string): string[] {
   const contents = fs.readFileSync(file, 'utf8');
   const dir = path.dirname(file);
@@ -75,8 +45,6 @@ function resolvedImportTargets(file: string): string[] {
     .map((specifier) => path.resolve(dir, specifier));
 }
 
-/** True when `target` (an absolute, extension-less resolved path) falls
- * inside `moduleRoot`'s directory tree. */
 function isUnder(target: string, moduleRoot: string): boolean {
   const relative = path.relative(moduleRoot, target);
   return !relative.startsWith('..') && !path.isAbsolute(relative);

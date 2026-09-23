@@ -1,38 +1,3 @@
-/**
- * T090 — `UpdateRiskUseCase`: partial business-content update with
- * per-field audit (FR-033, FR-058) and optimistic-lock conflict detection
- * (FR-103, ADR-013).
- *
- * ## Shape of `UpdateRiskInput`
- *
- * A field's TypeScript value distinguishes exactly the three states
- * `contracts/risks.openapi.yaml`'s `UpdateRiskRequest` defines: **absent**
- * (`undefined` — "omitted properties are left unchanged"), **explicitly
- * cleared** (`null`, only for the fields the schema types `[string,
- * 'null']`), and **supplied** (a real value). JSON itself has no
- * `undefined` literal, so a JSON body's key either exists (`null` or a
- * value) or does not (`undefined` once mapped onto this interface) — the
- * presentation-layer DTO->input mapping (`risk.controller.ts`) relies on
- * exactly this to preserve the distinction all the way from the wire.
- *
- * ## Same transaction-boundary reasoning as `CreateRiskUseCase`
- *
- * See that file's header — this class likewise depends on
- * `TransactionRunnerPort`, never `PrismaService`, so the conditional update
- * and its audit entry share one transaction without violating ADR-011.
- *
- * ## Why the diff is field-by-field rather than "always audit +
- * merged inputs"
- *
- * `AuditRecorder`/`applyAuditFieldAllowlist` drop unlisted fields but do
- * NOT drop fields whose old and new value are equal — writing every
- * supplied field into `previousValues`/`newValues` regardless of whether it
- * actually changed would put a "changed" `title` in the trail even when a
- * caller re-submitted the same title unchanged (FR-033's "field changes",
- * not "fields submitted"). Each `diff*` call below therefore ALWAYS looks
- * at the record's CURRENT (pre-update) value before deciding whether a
- * field is part of the change set at all.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -62,7 +27,6 @@ const RISK_ENTITY_LABEL = 'Risco';
 export interface UpdateRiskInput {
   readonly actorUserId: string;
   readonly riskId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
   readonly title?: string | undefined;
   readonly description?: string | undefined;
@@ -97,11 +61,6 @@ export class UpdateRiskUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // FR-025/FR-030: scoped read — a risk outside the caller's scope reads
-    // as `undefined`, indistinguishable from "does not exist" to the
-    // caller. F-38: recorded server-side, via
-    // `assertExistingRecordAccessible`, whenever the risk actually exists
-    // outside `scope`.
     const current = await this.riskRepository.findById(scope, input.riskId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -116,15 +75,8 @@ export class UpdateRiskUseCase {
       );
     }
 
-    // FR-084 — the domain rule, not a controller check.
     assertBusinessContentEditable(current.status);
 
-    // `UpdateRiskChanges`'s fields are `readonly` at its public port boundary
-    // (`domain/ports/risk-repository.port.ts` — callers must not mutate a
-    // value they received); building one up field-by-field here is
-    // construction, not mutation of an existing value, so a locally-mutable
-    // view of the same shape is used instead of fighting `readonly` with
-    // an `any`/`as` escape hatch.
     const changes: { -readonly [K in keyof UpdateRiskChanges]: UpdateRiskChanges[K] } = {};
     const previousValues: Record<string, unknown> = {};
     const newValues: Record<string, unknown> = {};
@@ -190,7 +142,6 @@ export class UpdateRiskUseCase {
     }
 
     if (input.orgUnitId !== undefined && input.orgUnitId !== current.orgUnit.id) {
-      // FR-025c applies to reassignment exactly as it applies to creation.
       const orgUnit = await this.referenceData.findOrgUnit(input.orgUnitId);
       if (!orgUnit?.isActive) {
         throw new ValidationDomainError(USER_MESSAGES.risk.orgUnitNotFound, [
@@ -207,22 +158,10 @@ export class UpdateRiskUseCase {
       newValues.orgUnitId = input.orgUnitId;
     }
 
-    // The assignment line must be resolved against the org unit the risk
-    // will HAVE after this update, not the one it had before — `changes`
-    // already carries the new `orgUnitId` at this point if it is changing
-    // (the block above runs first). A move that leaves the current
-    // owner/responsible no longer assignable in the destination unit is
-    // refused exactly as a new, unassignable owner would be — computed
-    // lazily so an update that touches neither the org unit nor the
-    // owner/responsible fields never pays for the lookup.
     const finalOrgUnitId = changes.orgUnitId ?? current.orgUnit.id;
     const orgUnitChanging = changes.orgUnitId !== undefined;
     let assignableUnitIds: ReadonlySet<string> | undefined;
     const resolveAssignableUnitIds = async (): Promise<ReadonlySet<string>> => {
-      // `finalOrgUnitId` was already proved to exist and be active either
-      // now (the org-unit block above) or when the risk was originally
-      // created — the `?? new Set()` fallback is defensive-only and fails
-      // closed, exactly like `CreateRiskUseCase`'s own fallback.
       assignableUnitIds ??=
         (await this.assignmentLine.resolveUnitIds(finalOrgUnitId)) ?? new Set<string>();
       return assignableUnitIds;
@@ -266,9 +205,6 @@ export class UpdateRiskUseCase {
         newValues.responsibleUserId = input.responsibleUserId;
       }
     } else if (orgUnitChanging && current.responsible) {
-      // Responsible person left untouched by this request, but the risk is
-      // moving units: the existing responsible person must still be
-      // assignable in the destination unit.
       await this.assertUserAssignable(
         current.responsible.id,
         await resolveAssignableUnitIds(),
@@ -322,9 +258,6 @@ export class UpdateRiskUseCase {
         );
       }
 
-      // Only audit when something actually changed — an idempotent PATCH
-      // re-submitting the current values still succeeds (200), but leaves
-      // no misleading "nothing changed" audit row.
       if (Object.keys(newValues).length > 0) {
         await this.auditRecorder.record({
           action: 'risk.updated',
@@ -341,26 +274,6 @@ export class UpdateRiskUseCase {
     });
   }
 
-  /**
-   * See `CreateRiskUseCase.assertUserAssignable`'s own doc comment — the
-   * exact same rule, duplicated rather than shared for the same reason
-   * `assertReferenceActive` already is: each use case owns its narrow,
-   * single-implementation lookup logic, and there is no third caller yet
-   * that would justify extracting a shared helper. This includes F-CV-2's
-   * visibility check (`risk:view` + scope reaching `orgUnitId`, against the
-   * CANDIDATE, not the caller) — same predicate, same reasoning, same
-   * duplication policy.
-   *
-   * ## Only reached when the field is actually being set or changed
-   *
-   * Every call site above only reaches this method when `ownerChanging`,
-   * `orgUnitChanging`, or the responsible field is itself present and
-   * different from its current value — never merely because SOME other
-   * field on the PATCH changed. A risk created before this rule existed can
-   * carry an owner/responsible who would now fail it; editing that risk's
-   * title, description or any other untouched field must keep working, and
-   * does, because this method is simply never invoked for that request.
-   */
   private async assertUserAssignable(
     userId: string,
     assignmentLine: ReadonlySet<string>,

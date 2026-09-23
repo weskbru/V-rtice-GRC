@@ -1,21 +1,3 @@
-/**
- * Unit test for `OrganizationComplianceSummaryAdapter.getStateBreakdown`
- * (`src/modules/compliance/infrastructure/
- * organization-compliance-summary.adapter.ts`), added for `GET
- * /dashboard/summary`'s `breakdowns.compliance`
- * (`get-dashboard-summary.usecase.ts`). `PrismaService`/`ControlDirectoryPort`/
- * `ControlEffectivenessPort` are hand-rolled fakes — no I/O, no NestJS test
- * module.
- *
- * The central proof: `getStateBreakdown` and
- * `getOrganizationWideCompliancePercentage` derive their own answer from
- * the SAME private `computeRequirementStates` call (CLAUDE.md §19.7) — this
- * file constructs one fixture (three requirements: one NOT_APPLICABLE, one
- * COMPLIANT, one NOT_MET) and asserts BOTH methods agree with each other:
- * `byState` sums to `requirementCount`, and the percentage equals
- * `compliantCount / applicableCount * 100` over the SAME two applicable
- * requirements `byState` itself counts.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { OrganizationComplianceSummaryAdapter } from '../../src/modules/compliance/infrastructure/organization-compliance-summary.adapter';
@@ -52,9 +34,6 @@ function buildPrisma(options: {
 
 describe('OrganizationComplianceSummaryAdapter', () => {
   it('getStateBreakdown zero-fills every RequirementComplianceState and byState sums to requirementCount, agreeing with getOrganizationWideCompliancePercentage over the same data', async () => {
-    // req-na: declared NOT_APPLICABLE.
-    // req-compliant: one linked control, active + EFFECTIVE -> COMPLIANT.
-    // req-notmet: no linked control -> NOT_MET.
     const prisma = buildPrisma({
       requirementIds: ['req-na', 'req-compliant', 'req-notmet'],
       notApplicableIds: ['req-na'],
@@ -87,8 +66,6 @@ describe('OrganizationComplianceSummaryAdapter', () => {
     const stateSum = Object.values(breakdown.byState).reduce((a, b) => a + b, 0);
     expect(stateSum).toBe(breakdown.requirementCount);
 
-    // Two APPLICABLE requirements (req-compliant, req-notmet), one COMPLIANT
-    // — the SAME population `byState` itself counted (excluding NOT_APPLICABLE).
     expect(percentage).toBe(50);
   });
 

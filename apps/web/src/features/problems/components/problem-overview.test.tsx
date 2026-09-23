@@ -5,29 +5,6 @@ import { ProblemOverview } from './problem-overview';
 
 import type { ProblemDetail } from '../types';
 
-/**
- * Component-mount evidence for the "Visão geral" section's three cards
- * (019-problem-detail-experience, Fase B — replaces the flat, card-less
- * `<dl>` this component used to be). Three things this suite exists to
- * prove:
- *
- *   - "Descrição", "Causa raiz" and "Detalhes do problema" all render as
- *     real cards with real headings, each "Detalhes do problema" attribute
- *     anchored by its own icon-carrying `DetailField`;
- *   - "Causa raiz" renders the honest empty-state sentence when `rootCause`
- *     is `null` — never a placeholder that reads like content — and the
- *     actual value, with its OWN card, once identified. This is the exact
- *     domain defect this phase exists to fix (the coordinator's own
- *     rendered measurement: root cause used to sit as the seventh cell of a
- *     flat `<dl>`, same typographic weight as "Registrado em");
- *   - "Registrado em" (`createdAt`) renders ONLY when the fact is present.
- *
- * The lifecycle outcome facts (resolution/closure/cancellation) are NOT
- * this component's concern any more — `problem-lifecycle-section.test.tsx`
- * would cover those (component-mount coverage for that section is left to
- * its own pure-model/view suites, mirroring Incident's own split).
- */
-
 function buildProblem(overrides: Partial<ProblemDetail> = {}): ProblemDetail {
   return {
     id: 'problem-1',

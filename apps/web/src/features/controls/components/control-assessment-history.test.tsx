@@ -5,13 +5,6 @@ import { ControlAssessmentHistory } from './control-assessment-history';
 
 import type { ControlAssessment, Page } from '../types';
 
-/**
- * Component-mount evidence for T048 (US2, FR-016 to FR-020, D-3) — the two
- * segregation-of-duties rules must be explained proactively and the decide
- * controls must be withheld client-side from the assessor and from the
- * control's owner (an advisory courtesy; the server is the sole authority
- * regardless).
- */
 const { listAssessmentsMock, requestAttestationMock } = vi.hoisted(() => ({
   listAssessmentsMock: vi.fn(),
   requestAttestationMock: vi.fn(),

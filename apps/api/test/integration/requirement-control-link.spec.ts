@@ -1,12 +1,3 @@
-/**
- * T034/T035/004-compliance-management, User Story 2 — end-to-end coverage
- * against the real database for `RequirementControlLink`: ADR-020 part 4
- * (scope checked BEFORE the write, NOTHING written for an out-of-scope or
- * nonexistent control — SC-005, FR-022), SC-001 (a control linked to
- * clauses of multiple frameworks stays one `controls` row), FR-008/FR-011
- * (duplicate-active refused, withdrawal preserves history, relink after
- * withdrawal permitted).
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -66,8 +57,6 @@ describe('RequirementControlLink (T032-T035, ADR-020, SC-001, SC-005, FR-008/FR-
       email: `${uniqueTestMarker('compliance-link-actor')}@example.test`,
       primaryOrgUnitId: orgUnitId,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `compliance:map`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['compliance:map', 'compliance:administer', 'compliance:view', 'control:view'],
@@ -262,17 +251,6 @@ describe('RequirementControlLink (T032-T035, ADR-020, SC-001, SC-005, FR-008/FR-
   });
 });
 
-/**
- * ADR-020 part 5, both halves (`docs/architecture/decisions.md`) — closing
- * the gap where only `compliance:map` (the registering side) was ever
- * enforced and `control:view` (the referenced side) was not. This is
- * exactly the shape the seeded `Compliance Manager` role shipped with
- * (`compliance:map` without `control:view`) until this task fixed it.
- * `LinkRequirementToControlUseCase` now folds a missing `control:view` into
- * the SAME refusal a nonexistent control already produces
- * (`ValidationDomainError`/`controlNotFoundOrOutOfScope`) — proven the same
- * way the SC-005/FR-022 test above proves out-of-scope vs. nonexistent.
- */
 describe('RequirementControlLink — control:view is required on the referenced control (ADR-020 part 5)', () => {
   let ctx: IntegrationTestContext;
   let createFramework: CreateFrameworkUseCase;
@@ -294,8 +272,6 @@ describe('RequirementControlLink — control:view is required on the referenced 
     await ctx.close();
   });
 
-  /** Deliberately WITHOUT `control:view` — the exact shape the seeded
-   * `Compliance Manager` role shipped with before this task fixed it. */
   async function setupActorWithoutControlView(orgUnitId: string): Promise<User> {
     const actor = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('compliance-link-noview-actor')}@example.test`,

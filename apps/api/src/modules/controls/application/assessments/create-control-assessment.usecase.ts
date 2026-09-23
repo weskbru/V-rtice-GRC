@@ -1,10 +1,3 @@
-/**
- * T028/003-controls-management, User Story 2 — `CreateControlAssessmentUseCase`.
- * `POST /controls/{controlId}/assessments`
- * (`contracts/controls.openapi.yaml`'s `createControlAssessment`
- * operation). Requires `control:test` (research.md D-9), enforced by
- * `@RequirePermission` on the controller route.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

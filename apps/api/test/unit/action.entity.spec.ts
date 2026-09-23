@@ -1,14 +1,3 @@
-/**
- * T047/002-shared-grc-foundation, US2 — unit coverage for `Action`'s pure
- * domain invariants and transition table
- * (`grc/action/domain/action.entity.ts`). No I/O, no framework — mirrors
- * `test/unit/evidence.entity.spec.ts`'s structure.
- *
- * Exhaustively exercises all sixteen `(from, to)` pairs `ActionStatus`
- * allows — five legal, eleven illegal (including four same-state
- * "transitions") — so the transition table itself, not just a sample, is
- * proven (T040).
- */
 import { describe, expect, it } from 'vitest';
 
 import {

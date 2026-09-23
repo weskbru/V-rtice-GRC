@@ -1,26 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T047-T050) + Fase 8 (T068) — coverage for
- * US5's four operations: `GET /reports` (`listReportDefinitions`),
- * `POST /reports` (`createReportDefinition`), and
- * `GET /reports/{reportId}/run` in both its JSON (default) and `text/csv`
- * (`format=csv`) forms (`runReport`) — plus, added by T068, the contract's
- * two remaining operations: `GET /reports/{reportId}` (`getReportDefinition`)
- * and `PATCH /reports/{reportId}` (`updateReportDefinition`).
- *
- * Every JSON response here is additionally checked against
- * `contracts/reports.openapi.yaml` by the module-level payload validator
- * (`installResponseValidation`, `openapi-documents.ts`'s `Reports` entry)
- * — no test in this file needs to hand-assert every field the schema
- * already requires. The `text/csv` response is never JSON and is never
- * routed through that validator (`auto-validate-responses.ts`'s own
- * `isJsonContentType` check) — this file asserts its shape directly
- * instead.
- *
- * `ReportDefinition` has NO uniqueness constraint on `metricKeys` (unlike
- * `IndicatorDefinition.metricKey UNIQUE`) — every `it()` below is free to
- * reference any `IndicatorMetricKey`, any number of times, without
- * colliding with another `it()` in this file.
- */
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -130,10 +107,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
     };
   }
 
-  // -------------------------------------------------------------------
-  // createReportDefinition (T048)
-  // -------------------------------------------------------------------
-
   describe('POST /reports', () => {
     it('succeeds for a caller holding report:create and returns the declared shape', async () => {
       const { agent, userId } = await agentWithPermissions(['report:create', 'report:view']);
@@ -222,10 +195,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // listReportDefinitions (T047)
-  // -------------------------------------------------------------------
-
   describe('GET /reports', () => {
     it('responds with the {data, meta} envelope, never {items}', async () => {
       const { agent } = await agentWithPermissions(['report:create', 'report:view']);
@@ -257,10 +226,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // runReport, JSON form (T049)
-  // -------------------------------------------------------------------
 
   describe('GET /reports/{reportId}/run (JSON)', () => {
     it('computes every referenced metric under the caller scope and returns the declared shape', async () => {
@@ -295,7 +260,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
         'report:view',
         'risk:view',
         'asset:view',
-        // Deliberately NOT `control:view`.
       ]);
       const createResponse = await agent
         .post('/api/v1/reports')
@@ -367,10 +331,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // runReport, text/csv form (T050)
-  // -------------------------------------------------------------------
-
   describe('GET /reports/{reportId}/run?format=csv', () => {
     it('responds text/csv with a header row and one data row per referenced metric, in declared order', async () => {
       const { agent } = await agentWithPermissions([
@@ -405,12 +365,7 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
     });
 
     it('an item lacking source permission is an empty value column, never a zeroed number', async () => {
-      const { agent } = await agentWithPermissions([
-        'report:create',
-        'report:view',
-        'asset:view',
-        // Deliberately NOT `control:view`.
-      ]);
+      const { agent } = await agentWithPermissions(['report:create', 'report:view', 'asset:view']);
       const createResponse = await agent
         .post('/api/v1/reports')
         .set('Origin', appOrigin)
@@ -429,7 +384,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
 
       expect(response.status).toBe(200);
       const lines = response.text.trim().split('\r\n');
-      // header,available=false row: metricKey,label,false,,scopeApplicability
       expect(lines[1]).toMatch(/^CONTROL_INACTIVE_COUNT,.*,false,,ORGANIZATIONAL_UNIT$/);
     });
 
@@ -442,13 +396,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
       expect(response.status).toBe(404);
     });
   });
-
-  // -------------------------------------------------------------------
-  // getReportDefinition (T068) — `ReportDefinition` has no uniqueness
-  // constraint on `metricKeys` (this file's own header), so this describe
-  // block is free to create its own fixture without any cross-`it()`
-  // key-allocation concern.
-  // -------------------------------------------------------------------
 
   describe('GET /reports/{reportId}', () => {
     let reportId: string;
@@ -494,10 +441,6 @@ describe('Report contract (US5, 009-indicators-reports)', () => {
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // updateReportDefinition (T068)
-  // -------------------------------------------------------------------
 
   describe('PATCH /reports/{reportId}', () => {
     let reportId: string;

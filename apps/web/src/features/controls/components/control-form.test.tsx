@@ -7,15 +7,6 @@ import { ControlForm } from './control-form';
 
 import type { ControlDetail } from '../types';
 
-/**
- * Component-mount evidence for T046 (`ControlForm`) — most importantly the
- * owner picker's ASSIGNMENT-listing requirement (this task's own explicit
- * instruction, mirroring the exact fix `risk-form.test.tsx` already
- * verifies for Risk): using the browse listing here would reproduce the
- * defect where a scoped analyst saw an empty owner picker.
- *
- * `../api` (`controlsApi`) is mocked at the network boundary.
- */
 const { pushMock, backMock, createControlMock, updateControlMock, searchUsersMock } = vi.hoisted(
   () => ({
     pushMock: vi.fn(),
@@ -38,9 +29,6 @@ vi.mock('../api', () => ({
       { id: 'org-1', code: 'ROOT', name: 'PharosGRC' },
       { id: 'org-2', code: 'FILIAL', name: 'Unidade Filial' },
     ]),
-    // A `vi.fn()` on its own (not `.mockResolvedValue(...)` inline) so
-    // individual tests can assert the exact `(q, assignableForOrgUnitId)`
-    // arguments (S-10: now searched server-side, `q` first).
     searchUsers: searchUsersMock,
   },
 }));
@@ -100,10 +88,6 @@ describe('ControlForm', () => {
       expect(searchUsersMock).not.toHaveBeenCalledWith('', undefined);
 
       fireEvent.click(screen.getByRole('combobox', { name: /Responsável pelo controle/ }));
-      // `{ timeout: 3000 }`: the picker's own 300ms open debounce plus a
-      // mocked async resolution can occasionally outrun the default 1000ms
-      // under a heavily parallel full-suite run — measured flaky at the
-      // default, stable at this one.
       expect(
         await screen.findByRole('option', { name: 'Ana Souza' }, { timeout: 3000 }),
       ).toBeInTheDocument();
@@ -168,7 +152,6 @@ describe('ControlForm', () => {
       type: null,
       frequency: null,
     });
-    // Server-owned fields must never be expressible from this form.
     expect(submittedBody).not.toHaveProperty('code');
     expect(submittedBody).not.toHaveProperty('status');
     expect(submittedBody).not.toHaveProperty('effectiveness');
@@ -177,16 +160,6 @@ describe('ControlForm', () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/controls/control-new'));
   });
 
-  /**
-   * F-79 (`docs/deferred-findings.md`) — "Cancelar" defaults to
-   * `navigate.back()` when no `onCancel` is supplied (the register's own
-   * `/controls/new` page, and any other caller that has not opted in),
-   * exactly as it always has; a caller composing this form inside something
-   * that is NOT itself a navigation (`ControlEditPanel`'s own overlay
-   * `Sheet`) supplies `onCancel` instead, and that — never `navigate.back()`
-   * — is what fires. Both paths are proven here so neither can silently
-   * regress into the other.
-   */
   it('"Cancelar" calls navigate.back() when no onCancel is supplied — the default, unchanged for /controls/new', () => {
     render(<ControlForm mode="create" onSaved={vi.fn()} />);
 

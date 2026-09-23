@@ -1,9 +1,3 @@
-/**
- * T168/US7 — matches `GET /risks/{riskId}/audit-events`'s query parameters
- * (`contracts/risks.openapi.yaml`'s `listRiskAuditEvents` operation):
- * `page`, `pageSize` (inherited from `PageQueryDto`) plus `action`,
- * `actorUserId`, `occurredFrom`, `occurredTo`.
- */
 import { IsDateString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

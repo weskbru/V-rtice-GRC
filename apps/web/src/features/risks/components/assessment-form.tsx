@@ -1,45 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk assessment form (T129, US4, FR-061 to FR-068, ADR-006).
- *
- * ## Never computes a score or a level (ADR-006, "guarantees drift" clause)
- *
- * `CreateRiskAssessmentRequest` (`../types`) has no `inherentScore`,
- * `inherentLevel`, `residualScore` or `residualLevel` field — the type
- * itself makes the mistake unrepresentable, and the API additionally
- * rejects any of those four properties as unknown
- * (`additionalProperties: false`, FR-062, FR-063; T118's contract test
- * exercises the rejection). The only numbers this component ever reads for
- * a probability/impact combination are values ALREADY present on the
- * fetched `RiskMethodologyVersion.matrix` (`GET /risk-methodology`, itself
- * entirely server-derived) — `RiskMatrix.onCellSelect` hands back the exact
- * matrix cell the assessor clicked, `{ score, level }` included, so this
- * component never even performs the lookup itself, let alone the
- * arithmetic behind it.
- *
- * ## Inherent vs residual are unmistakable (ADR-006's basis-naming clause)
- *
- * One shared `RiskMatrix`, driven by a two-way "Selecionando" toggle
- * (`basisToggle`) that decides which basis `onCellSelect` currently writes
- * to. Both selections, once made, stay visible together on the SAME grid
- * via `highlighted` — `RiskMatrix` renders each with its own corner marker
- * shape (solid ring "I" vs dashed ring "R"), never colour alone, so a
- * colour-blind assessor can see exactly where both values landed at once,
- * and the two are never visually confusable with each other or with an
- * ordinary unselected cell. `selectionSummary` repeats both as plain text
- * beneath the matrix for a reader who prefers not to parse the grid at all.
- *
- * ## Methodology-changed 422 (US4 AS5, FR-068)
- *
- * The methodology version resolved when the form loaded is pinned and sent
- * explicitly as `methodologyVersionId` on every submit — never omitted — so
- * if the active version changes between load and submit, the server's 422
- * is guaranteed to fire rather than the request silently completing against
- * a version the assessor never saw. `methodologyChanged` renders that
- * specific 422 as an explicit, actionable state (reload the methodology,
- * redo the selections) instead of the generic error banner other 422s get.
- */
 import { FormField, RiskMatrix } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -62,9 +22,7 @@ import type { RiskMatrixCell, RiskMatrixHighlight } from '@pharos/design-system/
 
 export interface AssessmentFormProps {
   riskId: string;
-  /** The risk's current `ETag` (ADR-013) — required by `POST .../assessments` (`If-Match`). */
   etag: string;
-  /** Called after a successful assessment. The response carries only the assessment, not the risk's updated denormalized levels — the caller re-reads the risk (`risksApi.getRisk`) rather than this form guessing at the new state. */
   onAssessed: () => void;
 }
 
@@ -100,11 +58,6 @@ export function AssessmentForm({
   const [conflict, setConflict] = useState<ConflictState | null>(null);
 
   useEffect(() => {
-    // Declared inline, matching `risk-form.tsx`'s own reference-data effect
-    // — `react-hooks/set-state-in-effect` traces a same-file named function
-    // called from an effect more conservatively than an inline one, so this
-    // form is what stays lint-clean while still only setting state after
-    // the fetch settles.
     async function load(): Promise<void> {
       try {
         const active = await risksApi.getActiveMethodology();
@@ -127,7 +80,6 @@ export function AssessmentForm({
     setActiveBasis('inherent');
   }
 
-  /** Re-fetches the methodology after the methodology-changed 422 (US4 AS5) — an event-handler call, not an effect, so setting `loadingMethodology`/`methodologyError` synchronously here is unproblematic. */
   async function reloadMethodology(): Promise<void> {
     setMethodologyChanged(false);
     resetSelections();
@@ -156,9 +108,6 @@ export function AssessmentForm({
         return;
       }
       if (problem.status === 422) {
-        // US4 AS5, FR-068 — the pinned `methodologyVersionId` is no longer
-        // active. This is never treated as a generic failure: the assessor
-        // needs to understand the methodology moved under them.
         if (findFieldError(problem, 'methodologyVersionId')) {
           setMethodologyChanged(true);
           return;
@@ -184,9 +133,6 @@ export function AssessmentForm({
           residualProbability: residualCell.probabilityValue,
           residualImpact: residualCell.impactValue,
           rationale: rationale.trim() ? rationale.trim() : null,
-          // Pinned explicitly, never omitted — omitting it would let the
-          // server silently score against whatever is active NOW instead of
-          // surfacing that it changed since this form loaded (US4 AS5).
           methodologyVersionId: methodology.id,
         },
         ifMatch,

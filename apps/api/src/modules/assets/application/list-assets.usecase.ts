@@ -1,18 +1,3 @@
-/**
- * T017/006-assets-processes — `ListAssetsUseCase`: the read side of `GET
- * /assets` (`listAssetCatalog` operation, FR-007). No transaction and no
- * audit entry — reads are not audited (ADR-005), mirroring
- * `ListControlsUseCase`'s own reasoning.
- *
- * **Closes "Vazamento 1" (spec §"Contexto medido")**: unlike the retired
- * `RegistryController.listAssets` (`modules/risk`), which called its
- * repository directly with no `ScopeResolverService` in the path at all,
- * this use case resolves the caller's `ScopeFilter` and hands it to
- * `AssetRepositoryPort.list`, which applies it unconditionally
- * (`PrismaAssetRepository`, extending `AssetScopedRepository`) — an asset
- * outside the caller's scope is neither listed nor counted (FR-010,
- * SC-003b).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

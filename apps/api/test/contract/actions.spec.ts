@@ -1,14 +1,3 @@
-/**
- * D-11 coverage for `/actions` and `/actions/{actionId}[/transitions]`
- * (T039-T045a, 002-shared-grc-foundation US2): `listActions`,
- * `createAction`, `getAction`, `updateAction`, `transitionAction` — the
- * declared shape, the stated permission per route, 401 for an
- * unauthenticated caller, origin integrity (FR-031, R-001), the five-edge
- * transition table (422 for every illegal pair), reopen's reason
- * requirement (Invariant A2), the single computed-on-read overdue rule
- * (R-006, FR-014), organizational-scope non-disclosure (SC-005), and
- * `EvidenceSubjectType.ACTION` (T045a, FR-017).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -93,10 +82,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       email: `${uniqueTestMarker('action-contract-responsible')}@example.test`,
     });
     responsibleUserId = responsible.id;
-    // F-CV-2: `responsible` here is a pure precondition (risk owner, used
-    // to satisfy risk creation across this whole file) — never the object
-    // of any assertion. Made visible to both org units `createRisk`/the
-    // reassignment scenario can put a risk in (`orgUnitId`, `otherOrgUnitId`).
     await makeRiskAssignmentVisible(prisma, { user: responsible, orgUnitId: orgUnit.id });
     await grantUnitScopeFixture(prisma, { user: responsible, orgUnitId: otherOrgUnit.id });
   });
@@ -130,11 +115,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     return { agent, userId: fixture.user.id };
   }
 
-  /** Same shape as `agentWithPermissions`, but with a GLOBAL organizational
-   * scope grant instead of a single-unit one — needed for the
-   * "administrator reassigns a risk to a different unit" scenario below,
-   * since `UpdateRiskUseCase` requires the actor's OWN scope to cover BOTH
-   * the risk's current unit and the new one. */
   async function agentWithGlobalScope(
     permissions: readonly PermissionIdentifier[],
   ): Promise<{ agent: ReturnType<typeof request.agent>; userId: string }> {
@@ -159,13 +139,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     return { agent, userId: fixture.user.id };
   }
 
-  /** A `RISK_TREATMENT`-eligible origin: a risk the given agent may
-   * `risk:treat`. Requires the agent to hold `risk:create`/`risk:view` too.
-   * `riskOrgUnitId` defaults to the shared `orgUnitId` but MUST match the
-   * agent's own scoped org unit when the caller was built against
-   * `otherOrgUnitId` (`agentWithPermissions`'s second argument) — creation
-   * itself is scope-checked (FR-031), so a mismatch here fails with 422
-   * before this helper's own object under test is ever reached. */
   async function createRisk(
     agent: ReturnType<typeof request.agent>,
     riskOrgUnitId: string = orgUnitId,
@@ -189,9 +162,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       originId: riskId,
       title: 'Corrigir configuração de firewall',
       responsibleUserId,
-      // Comfortably in the future for any plausible test-run date, so
-      // `overdue` defaults to `false` unless a test deliberately overrides
-      // it with a past date (see the `2020-01-01` case below).
       dueOn: '2035-03-01',
       ...overrides,
     };
@@ -209,10 +179,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     expect(response.status).toBe(201);
     return response.body as ActionBody;
   }
-
-  // -------------------------------------------------------------------
-  // createAction
-  // -------------------------------------------------------------------
 
   describe('POST /actions', () => {
     it('succeeds for a caller holding action:create + risk:treat and returns the declared Action shape', async () => {
@@ -294,9 +260,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
         .post('/api/v1/actions')
         .set('Origin', appOrigin)
         .send(validCreateBody(riskId));
-      // NotFoundDomainError, not Forbidden — indistinguishable from unknown
-      // (SC-005), even though the caller CAN see the risk (risk:view) and
-      // it genuinely exists.
       expect(response.status).toBe(404);
     });
 
@@ -347,10 +310,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // listActions
-  // -------------------------------------------------------------------
-
   describe('GET /actions', () => {
     it('lists actions from two distinct origins for the same responsible in a single page (SC-002)', async () => {
       const { agent } = await agentWithPermissions([
@@ -395,10 +354,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // getAction — scope non-disclosure
-  // -------------------------------------------------------------------
-
   describe('GET /actions/{actionId}', () => {
     it('T043/SC-005: an action outside the caller scope reads as 404, byte-identical to an unknown id', async () => {
       const { agent: ownerAgent } = await agentWithPermissions(
@@ -431,8 +386,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       const riskId = await createRisk(managerAgent);
       const action = await createActionViaApi(managerAgent, riskId);
 
-      // A caller with action:view but NO risk:view at all cannot see the
-      // origin risk, yet must still be able to read the action.
       const { agent: actionOnlyAgent } = await agentWithPermissions(['action:view']);
       const response = await actionOnlyAgent
         .get(`/api/v1/actions/${action.id}`)
@@ -443,10 +396,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect(body.originLabel).toBeUndefined();
     });
   });
-
-  // -------------------------------------------------------------------
-  // transitionAction — the five-edge table, reopen, overdue
-  // -------------------------------------------------------------------
 
   describe('POST /actions/{actionId}/transitions', () => {
     async function setup(): Promise<{
@@ -493,7 +442,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
 
     it('IN_PROGRESS -> COMPLETED is legal, stamps completedAt, emits action.completed, and overdue flips to false without a field write', async () => {
       const { agent, action } = await setup();
-      // Past due date so the action starts overdue.
       const created = await createActionViaApi(agent, action.originId, { dueOn: '2020-01-01' });
       const started = await agent
         .post(`/api/v1/actions/${created.id}/transitions`)
@@ -510,8 +458,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       const body = completed.body as ActionBody;
       expect(body.status).toBe('COMPLETED');
       expect(body.completedAt).not.toBeNull();
-      // T042 — overdue is computed on read from status/dueOn; completing
-      // flips it to false with no `overdue`/`isOverdue` column ever written.
       expect(body.overdue).toBe(false);
 
       const prisma = ctx.app.get(PrismaService);
@@ -530,7 +476,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect(cancelled.status).toBe(200);
       expect((cancelled.body as ActionBody).status).toBe('CANCELLED');
 
-      // CANCELLED is terminal — every further transition is illegal.
       const afterCancel = await agent
         .post(`/api/v1/actions/${action.id}/transitions`)
         .set('Origin', appOrigin)
@@ -577,8 +522,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect(reopened.status).toBe(200);
       const reopenedBody = reopened.body as ActionBody;
       expect(reopenedBody.status).toBe('OPEN');
-      // Invariant A1 — completedAt cleared on the LIVE row once status
-      // leaves COMPLETED.
       expect(reopenedBody.completedAt).toBeNull();
       expect(reopenedBody.reopenedAt).not.toBeNull();
 
@@ -587,9 +530,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
         where: { entityId: action.id, action: 'action.reopened' },
       });
       expect(reopenedAuditRow).not.toBeNull();
-      // The audit row for THIS transition still carries the PREVIOUS
-      // completedAt in previousValues — the earlier completion is not lost,
-      // only no longer the live value.
       const previousValues = reopenedAuditRow?.previousValues as Record<string, unknown> | null;
       expect(previousValues?.completedAt).toBeTruthy();
 
@@ -633,10 +573,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // updateAction
-  // -------------------------------------------------------------------
-
   describe('PATCH /actions/{actionId}', () => {
     it('succeeds for a caller holding action:edit and updates the declared fields, never status', async () => {
       const { agent } = await agentWithPermissions([
@@ -678,10 +614,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect(response.status).toBe(400);
     });
   });
-
-  // -------------------------------------------------------------------
-  // T045a — evidence attached to an Action (EvidenceSubjectType.ACTION)
-  // -------------------------------------------------------------------
 
   describe('Evidence linked to an Action (T045a, FR-017, EvidenceSubjectType.ACTION)', () => {
     it('an evidence record can be linked to an action, proving its execution, and the link is visible from both sides', async () => {
@@ -731,7 +663,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
     });
 
     it('linking to an action outside the caller scope is refused 404 (FR-032) — the subject side is checked independently of the evidence side', async () => {
-      // The action lives in `otherOrgUnitId`, out of the outsider's scope.
       const { agent: ownerAgent } = await agentWithPermissions(
         ['action:create', 'action:view', 'risk:create', 'risk:view', 'risk:treat'],
         otherOrgUnitId,
@@ -739,16 +670,10 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       const riskId = await createRisk(ownerAgent, otherOrgUnitId);
       const action = await createActionViaApi(ownerAgent, riskId);
 
-      // The outsider's OWN evidence lives in their OWN scope (orgUnitId) —
-      // the evidence side of the link is fully authorized; only the
-      // subject (ACTION) side is out of scope.
       const { agent: outsiderAgent } = await agentWithPermissions([
         'evidence:link',
         'evidence:view',
         'evidence:create',
-        // Holds action:view (so the refusal below is specifically a SCOPE
-        // failure, not a missing-permission one) but no scope grant over
-        // `otherOrgUnitId`.
         'action:view',
       ]);
       const outsiderEvidence = await outsiderAgent
@@ -772,14 +697,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect(response.status).toBe(404);
     });
   });
-
-  // -------------------------------------------------------------------
-  // Assurance fix — Action access tracks the origin's LIVE scope, not the
-  // creation-time `Action.orgUnitId` snapshot (confirmed breach: an
-  // administrator reassigning a risk's org unit used to leave the
-  // ORIGINAL custodian with full read/write on the derived Action while
-  // 404ing the risk's legitimate NEW custodian).
-  // -------------------------------------------------------------------
 
   describe("Action access follows the origin risk's CURRENT org unit, not a stale snapshot", () => {
     async function setupReassignmentScenario(): Promise<{
@@ -809,16 +726,11 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       const riskId = await createRisk(originalCustodianAgent, orgUnitId);
       const action = await createActionViaApi(originalCustodianAgent, riskId);
 
-      // Sanity check — before reassignment, the action is created in
-      // `orgUnitId` and readable by the original custodian.
       const before = await originalCustodianAgent
         .get(`/api/v1/actions/${action.id}`)
         .set('Origin', appOrigin);
       expect(before.status).toBe(200);
 
-      // An administrator with GLOBAL scope moves the RISK (not the
-      // action) to the new custodian's unit. `PATCH /risks/{id}` requires
-      // `If-Match` (ADR-013) — read the current ETag first.
       const { agent: adminAgent } = await agentWithGlobalScope(['risk:edit', 'risk:view']);
       const riskBeforeReassign = await adminAgent
         .get(`/api/v1/risks/${riskId}`)
@@ -833,9 +745,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
         .send({ orgUnitId: otherOrgUnitId });
       expect(reassignResponse.status).toBe(200);
 
-      // The risk itself now correctly reads as 404 for the original
-      // custodian and 200 for the new one — establishing the premise the
-      // Action-side assertions below are testing against.
       const riskNowHidden = await originalCustodianAgent
         .get(`/api/v1/risks/${riskId}`)
         .set('Origin', appOrigin);
@@ -909,10 +818,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect((response.body as ActionBody).status).toBe('IN_PROGRESS');
     });
 
-    // Fix 1 — the residual from this same assurance fix: `ListActionUseCase`
-    // still filtered on `Action.orgUnitId`'s stale snapshot, so the FORMER
-    // custodian could still SEE the action (its code and title) in a list
-    // even though direct GET/PATCH/transition on it already 404'd above.
     it('LIST: the former custodian no longer sees the action once the origin risk moves out of their scope', async () => {
       const { originalCustodianAgent, action, riskId } = await setupReassignmentScenario();
 
@@ -937,22 +842,6 @@ describe('Action contract (T039-T045a, US2, D-11)', () => {
       expect(body.items.map((item) => item.id)).toContain(action.id);
     });
   });
-
-  // -------------------------------------------------------------------
-  // 008-incidents-problems, US3 — coordinator finding, 2026-09-11:
-  // `INCIDENT`/`PROBLEM` were fully wired at the domain level (resolvers
-  // registered, `test/unit/action-model-convergence-guard.spec.ts` green)
-  // while `CreateActionRequestDto`'s own hand-typed allow-list still named
-  // only `RISK_TREATMENT`/`FINDING`, so `POST /actions` rejected both new
-  // origins with a flat 400 — a mechanism that compiled and was never
-  // exercised end to end (CLAUDE.md §19.10). Fixed by deriving
-  // `ACTION_ORIGIN_TYPE_VALUES` from `ActionOriginType` at runtime instead
-  // of restating it (which also silently repaired `CONTROL_ASSESSMENT`,
-  // missing from that same list since 003-controls-management). These two
-  // cases prove the fix AT THE ROUTE, the layer a use-case-level test
-  // cannot reach — an accessor test proves the domain agrees with the
-  // enum; only a real HTTP POST proves the request validator does too.
-  // -------------------------------------------------------------------
 
   describe('POST /actions accepts every ActionOriginType the schema declares (not a hand-restated subset)', () => {
     it('originType: INCIDENT is accepted end to end through the real route', async () => {

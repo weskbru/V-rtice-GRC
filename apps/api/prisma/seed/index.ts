@@ -1,30 +1,3 @@
-/**
- * PharosGRC database seed entry point (T042).
- *
- * Bootstraps a minimal, standalone Nest application context — NOT the full
- * `AppModule` (no HTTP listener, no `HealthModule`/`ThrottlerModule`/
- * guards are relevant to a one-shot script) — solely to obtain
- * `AppConfigService` (validated configuration, never raw `process.env`
- * read from this file — "no `process.env` outside the config layer") and
- * the real `PrismaService` (so the seed runs against the same connection
- * contract — `DATABASE_URL`, the restricted `pharos_app` role — as the
- * running application, per ADR-005). `seedPlatform` (`platform.seed.ts`)
- * does the actual work.
- *
- * Run via `pnpm --filter @pharos/api run db:seed` (`prisma db seed`,
- * configured in `prisma.config.ts` to invoke this file with `tsx`).
- *
- * Plain `console` output (not `AppLogger`) throughout: this script has no
- * HTTP request, so there is no structured-logging request context for
- * `AppLogger` to enrich — the same reasoning the prior no-op placeholder
- * documented.
- *
- * T085 added `seedRiskReferenceData` (`risk-reference.seed.ts`), run after
- * `seedPlatform` — it has no dependency on platform data (categories/types/
- * origins reference nothing platform seeds), but running it second keeps
- * this file's log output in the same order as `docs/local-environment.md`'s
- * "Fundação da plataforma" -> "Gestão de Riscos" module ordering.
- */
 import 'reflect-metadata';
 
 import { Module } from '@nestjs/common';

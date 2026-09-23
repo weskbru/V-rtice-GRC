@@ -5,13 +5,6 @@ import { RiskSummaryRow } from './risk-summary-row';
 
 import type { RiskDetail } from '../../types';
 
-/**
- * Component-mount evidence for the executive summary row
- * (016-risk-detail-experience §4.3). Every value here must come straight
- * off `RiskDetail` — no second request, no recomputation (§4.9, CLAUDE.md
- * §19.7).
- */
-
 const baseRisk: RiskDetail = {
   id: 'risk-1',
   code: 'RSK-2026-0001',

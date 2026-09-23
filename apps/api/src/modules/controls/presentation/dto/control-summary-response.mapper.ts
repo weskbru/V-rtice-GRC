@@ -1,15 +1,3 @@
-/**
- * T023/003-controls-management — maps `ControlCatalogRow`
- * (`domain/ports/control-query.port.ts`, the catalog's read model) to the
- * wire shape `contracts/controls.openapi.yaml`'s `ControlSummary`
- * describes — one catalog row (`GET /controls`, FR-007). The catalog's own
- * mapper, separate from `control-response.mapper.ts`'s
- * `toControlDetailResponse` (`GET /controls/{controlId}`'s single-control
- * `ControlDetail`) — different input type, same "one mapper is the only
- * place a domain object becomes a DTO" discipline (ADR-009). Reuses
- * `ControlOrgUnitRefResponse`/`ControlUserRefResponse` from
- * `control-response.mapper.ts` rather than redeclaring identical shapes.
- */
 import { isActiveForControlStatus } from '../../domain/control.entity';
 
 import type {

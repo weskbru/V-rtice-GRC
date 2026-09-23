@@ -1,11 +1,3 @@
-/**
- * T017-T021/006-assets-processes — `PrismaProcessRepository`, the sole
- * implementation of `ProcessRepositoryPort`. Identical in shape to
- * `modules/assets/infrastructure/prisma-asset.repository.ts` (FR-020) —
- * see that file's header for the full account this one does not repeat,
- * including why reading `risk_process_links`/`control_process_links`
- * directly is not a boundary violation.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -166,8 +158,6 @@ export class PrismaProcessRepository
     return { items: rows.map((row) => this.toSummaryRecord(row)), total };
   }
 
-  /** See `PrismaAssetRepository.combineOrgUnitScope`'s own doc comment —
-   * identical reasoning, applied to `Process`. */
   private combineOrgUnitScope(
     scope: ScopeFilter,
     where: Prisma.ProcessWhereInput,

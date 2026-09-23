@@ -1,14 +1,3 @@
-/**
- * T067/002-shared-grc-foundation, US3 — unit coverage for `Finding`'s pure
- * domain invariants and transition table
- * (`grc/finding/domain/finding.entity.ts`). No I/O, no framework — mirrors
- * `test/unit/action.entity.spec.ts`'s structure.
- *
- * Exhaustively exercises all sixteen `(from, to)` pairs `FindingStatus`
- * allows, so the transition table itself, not just a sample, is proven —
- * including Invariant F4 (only `CLOSED` may reach `ARCHIVED`) as a
- * consequence of the same table, not a separate function.
- */
 import { describe, expect, it } from 'vitest';
 
 import {

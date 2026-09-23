@@ -6,11 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { ControlRegisterEmpty } from './control-register-empty';
 
-/**
- * Component-mount evidence mirroring `risk-register-empty.test.tsx` — the
- * two empty states must be textually distinct and each drive its own next
- * action (US1, CLAUDE.md §18.11).
- */
 describe('ControlRegisterEmpty', () => {
   it('shows "no control exists yet" (never "no results") when no filters are applied', () => {
     render(

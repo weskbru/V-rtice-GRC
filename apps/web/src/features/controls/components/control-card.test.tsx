@@ -5,10 +5,6 @@ import { ControlCard } from './control-card';
 
 import type { ControlSummary } from '../types';
 
-/**
- * Component-mount evidence for the catalog's card view (CLAUDE.md §18),
- * mirroring `risk-card.test.tsx`'s fixture shape and regression coverage.
- */
 const baseControl: ControlSummary = {
   id: 'control-1',
   code: 'CTL-2026-0001',
@@ -22,7 +18,6 @@ const baseControl: ControlSummary = {
   status: 'ACTIVE',
   effectiveness: 'EFFECTIVE',
   version: 1,
-  // Midday UTC — see `risk-card.test.tsx`'s own fixture comment for why not midnight.
   updatedAt: '2026-09-04T12:00:00.000Z',
 };
 

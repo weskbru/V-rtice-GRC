@@ -1,29 +1,3 @@
-/**
- * 013-incidents-problems-reverse-links — contract coverage for the four
- * new READ-ONLY reverse listings this phase adds:
- * `GET /risks/{riskId}/incidents`, `GET /risks/{riskId}/problems`,
- * `GET /assets/{assetId}/incidents`, `GET /processes/{processId}/incidents`.
- *
- * `modules/risk`/`modules/assets`/`modules/processes` never write
- * `IncidentRiskLink`/`ProblemRiskLink`/`IncidentAssetLink`/
- * `IncidentProcessLink` — every link row this file creates is written
- * directly via Prisma, exactly as `control-relationship-links.spec.ts`'s
- * own "GET risks" tests already do for the identical `RiskControlLink`
- * reverse-read shape, and `incident-problem-relationship-links.spec.ts`'s
- * fixtures do for `Incident`/`Problem` themselves.
- *
- * Per endpoint: succeeds for the resource's OWN view permission and
- * returns the declared minimal shape (`auto-validate-responses.ts`
- * additionally checks every response body against
- * `risks.openapi.yaml`/`assets.openapi.yaml`/`processes.openapi.yaml`
- * automatically, via `contract-app.ts`'s module-level `afterEach`); refuses
- * a caller lacking that permission (403); refuses an unauthenticated
- * caller (401); and answers a source record outside the caller's
- * organizational scope EXACTLY like a nonexistent one (404, ADR-020
- * part 4 non-disclosure) — proven by asserting both cases return the
- * identical status, mirroring `control-relationship-links.spec.ts`'s own
- * non-disclosure test.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -196,10 +170,6 @@ describe('013-incidents-problems-reverse-links — reverse read endpoints', () =
     });
   }
 
-  // ---------------------------------------------------------------------
-  // GET /risks/{riskId}/incidents
-  // ---------------------------------------------------------------------
-
   describe('GET /risks/{riskId}/incidents', () => {
     it('succeeds for a caller holding risk:view and returns the declared minimal IncidentRef shape', async () => {
       const risk = await createRiskRow();
@@ -227,8 +197,6 @@ describe('013-incidents-problems-reverse-links — reverse read endpoints', () =
       expect(body[0]!.incident.code).toBe(incident.code);
       expect(body[0]!.incident.title).toBe(incident.title);
       expect(body[0]!.incident.status).toBe('OPEN');
-      // ADR-020 part 4 — deliberately minimal: no `severity`, `description`,
-      // `ownerUserId` or `orgUnitId` leak through this reverse read.
       expect(Object.keys(body[0]!.incident).sort()).toEqual(['code', 'id', 'status', 'title']);
     });
 
@@ -268,10 +236,6 @@ describe('013-incidents-problems-reverse-links — reverse read endpoints', () =
       expect(nonexistentResponse.status).toBe(404);
     });
   });
-
-  // ---------------------------------------------------------------------
-  // GET /risks/{riskId}/problems
-  // ---------------------------------------------------------------------
 
   describe('GET /risks/{riskId}/problems', () => {
     it('succeeds for a caller holding risk:view and returns the declared minimal ProblemRef shape', async () => {
@@ -337,10 +301,6 @@ describe('013-incidents-problems-reverse-links — reverse read endpoints', () =
     });
   });
 
-  // ---------------------------------------------------------------------
-  // GET /assets/{assetId}/incidents
-  // ---------------------------------------------------------------------
-
   describe('GET /assets/{assetId}/incidents', () => {
     it('succeeds for a caller holding ONLY asset:view (no risk:view/incident:view at all) and returns the minimal shape', async () => {
       const asset = await createAssetRow();
@@ -403,10 +363,6 @@ describe('013-incidents-problems-reverse-links — reverse read endpoints', () =
       expect(nonexistentResponse.status).toBe(404);
     });
   });
-
-  // ---------------------------------------------------------------------
-  // GET /processes/{processId}/incidents
-  // ---------------------------------------------------------------------
 
   describe('GET /processes/{processId}/incidents', () => {
     it('succeeds for a caller holding ONLY process:view and returns the minimal shape', async () => {

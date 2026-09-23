@@ -1,9 +1,3 @@
-/**
- * T040/003-controls-management, User Story 3 — maps
- * `ControlEntityLinkRecord`/`RiskControlLinkReadRecord` to
- * `contracts/controls.openapi.yaml`'s `ControlProcessLink`/
- * `ControlAssetLink`/`ControlRiskLink` response shapes.
- */
 import type { RiskControlLinkReadRecord } from '../../../../shared/grc-ports/risk-control-link-read.port';
 import type { ControlEntityLinkRecord } from '../../domain/ports/control-relationship-repository.port';
 

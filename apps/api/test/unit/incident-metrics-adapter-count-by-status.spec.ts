@@ -1,16 +1,3 @@
-/**
- * Unit test for `IncidentMetricsAdapter.getCountByStatus`
- * (`src/modules/incidents/infrastructure/incident-metrics.adapter.ts`),
- * added for `GET /dashboard/summary`'s `breakdowns.incidents.byStatus`
- * (`get-dashboard-summary.usecase.ts`).
- *
- * `PrismaIncidentRepository.list` is a hand-rolled fake — no I/O, no
- * NestJS test module, the same convention `indicator-calculation-service
- * .spec.ts` uses for every port one layer up. The one fact this file
- * exists to prove: the returned record is ZERO-FILLED for every
- * `IncidentStatus` value, even one `list` never reports a nonzero total
- * for.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { IncidentMetricsAdapter } from '../../src/modules/incidents/infrastructure/incident-metrics.adapter';
@@ -41,8 +28,6 @@ describe('IncidentMetricsAdapter.getCountByStatus', () => {
       CLOSED: 1,
       CANCELLED: 0,
     });
-    // Every one of the five statuses issued its OWN `list` call — never a
-    // single unfiltered read post-processed in memory.
     expect(list).toHaveBeenCalledTimes(5);
   });
 

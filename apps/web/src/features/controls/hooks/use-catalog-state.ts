@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control catalog URL state (T045), mirroring
- * `features/risks/hooks/use-register-state.ts` exactly (CLAUDE.md §18.12 —
- * a new module extends established patterns, it does not invent its own).
- * See that module's own doc comment for the full reasoning behind
- * URL-as-state, `replace()` vs `push()`, and the debounced search commit;
- * this file applies the identical design to the Controls catalog's own
- * (narrower) filter set.
- */
-
-// Reads the current screen's own query string. The WRITE side — and the
-// `useRouter` import the loader policy restricts — lives in the shared
-// `@/lib/register/url-state` (specs/014-institutional-loader §2.3).
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -104,7 +91,6 @@ function parseSort(value: string | null): ControlRegisterSortField {
     : DEFAULT_SORT;
 }
 
-/** Which presentation the results area is currently rendering — cards is the primary view (CLAUDE.md §18). */
 export type ControlCatalogView = 'cards' | 'table';
 
 export interface ControlCatalogUrlState {
@@ -140,16 +126,11 @@ export interface UseCatalogStateResult {
   setView: (view: ControlCatalogView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter fields are currently applied — shown on the collapsed "Filtros" button. */
   activeFilterCount: number;
 }
 
 export function useCatalogState(): UseCatalogStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism — one change applied to the CURRENT query string,
-  // `replace` not `push`, page reset by default — is shared with every other
-  // register (`@/lib/register/url-state`). What stays here is what only this
-  // catalog knows: its enums, its sortable fields and its defaults.
   const commit = useUrlQueryCommit();
 
   const urlQ = searchParams.get('q') ?? '';
@@ -180,10 +161,6 @@ export function useCatalogState(): UseCatalogStateResult {
     });
   }
 
-  // Both directions (typing → URL after a pause, and URL → input on
-  // Back/Forward, a pasted link or "clear filters") are the shared
-  // mechanism's job, including cancelling a pending commit so it can never
-  // overwrite a change that came from elsewhere mid-debounce.
   const {
     inputValue: searchInputValue,
     setValue: setSearch,
@@ -266,7 +243,6 @@ export function useCatalogState(): UseCatalogStateResult {
     });
   }, [commit, clearSearchInput]);
 
-  /** Which filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows, from the same conditions the chip row is built on. */
   const activeFilterCount =
     (state.q !== '' ? 1 : 0) +
     (state.status.length > 0 ? 1 : 0) +

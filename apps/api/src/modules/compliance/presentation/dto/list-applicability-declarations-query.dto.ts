@@ -1,8 +1,3 @@
-/**
- * T056/004-compliance-management — matches `GET
- * /requirements/{requirementId}/applicability-declarations`'s query
- * parameters (`listRequirementApplicabilityDeclarations` operation).
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 

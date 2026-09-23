@@ -1,17 +1,3 @@
-/**
- * T055/004-compliance-management, User Story 3 (SC-008, research.md D-10)
- * — the version-wide compliance summary over 500 requirements, each with
- * a currently-linked control, completes in under 2 seconds: one batch
- * read per input type (requirements, applicability, links, control
- * directory, control effectiveness), never a per-row round trip and never
- * a replicated SQL expression.
- *
- * Fixture rows are inserted directly via `createMany` (not through the
- * `Create*UseCase`s, which would themselves cost 500+ sequential
- * round-trips and audit writes irrelevant to what this test measures) —
- * the SUT here is `GetFrameworkVersionComplianceSummaryUseCase`'s own
- * read path, not fixture setup.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -110,9 +96,6 @@ describe('GetFrameworkVersionComplianceSummaryUseCase — 500-requirement perfor
 
     expect(summary.totalRequirements).toBe(REQUIREMENT_COUNT);
     expect(summary.applicableRequirementCount).toBe(REQUIREMENT_COUNT);
-    // Every linked control is active but never assessed -> NOT_PROVEN for
-    // all 500 — the exact bucket does not matter to this test as much as
-    // the fact that a real, non-trivial computation actually ran.
     expect(summary.counts.notProven).toBe(REQUIREMENT_COUNT);
     expect(elapsedMs).toBeLessThan(PERFORMANCE_BUDGET_MS);
   });

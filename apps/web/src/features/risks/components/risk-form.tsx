@@ -1,42 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk create/edit form (T095, T099, FR-053 to FR-060).
- *
- * ## Conflict handling (T099, FR-103, ADR-013)
- *
- * Editing a risk requires the `version` last read, echoed as `If-Match`
- * (ADR-013). When another user saves first, the server answers `409` with
- * the risk's current `version`/`status`/last modifier rather than silently
- * overwriting anything. The easy-and-wrong response to that would be to
- * discard the form and reload the record — that throws away everything the
- * user just typed. Instead, on a `409` this component:
- *
- *   1. Leaves every field exactly as the user left it. Nothing is reset,
- *      nothing is refetched into the form — `form.getValues()` after a 409
- *      is identical to `form.getValues()` right before the failed submit.
- *   2. Shows a banner explaining *why* the save did not go through — the
- *      record changed underneath them — and, when the server supplied them,
- *      who changed it and when, so the user can judge whether to look at it
- *      before proceeding.
- *   3. Offers three explicit next actions, none of which touches the form's
- *      values on the user's behalf:
- *      - "Ver versão atual em nova aba" opens `/risks/{id}` in a new tab so
- *        the user can review what changed side-by-side, without losing this
- *        editing session.
- *      - "Salvar mesmo assim com meus dados" re-submits the *exact* values
- *        still in the form, now against the current version the 409 body
- *        supplied. This is a deliberate, informed overwrite the user
- *        explicitly chose after being shown the conflict — not silent
- *        last-write-wins (FR-103 forbids the silent kind, not an informed
- *        one).
- *      - "Continuar editando" simply dismisses the banner so the user can
- *        adjust fields first (e.g. after reviewing the other tab) before
- *        retrying a normal save.
- *
- * A second conflict while retrying re-enters this same state rather than
- * ever falling back to overwriting blindly.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -80,16 +43,12 @@ import type {
 } from '../types';
 import type { ApiProblem } from '@/lib/api-client';
 
-/** The platform-wide required/optional convention (CLAUDE.md §18, `common.formField`'s own doc comment) — every non-required `FormField` in this form shows it. */
 const OPTIONAL = common.formField.optionalIndicator;
 
 export interface RiskFormProps {
   mode: 'create' | 'edit';
-  /** Required, and used as the initial values, when `mode === 'edit'`. */
   risk?: RiskDetail;
-  /** The `ETag` last read for `risk` (ADR-013). Required when `mode === 'edit'`. */
   etag?: string;
-  /** Called after a successful create or update with the fresh record and its new `ETag`. */
   onSaved: (result: { risk: RiskDetail; etag: string }) => void;
 }
 
@@ -177,21 +136,6 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
   const [loadingReferenceData, setLoadingReferenceData] = useState(true);
   const [referenceDataReloadToken, setReferenceDataReloadToken] = useState(0);
 
-  // ---------------------------------------------------------------------
-  // Owner/responsible pickers — the ASSIGNMENT listing for whichever
-  // organizational unit is currently selected in this form, never the
-  // browse listing `risksApi.searchUsers(q)` (no `assignableForOrgUnitId`)
-  // returns for the CALLER's own scope. See `risksApi.searchUsers`'s doc
-  // comment and `risks.form.fields.owner`'s own doc comment (message
-  // catalogue) for why the two must never be conflated for a required field.
-  // ---------------------------------------------------------------------
-  // S-10 — both pickers now search the directory server-side (`UserPicker`)
-  // instead of holding the ASSIGNMENT listing's full, bounded page in
-  // `assignableUsers`. `owner`/`responsible` track each picker's own
-  // current value (label included); `assignableUsersEmpty` is still
-  // resolved eagerly per org unit (a single unsearched first page) purely
-  // to tell "nobody is assignable here" apart from "nobody has been typed
-  // yet" for `assignablePickerState`/the description text below.
   const [owner, setOwner] = useState<UserRef | undefined>(risk?.owner);
   const [responsible, setResponsible] = useState<UserRef | undefined>(
     risk?.responsible ?? undefined,
@@ -202,7 +146,6 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
   const [assignableUsersReloadToken, setAssignableUsersReloadToken] = useState(0);
   const [ownerClearedNotice, setOwnerClearedNotice] = useState(false);
   const [responsibleClearedNotice, setResponsibleClearedNotice] = useState(false);
-  /** `null` until the first organizational unit has ever been selected — distinguishes "nothing chosen yet" (no clearing) from "the unit actually changed" (may need to clear a now-invalid owner/responsible), see the effect below. */
   const previousOrgUnitIdRef = useRef<string | null>(null);
 
   const form = useForm<RiskFormValues>({
@@ -245,15 +188,6 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
     };
   }, [referenceDataReloadToken]);
 
-  /**
-   * Refetches the assignment listing every time the form's own
-   * `orgUnitId` changes — never once at mount. When this is an actual
-   * CHANGE (not the form's very first render with its initial org unit),
-   * an already-selected owner/responsible that the new set no longer
-   * contains is cleared rather than left to be silently rejected by the
-   * server on submit, and that clearing is surfaced via
-   * `ownerClearedNotice`/`responsibleClearedNotice` — never done quietly.
-   */
   useEffect(() => {
     let cancelled = false;
     const orgUnitId = selectedOrgUnitId || null;
@@ -262,25 +196,9 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
     previousOrgUnitIdRef.current = orgUnitId;
 
     if (!orgUnitId) {
-      // Nothing to fetch yet. No setState here: `assignablePickerState`
-      // (below, render time) already treats "no unit selected" as its own
-      // `'no-unit'` case ahead of `assignableUsers`/`loadingAssignableUsers`/
-      // `assignableUsersError`, so a stale value in any of those from a
-      // previous unit can never leak into what the picker shows.
       return;
     }
 
-    // Nested and invoked via `void run()` — same shape as the reference-data
-    // effect above — so the "start loading" `setState` calls below run
-    // inside a called function rather than directly in the effect body
-    // (`react-hooks/set-state-in-effect`: a bare synchronous `setState` at
-    // the top of an effect risks a cascading render; one that kicks off an
-    // async fetch and reports its outcome does not).
-    // Re-validates one currently selected user against the org unit's
-    // assignment line — first against the already-fetched first page (the
-    // common case for a small org), falling back to one targeted search by
-    // their own exact name (never a full-list download) before concluding
-    // they are no longer assignable. Mirrors `ControlForm`'s identical fix.
     async function stillAssignable(user: UserRef, firstPage: readonly UserRef[]): Promise<boolean> {
       if (firstPage.some((candidate) => candidate.id === user.id)) return true;
       const result = await risksApi.searchUsers(user.fullName, orgUnitId!);
@@ -334,18 +252,13 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
     return () => {
       cancelled = true;
     };
-    // `form` (react-hook-form's returned object) is stable across renders;
-    // only the selected unit and an explicit retry should re-trigger this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedOrgUnitId, assignableUsersReloadToken]);
 
-  /** Shared error handling for both the normal submit path and the conflict "save anyway" retry. */
   function handleSubmitError(error: unknown): void {
     if (error instanceof ApiError) {
       const problem: ApiProblem = error.problem;
       if (problem.status === 409) {
-        // T099: the record changed underneath the user. Surface it; never
-        // reset the form, never auto-reload.
         setConflict({
           currentVersion: problem.currentVersion,
           currentStatus: problem.currentStatus,
@@ -382,11 +295,6 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
         return;
       }
 
-      // mode === 'edit' — RiskFormProps requires `risk`/`etag` in this mode.
-      // `etag` is read fresh from props (not duplicated into local state) so
-      // this always sends the caller's most current version — including one
-      // that advanced for a reason outside this form, e.g. the detail page's
-      // Causes and Consequences section saving concurrently.
       const result = await risksApi.updateRisk(risk!.id, buildUpdateBody(values), etag!);
       feedback.success(risks.form.updateSuccess);
       onSaved(result);
@@ -419,14 +327,6 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
 
   const disabled = submitting || loadingReferenceData;
 
-  // -----------------------------------------------------------------------
-  // Owner/responsible picker state — see the assignment-listing effect above
-  // and `risks.form.fields.owner`'s own doc comment (message catalogue) for
-  // why this is derived from `selectedOrgUnitId`/`assignableUsers` rather
-  // than from `referenceData`. Owner and responsible read the SAME
-  // underlying fetch (one org unit has exactly one assignment set), so both
-  // pickers are always in the same one of these four states at once.
-  // -----------------------------------------------------------------------
   const orgUnitSelected = Boolean(selectedOrgUnitId);
   const assignablePickerState: 'no-unit' | 'loading' | 'error' | 'empty' | 'ready' =
     !orgUnitSelected
@@ -438,14 +338,6 @@ export function RiskForm({ mode, risk, etag, onSaved }: RiskFormProps): React.JS
           : assignableUsersEmpty
             ? 'empty'
             : 'ready';
-  // Disabled only when there is genuinely nothing to pick from yet — no
-  // organizational unit chosen at all. `loading` and `error` leave the
-  // control itself enabled (its `SelectContent` is simply empty in either
-  // case) because BOTH are communicated explicitly beside it — the
-  // description text below the field for `loading`, and the dedicated
-  // role="alert" line with a retry action for `error` — never by disabling
-  // silently. Only `no-unit` has no data-driven state to show yet, so
-  // disabling it is what keeps it from reading as an empty, broken picker.
   const assignablePickerDisabled = disabled || assignablePickerState === 'no-unit';
   const ownerDescription =
     assignablePickerState === 'no-unit'

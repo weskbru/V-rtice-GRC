@@ -1,12 +1,3 @@
-/**
- * T031/004-compliance-management, User Story 1 — contract coverage for
- * operations 1-9, 11 and 13 of `contracts/compliance.openapi.yaml`
- * (framework CRUD, version CRUD and publication, create/edit requirement).
- * Uses the REAL `AppModule` (`buildContractTestApp`) — `ComplianceModule`
- * is a real, directly-wired composition root (unlike Controls' interim
- * `ControlsTestModule` workaround from an earlier phase), so no override
- * is needed.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';

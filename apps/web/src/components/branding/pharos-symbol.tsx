@@ -1,6 +1,5 @@
 import { useId } from 'react';
 
-/** Vector interpretation of the supplied folded Pharos mark; reusable independently of the login. */
 export function PharosSymbol({ className }: { className?: string }): React.JSX.Element {
   const id = useId();
   return (

@@ -1,20 +1,3 @@
-/**
- * PharosGRC frontend — Compliance API wrapper (004-compliance-management).
- *
- * A thin, typed layer over `apiClient` for all 23 contract operations —
- * the normative library, requirement↔control mapping, applicability
- * declaration, mapping migration and the compliance summary. Mirrors
- * `features/controls/api.ts`'s own conventions.
- *
- * `Framework`, `FrameworkVersion` and `Requirement` each carry their own
- * optimistic-locking `version`; every `PATCH` and `publish` call requires
- * `If-Match` and returns the new `ETag` alongside the updated record,
- * exactly like `controlsApi`. Requirement-control links and applicability
- * declarations are independent, separately-keyed rows that never write to
- * a root entity's `version` column (the contract's own "Optimistic locking
- * is scoped to each root entity's own row" clause) — none of the calls
- * below that create or withdraw them carries `If-Match`.
- */
 import { apiClient } from '@/lib/api-client';
 
 import type {
@@ -43,18 +26,15 @@ import type {
   UpdateRequirementRequest,
 } from './types';
 
-/** A record together with the entity-tag its next mutation must echo in `If-Match`. */
 export interface WithEtag<T> {
   record: T;
   etag: string;
 }
 
-/** Falls back to a quoted `version` when a response genuinely carries no `ETag` header — mirrors `controlsApi`'s own `resolveEtag`. */
 function resolveEtag(etag: string | null, version: number): string {
   return etag ?? `"${version}"`;
 }
 
-/** Builds `GET /frameworks`'s query string per its contract: comma-separated arrays (`style: form, explode: false`), omitting any filter the caller did not set. */
 function buildFrameworkListQueryString(query: FrameworkListQuery): string {
   const params = new URLSearchParams();
   params.set('page', String(query.page));
@@ -92,10 +72,6 @@ function buildPageQueryString(page: number, pageSize: number): string {
 }
 
 export const complianceApi = {
-  // -------------------------------------------------------------------
-  // Frameworks (operations 1-4, US1)
-  // -------------------------------------------------------------------
-
   listFrameworks(query: FrameworkListQuery): Promise<Page<Framework>> {
     return apiClient.get<Page<Framework>>(`/frameworks?${buildFrameworkListQueryString(query)}`);
   },
@@ -122,10 +98,6 @@ export const complianceApi = {
     );
     return { record: data, etag: resolveEtag(etag, data.version) };
   },
-
-  // -------------------------------------------------------------------
-  // Framework versions (operations 5-9, US1)
-  // -------------------------------------------------------------------
 
   listFrameworkVersions(
     frameworkId: string,
@@ -171,7 +143,6 @@ export const complianceApi = {
     return { record: data, etag: resolveEtag(etag, data.version) };
   },
 
-  /** `POST /frameworks/{frameworkId}/versions/{versionId}/publish` — FR-005, one-way (research.md D-3). Refused with `422` when the version has no requirement, surfaced honestly rather than pre-guessed client-side (this phase has no way to count requirements — see the module doc comment in `features/compliance/types.ts`). */
   async publishFrameworkVersion(
     frameworkId: string,
     versionId: string,
@@ -185,11 +156,6 @@ export const complianceApi = {
     return { record: data, etag: resolveEtag(etag, data.version) };
   },
 
-  // -------------------------------------------------------------------
-  // Requirements (operations 10-13, US1).
-  // -------------------------------------------------------------------
-
-  /** `GET .../versions/{versionId}/requirements` — ordered by `externalRef` by default (operation 10). Each row carries a freshly computed `complianceState` (research.md D-8). */
   listRequirements(
     frameworkId: string,
     versionId: string,
@@ -200,7 +166,6 @@ export const complianceApi = {
     );
   },
 
-  /** `GET /requirements/{requirementId}` — `complianceState` is freshly computed on every call (operation 12). */
   async getRequirement(requirementId: string): Promise<WithEtag<Requirement>> {
     const { data, etag } = await apiClient.getWithMeta<Requirement>(
       `/requirements/${requirementId}`,
@@ -208,7 +173,6 @@ export const complianceApi = {
     return { record: data, etag: resolveEtag(etag, data.version) };
   },
 
-  /** `POST /frameworks/{frameworkId}/versions/{versionId}/requirements` — permitted only while the version is `DRAFT` (FR-004), refused with `422` once `PUBLISHED`. */
   async createRequirement(
     frameworkId: string,
     versionId: string,
@@ -221,7 +185,6 @@ export const complianceApi = {
     return { record: data, etag: resolveEtag(etag, data.version) };
   },
 
-  /** `PATCH /requirements/{requirementId}` — refused with `422` once the parent version is `PUBLISHED` (FR-004), enforced by a database trigger the API surfaces as a domain error. */
   async updateRequirement(
     requirementId: string,
     body: UpdateRequirementRequest,
@@ -235,11 +198,6 @@ export const complianceApi = {
     return { record: data, etag: resolveEtag(etag, data.version) };
   },
 
-  // -------------------------------------------------------------------
-  // Requirement-control mapping (operations 14-15, US2, ADR-020).
-  // -------------------------------------------------------------------
-
-  /** `GET /requirements/{requirementId}/controls` — a plain array, current links only unless `includeWithdrawn` (FR-011). */
   listRequirementControlLinks(
     requirementId: string,
     includeWithdrawn = false,
@@ -249,13 +207,6 @@ export const complianceApi = {
     );
   },
 
-  /**
-   * `POST /requirements/{requirementId}/controls` — requires `compliance:map`
-   * on the requirement AND the control to lie inside the caller's
-   * organizational scope (ADR-020). A control that does not exist, and one
-   * that lies outside scope, both answer `422` — deliberately
-   * indistinguishable (FR-022) — never `404`. Does not carry `If-Match`.
-   */
   linkRequirementToControl(
     requirementId: string,
     body: LinkRequirementControlRequest,
@@ -263,16 +214,10 @@ export const complianceApi = {
     return apiClient.post<RequirementControlLink>(`/requirements/${requirementId}/controls`, body);
   },
 
-  /** `DELETE /requirements/{requirementId}/controls/{linkId}` — withdraws the link (stamps `unlinkedBy`/`unlinkedAt`); the row is preserved, never deleted (FR-011). */
   unlinkRequirementFromControl(requirementId: string, linkId: string): Promise<void> {
     return apiClient.delete<void>(`/requirements/${requirementId}/controls/${linkId}`);
   },
 
-  // -------------------------------------------------------------------
-  // Applicability declaration (operations 16-17, US3, FR-015/FR-016).
-  // -------------------------------------------------------------------
-
-  /** `GET /requirements/{requirementId}/applicability-declarations` — every declaration, current and revoked, newest first (data-model.md §6). */
   listRequirementApplicabilityDeclarations(
     requirementId: string,
     page = 1,
@@ -283,7 +228,6 @@ export const complianceApi = {
     );
   },
 
-  /** `POST /requirements/{requirementId}/applicability-declarations` — `justification` required (FR-015); refused with `409` when a declaration is already active. */
   declareRequirementNotApplicable(
     requirementId: string,
     body: DeclareApplicabilityRequest,
@@ -294,7 +238,6 @@ export const complianceApi = {
     );
   },
 
-  /** `DELETE /requirements/{requirementId}/applicability-declarations/{declarationId}` — revokes the active declaration; the row is preserved (research.md D-7). */
   revokeRequirementApplicabilityDeclaration(
     requirementId: string,
     declarationId: string,
@@ -304,11 +247,6 @@ export const complianceApi = {
     );
   },
 
-  // -------------------------------------------------------------------
-  // Compliance summary (operation 18, US3, FR-020).
-  // -------------------------------------------------------------------
-
-  /** `GET .../versions/{versionId}/compliance-summary` — the aggregate compliance state of the version's applicable requirements. Never cached; recomputed on every call. */
   getFrameworkVersionComplianceSummary(
     frameworkId: string,
     versionId: string,
@@ -318,11 +256,6 @@ export const complianceApi = {
     );
   },
 
-  // -------------------------------------------------------------------
-  // Mapping migration (operations 19-20, US2, FR-012 to FR-014).
-  // -------------------------------------------------------------------
-
-  /** `GET .../versions/{versionId}/mapping-migrations` — newest first by `executedAt`; each entry is a summary. */
   listMappingMigrations(
     frameworkId: string,
     versionId: string,
@@ -334,13 +267,6 @@ export const complianceApi = {
     );
   },
 
-  /**
-   * `POST .../versions/{versionId}/mapping-migrations` — carries the
-   * compliance manager's own decided correspondences exactly as supplied;
-   * never infers one (research.md D-6). Re-runnable: a target already
-   * decided (by a prior run or by hand) is skipped, never overwritten
-   * (FR-014).
-   */
   executeMappingMigration(
     frameworkId: string,
     versionId: string,
@@ -352,7 +278,6 @@ export const complianceApi = {
     );
   },
 
-  /** `GET .../mapping-migrations/{migrationId}` — the full per-requirement detail of one execution (SC-004). Immutable once recorded. */
   getMappingMigration(
     frameworkId: string,
     versionId: string,
@@ -363,18 +288,6 @@ export const complianceApi = {
     );
   },
 
-  // -------------------------------------------------------------------
-  // Cross-module registry lookup — the control picker (ADR-020).
-  // -------------------------------------------------------------------
-
-  /**
-   * `GET /controls` (platform.openapi.yaml) — the minimal control registry
-   * this module's requirement-control picker searches against, mirroring
-   * `risksApi.listControls`'s own convention. `control:view`, not
-   * `compliance:*` — this reads Controls' own catalog, not compliance data;
-   * the actual link attempt is still re-checked server-side against the
-   * caller's organizational scope (ADR-020, FR-022).
-   */
   async listControls(q: string): Promise<RegistrySearchResult<ControlRef>> {
     const page = await apiClient.get<Page<ControlRef>>(
       `/controls?pageSize=25${q ? `&q=${encodeURIComponent(q)}` : ''}`,

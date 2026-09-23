@@ -3,12 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MyActionsEmpty } from './my-actions-empty';
 
-/**
- * T058/002-shared-grc-foundation, US2 — component-mount evidence, mirroring
- * `risk-register-empty.test.tsx`'s own SC-013 reasoning: "no action exists
- * yet" and "no action matches the current filters" must be textually
- * distinct and each drive their own next action.
- */
 describe('MyActionsEmpty', () => {
   it('shows "no action assigned yet" (never "no results") when no filters are applied', () => {
     render(<MyActionsEmpty hasActiveFilters={false} onClearFilters={vi.fn()} />);

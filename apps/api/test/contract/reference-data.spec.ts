@@ -1,37 +1,3 @@
-/**
- * D-11 gap-coverage — `GET /risk-categories`, `GET /risk-types` and
- * `GET /risk-origins` (`RiskReferenceDataController`,
- * `contracts/platform.openapi.yaml` ~582/604/623) had NO test anywhere in
- * the repository before this dispatch, found by the same coverage audit
- * that surfaced the untested `/risk-methodology` and `GET /users` endpoints
- * (see `risk-methodology.spec.ts`/`directory-users.spec.ts`'s own header
- * comments).
- *
- * All three share one contract sentence, verbatim or near-verbatim:
- * "Requires an authenticated session; no additional permission" (FR-053).
- * No scope is mentioned for any of the three — unlike `/org-units` and
- * `/users`, these are organization-wide classification tables, not
- * per-record data — so this file does not assert any scope filtering, only
- * that the endpoint is reachable by ANY authenticated user regardless of
- * permission, and refuses an unauthenticated one.
- *
- * ## Why this file seeds its own rows rather than reading release data
- *
- * `risk_categories`/`risk_types`/`risk_origins` ARE release-seeded in a
- * real environment (ADR-008, `prisma/seed`), but the contract-test harness
- * (`test/integration/support/global-setup.ts`) only runs `prisma migrate
- * deploy` against `pharos_grc_test`, never `prisma db seed` — confirmed
- * empirically: the test database's three reference tables are truncated to
- * empty by `resetMutableTestData` and never repopulated. Depending on the
- * seed here would make every assertion in this file vacuous (`toHaveLength(0)`
- * passing regardless of whether the endpoint or its ordering/filtering is
- * correct). Each `describe` block therefore creates its own
- * active/inactive rows directly via `prisma.client`, exactly as
- * `createOrgUnitFixture`/`createUserFixture` (`support/fixtures.ts`) do for
- * their own tables, and no other spec file in this suite touches these
- * three tables (verified by grep), so the truncate-once-at-start-of-run
- * isolation this harness uses elsewhere is safe here too.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -71,24 +37,6 @@ function assertReferenceDataItemsShape(body: readonly ReferenceDataItemBody[]): 
   expect(sortOrders).toEqual([...sortOrders].sort((a, b) => a - b));
 }
 
-/**
- * F-45 issue 1 (`docs/deferred-findings.md`) — this file's own header
- * explains why it seeds rather than reads release data: `global-setup.ts`
- * never seeds `pharos_grc_test`, and this suite runs every contract spec
- * file SEQUENTIALLY against that ONE database, truncated once at the start
- * of the whole run, never between files. Nine OTHER files also create
- * active `RiskCategory`/`RiskType`/`RiskOrigin` rows in that same,
- * never-truncated-between-files table — the original `toEqual(activeIds)`
- * compared the ENTIRE response to this describe block's own two ids,
- * silently assuming (never asserted, never true by contract) that no other
- * file's fixture rows would ever be present at the same time. Filtering the
- * response down to only the ids THIS block created proves the same two
- * things the original assertion proved — both fixture rows are present,
- * and they appear in the correct relative `sortOrder` order (`.filter`
- * preserves the response's own ordering, so a wrong relative order still
- * fails this) — without assuming exclusivity of a table nothing in this
- * suite's contract or code ever promised this describe block alone owns.
- */
 function expectOwnActiveIdsInSortOrder(
   body: readonly ReferenceDataItemBody[],
   ownActiveIds: readonly string[],
@@ -109,9 +57,6 @@ describe('Reference data endpoints (GET /risk-categories, /risk-types, /risk-ori
     appOrigin = ctx.app.get(AppConfigService).app.appOrigin;
 
     const prisma = ctx.app.get(PrismaService);
-    // A real, logged-in user holding NO role and therefore NO permission at
-    // all — the contract is explicit that these endpoints require "no
-    // additional permission".
     const fixture = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('reference-data-noperm')}@example.test`,
     });
@@ -139,9 +84,6 @@ describe('Reference data endpoints (GET /risk-categories, /risk-types, /risk-ori
       const firstId = randomUUID();
       const inactiveRowId = randomUUID();
 
-      // Deliberately out of natural creation order, so a passing "in
-      // sortOrder order" assertion cannot be a coincidence of insertion
-      // order.
       await prisma.client.riskCategory.create({
         data: {
           id: secondId,
@@ -173,12 +115,6 @@ describe('Reference data endpoints (GET /risk-categories, /risk-types, /risk-ori
         },
       });
 
-      // F-45 issue 1 (`docs/deferred-findings.md`) — a real, active row this
-      // describe block does NOT own, exactly reproducing what any of the
-      // other nine files that write to this same, never-truncated-between-
-      // files table already do in a real full run. `expectOwnActiveIdsInSortOrder`
-      // below must ignore it; the old `toEqual(activeIds)` this replaced
-      // would have failed the instant this row exists.
       await prisma.client.riskCategory.create({
         data: {
           id: randomUUID(),

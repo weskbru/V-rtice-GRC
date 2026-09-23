@@ -1,27 +1,3 @@
-/**
- * T020/003-controls-management — `CreateControlUseCase` (`POST /controls`,
- * `createControl` operation, FR-001-FR-003, FR-005, FR-008, FR-029/FR-030).
- * Mirrors `modules/risk/application/create-risk.usecase.ts`'s structure —
- * see that file's header for the transaction-boundary/order-of-checks
- * reasoning this one does not repeat.
- *
- * ## Owner is OPTIONAL here, unlike Risk's required owner
- *
- * `ownerUserId` may be omitted or `null` (FR-005, edge case "controle sem
- * dono"): a control may be drafted before responsibility is decided. It is
- * validated — existence, active, assignable to `orgUnitId`'s line — ONLY
- * when supplied; entering `ACTIVE` is where the owner becomes mandatory
- * (`domain/control-lifecycle.ts`'s `HAS_OWNER` precondition,
- * `PerformControlTransitionUseCase`).
- *
- * ## Code generation reuses the GRC kernel's shared allocator
- *
- * `EntityCodeGeneratorPort.nextCode('CTL', year)` — the SAME allocator
- * (`GrcCodeSequence`) Evidence/Action/Finding already use, extended with
- * the `CTL` prefix at T019a (data-model.md §1's own account of why this is
- * the right reuse despite `Control` not being a GRC-kernel entity). Never a
- * second, duplicated counter mechanism in this module.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -65,21 +41,12 @@ export class CreateControlUseCase {
     private readonly assignmentLine: AssignmentLineService,
     private readonly auditRecorder: AuditRecorder,
   ) {
-    // Idempotent — see that function's own doc comment. Called here rather
-    // than from `ControlsModule`'s constructor because this task does not
-    // own that file (see this task's report for the exact call the
-    // coordinator must add there instead, mirroring `RiskModule`'s own
-    // `registerRiskAuditAllowlists()` call).
     registerControlAuditAllowlists();
   }
 
   async execute(input: CreateControlInput): Promise<ControlRecord> {
     const actor = await this.referenceData.findUser(input.actorUserId);
     if (!actor) {
-      // Defensive only: `SessionGuard` already proved this user has a live
-      // session, so the actor row existing is expected. Fails closed
-      // rather than attributing an audit event to a fabricated label —
-      // mirrors `CreateRiskUseCase`'s own identical check.
       throw new UnauthorizedDomainError();
     }
 
@@ -171,9 +138,6 @@ export class CreateControlUseCase {
   }
 }
 
-/** FR-025c-equivalent predicate, shared verbatim by `UpdateControlUseCase`
- * — mirrors `create-risk.usecase.ts`'s own exported
- * `isOrgUnitWithinScope`. */
 export function isOrgUnitWithinScope(scope: ScopeFilter, orgUnitId: string): boolean {
   return scope.kind === 'GLOBAL' || scope.unitIds.has(orgUnitId);
 }

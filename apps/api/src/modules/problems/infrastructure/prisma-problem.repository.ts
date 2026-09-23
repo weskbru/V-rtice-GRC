@@ -1,19 +1,3 @@
-/**
- * 008-incidents-problems, US2 — `PrismaProblemRepository`, the sole
- * implementation of `ProblemRepositoryPort`. Extends
- * `ProblemScopedRepository`, which fixes `applyScope`/`withScope` to
- * `orgUnitId` — every scoped method below is compile-time required to
- * thread the caller's `ScopeFilter` through it.
- *
- * `findCompletedOriginActionCompleters` reads the shared `actions` table
- * directly via the same `PrismaService` client this repository already
- * holds — not a `modules/problems -> grc/action` boundary violation, the
- * identical reasoning `PrismaFindingRepository`'s own header gives for
- * its equivalent query (no FK from `Action.originId` to any table,
- * R-001; the only way to answer "which actions target this problem" is a
- * plain `WHERE originType = 'PROBLEM' AND originId = :id` query against
- * the one shared table).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -85,9 +69,6 @@ export class PrismaProblemRepository
     return row ? this.toProblemRecord(row) : undefined;
   }
 
-  /** F-38 — see `ProblemRepositoryPort.findOrgUnitIdUnscoped`'s doc
-   * comment. One extra indexed-by-PK `SELECT`, paid only by a caller that
-   * already knows a scoped lookup just returned nothing. */
   async findOrgUnitIdUnscoped(id: string): Promise<string | undefined> {
     return this.resolveOrganizationalUnitIgnoringScope(() =>
       this.prisma.client.problem.findUnique({ where: { id }, select: { orgUnitId: true } }),
@@ -144,9 +125,6 @@ export class PrismaProblemRepository
       where: { originType: 'PROBLEM', originId: problemId, status: 'COMPLETED' },
       select: { completedByUserId: true },
     });
-    // Invariant A1 (`grc/action`): `completedByUserId` is stamped together
-    // with `status: COMPLETED` — never `null` for a row this query
-    // matches. The filter below is defensive, not an expected branch.
     return rows
       .map((row) => row.completedByUserId)
       .filter((value): value is string => value !== null);
@@ -166,8 +144,6 @@ export class PrismaProblemRepository
       where.severity = { in: [...filter.severity] };
     if (filter.orgUnitId !== undefined) where.orgUnitId = filter.orgUnitId;
     if (filter.search) {
-      // `search` matches `code` and `title` (contracts/problems.openapi
-      // .yaml's own `listProblems` description).
       where.OR = [
         { code: { contains: filter.search, mode: 'insensitive' } },
         { title: { contains: filter.search, mode: 'insensitive' } },

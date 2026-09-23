@@ -1,7 +1,3 @@
-/**
- * T192 — the sole Prisma-backed `CommentRepositoryPort` implementation.
- * Unscoped by design — see that port's header comment.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

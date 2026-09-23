@@ -1,17 +1,3 @@
-/**
- * Typed configuration accessor (T015).
- *
- * The only way any other file in this codebase reads configuration.
- * Wraps Nest's `ConfigService` (already populated and validated by
- * `EnvConfig`/`validateEnv` — see `config.module.ts`) and exposes it as
- * grouped, named getters instead of flat string keys, so call sites read
- * `config.session.idleTimeoutMinutes` rather than
- * `configService.get('SESSION_IDLE_TIMEOUT_MINUTES')`.
- *
- * Docker-Compose-only variables (`POSTGRES_HOST_PORT`, ...) are validated by
- * `env.schema.ts` but deliberately not exposed here — this Node process
- * never reads them.
- */
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -34,7 +20,6 @@ export interface DatabaseSettings {
 }
 
 export interface CacheSettings {
-  /** `undefined` selects the in-memory adapter (D-2). */
   readonly redisUrl: string | undefined;
 }
 

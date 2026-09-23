@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident detail, Attachments section (CLAUDE.md §19.10
- * remediation). Mirrors `RiskAttachmentsSection` exactly — see that
- * file's own header for the full reasoning this one deliberately does
- * not repeat: `AttachableEntityType.INCIDENT` was registered on the
- * backend (`IncidentParentRecordAccessor`) with no reachable interface
- * until this file. Consumes `GET/POST /attachments` and
- * `DELETE /attachments/{attachmentId}`, scoped to this incident via
- * `entityType=INCIDENT&entityId={incidentId}`
- * (`incidentsApi.listAttachments`/`uploadAttachment`/`withdrawAttachment`,
- * ADR-008's entity-type registry). Renders through `AttachmentList`
- * (`@pharos/design-system`) — a generic, domain-agnostic component; this
- * file supplies every word (D-10).
- */
 import { AttachmentList, ConfirmDialog } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -35,7 +21,6 @@ export interface IncidentAttachmentsSectionProps {
 
 const PAGE_SIZE = 20;
 
-/** Native file input `accept` hint only — a courtesy, not the actual allow-list authority. Kept in sync with `magic-bytes.ts`'s `SNIFFABLE_CONTENT_TYPES` / `.env.example`'s `ATTACHMENT_ALLOWED_MIME_TYPES` default. */
 const ACCEPTED_CONTENT_TYPES = 'application/pdf,image/png,image/jpeg,text/plain';
 
 function toListItem(attachment: Attachment, canWithdraw: boolean) {

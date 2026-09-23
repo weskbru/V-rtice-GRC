@@ -1,21 +1,3 @@
-/**
- * 009-indicators-reports, T023 — `FINDING_OPEN_COUNT_BY_SEVERITY`.
- * `Finding` is a GRC-kernel capability (`grc/finding`), not a business
- * module — `modules/indicators` (a business module) is explicitly allowed
- * to depend on `grc-domain`/`grc-application` directly (ADR-016,
- * `apps/api/eslint.config.mjs`'s module-isolation policy), the same way
- * `modules/risk`/`modules/audit-engagements` already import `ActionModule`/
- * `FindingModule`. No `shared/grc-ports` boundary port is needed here —
- * only the eight business-module-sourced keys need one.
- *
- * Delegates to `FindingRepositoryPort.list` — the SAME catalog query
- * `GET /findings` already runs. `FindingListFilter.status`/`severity` are
- * both single values (not arrays, unlike `Incident`/`ProblemListFilter`),
- * so this reads one page per `(status, severity)` combination —
- * `OPEN_FINDING_STATUSES.length` (2) × four severities = eight small,
- * indexed, parallel calls, summed per severity — never a ninth,
- * hand-rolled aggregate query.
- */
 import { Injectable } from '@nestjs/common';
 
 import { OPEN_FINDING_STATUSES } from '../../../../grc/finding/domain/finding.entity';

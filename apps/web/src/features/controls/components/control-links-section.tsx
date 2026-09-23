@@ -1,62 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control detail, relationships section (T049, US3, FR-021 to
- * FR-025, ADR-020).
- *
- * Three subsections:
- *
- *   - **Riscos** — read-only by design (FR-021): `RiskControlLink` is owned
- *     by the Risk module and is created/withdrawn only from the risk side.
- *     This section only ever calls `GET /controls/{controlId}/risks`;
- *     there is deliberately no link/unlink affordance here.
- *   - **Processos** / **Ativos** — explicit, nameable link/unlink, mirroring
- *     `RiskControlsSection`'s own `RelationshipSubsection` pattern
- *     (CLAUDE.md §18.12, §13.8) — a registry picker to add, a
- *     confirm-before-remove to withdraw. Unlike the risk-side calls, these
- *     never carry `If-Match`: they are independent, separately-keyed rows
- *     (contract's own "Optimistic locking is scoped to the control's own
- *     row" clause).
- *
- * A control that is `RETIRED` accepts no new process/asset links (FR-006) —
- * `canLinkRelationships` already reflects that from the caller (the detail
- * view passes `canEdit && control.status !== 'RETIRED'`), so the picker is
- * hidden rather than shown-then-refused.
- *
- * ## Progressive disclosure (021-control-detail-experience, Fase D)
- *
- * Measured before this change: the picker and "Vincular" sat permanently
- * open in both Processos and Ativos, even with a full list already on
- * screen — the same "query that reads as a form" defect
- * `problem-relationships-section.tsx`/`incident-relationships-section.tsx`
- * corrected in their own Fase D. `RelationshipSubsection` now shows an
- * intent button ("Vincular processo"/"Vincular ativo" — the SAME word
- * `messages.pickerLabel` already names) instead of the picker; clicking it
- * reveals the `SearchablePicker` + "Vincular" + a "Cancelar" escape hatch,
- * mirroring that same file's shape exactly (CLAUDE.md §18.12). The empty
- * state is never silent about it — the trigger renders directly under the
- * empty-state sentence, not hidden behind another click. Unlike Problem's
- * own version, there is no `includeWithdrawn` toggle here: this rodada's
- * instruction was progressive disclosure and volume-safe tables, not a new
- * "show withdrawn links" capability this screen never had — that stays
- * out of scope (CLAUDE.md §2).
- *
- * ## Volume-safe tables (Fase D)
- *
- * `table-fixed` at every width squeezes three-to-four columns into ~244px
- * at 390 — the exact defect `problem-relationships-section.tsx`'s own C1
- * (coordinator review) already measured and fixed: cell text overlapping,
- * titles breaking mid-word. `sm:table-fixed` (never unprefixed) with
- * percentage `TableHead` widths, `whitespace-normal break-words` on the
- * entity/"Vinculado por" cells (never `whitespace-nowrap` there — a long
- * name wraps within its column instead of forcing the column wide), and a
- * fixed-px action column (`Button`'s own base class hardcodes
- * `whitespace-nowrap`, so a percentage narrower than "Desvincular"'s
- * natural width would overflow regardless of its assigned share). Below
- * `sm` the table reverts to the browser's default `table-layout: auto`,
- * scrolling horizontally within the existing `overflow-x-auto` wrapper —
- * honest scroll, never overlapping text.
- */
 import { ConfirmDialog, SearchablePicker } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -95,9 +38,7 @@ interface RelationshipMessages {
   readonly pickerLabel: string;
   readonly pickerPlaceholder: string;
   readonly pickerNoOptions: string;
-  /** Front H: placeholder text inside the picker's own search input. */
   readonly pickerSearchPlaceholder: string;
-  /** Front H: accessible name for the picker's trigger button. */
   readonly pickerAriaLabel: string;
   readonly empty: string;
   readonly linkAction: string;
@@ -125,8 +66,6 @@ interface RelationshipSubsectionProps<TLink extends RelationshipLink> {
   canLink: boolean;
   links: readonly TLink[];
   getRef: (link: TLink) => { id: string; code: string; name: string };
-  /** Front H: called with the user's live search text — see
-   * `risk-controls-section.tsx`'s identical prop for the full reasoning. */
   fetchRegistry: (
     query: string,
   ) => Promise<RegistrySearchResult<{ id: string; code: string; name: string }>>;
@@ -236,11 +175,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
                   <TableHead className="w-[24%]">{messages.columns.linkedBy}</TableHead>
                   <TableHead className="w-[18%]">{messages.columns.linkedAt}</TableHead>
                   {canLink ? (
-                    // Fixed px, not a percentage: `Button`'s own base class
-                    // hardcodes `whitespace-nowrap`, so "Desvincular" always
-                    // renders on one line regardless of the column's
-                    // assigned share — mirrors
-                    // `problem-relationships-section.tsx`'s identical fix.
                     <TableHead className="sr-only w-28">{messages.unlinkAction}</TableHead>
                   ) : null}
                 </TableRow>
@@ -374,9 +308,7 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
 
 export interface ControlLinksSectionProps {
   controlId: string;
-  /** `control:edit`, AND the control must not be `RETIRED` (FR-006) — the caller passes the already-combined condition. */
   canLinkRelationships: boolean;
-  /** Bump after any successful link/unlink to force this section's own lists to reload. */
   refreshToken?: number;
 }
 
@@ -460,10 +392,6 @@ export function ControlLinksSection({
                     <TableHead className="w-[18%]">
                       {controls.relationships.risks.columns.linkedAt}
                     </TableHead>
-                    {/* Fixed px, not a percentage — see the sibling
-                        subsections' own identical comment on why an action
-                        column with a fixed-width button never uses a
-                        percentage share. */}
                     <TableHead className="sr-only w-28">
                       {controls.relationships.risks.openRisk}
                     </TableHead>

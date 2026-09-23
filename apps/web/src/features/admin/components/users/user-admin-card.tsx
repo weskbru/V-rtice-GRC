@@ -1,34 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, users card view, one user (CLAUDE.md §18,
- * §18.12). Mirrors `ActionCard`'s shape: initials + name + e-mail, status
- * badge and the SAME row-actions menu (`UserRowActionsMenu`) in the header
- * — the same three fields the table's own columns show, so the two views
- * can never disagree about what a user "is".
- *
- * ## Papéis gets its own full-width row — a rendered measurement found why the original three-equal-column row could not stay
- *
- * The original metadata section split Unidade / Papéis / Último acesso into
- * three equal `grid-cols-3` columns. At 1440 that gave Papéis roughly a
- * third of the card (~100px) — narrow enough that a single role badge's OWN
- * label wrapped mid-word ("Responsável por / Controle"), and two badges
- * stacked vertically, so card height drifted with how many roles a user
- * held. Roles are the richest field a user card carries; squeezing them
- * into one of three equal columns was the defect, not the badge component.
- *
- * Papéis now renders BELOW, across the card's full width, fit to ONE line
- * via `UserRoleBadges`'s `widthBudget="measure"` mode (that component's own
- * header explains the measurement). Unidade and Último acesso share the
- * row ABOVE it — two columns, not three — so neither truncates the way
- * `title="Division A / Tea…"`/`13:04…` did in the cramped three-column
- * layout.
- *
- * Deliberately NOT a link to a detail route: unlike every business
- * register, Administration → Usuários has no `/admin/users/{id}` page —
- * every user action (edit, roles, status, password, sessions) is a dialog
- * reached from the row-actions menu, so the card itself opens nothing.
- */
 import { EmptyValue, StatusBadge } from '@pharos/design-system/components';
 import { Building2, Clock } from 'lucide-react';
 
@@ -108,9 +79,6 @@ export function UserAdminCard({
       </div>
 
       <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
-        {/* Unidade / Último acesso — two columns, not three, so neither
-            truncates the way it did when Papéis shared this row (this
-            file's own header). */}
         <dl className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex min-w-0 flex-col gap-0.5">
             <dt className="flex items-center gap-1 text-muted-foreground">
@@ -140,9 +108,6 @@ export function UserAdminCard({
           </div>
         </dl>
 
-        {/* Papéis — a full-width row of its own, fit to ONE line against
-            this row's own measured width (`widthBudget="measure"`, see
-            `UserRoleBadges`'s own header). */}
         <div className="flex min-w-0 flex-col gap-0.5 text-xs">
           <span className="text-muted-foreground">{card.rolesLabel}</span>
           <UserRoleBadges roles={user.roles} widthBudget="measure" />

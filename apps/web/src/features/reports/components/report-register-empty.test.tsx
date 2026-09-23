@@ -6,11 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { ReportRegisterEmpty } from './report-register-empty';
 
-/**
- * Component-mount evidence mirroring `incident-register-empty.test.tsx` (009-indicators-reports,
- * T061) — the two empty states must be textually distinct and each drive its own next action
- * (CLAUDE.md §18.11), and the "create" action is gated on `report:create` (advisory only).
- */
 describe('ReportRegisterEmpty', () => {
   it('shows "no report created yet" (never "no results") when no filters are applied', () => {
     render(

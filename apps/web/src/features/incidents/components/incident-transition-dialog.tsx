@@ -1,25 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident lifecycle transition dialog (008-incidents-problems,
- * US1), mirroring `ReopenActionDialog`'s shape (CLAUDE.md §18.12), made
- * adaptive across `IncidentTransitionOption.requiredField` instead of one
- * dialog per transition: `resolve`/`cancel`/`reopen` each render the
- * `Textarea` for their own required field (data-model.md invariants I1/I2
- * and the reopen edge's own requirement — "the form has to ask for it
- * rather than letting the server reject an empty one"); `close` renders the
- * SAME confirmation shell with no field, since `incidents.lifecycle.confirm
- * .close` still exists to warn that descriptive fields stop being editable.
- * `start` (`OPEN -> IN_PROGRESS`) never reaches this component at all — its
- * `confirmKey` is `undefined`, so the caller (`IncidentLifecycleActions`)
- * applies it immediately.
- *
- * The client-side non-empty check on the required field is a courtesy that
- * saves a round trip, never the actual gate — `POST /incidents/{id}
- * /transitions` re-validates every transition and its required field
- * independently (CLAUDE.md §18.9); this dialog's `error` state renders
- * whatever the server actually says on a 422.
- */
 import { FormField } from '@pharos/design-system/components';
 import { useState } from 'react';
 

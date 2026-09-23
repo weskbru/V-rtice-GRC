@@ -1,30 +1,14 @@
 'use client';
 
-/**
- * PharosGRC — control catalog compact summary row (CLAUDE.md §18.5, §19.7),
- * mirroring `risk-register-summary.tsx`'s own shape and reasoning.
- *
- * Unlike the risk register, there is no `GET /dashboard` aggregate for
- * Controls yet (this phase does not add one) — so each figure is read from
- * `meta.total` of the SAME `GET /controls` catalog query the register
- * itself uses (`controlsApi.listCatalog`, `pageSize: 1`), filtered exactly
- * the way the card's own link filters the register. This keeps ONE
- * calculator for "how many controls match X" (the server's own filtered
- * count, CLAUDE.md §19.7) — never a client-side recount of rows, and never
- * a duplicated filter expression that could drift from the register's.
- *
- * A failure degrades to one quiet message in place of the row — it must
- * never hide or block the catalog underneath it.
- */
 import { CheckCircle2, Clock, Layers, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { RegisterSummaryCard } from '@/components/register/register-summary-card';
+import { controls } from '@/lib/messages/controls';
 
 import { controlsApi } from '../api';
 
 import type { ComponentType, SVGProps } from 'react';
-
-import { RegisterSummaryCard } from '@/components/register/register-summary-card';
-import { controls } from '@/lib/messages/controls';
 
 export interface ControlRegisterSummaryProps {
   className?: string;

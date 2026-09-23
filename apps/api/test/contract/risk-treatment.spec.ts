@@ -1,10 +1,3 @@
-/**
- * T135 — treatment operations refused without `risk:treat` (FR-071 to
- * FR-074c), plus full D-11 coverage for every endpoint this dispatch adds
- * under "Risk Treatment": the stated authorization rule (including a
- * zero-permission/wrong-permission caller refused), 401 for an
- * unauthenticated caller, and the declared response shape.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -102,7 +95,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
       email: `${uniqueTestMarker('risk-treatment-contract-owner')}@example.test`,
     });
     ownerUserId = owner.id;
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
   });
 
@@ -110,10 +102,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
     await ctx.close();
   });
 
-  /** Logs in a fresh user granted `permissions` (plus `risk:create`,
-   * `risk:view` unless the caller only wants the bare permission under
-   * test), scoped to the shared org unit, and returns a fresh `DRAFT` risk
-   * created by that agent along with the ETag/version to use as `If-Match`. */
   async function agentWithPermissions(
     permissions: Parameters<typeof createRoleWithPermissionsFixture>[1],
   ): Promise<{ agent: ReturnType<typeof request.agent> }> {
@@ -151,10 +139,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
     const body = response.body as RiskDetailBody;
     return { id: body.id, version: response.headers.etag! };
   }
-
-  // -------------------------------------------------------------------
-  // POST /risks/{riskId}/treatments
-  // -------------------------------------------------------------------
 
   describe('POST /risks/{riskId}/treatments', () => {
     it('succeeds for a caller holding risk:treat and returns the declared RiskTreatmentDecision shape', async () => {
@@ -254,10 +238,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
       expect(secondDecision.status).toBe(201);
 
       const { agent: viewerAgent } = await agentWithPermissions(['risk:view']);
-      // The viewer has no scope grant of its own by default, but the org
-      // unit is shared — grant it explicitly so this exercises risk:view
-      // alone, not scope.
-      // (agentWithPermissions already grants scope over the shared org unit.)
       const response = await viewerAgent
         .get(`/api/v1/risks/${id}/treatments`)
         .set('Origin', appOrigin);
@@ -269,7 +249,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
       expect(body.data).toHaveLength(2);
       expect(body.meta).toEqual({ page: 1, pageSize: 25, total: 2, totalPages: 1 });
 
-      // Newest first; the superseded first decision is still present.
       const second = secondDecision.body as TreatmentDecisionBody;
       expect(body.data[0]!.id).toBe(second.id);
       expect(body.data[1]!.supersededAt).not.toBeNull();
@@ -298,10 +277,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // POST /risks/{riskId}/treatment-actions
-  // -------------------------------------------------------------------
 
   describe('POST /risks/{riskId}/treatment-actions', () => {
     it('succeeds for a caller holding risk:treat and returns the declared RiskTreatmentAction shape', async () => {
@@ -421,10 +396,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
     });
   });
 
-  // -------------------------------------------------------------------
-  // PATCH /risks/{riskId}/treatment-actions/{actionId}
-  // -------------------------------------------------------------------
-
   describe('PATCH /risks/{riskId}/treatment-actions/{actionId}', () => {
     it('succeeds for a caller holding risk:treat, stamps completedAt on transition to COMPLETED, and returns the declared shape', async () => {
       const { agent } = await agentWithPermissions(['risk:create', 'risk:view', 'risk:treat']);
@@ -438,17 +409,6 @@ describe('Risk Treatment endpoints (T135, T143, FR-071 to FR-075, D-11)', () => 
       expect(created.status).toBe(201);
       const action = created.body as TreatmentActionBody;
 
-      // 007-implementation-remediation, Frente A — `Action`'s lifecycle
-      // table (data-model.md §4, FR-011 to FR-016,
-      // `grc/action/domain/action.entity.ts`'s own `LEGAL_TRANSITIONS`) does
-      // NOT include `OPEN -> COMPLETED` directly: completion always passes
-      // through `IN_PROGRESS` first. Before the Action convergence, this
-      // route wrote `risk_treatment_actions.status` directly with no
-      // legality check at all, so the old version of this test jumped
-      // straight from OPEN to COMPLETED in one PATCH. That path is now
-      // illegal by design (every treatment-action status write goes through
-      // the SAME shared table every other Action-backed workflow uses), so
-      // this test exercises the real two-step lifecycle instead.
       const inProgress = await agent
         .patch(`/api/v1/risks/${id}/treatment-actions/${action.id}`)
         .set('Origin', appOrigin)

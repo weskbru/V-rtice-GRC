@@ -6,11 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { AuditEngagementRegisterEmpty } from './audit-engagement-register-empty';
 
-/**
- * Component-mount evidence mirroring `control-register-empty.test.tsx`
- * (T076/T080) — the two empty states must be textually distinct and each
- * drive its own next action (US1, CLAUDE.md §18.11).
- */
 describe('AuditEngagementRegisterEmpty', () => {
   it('shows "no engagement registered yet" (never "no results") when no filters are applied', () => {
     render(

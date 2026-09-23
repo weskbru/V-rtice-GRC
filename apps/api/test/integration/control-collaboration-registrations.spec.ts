@@ -1,22 +1,3 @@
-/**
- * Task C/003-controls-management — real, exercised coverage (not a stub,
- * CLAUDE.md §19.10) for the two closed-type registrations this workstream
- * owns:
- *
- *   1. `ActionOriginType.CONTROL_ASSESSMENT`, registered against
- *      `ActionOriginResolverPort` by `ControlAssessmentActionOriginAccessor`
- *      — an `Action` created with this origin appears in the shared work
- *      list identified by its origin, and an origin outside the caller's
- *      scope is refused (FR-027, research.md D-5).
- *   2. `EvidenceSubjectType.CONTROL`, registered against
- *      `EvidenceSubjectResolverPort` by `ControlEvidenceSubjectAccessor` —
- *      evidence can be linked directly to a control (FR-026).
- *
- * Also proves the convergence guard `test/unit/
- * action-model-convergence-guard.spec.ts` checks statically: exactly one
- * `registerActionOriginResolver('CONTROL_ASSESSMENT', ...)` call site
- * exists, and it is genuinely wired into a running application.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -133,8 +114,6 @@ describe('Task C — CONTROL_ASSESSMENT action origin and CONTROL evidence subje
     expect(action.originId).toBe(assessment.id);
     expect(originLabel).toContain(control.code);
 
-    // Appears in the SAME shared work list as every other action, found by
-    // its origin (FR-027).
     const list = await listActionUseCase.execute({
       actorUserId: actor.id,
       page: 1,

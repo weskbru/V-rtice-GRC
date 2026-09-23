@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework register empty states, mirroring
- * `features/controls/components/control-register-empty.tsx` exactly
- * (CLAUDE.md §18.12) — two genuinely different situations, never collapsed
- * into one generic message.
- */
 import { EmptyState } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

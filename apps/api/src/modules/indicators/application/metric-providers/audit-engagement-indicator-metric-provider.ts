@@ -1,10 +1,3 @@
-/**
- * 009-indicators-reports, T022 — `AUDIT_ENGAGEMENT_OPEN_COUNT`. Delegates
- * to `AuditEngagementMetricsPort`
- * (`shared/grc-ports/audit-engagement-metrics.port.ts`), which itself
- * reuses `PrismaAuditEngagementRepository.list` — no query of this file's
- * own.
- */
 import { Injectable } from '@nestjs/common';
 
 import { AuditEngagementMetricsPort } from '../../../../shared/grc-ports/audit-engagement-metrics.port';

@@ -1,10 +1,3 @@
-/**
- * T010/003-controls-management — the sole implementation of
- * `ControlDirectoryPort` (`shared/grc-ports/control-directory.port.ts`,
- * ADR-020 part 3). `modules/controls` OWNS the `controls` table, so this
- * adapter is the one place in the platform allowed to query it on behalf
- * of another module.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -24,8 +17,6 @@ export class PrismaControlDirectoryAdapter implements ControlDirectoryPort {
     return row ?? undefined;
   }
 
-  /** T013/004-compliance-management — see `ControlDirectoryPort
-   * .findManyById`'s own doc comment for the contract this implements. */
   async findManyById(ids: readonly string[]): Promise<readonly ControlDirectoryEntry[]> {
     if (ids.length === 0) {
       return [];

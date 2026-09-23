@@ -7,13 +7,6 @@ import { ProcessForm } from './process-form';
 
 import type { ProcessDetail } from '../types';
 
-/**
- * Component-mount evidence for T048 (`ProcessForm`) — most importantly that
- * organizational unit is unmistakably required (invariant A1, FR-004) and
- * that description, being optional, never blocks submission.
- *
- * `../api` (`processesApi`) is mocked at the network boundary.
- */
 const { pushMock, backMock, createProcessMock, updateProcessMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   backMock: vi.fn(),

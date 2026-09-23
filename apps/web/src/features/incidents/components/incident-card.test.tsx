@@ -5,13 +5,6 @@ import { IncidentCard } from './incident-card';
 
 import type { IncidentSummary } from '../types';
 
-/**
- * Component-mount evidence for the register's card view (CLAUDE.md §18),
- * mirroring `control-card.test.tsx`'s fixture shape. `IncidentSummary`
- * carries no description field (`incidents.openapi.yaml`) — these tests
- * pin that the card renders only the fields the summary actually has:
- * severity, status, organizational unit, responsible and reported date.
- */
 const baseIncident: IncidentSummary = {
   id: 'incident-1',
   code: 'INC-2026-0001',

@@ -1,29 +1,3 @@
-/**
- * T040/005-audit-findings, User Story 1 — `AuditEngagementScopeController`:
- * `contracts/audit.openapi.yaml`'s `/audits/{auditId}/scope[/framework-versions|
- * /requirements|/controls]` paths (`listAuditScope`, `addFrameworkVersionToScope`,
- * `addRequirementToScope`, `addControlToScope` — operations 5-8 of 11).
- *
- * ## Why the three `add*ToScope` handlers re-read the scope after writing
- *
- * `LinkAuditScopeTo*UseCase.execute()` returns only `{id, linkedAt}`
- * (`AuditScopeLinkResult`, `application/scope/link-framework-version.usecase.ts`)
- * — the minimum the WRITE side needs. The `201` response this contract
- * declares is the full `AuditScopeEntry` (`targetType`, `target.label`,
- * `linkedBy`), which only the READ side
- * (`AuditScopeRepositoryPort.listScope`, via `ListAuditScopeUseCase`)
- * computes — `target.label` in particular is a joined, precomputed string
- * (`FrameworkVersion.label` / `"{externalRef} — {title}"` /
- * `"{code} — {name}"`, `prisma-audit-scope.repository.ts`'s own header)
- * that no write-path method returns. Rather than duplicate that
- * computation here (a second place `target.label`'s format could drift
- * from `listAuditScope`'s own), this controller composes the two existing
- * use cases: link, then re-read the engagement's scope and pick out the
- * entry whose `id` the link call just returned — an unpaginated, bounded
- * read (research.md's own "an engagement's scope is bounded by what a
- * human explicitly added"), consistent BY CONSTRUCTION with what
- * `GET /audits/{auditId}/scope` would show immediately afterward.
- */
 import {
   Body,
   Controller,
@@ -62,7 +36,6 @@ export class AuditEngagementScopeController {
     private readonly listAuditScopeUseCase: ListAuditScopeUseCase,
   ) {}
 
-  /** `listAuditScope`. */
   @RequirePermission('audit-engagement:view')
   @Get()
   async listScope(
@@ -76,7 +49,6 @@ export class AuditEngagementScopeController {
     return entries.map(toAuditScopeEntryResponse);
   }
 
-  /** `addFrameworkVersionToScope`. */
   @RequirePermission('audit-engagement:scope')
   @Post('framework-versions')
   @HttpCode(HttpStatus.CREATED)
@@ -93,7 +65,6 @@ export class AuditEngagementScopeController {
     return this.rereadEntry(session, auditId, link.id);
   }
 
-  /** `addRequirementToScope`. */
   @RequirePermission('audit-engagement:scope')
   @Post('requirements')
   @HttpCode(HttpStatus.CREATED)
@@ -110,7 +81,6 @@ export class AuditEngagementScopeController {
     return this.rereadEntry(session, auditId, link.id);
   }
 
-  /** `addControlToScope`. */
   @RequirePermission('audit-engagement:scope')
   @Post('controls')
   @HttpCode(HttpStatus.CREATED)
@@ -127,8 +97,6 @@ export class AuditEngagementScopeController {
     return this.rereadEntry(session, auditId, link.id);
   }
 
-  /** See this file's header for why the `201` body is built by re-reading
-   * the scope rather than by the link use case's own minimal result. */
   private async rereadEntry(
     session: ValidatedSession,
     auditId: string,
@@ -139,10 +107,6 @@ export class AuditEngagementScopeController {
       auditEngagementId: auditId,
     });
     const entry = entries.find((candidate: AuditScopeEntryRecord) => candidate.id === linkId);
-    // Defensive only: the link just committed in the SAME request, inside
-    // the same transaction that has since closed — it cannot be absent
-    // from an immediately following read of the same (append-only,
-    // research.md D-12) table.
     if (!entry) {
       throw new Error(`Scope link ${linkId} not found immediately after being created.`);
     }

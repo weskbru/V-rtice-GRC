@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Requisitos" section of a framework version's detail
- * screen (US1/US3, contract operation 10). Replaces the session-scoped
- * workaround this module shipped with while `listRequirements` was not yet
- * wired server-side — it is now, and this section fetches the version's
- * real requirement listing, paginated and filterable by the requirement's
- * own calculated `complianceState`, exactly like `FrameworkListView`'s own
- * three-state loading/empty/error discipline (CLAUDE.md §18.11).
- *
- * Each row's compliance state is shown as icon + text + colour, never
- * colour alone (CLAUDE.md §18.8) — `complianceStateBadgeVariant`/
- * `complianceStateIcon`/`complianceStateLabel` from `../status` already
- * enforce that a `StatusBadge` never renders with colour as its only
- * signal.
- */
 import {
   EmptyState,
   ErrorState,
@@ -61,7 +46,6 @@ export interface RequirementListSectionProps {
   versionId: string;
   versionIsDraft: boolean;
   canAdminister: boolean;
-  /** Reports the version's real, unfiltered requirement total upward, e.g. for `PublishVersionAction`'s hint. Called once per successful unfiltered fetch. */
   onTotalChange?: (total: number) => void;
 }
 

@@ -1,12 +1,3 @@
-/**
- * T180 — `AdminOrgUnitsController`: `GET|POST /admin/org-units`,
- * `GET|PATCH /admin/org-units/{orgUnitId}`,
- * `PUT /admin/org-units/{orgUnitId}/status`
- * (`contracts/admin.openapi.yaml`'s `Organizational Units` tag). Every
- * operation requires `org_unit:administer` (T172). Distinct from
- * `OrgUnitController` (`GET /org-units`, scope-filtered, no administrative
- * permission) in this same capability.
- */
 import {
   BadRequestException,
   Body,
@@ -92,13 +83,6 @@ export class AdminOrgUnitsController {
       orgUnitId,
       ...(body.code !== undefined ? { code: body.code } : {}),
       ...(body.name !== undefined ? { name: body.name } : {}),
-      // `body.parentId !== undefined` — not `'parentId' in body` — is the
-      // correct "was this field actually sent" test here: see
-      // `assertUpdateBodyNotEmpty`'s header below for why `in`/`Object.keys`
-      // against a `class-transformer` instance cannot tell "omitted" from
-      // "present" on this DTO. `undefined` still means omitted (JSON has no
-      // `undefined`, so the only way `body.parentId` reads `undefined` is
-      // the key never having been sent); `null` means "reparent to root".
       ...(body.parentId !== undefined ? { parentId: body.parentId } : {}),
     });
     return toOrgUnitNodeResponse(unit);
@@ -120,17 +104,6 @@ export class AdminOrgUnitsController {
   }
 }
 
-/**
- * Named after `RiskController`'s identical-in-intent
- * `assertUpdateBodyNotEmpty`, but NOT copying its `Object.keys(body).length
- * === 0` check: under this project's `target: ES2023` (default
- * `useDefineForClassFields: true`), `class-transformer`'s `plainToInstance`
- * defines every declared class field on the instance — as `undefined` when
- * the client omitted it — so an actually-empty `{}` request body still
- * yields an instance whose `Object.keys(...)` lists every declared
- * property. Checking for at least one DEFINED value is what
- * `minProperties: 1` actually requires here.
- */
 function assertUpdateBodyNotEmpty(body: UpdateOrgUnitRequestDto): void {
   const hasAnyField = Object.values(body).some((value) => value !== undefined);
   if (!hasAnyField) {

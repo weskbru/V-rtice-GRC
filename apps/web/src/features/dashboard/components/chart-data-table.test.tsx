@@ -3,11 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { ChartDataTable } from './chart-data-table';
 
-/**
- * Component-mount evidence for T198 — `ChartDataTable` is the text
- * equivalent every dashboard chart renders for a screen-reader user
- * alongside its `aria-hidden` SVG.
- */
 describe('ChartDataTable', () => {
   it('renders a visually-hidden table carrying every row and its exact value', () => {
     render(
@@ -23,15 +18,10 @@ describe('ChartDataTable', () => {
 
     const table = screen.getByRole('table', { name: 'Tabela: quantidade de riscos por nível' });
 
-    // The hiding must be done by a WRAPPER, never by the table itself: a table
-    // box treats width/height as minimums and CSS leaves `overflow` on it
-    // undefined, so `sr-only` on the <table> hid it visually while it still
-    // took up hundreds of pixels of layout (F-66 cause 2, F-67).
     expect(table).not.toHaveClass('sr-only');
     expect(table.parentElement).toHaveClass('sr-only');
 
     const rows = within(table).getAllByRole('row');
-    // Header row + 2 data rows.
     expect(rows).toHaveLength(3);
     expect(within(rows[1]!).getByText('Baixo')).toBeInTheDocument();
     expect(within(rows[1]!).getByText('3')).toBeInTheDocument();

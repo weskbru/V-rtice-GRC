@@ -1,27 +1,6 @@
 'use client';
 
-/**
- * PharosGRC — "Planos de Ação" register filter toolbar, brought into the
- * shared register family (CLAUDE.md §18.12): the same collapsible
- * `FilterBar` disposition `RiskRegisterFilters`/`AuditEngagementRegisterFilters`
- * use — search-row + "Filtros N" disclosure + an active-filters chip row
- * that stays visible while the panel is collapsed.
- *
- * `GET /actions` accepts exactly one value per filter field (no CSV array),
- * so — like `AuditEngagementRegisterFilters` — the controls stay
- * single-value `Select`s, never `MultiSelectFilter`. No reference-data fetch
- * either: status and origin are both static, closed enums (`actions
- * .statusLabels`/`actions.originTypeLabels`), unlike Risks' category/
- * org-unit filters, which come from the server.
- *
- * `onlyMine`'s chip is this screen's own kind: it starts `true` (SC-002 —
- * this screen's whole reason to exist), so a chip appears only when the
- * caller has turned it OFF, never when it is at its own default.
- */
 import { FilterBar, type ActiveFilterChip } from '@pharos/design-system/components';
-
-import type { ActionOriginType, ActionStatus } from '../types';
-import type { ReactNode } from 'react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -36,12 +15,10 @@ import { actions } from '@/lib/messages/actions';
 import { common } from '@/lib/messages/common';
 import { singleValueChip } from '@/lib/register/filter-chips';
 
+import type { ActionOriginType, ActionStatus } from '../types';
+import type { ReactNode } from 'react';
+
 const STATUS_VALUES: readonly ActionStatus[] = ['OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
-/**
- * Derived from `originTypeLabels`'s own keys, never a second hand-restated
- * list — see `actions.ts`'s own header for the drift this already caused
- * once.
- */
 const ORIGIN_VALUES = Object.keys(actions.originTypeLabels) as readonly ActionOriginType[];
 
 const ALL_VALUE = '__all__';
@@ -57,7 +34,6 @@ export interface MyActionsFiltersProps {
   onlyOverdue: boolean;
   onOnlyOverdueChange: (value: boolean) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }

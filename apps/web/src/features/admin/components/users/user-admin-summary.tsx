@@ -1,48 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, the users screen's four indicators (CLAUDE.md
- * §18.5, §19.7), mirroring `risk-register-summary.tsx`'s own reasoning for
- * why these are server aggregates and never a second count computed here.
- *
- * Three requests on mount, each an O(1) server aggregate — never a count
- * derived from the loaded page:
- *   - **Total de usuários**: `adminApi.listUsers({ page: 1, pageSize: 1 })`
- *     → `meta.total`, no filters.
- *   - **Ativos**: the same call with `status: 'ACTIVE'` → `meta.total`.
- *   - **Inativos**: `total − ativos`, computed here rather than a fourth
- *     request — exact, because `status` is a closed two-value enum
- *     (`AdminUserStatus`), so every user counted in `total` is in exactly
- *     one of the two buckets.
- *   - **Sem papel**: `total − usersWithRoles`, where `usersWithRoles` comes
- *     from `adminApi.getRolesSummary()` (`GET /admin/roles/summary`). Both
- *     counts are over the SAME universe — the unfiltered `listUsers` call
- *     counts every row of `user`, and `usersWithRoles` is
- *     `COUNT(DISTINCT user_id)` over `user_roles`
- *     (`prisma-user-directory.repository.ts#listAdmin`,
- *     `prisma-role.repository.ts#getSummaryCounts`) — so the subtraction is
- *     exact, not an approximation.
- *
- * `GET /admin/roles/summary` requires `role:administer`, which this
- * screen's own `user:administer` does NOT imply (015-roles-permissions-
- * surface FR-019): a caller can hold one without the other. When
- * `canManageRoles` is false, this component never calls that endpoint at
- * all — no failed request, no permanent skeleton — and the "Sem papel" tile
- * is simply ABSENT, never a zero. The strip then lays out the remaining
- * three tiles.
- *
- * "Ativos" and "Inativos" link into this register's own `status` filter —
- * a real, already-existing filter field, so the number shown and the list
- * it opens into can never disagree. "Sem papel" is NOT a link: `GET
- * /admin/users` has no filter the contract supports for it, and faking one
- * would be worse than a plain figure (CLAUDE.md §19.7 — never a second,
- * unenforced rule standing in for a real one).
- *
- * A failure anywhere in the three requests degrades the WHOLE strip to one
- * quiet line (mirroring `role-admin-summary.tsx`'s identical choice for
- * this same administration area) — it must never hide or block the
- * register underneath it.
- */
 import { SummaryStatCard } from '@pharos/design-system/components';
 import { ShieldOff, UserCog, UserRoundCheck, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -56,7 +13,6 @@ import { adminApi } from '../../api';
 import type { ComponentType, SVGProps } from 'react';
 
 export interface UserAdminSummaryProps {
-  /** Whether `GET /admin/roles/summary` is reachable at all — decides whether the fourth tile is fetched and rendered (FR-019: `role:administer` does not imply `user:administer`, nor the reverse). */
   canManageRoles: boolean;
   className?: string;
 }

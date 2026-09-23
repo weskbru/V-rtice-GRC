@@ -1,27 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report execution dialog (009-indicators-reports, T061, US5, FR-025 to FR-028).
- *
- * `GET /reports/{reportId}` (`getReportDefinition`) is declared in the contract but deliberately
- * not implemented (`ReportController`'s own header comment) — there is no single-fetch detail
- * route this screen could otherwise be. Execution therefore renders as a dialog opened from the
- * catalog row that already holds the full `ReportDefinition` (name, description, code) in memory;
- * only the run RESULT (`GET /reports/{reportId}/run`) is fetched here, on open.
- *
- * ## `available: false` is never a zero (FR-026/SC-006)
- *
- * Every item renders through `MetricCard` via `buildReportItemMetricCardValue` — an item the
- * caller lacks the source permission for renders in `MetricCard`'s own distinct `unavailable`
- * treatment (muted dashed card, eye-off glyph, explanatory text), never a bare `0`, and never
- * fails the rest of the grid (CLAUDE.md §18.11).
- *
- * ## CSV export is a plain navigation, never a fetched blob
- *
- * `reportsApi.buildRunCsvUrl` returns the same authorizing path `run()` calls with `format=csv`
- * appended, rendered as a real `<a href>` — see that function's own header for why (mirrors
- * `AttachmentList`'s documented convention, the platform's one download mechanism).
- */
 import { MetricCard, PharosLoader, useDelayedVisibility } from '@pharos/design-system/components';
 import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -116,8 +94,6 @@ export function ReportRunDialog({
 
         <div className="flex-1 overflow-y-auto py-1">
           {loading ? (
-            // Institutional loader (specs/014), shown only once the run has taken longer than
-            // the shared delay — a report that computes fast opens straight onto its result.
             <div className="flex min-h-40 items-center justify-center py-12">
               {showLoader ? <PharosLoader variant="inline" label={reports.run.loading} /> : null}
             </div>

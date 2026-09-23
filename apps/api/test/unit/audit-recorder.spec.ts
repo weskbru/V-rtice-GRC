@@ -1,12 +1,3 @@
-/**
- * Unit tests for `AuditRecorder` (T029) against fake ports — no NestJS
- * container, no database. The transactional guarantee itself (that the
- * Prisma-backed port refuses to write outside a transaction) is proven at
- * the integration level (test/integration/audit-transactional.spec.ts)
- * against a real `PrismaService`; these tests cover what is pure logic in
- * `AuditRecorder` itself: context population, defaulting, and delegating
- * field filtering to the allow-list.
- */
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

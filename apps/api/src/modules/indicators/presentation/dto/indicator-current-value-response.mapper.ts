@@ -1,9 +1,3 @@
-/**
- * 009-indicators-reports, Fase 3 (T031) — maps
- * `GetIndicatorCurrentValueResult` (application layer) to the wire shape
- * `contracts/indicators.openapi.yaml`'s `IndicatorCurrentValue` schema
- * describes. ONE function is the only place this happens (ADR-009).
- */
 import { toIndicatorDefinitionResponse } from './indicator-definition-response.mapper';
 
 import type { IndicatorDefinitionResponse } from './indicator-definition-response.mapper';

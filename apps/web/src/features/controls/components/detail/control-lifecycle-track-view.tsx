@@ -1,41 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control detail, the "Ciclo de vida" track's rendered view
- * (021-control-detail-experience, Fase B). Pure presentation over
- * `ControlLifecycleTrackModel` (`control-lifecycle-track.ts`) — no fetching,
- * no derivation of its own.
- *
- * Visual vocabulary reused from `ProblemLifecycleTrackView`/
- * `ActionLifecycleTrackView`, NOT their code (see `control-lifecycle-
- * track.ts`'s own header comment for why this stays a separate mechanism):
- * every node state carried by an ICON plus a TEXT word together, never
- * colour alone (CLAUDE.md §18.8).
- *
- * Below `sm` (640px) this renders a VERTICAL list instead of the `sm`+
- * horizontal one-column-per-node layout — the same defect Incident's/
- * Problem's/Action's own tracks paid for at 390px before being corrected.
- *
- * `RETIRED` is a terminal of the WHOLE trajectory, never of a node: this
- * payload does not record which of the three possible origins
- * (`DRAFT`/`ACTIVE`/`SUSPENDED`) a retirement came from, so it renders
- * centered below a full-width dashed divider, decoupled from every column,
- * with a short honest context line — never a connector implying a
- * provenance the payload does not have (mirrors `ActionLifecycleTrackView`'s
- * own `CancelledTerminal`).
- *
- * `max-w-xl mx-auto` on the `sm`+ layout: `Control`'s three-node main track,
- * like `Action`'s own three-node track, would otherwise spread across the
- * FULL card width — measured directly on `Action`'s own screen
- * (`action-lifecycle-track-view.tsx`'s own doc comment: ~360px between
- * nodes in a ~1072px-wide card with no aside). `Control`'s "Visão geral"
- * currently renders in the exact same no-aside width (Fase C has not added
- * an aside yet), so the same fix applies for the same reason: cap at
- * `max-w-xl` (36rem/576px, the same density Incident's/Problem's own four-
- * node tracks already read as, inside their narrower aside-bearing card),
- * centered. Below `xl`, or once Fase C's aside narrows the main column, the
- * cap is a no-op — `max-width` only ever shrinks, never stretches.
- */
 import { ArrowRightCircle, Check, Circle, CircleDot } from 'lucide-react';
 
 import { controls } from '@/lib/messages/controls';
@@ -63,7 +27,6 @@ const DOT_TONE_BY_STATE: Record<ControlLifecycleTrackNode['state'], string> = {
   unavailable: 'border-border bg-muted text-muted-foreground',
 };
 
-/** One node's dot + status word + short state word, stacked (dot above text) — used by the horizontal (`sm`+) layout, one column per node. */
 function TrackNodeColumn({ node }: { node: ControlLifecycleTrackNode }): React.JSX.Element {
   const Icon = ICON_BY_STATE[node.state];
   const label = controlStatusLabel(node.status);
@@ -89,7 +52,6 @@ function TrackNodeColumn({ node }: { node: ControlLifecycleTrackNode }): React.J
   );
 }
 
-/** One node's dot + status word + short state word, side by side (dot left of text) — used by the vertical (below-`sm`) layout, one row per node. */
 function TrackNodeRow({ node }: { node: ControlLifecycleTrackNode }): React.JSX.Element {
   const Icon = ICON_BY_STATE[node.state];
   const label = controlStatusLabel(node.status);
@@ -113,7 +75,6 @@ function TrackNodeRow({ node }: { node: ControlLifecycleTrackNode }): React.JSX.
   );
 }
 
-/** `RETIRED`, when present — a terminal of the WHOLE trajectory, never of a specific node. See this file's own header comment. */
 function RetiredTerminal({ node }: { node: ControlLifecycleTrackNode }): React.JSX.Element {
   return (
     <div
@@ -140,9 +101,6 @@ export function ControlLifecycleTrackView({
 
   return (
     <div className="flex flex-col gap-1">
-      {/* Below `sm` — vertical stack, each node's own connector segment
-          running from the bottom of its dot to the top of the next, so
-          alignment never depends on guessing a shared total height. */}
       <div className="sm:hidden">
         <ol aria-label={controls.detail.lifecycleTrack.mainAriaLabel} className="flex flex-col">
           {model.main.map((node, index) => (
@@ -160,7 +118,6 @@ export function ControlLifecycleTrackView({
         {model.retired ? <RetiredTerminal node={model.retired} /> : null}
       </div>
 
-      {/* `sm` and wider — one column per node with a single continuous line through every centre. See this file's own header comment for `max-w-xl mx-auto`. */}
       <div className="hidden sm:block">
         <div className="relative mx-auto max-w-xl pt-3.5">
           <div

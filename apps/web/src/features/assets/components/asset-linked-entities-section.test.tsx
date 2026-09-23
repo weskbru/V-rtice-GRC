@@ -6,13 +6,6 @@ import {
   AssetLinkedRisksSection,
 } from './asset-linked-entities-section';
 
-/**
- * Component-mount evidence for T047 (FR-008, ADR-020 part 4) — read-only
- * rendering of the risks/controls already embedded in `AssetDetail`. No
- * network mock here: unlike `ControlLinksSection`, this component issues no
- * call of its own (see its own doc comment for why) — data arrives purely
- * by prop.
- */
 describe('AssetLinkedRisksSection', () => {
   it('shows the empty message when no risk is linked', () => {
     render(<AssetLinkedRisksSection risks={[]} />);

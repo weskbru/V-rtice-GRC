@@ -1,11 +1,3 @@
-/**
- * 009-indicators-reports, Fase 8 (T068 prep) — `GetIndicatorDefinitionUseCase`
- * (`getIndicatorDefinition`, `GET /indicators/{definitionId}`). No
- * `ScopeFilter` anywhere (research.md D-8, `IndicatorDefinitionRepositoryPort`'s
- * own header) — mirrors `modules/compliance/application/frameworks/
- * get-framework.usecase.ts`'s identical shape: a record that does not
- * exist is simply `NotFoundDomainError`, never a scope question.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';

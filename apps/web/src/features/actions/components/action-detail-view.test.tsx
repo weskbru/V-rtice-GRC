@@ -9,13 +9,6 @@ import { ActionDetailView } from './action-detail-view';
 
 import type { Action } from '../types';
 
-/**
- * Component-mount evidence for the action detail screen this task adds —
- * `getAction`/`updateAction` had no caller anywhere in the frontend before
- * it. Mirrors `risk-detail-view.test.tsx`'s own conventions (mocked
- * feature API, `AuthProvider` + `buildTestSession` for permission gating).
- */
-
 const {
   getActionMock,
   updateActionMock,
@@ -141,7 +134,6 @@ describe('ActionDetailView', () => {
 
     await screen.findByRole('heading', { name: 'Corrigir configuração de firewall' });
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
-    // OPEN offers "Iniciar"/"Cancelar" when action:edit is present — absent here.
     expect(screen.queryByRole('button', { name: 'Iniciar' })).not.toBeInTheDocument();
   });
 
@@ -226,11 +218,6 @@ describe('ActionDetailView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
 
-    // Radix marks the rest of the page `aria-hidden` while the modal Sheet
-    // is open (mirrors `incident-detail-view.test.tsx`'s own identical
-    // note) — this only asserts the panel itself opened, not that the
-    // read-only page underneath remains in the accessibility tree while it
-    // is open.
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText('Editar ação').length).toBeGreaterThan(0);
   });
@@ -243,10 +230,6 @@ describe('ActionDetailView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await screen.findByRole('dialog');
 
-    // "Ciclo de vida" is part of the SAME "Visão geral" section that used
-    // to be swapped out for the form — its continued presence in the DOM
-    // proves the overlay opened alongside the read-only page, not instead
-    // of it.
     expect(screen.getAllByText('Ciclo de vida').length).toBeGreaterThan(0);
   });
 
@@ -258,18 +241,12 @@ describe('ActionDetailView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
     await screen.findByRole('dialog');
 
-    // `showCloseButton={false}` on `SheetContent` — see `action-edit-panel
-    // .tsx`'s own header comment for why: `ActionEditForm` already renders
-    // its own "Cancelar", and a second, icon-only "Fechar" control would be
-    // a duplicate affordance.
     expect(screen.queryByRole('button', { name: 'Fechar' })).not.toBeInTheDocument();
 
     const cancelButton = screen.getByRole('button', { name: 'Cancelar' });
     fireEvent.click(cancelButton);
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    // The inline "Visão geral" content (never replaced, Fase C) is still
-    // there, unaffected by the cancel.
     expect(screen.getByText('Ciclo de vida')).toBeInTheDocument();
   });
 });

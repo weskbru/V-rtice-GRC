@@ -1,18 +1,3 @@
-/**
- * 009-indicators-reports, fechamento da Fase 7 (STATE.md §13.3/§13.5,
- * Achado 2) — unit tests for `CreateIndicatorDefinitionUseCase`, simétrico
- * a `create-report-definition.usecase.spec.ts`. Todo port é um fake manual
- * (`as unknown as <Port>`), a mesma convenção que aquele arquivo já usa —
- * sem módulo de teste Nest, sem conexão Prisma.
- *
- * Cobre o que é lógica pura deste caso de uso: pertencimento ao catálogo
- * fechado, Invariante T1 nas duas direções (via `assertIndicatorThresholdInvariant`,
- * exercitada através do caso de uso — a função em si já tem cobertura
- * própria), unicidade de `metricKey`, resolução de `ownerUserId`
- * (inexistente/inativo) e o caminho feliz de alocação de código + auditoria.
- * Cobertura de contrato (a rota HTTP, o `422` do próprio DTO) é escopo de
- * `apps/api/test/contract/indicators.spec.ts`, não deste arquivo.
- */
 import { AuditEntityType, IndicatorMetricKey } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -287,7 +272,6 @@ describe('CreateIndicatorDefinitionUseCase', () => {
         ownerUserId: OWNER.id,
       }),
     ).rejects.toBeInstanceOf(UnauthorizedDomainError);
-    // Not touched here on purpose — `useCase` is unused otherwise.
     expect(useCase).toBeDefined();
   });
 

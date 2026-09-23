@@ -1,8 +1,3 @@
-/**
- * 008-incidents-problems, US3 (spec.md FR-013, data-model.md §2) — domain
- * shape for `IncidentAssetLink`. Sibling of `incident-risk-link.entity.ts`,
- * same reasoning, against `Asset` instead of `Risk`.
- */
 export interface IncidentAssetLinkAssetRef {
   readonly id: string;
   readonly code: string;

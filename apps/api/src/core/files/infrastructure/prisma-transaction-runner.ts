@@ -1,10 +1,3 @@
-/**
- * T188/T189 — the sole `TransactionRunnerPort` implementation for
- * `core/files`, thin by design (see `shared/persistence/
- * transaction-runner.port.ts` and every other module's own copy of this
- * exact class — `modules/risk`, `core/identity`, `core/authorization`,
- * `core/organizations`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

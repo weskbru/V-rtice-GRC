@@ -1,15 +1,3 @@
-/**
- * Exhaustive test of `calculateRequirementComplianceState`
- * (`modules/compliance/domain/requirement-compliance.service.ts`,
- * research.md D-8) — every one of the five acceptance scenarios of US3
- * (004-compliance-management), plus the two edge cases D-8 names by name.
- * Written ahead of its own scheduled task (T048, Fase 5) alongside the
- * calculator itself (see that file's own header for why) — pure function,
- * no I/O, no reason to defer proving it correct.
- *
- * No sixth value left unreached: every member of `RequirementComplianceState`
- * is exercised by at least one case below.
- */
 import { describe, expect, it } from 'vitest';
 
 import { calculateRequirementComplianceState } from '../../src/modules/compliance/domain/requirement-compliance.service';
@@ -31,7 +19,7 @@ describe('calculateRequirementComplianceState (research.md D-8)', () => {
 
   it('NOT_PROVEN — applicable, at least one link, none of them currently proves it', () => {
     const cases: readonly LinkedControlComplianceInput[][] = [
-      [{ isActive: false, effectiveness: 'EFFECTIVE' }], // retired/inactive control — edge case below
+      [{ isActive: false, effectiveness: 'EFFECTIVE' }],
       [{ isActive: true, effectiveness: 'NOT_ASSESSED' }],
       [{ isActive: true, effectiveness: 'EXPIRED' }],
       [{ isActive: true, effectiveness: 'INEFFECTIVE' }],

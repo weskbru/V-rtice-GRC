@@ -1,19 +1,3 @@
-/**
- * 008-incidents-problems, US2 — matches `GET /problems`'s query
- * parameters (`contracts/problems.openapi.yaml`'s `listProblems`
- * operation) exactly.
- *
- * `status`/`severity` use `style: form, explode: true` in the contract —
- * REPEATED query parameters (`?status=OPEN&status=CANCELLED`), not the
- * comma-separated `explode: false` convention every other list query in
- * this codebase uses (`ListControlsQueryDto`'s own header). Express/qs
- * already parses two repeated keys into an array, but a SINGLE occurrence
- * (`?status=OPEN`) parses as a bare string, not a one-element array — the
- * `toArray` transform below normalizes both shapes into an array, the
- * same class of coercion `toBoolean` in `list-finding-query.dto.ts`
- * documents needing (`enableImplicitConversion` alone does not solve this
- * for arrays either).
- */
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsIn, IsInt, IsOptional, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
@@ -41,10 +25,6 @@ const SORT_FIELD_VALUES: readonly ProblemListSortField[] = [
   'updatedAt',
 ];
 
-/** Reads `obj[key]` — the raw query value — never `value` (see this
- * file's header for why). A single value becomes a one-element array; an
- * already-repeated parameter (already an array, courtesy of Express/qs)
- * passes through unchanged; an absent parameter stays `undefined`. */
 function toArray({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
   const raw = obj[key];
   if (raw === undefined) return undefined;

@@ -1,19 +1,3 @@
-/**
- * T100 — `GET /api/v1/risks` (US3, `contracts/risks.openapi.yaml`'s
- * `listRiskRegister` operation), proving the three properties CLAUDE.md
- * calls out as the ones that "costumam dar errado":
- *
- *   1. Page size is capped on the SERVER, not merely suggested to the
- *      client (FR-086) — requesting 10,000 rows never returns 10,000 rows.
- *   2. The total count is returned and matches the actual number of
- *      matching records (ADR-009).
- *   3. Ordering is stable across pages even when many rows tie on the
- *      requested sort field — no record is duplicated or omitted when
- *      paging through a tied result set (US3 AS1). This is deliberately
- *      exercised with EVERY seeded risk sharing the same `status` (the
- *      sort field under test) so `code` (the contract's documented
- *      tiebreaker) is the only thing keeping the order well-defined.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -66,10 +50,6 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
     await ctx.close();
   });
 
-  /** A logged-in `risk:view`/`risk:create` actor scoped to a fresh org
-   * unit, plus `seededCount` risks created under it — every seeded risk
-   * shares the default `DRAFT` status, so a `sort=status` request ties
-   * every row on the field under test. */
   async function seedActorWithRisks(
     seededCount: number,
   ): Promise<{ agent: ReturnType<typeof request.agent>; codes: string[] }> {
@@ -90,8 +70,6 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('risk-register-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner for the register listing tests below —
-    // not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const createRiskUseCase = ctx.app.get(CreateRiskUseCase);
     const codes: string[] = [];
@@ -116,10 +94,6 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
     return { agent, codes };
   }
 
-  /** A logged-in actor scoped to a fresh org unit, with exactly ONE risk
-   * created under it using the given `description` — for the
-   * `descriptionExcerpt` truncation tests below, which need control over
-   * the description text itself rather than the count of seeded risks. */
   async function seedActorWithRisk(
     description: string,
   ): Promise<{ agent: ReturnType<typeof request.agent>; code: string }> {
@@ -140,8 +114,6 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('risk-register-excerpt-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner for the excerpt-truncation tests below —
-    // not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const createRiskUseCase = ctx.app.get(CreateRiskUseCase);
     const risk = await createRiskUseCase.execute({
@@ -199,11 +171,6 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
       .query({ pageSize: 10000 })
       .set('Origin', appOrigin);
 
-    // The cap is enforced by the server regardless of HOW it is enforced:
-    // either the request is refused outright (this DTO's `@Max(100)`, the
-    // strictest possible form of "never suggested to the client") or the
-    // response is silently truncated to the cap. Either way, 10,000 rows
-    // are never returned.
     if (response.status === 200) {
       const body = response.body as RegisterPageBody;
       expect(body.data.length).toBeLessThanOrEqual(100);
@@ -239,9 +206,6 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
     const seenCodes: string[] = [];
 
     for (let page = 1; page <= expectedPages; page += 1) {
-      // Every seeded risk is `DRAFT` — sorting by `status` ties ALL of
-      // them, so only the contract's documented `code` tiebreaker keeps
-      // page boundaries well-defined.
       const response = await agent
         .get('/api/v1/risks')
         .query({ page, pageSize, sort: 'status', direction: 'asc' })
@@ -252,23 +216,18 @@ describe('GET /risks — the risk register (T100, FR-086, FR-087, US3 AS1)', () 
       expect(body.meta.total).toBe(seededCount);
 
       for (const row of body.data) {
-        expect(seenIds.has(row.id)).toBe(false); // never duplicated across pages
+        expect(seenIds.has(row.id)).toBe(false);
         seenIds.add(row.id);
         seenCodes.push(row.code);
       }
     }
 
-    // Nothing omitted: every seeded risk appeared exactly once.
     expect(seenIds.size).toBe(seededCount);
     expect(new Set(seenCodes).size).toBe(seededCount);
     for (const code of codes) {
       expect(seenCodes).toContain(code);
     }
 
-    // The tiebreaker actually produced a well-defined total order: codes
-    // collected across pages, in page order, are monotonically increasing
-    // (risk codes are assigned from a strictly increasing per-year
-    // sequence, `domain/risk-code.ts`).
     const sorted = [...seenCodes].sort();
     expect(seenCodes).toEqual(sorted);
   });

@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Versão de framework" scope variant's picker (T076, US1,
- * FR-005/FR-006, ADR-020). A cascading, two-step picker (framework, then
- * one of its `PUBLISHED` versions) — this API exposes no flat,
- * cross-framework listing endpoint, so the picker walks the normative
- * library the same way a human would browse it (`../api.ts`'s own
- * reference-data section header explains why).
- *
- * Nothing here is pre-selected (a stated requirement, the same spirit as
- * Phase 3's `mapping-migration-panel.tsx`): both selects start empty, and
- * "Adicionar ao escopo" stays disabled until the auditor has explicitly
- * chosen a published version.
- */
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 

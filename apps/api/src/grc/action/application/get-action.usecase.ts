@@ -1,19 +1,3 @@
-/**
- * T051/002-shared-grc-foundation, US2 — `GetActionUseCase` (`getAction`,
- * FR-032). Reused verbatim by `ActionEvidenceSubjectAccessor` the same way
- * `GetEvidenceUseCase` is reused by `EvidenceParentRecordAccessor`.
- *
- * ## Scope is decided by the origin's CURRENT unit, not `Action.orgUnitId`
- *
- * Assurance fix (confirmed breach): the read used to be gated by
- * `ActionScopedRepository`'s own `orgUnitId` predicate — a creation-time
- * snapshot of the origin's unit that never moves when the origin is later
- * reassigned. `findByIdUnscoped` plus `assertActionOriginInScope` below
- * replace that with a LIVE re-check against the origin's current unit on
- * every call — see `assert-action-origin-in-scope.ts`'s own header for the
- * full reasoning (mirrors `EvidenceLinkVisibilityService`'s "never
- * persisted, always re-resolved" answer for a link's subject).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';
@@ -31,9 +15,6 @@ export interface GetActionInput {
   readonly actionId: string;
 }
 
-/** `ActionRecord` plus the two read-time-derived fields
- * (contracts/grc-foundation.openapi.yaml's `Action` schema): `overdue`
- * (R-006, never stored) and `originLabel` (optional display field). */
 export interface ActionWithDerived extends ActionRecord {
   readonly overdue: boolean;
   readonly originLabel: string | undefined;
@@ -52,8 +33,6 @@ export class GetActionUseCase {
       throw new NotFoundDomainError(USER_MESSAGES.action.entityLabel, input.actionId);
     }
 
-    // Assurance fix — see this file's own header: gates the read on the
-    // origin's LIVE unit rather than `record.orgUnit` (possibly stale).
     await assertActionOriginInScope(
       input.actorUserId,
       input.actionId,

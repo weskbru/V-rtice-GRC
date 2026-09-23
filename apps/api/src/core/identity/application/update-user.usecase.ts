@@ -1,10 +1,3 @@
-/**
- * T176 — `PATCH /admin/users/{userId}` (`contracts/admin.openapi.yaml`).
- * Changes name/job title/contact identifier/primary organizational unit
- * only — roles, scope and activation status have their own endpoints so
- * each change is audited as a distinct, meaningful action (FR-032, the
- * contract's own description).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 

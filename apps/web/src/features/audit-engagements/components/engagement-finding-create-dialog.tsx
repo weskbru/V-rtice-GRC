@@ -1,27 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — "Registrar achado" dialog, from an audit engagement (T077,
- * 005-audit-findings, US2, FR-007/FR-008).
- *
- * `POST /audits/{auditId}/findings` — same fields as `FindingCreateDialog`
- * (Phase 1, `features/findings/components/finding-create-dialog.tsx`), minus
- * `orgUnitId`: never accepted here, always derived server-side from the
- * engagement's own organizational unit (`findingsFromEngagement.form
- * .createDescription` says so explicitly, rather than rendering a
- * disabled/pre-filled field that would misleadingly suggest it is part of
- * this request). Reuses `createFindingFormSchema` unchanged —
- * `CreateFindingFromEngagementRequest`'s own fields are already exactly
- * that schema's fields (`lib/validation/findings.ts`'s own shape, no
- * `orgUnitId` there either) — and `findings.ts`'s own field labels/option
- * lists, per this task's own instruction to reuse an existing catalog
- * entry rather than declare a second copy.
- *
- * `Finding` is core-GRC (`grc/finding`, CLAUDE.md §1/§19.6), not a business
- * module — so this business module (Auditoria) depending on it here is the
- * expected direction, not a business-module-to-business-module dependency
- * CLAUDE.md §4/§19 rules out.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -83,11 +61,6 @@ const SEVERITIES: readonly FindingSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITIC
 const PRIORITIES: readonly FindingPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 function todayDateOnly(): string {
-  // Local calendar date, never `Date#toISOString()`'s UTC date: in any
-  // timezone behind UTC, an evening `toISOString().slice(0, 10)` returns
-  // TOMORROW, so this field defaulted to a date that had not happened yet.
-  // Found on the rendered screen (CLAUDE.md §18.1) defaulting to 09/09
-  // on 08/09. Same rule as `features/*/date.ts`'s own `todayDateOnly`.
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -113,11 +86,6 @@ export function EngagementFindingCreateDialog({
   const { user: currentUser } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // S-10 — the owner picker now searches the directory server-side
-  // (`UserPicker`) instead of a preloaded, bounded list. Every call site of
-  // this dialog passes the CURRENT USER's own id as `defaultOwnerUserId`
-  // (self-assign default) — so that label is already known from the
-  // session itself, with no fetch needed for the common case.
   const defaultOwner: UserRef | undefined =
     currentUser.id === defaultOwnerUserId
       ? { id: currentUser.id, fullName: currentUser.fullName, email: currentUser.email }
@@ -143,8 +111,6 @@ export function EngagementFindingCreateDialog({
     if (submitting) return;
     if (!next) {
       form.reset();
-      // The picker shows `owner`, not the form value: reset both, or a reopened
-      // dialog would display the previous pick while submitting the default.
       setOwner(defaultOwner);
       setFormError(null);
     }
@@ -183,10 +149,6 @@ export function EngagementFindingCreateDialog({
         }
         setFormError(findingsFromEngagement.form.fixHighlightedFields);
       } else if (error instanceof ApiError && error.problem.status === 422) {
-        // Not-`IN_PROGRESS` refusal (FR-007) — named specifically rather
-        // than falling through to the generic error, mirroring the
-        // proactive notice this same rule already gets before the attempt
-        // (`EngagementFindingsSection`'s own `notInProgressNotice`).
         setFormError(error.problem.detail ?? findingsFromEngagement.notInProgressError);
       } else if (error instanceof ApiError && error.problem.detail) {
         setFormError(error.problem.detail);

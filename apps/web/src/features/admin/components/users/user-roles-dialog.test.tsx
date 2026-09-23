@@ -5,19 +5,6 @@ import { UserRolesDialog } from './user-roles-dialog';
 
 import type { AdminUser, Role } from '../../types';
 
-/**
- * A5-F02 — regression coverage for `UserRolesDialog`'s role list. Before
- * this fix, it called `adminApi.listRoles(1, 100)` once — a role ranked
- * past the first 100 (`GET /admin/roles` has no name search, only
- * `page`/`pageSize`) could never be shown or assigned, silently. This test
- * seeds two pages (101 roles total) and proves the role on page 2 is
- * fetched and offered.
- *
- * Reverting the fix (back to a single `listRoles(1, 100)` call) makes this
- * test fail: `listRolesMock` would only ever be called once, and the
- * page-2 role's checkbox would never render.
- */
-
 const { listRolesMock, replaceUserRolesMock } = vi.hoisted(() => ({
   listRolesMock: vi.fn(),
   replaceUserRolesMock: vi.fn(),

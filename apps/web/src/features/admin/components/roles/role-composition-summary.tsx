@@ -1,31 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, what a NEW role will grant, counted while it
- * is being composed (Fase 1 de "Novo papel").
- *
- * This is the create-mode counterpart of the edit mode's pending diff. A
- * diff is the wrong instrument here: against a role that does not exist yet
- * every selection is "a acrescentar", which says nothing. What the person
- * composing a role needs is the shape of what they are building — how many
- * permissions, across how many modules, and which modules — plus the three
- * things the form still requires before it can be submitted at all.
- *
- * ## The requirement list is a second channel, not decoration
- *
- * Each requirement carries its state in SHAPE (a filled check circle when
- * met, an empty circle when not) and in WORDS (the accessible name reads
- * "Atendido: …" or "Pendente: …"), never in colour alone — §18.8/NFR-004.
- * The `<ul>` is the list a screen reader walks; the icons are `aria-hidden`
- * and the state travels in the `sr-only` prefix of each item.
- *
- * ## The module taxonomy is the existing one
- *
- * Modules come from `groupPermissionsByArea` over the permissions the person
- * has actually selected — the same `PermissionArea` the list, the module
- * filter, the detail panel and the edit tree use (015 FR-013). There is no
- * second taxonomy here and there must never be one.
- */
 import { Check, Circle } from 'lucide-react';
 
 import { admin } from '@/lib/messages/admin';
@@ -48,11 +22,6 @@ function Requirement({ met, label }: { met: boolean; label: string }): React.JSX
       ) : (
         <Circle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
       )}
-      {/*
-       * The state is in the accessible name, not only in the glyph beside
-       * it: "Atendido: Um nome, de até 100 caracteres". A reader who cannot
-       * see the icon — or who sees it in greyscale — still gets the state.
-       */}
       <span className={met ? 'text-foreground' : 'text-muted-foreground'}>
         <span className="sr-only">{met ? messages.met(label) : messages.unmet(label)}</span>
         <span aria-hidden="true">{label}</span>

@@ -1,11 +1,3 @@
-/**
- * T125/T126 — the `page`/`pageSize` query parameters shared verbatim by
- * `GET /risks/{riskId}/assessments` and `GET /risk-methodology/versions`
- * (`contracts/*.yaml`'s `#/components/parameters/Page`/`PageSize`).
- * Extracted once, here, because THIS dispatch introduces two consumers at
- * once — `ListRisksQueryDto` (US3) defines its own inline instead, since it
- * was the only consumer when it was written; not worth retrofitting.
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 

@@ -1,16 +1,3 @@
-/**
- * T106 — `ListRisksUseCase`: the read side of `GET /risks` (US3,
- * `contracts/risks.openapi.yaml`'s `listRiskRegister` operation). No
- * transaction and no audit entry (reads are not audited, ADR-005 —
- * `audit_event` records actions, not views), matching `GetRiskUseCase`'s
- * own reasoning (T092).
- *
- * FR-090's mandatory scope filter is applied here, once, by resolving the
- * caller's `ScopeFilter` and handing it to `RiskQueryPort.listRegister` as
- * a required argument — there is no code path through this use case that
- * calls the port without a scope, because the port's own signature has no
- * optional/defaulted `scope` parameter (`domain/ports/risk-query.port.ts`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

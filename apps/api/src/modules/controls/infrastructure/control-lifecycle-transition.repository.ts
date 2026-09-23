@@ -1,9 +1,3 @@
-/**
- * T020/003-controls-management — the sole implementation of
- * `ControlLifecycleTransitionRepositoryPort`. No scope predicate anywhere
- * in this file — same "the caller already authorized the parent control"
- * reasoning as `RiskLifecycleTransitionRepository`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

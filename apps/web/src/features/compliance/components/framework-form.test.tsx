@@ -5,15 +5,6 @@ import { FrameworkForm } from './framework-form';
 
 import type { Framework } from '../types';
 
-/**
- * Component-mount evidence for `FrameworkForm` (US1, FR-001). `../api`
- * (`complianceApi`) is mocked at the network boundary.
- *
- * `screen.getByLabelText` returns a plain `HTMLElement`; the F-56 regression test below needs
- * `.value`, which only exists on `HTMLInputElement`/`HTMLTextAreaElement`. Narrowed through a
- * named helper for the same reason `login-form.test.tsx`'s own `asInputElement` exists — an
- * inline assertion trips `@typescript-eslint/no-unnecessary-type-assertion` inconsistently.
- */
 function asValueElement(element: HTMLElement): HTMLInputElement | HTMLTextAreaElement {
   return element as HTMLInputElement | HTMLTextAreaElement;
 }
@@ -111,13 +102,6 @@ describe('FrameworkForm', () => {
   });
 
   it('submits whatever is in the DOM even without a prior React change event (F-56/D-21 regression)', async () => {
-    // F-56 (`docs/deferred-findings.md`): `name`/`description` are the same shape D-21 found in
-    // the login form — a value typed before hydration finishes never reaches React via
-    // `onChange`, landing on a plain DOM node nothing is listening to yet. Setting `.value`
-    // directly (bypassing `fireEvent.change`, which dispatches a React-observable synthetic
-    // event and would mask exactly this) reproduces that. The fix reads the DOM at submit time
-    // rather than trusting `react-hook-form`'s tracked state, so this must pass regardless of
-    // how the value got there.
     createFrameworkMock.mockResolvedValueOnce({ record: baseFramework, etag: '"1"' });
     const onSaved = vi.fn();
 

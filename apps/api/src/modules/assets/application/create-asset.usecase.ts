@@ -1,21 +1,3 @@
-/**
- * T019/006-assets-processes — `CreateAssetUseCase` (`POST /assets`,
- * `createAsset` operation, FR-002, Invariants A1/A2/A6). Mirrors
- * `modules/controls/application/create-control.usecase.ts`'s structure —
- * see that file's header for the transaction-boundary reasoning this one
- * does not repeat, narrowed to what Assets actually needs: no owner field
- * (research.md D-10), so no assignment-line check.
- *
- * `assertAssetOrgUnitProvided`/`assertAssetOrgUnitInScope`/
- * `assertAssetNameProvided` (`domain/asset.entity.ts`, T015) are the
- * domain-layer, belt-and-suspenders re-checks of what the DTO already
- * validated — used here rather than re-implemented inline (per this task's
- * own instructions).
- *
- * Code generation reuses the GRC kernel's shared allocator
- * (`EntityCodeGeneratorPort.nextCode('AST', year)`, data-model.md §2) —
- * never a second, duplicated counter mechanism in this module.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -57,9 +39,6 @@ export class CreateAssetUseCase {
   async execute(input: CreateAssetInput): Promise<AssetRecord> {
     const actor = await this.referenceData.findUser(input.actorUserId);
     if (!actor) {
-      // Defensive only: `SessionGuard` already proved this user has a live
-      // session, so the actor row existing is expected. Fails closed
-      // rather than attributing an audit event to a fabricated label.
       throw new UnauthorizedDomainError();
     }
 
@@ -99,14 +78,6 @@ export class CreateAssetUseCase {
     });
   }
 
-  /**
-   * Invariant A2 — a nonexistent OR out-of-scope unit is refused
-   * identically (`assertAssetOrgUnitInScope` collapses both into the SAME
-   * refusal, `USER_MESSAGES.assets.orgUnitRequired`) — FR-010's
-   * non-disclosure discipline applied at creation time, mirroring
-   * `CreateFindingUseCase.assertOrgUnitCreatable`'s own "Assurance fix"
-   * reasoning.
-   */
   private async assertOrgUnitCreatable(scope: ScopeFilter, orgUnitId: string): Promise<void> {
     const orgUnit = await this.referenceData.findOrgUnit(orgUnitId);
     const isUsable = Boolean(orgUnit?.isActive) && isOrgUnitWithinScope(scope, orgUnitId);

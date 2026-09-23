@@ -1,17 +1,3 @@
-/**
- * T185 — proves, against the real test database AND the real filesystem,
- * that a disallowed file type, a declared/sniffed magic-byte mismatch, and
- * an oversized upload are each rejected with NOTHING stored (FR-097,
- * ADR-010): no `Attachment` row, and no new file under
- * `ATTACHMENT_STORAGE_PATH`. Every assertion below inspects the filesystem
- * and the database directly — never only the HTTP status code.
- *
- * Uses `buildContractTestApp` (the full `AppModule`, real HTTP surface via
- * `supertest`) because the size limit is enforced by multer's own
- * `limits.fileSize` inside the real interceptor chain
- * (`AttachmentController`'s `FileInterceptor`), which a partial Nest
- * testing module bypassing HTTP entirely would not exercise.
- */
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -41,9 +27,6 @@ interface ProblemBody {
   readonly status: number;
 }
 
-/** Counts every file under `root`, recursively — `0` (not an error) when
- * `root` does not exist yet, which is the normal state before the FIRST
- * successful upload this whole test run ever performs. */
 function countFilesRecursively(root: string): number {
   if (!existsSync(root)) {
     return 0;
@@ -93,7 +76,6 @@ describe('Attachment upload validation — nothing stored on rejection (T185, FR
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('av-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const risk = await ctx.app.get(CreateRiskUseCase).execute({
       actorUserId: creator.id,
@@ -158,8 +140,6 @@ describe('Attachment upload validation — nothing stored on rejection (T185, FR
     const filesBefore = countFilesRecursively(storageRoot);
     const dbCountBefore = await attachmentCountForRisk();
 
-    // PNG signature bytes, declared as application/pdf — the classic
-    // "renamed file" attack this check exists to defeat.
     const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01]);
 
     const response = await agent
@@ -181,8 +161,6 @@ describe('Attachment upload validation — nothing stored on rejection (T185, FR
     const dbCountBefore = await attachmentCountForRisk();
 
     const oversized = Buffer.alloc(maxSizeBytes + 1, 0x41);
-    // Valid PDF signature at the start — proves the 413 fires on SIZE
-    // alone, not because the content also happens to be invalid.
     Buffer.from('%PDF-', 'ascii').copy(oversized, 0);
 
     const response = await agent
@@ -203,11 +181,6 @@ describe('Attachment upload validation — nothing stored on rejection (T185, FR
     const filesBefore = countFilesRecursively(storageRoot);
     const dbCountBefore = await attachmentCountForRisk();
 
-    // Content is unique PER TEST RUN (embeds a fresh UUID): storage is
-    // content-addressed and the real `ATTACHMENT_STORAGE_PATH` directory is
-    // never cleaned between separate test runs on this machine, so a fixed
-    // byte string would make "exactly one NEW file appeared" depend on
-    // whether an earlier run already wrote that exact content.
     const response = await agent
       .post('/api/v1/attachments')
       .set('Origin', appOrigin)

@@ -1,20 +1,3 @@
-/**
- * Unit tests for `GetDashboardSummaryUseCase`
- * (`apps/api/src/modules/dashboard/application/get-dashboard-summary.usecase.ts`).
- * `IndicatorCalculationPort`/`ScopeResolverService`/`PermissionResolverService`
- * are hand-rolled fakes (`as unknown as <Port>`), the same convention
- * `run-report.usecase.spec.ts` already uses for the identical port.
- *
- * The central proof this file exists for: a metric key whose source
- * permission the caller lacks is OMITTED from the result — never present
- * with a zeroed value, never present with an `available: false` flag,
- * never even passed to `calculate`. This is deliberately a DIFFERENT
- * contract from `RunReportUseCase`'s own `available: false` shape — see
- * the use case's own header for why. `IndicatorMetricKey` is read directly
- * off the generated Prisma enum (`Object.values`), matching the use case's
- * own enumeration, so this test suite is not a second, hand-written key
- * list that could silently drift from the real eleven-key catalog.
- */
 import { IndicatorMetricKey } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -35,11 +18,6 @@ const ALL_KEYS = Object.values(IndicatorMetricKey);
 
 const GLOBAL_SCOPE = { kind: 'GLOBAL' as const };
 
-/** The six `breakdowns` block permissions — a DIFFERENT axis from
- * `ALL_KEYS`' own fake `metrics` permissions above; real, catalogued
- * identifiers (`action:view` etc.), never `fake:*` strings, because the use
- * case checks these literal strings directly (`get-dashboard-summary
- * .usecase.ts`'s own `buildBreakdowns`). */
 const ALL_BREAKDOWN_PERMISSIONS: readonly PermissionIdentifier[] = [
   'action:view',
   'incident:view',
@@ -75,11 +53,6 @@ const FAKE_COMPLIANCE_BREAKDOWN = {
 };
 const FAKE_INDICATORS_BREAKDOWN = { monitored: 3, breached: 1 };
 
-/** One fake source permission per real catalog key — the exact string
- * never needs to match production's `INDICATOR_METRIC_CATALOG` (this test
- * verifies the USE CASE's own filtering logic against whatever
- * `getMetadata` reports, not the real catalog's own content, which
- * `indicator-metric-catalog.spec.ts` already covers exhaustively). */
 function fakeSourcePermission(metricKey: IndicatorMetricKey): string {
   return `fake:${metricKey}`;
 }
@@ -87,9 +60,6 @@ function fakeSourcePermission(metricKey: IndicatorMetricKey): string {
 function buildUseCase(options: {
   readonly deniedKeys?: ReadonlySet<IndicatorMetricKey>;
   readonly valueByKey?: Readonly<Record<string, number | undefined>>;
-  /** Breakdown permissions to WITHHOLD — every other one of the six is
-   * granted by default, mirroring `deniedKeys`' own "everything granted
-   * unless named" convention above. */
   readonly deniedBreakdownPermissions?: ReadonlySet<PermissionIdentifier>;
 }): {
   useCase: GetDashboardSummaryUseCase;
@@ -115,10 +85,6 @@ function buildUseCase(options: {
   }));
   const valueByKey = options.valueByKey ?? {};
   const calculate = vi.fn().mockImplementation((input: { metricKey: IndicatorMetricKey }) => {
-    // `??` cannot be used here: it treats an explicitly-configured
-    // `undefined` value the same as "not configured", which is exactly the
-    // distinction this fixture needs to preserve for the "no data yet"
-    // test below.
     const value = Object.prototype.hasOwnProperty.call(valueByKey, input.metricKey)
       ? valueByKey[input.metricKey]
       : 3;
@@ -242,9 +208,6 @@ describe('GetDashboardSummaryUseCase', () => {
       ),
     ).toBe(false);
 
-    // Never even computed — the omitted key's permission gate runs BEFORE
-    // any call to `calculate`, matching the use case's own header ("omitted,
-    // never zeroed").
     const calculatedKeys = calculationPort.calculate.mock.calls.map(
       (call: unknown[]) => (call[0] as { metricKey: IndicatorMetricKey }).metricKey,
     );
@@ -321,9 +284,6 @@ describe('GetDashboardSummaryUseCase — breakdowns', () => {
       compliance: undefined,
       indicators: undefined,
     });
-    // Never even computed — the same "omitted, never zeroed" discipline
-    // `metrics` itself follows (this file's own header, the use case's own
-    // header).
     expect(actionRepository.getStatusBreakdown).not.toHaveBeenCalled();
     expect(complianceSummary.getStateBreakdown).not.toHaveBeenCalled();
   });

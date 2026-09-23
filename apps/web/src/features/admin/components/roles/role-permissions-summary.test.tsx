@@ -46,7 +46,6 @@ describe('RolePermissionsSummary', () => {
       />,
     );
 
-    // Collapsed: only the preview identifiers are visible, plus an overflow toggle.
     expect(screen.getByText('risk:view')).toBeInTheDocument();
     expect(screen.getByText('risk:edit')).toBeInTheDocument();
     expect(screen.queryByText('user:administer')).not.toBeInTheDocument();
@@ -55,7 +54,6 @@ describe('RolePermissionsSummary', () => {
 
     fireEvent.click(toggle);
 
-    // Expanded: the remaining identifiers, grouped by resource, plus their descriptions, are now readable — no checkboxes (read-only).
     expect(screen.getByText('user:administer')).toBeInTheDocument();
     expect(screen.getByText('role:administer')).toBeInTheDocument();
     expect(screen.getByText('Administrar usuários')).toBeInTheDocument();

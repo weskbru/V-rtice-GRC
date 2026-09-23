@@ -1,24 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { actions } from '@/lib/messages/actions';
+
 import { MyActionsFilters } from './my-actions-filters';
 
 import type { ActionOriginType } from '../types';
 
-import { actions } from '@/lib/messages/actions';
-
-/**
- * Regression test for the origin-restatement defect (2026-09-11,
- * "confirmed drift" — the same class the coordinator closed server-side
- * in `CreateActionRequestDto`/`ListActionQueryDto`/the contract
- * document): this filter's own origin dropdown used to hardcode
- * `['RISK_TREATMENT', 'FINDING']`, silently excluding `CONTROL_ASSESSMENT`
- * (already live for months) and, later, `INCIDENT`/`PROBLEM`. Asserts the
- * dropdown actually OFFERS every real origin with a legible pt-BR label —
- * the "can a user filter by an incident's or a problem's work" question
- * this fix exists to answer, checked here rather than only by reading the
- * derivation.
- */
 describe('MyActionsFilters', () => {
   const noop = (): void => undefined;
 
@@ -38,10 +26,6 @@ describe('MyActionsFilters', () => {
         onClearFilters={noop}
       />,
     );
-    // The filter controls live behind the "Filtros" disclosure now that this
-    // toolbar is collapsible (CLAUDE.md §18.12) — opening it is what makes
-    // the `Select`s reachable at all (`FilterBar`'s own F-71 doc comment:
-    // the panel's contents mount only while open).
     fireEvent.click(
       screen.getByRole('button', { name: new RegExp(actions.myActions.filters.groupLabel) }),
     );

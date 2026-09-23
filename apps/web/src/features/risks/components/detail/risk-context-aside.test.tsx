@@ -5,17 +5,6 @@ import { RiskAttentionAside, RiskRelationshipsAside } from './risk-context-aside
 
 import type { RiskDetail, RiskLifecycleState } from '../../types';
 
-/**
- * Component-mount evidence for the contextual aside, split in two per P11
- * (016-risk-detail-experience §4.7, 2026-09-15): `RiskAttentionAside`
- * (`DetailLayout`'s `asideLead`) and `RiskRelationshipsAside`
- * (`DetailLayout`'s `aside`). This suite renders at the default (wide,
- * jsdom `matchMedia` stub) viewport, so every `RiskRelationshipsAside`
- * block is the plain, always-expanded section — `use-wide-viewport.test.ts`
- * -style narrow-mode coverage is not duplicated here (`vitest.setup.ts`
- * already documents why `matchMedia` defaults to `matches: true`).
- */
-
 const baseRisk: RiskDetail = {
   id: 'risk-1',
   code: 'RSK-2026-0001',
@@ -63,10 +52,6 @@ describe('RiskAttentionAside', () => {
     );
     expect(screen.getByText('Atenção')).toBeInTheDocument();
     expect(screen.getByText('Revisão vencida.')).toBeInTheDocument();
-    // Not "Tratamento vencido." — `overdueTreatment` reflects overdue
-    // ACTIONS, independent of whether a treatment decision even exists
-    // (P9); the sentence says so instead of implying the decision itself
-    // has a deadline in the past.
     expect(screen.getByText('Há ações de tratamento em atraso.')).toBeInTheDocument();
     expect(screen.queryByText('Tratamento vencido.')).not.toBeInTheDocument();
   });
@@ -101,8 +86,6 @@ describe('RiskAttentionAside', () => {
     };
     render(<RiskAttentionAside risk={baseRisk} lifecycle={lifecycle} onNavigate={vi.fn()} />);
     expect(screen.getByText('Transição para "Avaliado" bloqueada')).toBeInTheDocument();
-    // The full sentence belongs to `RiskLifecycleActions` alone now — never
-    // duplicated here.
     expect(
       screen.queryByText('É necessário haver ao menos uma avaliação registrada.'),
     ).not.toBeInTheDocument();
@@ -150,14 +133,6 @@ describe('RiskRelationshipsAside', () => {
     expect(screen.queryByText('Ações rápidas')).not.toBeInTheDocument();
   });
 
-  // Corrected 2026-09-17: a full E2E regression found TWO controls named
-  // "Comentar" on screen at once — this shortcut (a `<button>` before this
-  // fix) and `RiskCommentsSection`'s own real submit button, whenever the
-  // Comentários section happened to be open. A control that only ever
-  // changes `?section=` is a link, never a button (§18.8, §18.11) — `role`
-  // is what actually resolves the collision, since `role="link"` and
-  // `role="button"` sharing a name is not ambiguous the way two buttons
-  // sharing one would be.
   it('offers only the quick actions the caller actually holds the permission for, as LINKS (not buttons)', () => {
     render(
       <RiskRelationshipsAside {...relationshipsProps({ canAssess: true, canComment: true })} />,
@@ -168,8 +143,6 @@ describe('RiskRelationshipsAside', () => {
       screen.queryByRole('link', { name: 'Registrar decisão de tratamento' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Vincular controle' })).not.toBeInTheDocument();
-    // Never rendered as a button anywhere on this component, permission
-    // held or not.
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -207,8 +180,6 @@ describe('RiskRelationshipsAside', () => {
 
   it('marks a count-less relationship (Incidentes/Problemas) with a "Ver" hint, distinct from a real zero count (P6), as a LINK', () => {
     render(<RiskRelationshipsAside {...relationshipsProps()} />);
-    // Accessible name concatenates the label and the hint — "Incidentes Ver",
-    // never a bare number and never indistinguishable from an empty state.
     expect(screen.getByRole('link', { name: 'Incidentes Ver' })).toHaveAttribute(
       'href',
       '/risks/risk-1?section=incidents',
@@ -256,11 +227,6 @@ describe('RiskRelationshipsAside', () => {
   it('shows the last updated timestamp WITHOUT seconds (P8)', () => {
     render(<RiskRelationshipsAside {...relationshipsProps()} />);
     expect(screen.getByText('Última atualização')).toBeInTheDocument();
-    // Computed the same way the component does, in THIS process's own
-    // timezone — asserting a hardcoded clock time here would pass or fail
-    // depending on the machine running the suite, not on the component's
-    // own correctness (the real, previously-failing case: a UTC fixture
-    // read back as a different local hour on CI).
     const expected = new Date(baseRisk.updatedAt).toLocaleString('pt-BR', {
       day: '2-digit',
       month: '2-digit',

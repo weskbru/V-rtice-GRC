@@ -1,11 +1,3 @@
-/**
- * PharosGRC — problem lifecycle/severity display mapping (CLAUDE.md §18.8).
- *
- * Maps `ProblemStatus`/`ProblemSeverity` to a `StatusBadge` variant and
- * icon — status is never conveyed by colour alone: every value below
- * pairs a distinct icon with its colour and text label, mirroring
- * `features/controls/status.ts`'s own discipline.
- */
 import { AlertOctagon, Ban, CheckCircle2, CircleDot, Search, TriangleAlert } from 'lucide-react';
 
 import { problems } from '@/lib/messages/problems';
@@ -70,14 +62,6 @@ export function problemSeverityLabel(severity: ProblemSeverity): string {
   return problems.severityLabels[severity];
 }
 
-/** Which extra field, if any, a transition requires — drives whether the
- * lifecycle action opens a reason dialog and which field it asks for.
- * Mirrors data-model.md's Invariants P1 (`rootCause`)/the cancellation
- * reason requirement and the reopen edge's own `reopenReason` requirement
- * — the same shape `features/incidents/status.ts#IncidentTransitionField`
- * establishes. `CLOSED` carries no extra field of its own (its gate is
- * the completed-corrective-action/segregation-of-duties pair, checked by
- * `ProblemCloseDialog`, never a text field). */
 export type ProblemTransitionField = 'rootCause' | 'cancellationReason' | 'reopenReason';
 
 export interface ProblemTransitionOption {
@@ -86,17 +70,6 @@ export interface ProblemTransitionOption {
   readonly requiredField: ProblemTransitionField | undefined;
 }
 
-/**
- * UI-only mirror of `problems.openapi.yaml`'s own `transitionProblem`
- * description — kept in the SAME shape (a table keyed by `from`) as
- * `features/incidents/status.ts#TRANSITION_OPTIONS_BY_STATUS`, so a future
- * change to either is easy to notice and mirror. `CLOSED`/`CANCELLED` are
- * terminal — empty arrays, never omitted keys, so `availableProblemTransitions`
- * stays a total function over `ProblemStatus`. Every transition offered
- * here is re-validated, independently and authoritatively, by
- * `POST /problems/{id}/transitions` on submit (CLAUDE.md §18.9) — this
- * table decides only which buttons the screen shows.
- */
 const TRANSITION_OPTIONS_BY_STATUS: Record<ProblemStatus, readonly ProblemTransitionOption[]> = {
   OPEN: [
     {

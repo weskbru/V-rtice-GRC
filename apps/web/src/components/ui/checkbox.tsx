@@ -18,24 +18,6 @@ function Checkbox({
       )}
       {...props}
     >
-      {/*
-       * D-15: partial selection is a third, genuinely distinct state, not a
-       * dimmer "checked". Radix already models it — `checked="indeterminate"`
-       * emits `aria-checked="mixed"` on the root and `data-state=
-       * "indeterminate"` on both root and indicator — but the generated
-       * primitive rendered the SAME `CheckIcon` for it, so "all of this
-       * module" and "some of this module" were indistinguishable to sighted
-       * and screen-magnifier users alike. A minus is the platform-conventional
-       * glyph and, unlike a tint change, differs from the check in SHAPE:
-       * CLAUDE.md §18.8/NFR-004 — colour is never the only signal.
-       *
-       * Which glyph shows is decided by the indicator's own `data-state`, in
-       * CSS, rather than by reading a `checked` prop here: that keeps
-       * uncontrolled checkboxes (`defaultChecked`) correct too, and cannot
-       * drift from the state Radix actually reports to assistive technology.
-       * `display: none` on the inactive glyph keeps it out of layout AND out
-       * of the accessibility tree.
-       */}
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
         className="group/checkbox-indicator grid place-content-center text-current transition-none"

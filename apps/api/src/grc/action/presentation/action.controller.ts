@@ -1,12 +1,3 @@
-/**
- * T053/002-shared-grc-foundation, US2 — `ActionController`:
- * `contracts/grc-foundation.openapi.yaml`'s `/actions` and
- * `/actions/{actionId}[/transitions]` paths (`listActions`, `createAction`,
- * `getAction`, `updateAction`, `transitionAction`). Every route carries its
- * own `@RequirePermission` (FR-033) — there is no route on this controller
- * without one, and no `DELETE` route exists (FR-011-FR-019 give `Action` no
- * delete operation — cancellation is a `status` transition, not removal).
- */
 import {
   BadRequestException,
   Body,
@@ -176,9 +167,6 @@ export class ActionController {
   }
 }
 
-/** `UpdateActionRequest`'s `minProperties: 1` — controller-level check,
- * mirroring `evidence.controller.ts#assertUpdateBodyNotEmpty`'s own
- * documented reasoning. */
 function assertUpdateBodyNotEmpty(body: UpdateActionRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { OrgUnitRef, VersionConflictProblem } from './types';
 
-/**
- * Compile-time regression tests locking two shapes this module's contract
- * (audit.openapi.yaml) declares differently from sibling modules — the same
- * class of defect `features/findings/types.test.ts`'s own `OrgUnitRef` test
- * guards against (assurance-audit Fix 3): a hand-written type silently
- * borrowing a DIFFERENT module's shape for a schema name that recurs across
- * this codebase's several OpenAPI documents.
- */
 describe('OrgUnitRef (audit.openapi.yaml)', () => {
   it('is exactly {id, name} — no `code`, unlike the RISKS-domain OrgUnitRef', () => {
     const value: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste' };

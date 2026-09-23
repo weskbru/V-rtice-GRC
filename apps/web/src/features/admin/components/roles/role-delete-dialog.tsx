@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, delete role (T182, FR-023). Only a non-system
- * role with no current assignments may be deleted — the server refuses
- * with 422 otherwise (contract), surfaced here as a specific message rather
- * than a generic failure.
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';

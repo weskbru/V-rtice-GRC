@@ -1,11 +1,3 @@
-/**
- * T044/T057/004-compliance-management, User Story 2/3 — contract coverage
- * for operations 10, 12, 14-23 of `contracts/compliance.openapi.yaml`
- * (requirement read with `complianceState`, requirement-control mapping
- * and its migration, applicability declarations, compliance summary).
- * Uses the real `AppModule` (`buildContractTestApp`), the same convention
- * `compliance-normative-library.spec.ts` (US1) already established.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -163,10 +155,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         .set('Origin', appOrigin);
       expect(getResponse.status).toBe(200);
       expect((getResponse.body as RequirementBody).complianceState).toBe('NOT_MET');
-      // complianceState is derived fresh on every read and never reflected
-      // in `version` (research.md D-8) — the concurrency token (`version`,
-      // echoed via PATCH's own ETag) must never masquerade as a cache
-      // freshness validator for this body.
       expect(getResponse.headers.etag).toBeUndefined();
       expect(getResponse.headers['cache-control']).toBe('no-store');
 
@@ -184,8 +172,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — control:view is required to link a requirement
-        // to a control, exactly like the linking tests above.
         'control:view',
       ]);
       const { requirementId } = await createFrameworkVersionWithRequirement(agent);
@@ -208,19 +194,7 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         .set('Origin', appOrigin);
       expect(afterLink.status).toBe(200);
       const afterBody = afterLink.body as RequirementBody;
-      // An unassessed control makes the requirement NOT_PROVEN, not
-      // COMPLIANT (see the compliance-summary assertion below) — any
-      // change away from the pre-link NOT_MET proves this GET reflects the
-      // link rather than replaying a cached/stale body.
       expect(afterBody.complianceState).toBe('NOT_PROVEN');
-      // The requirement's OWN `version` is untouched by linking a control —
-      // this is exactly the defect this proves fixed: a naive ETag equal
-      // to `version` would be IDENTICAL before and after the link, so a
-      // conditional GET replaying that ETag would have been answered `304`
-      // with the stale, pre-link body. No `ETag` is present on this route
-      // at all (`RequirementController.findById`'s own doc comment), so
-      // no cache — nor the server's own request-driven conditional-GET
-      // matching — has any validator to serve a stale copy against.
       expect(afterBody.version).toBe(beforeBody.version);
       expect(afterLink.headers.etag).toBeUndefined();
       expect(afterLink.headers['cache-control']).toBe('no-store');
@@ -262,10 +236,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const { requirementId } = await createFrameworkVersionWithRequirement(agent);
@@ -307,10 +277,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const { requirementId } = await createFrameworkVersionWithRequirement(agent);
@@ -337,10 +303,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const { requirementId } = await createFrameworkVersionWithRequirement(agent);
@@ -446,10 +408,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const { frameworkId, versionId, requirementId } =
@@ -482,10 +440,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const { frameworkId: frameworkA, versionId: versionA } =
@@ -504,10 +458,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const {
@@ -544,10 +494,6 @@ describe('Compliance mapping and state (US2/US3, operations 10/12/14-23)', () =>
         'compliance:administer',
         'compliance:map',
         'compliance:view',
-        // ADR-020 part 5 — this fixture's agent now needs to see the
-        // referenced control (`control:view`), not only `compliance:map`,
-        // to link a requirement to it — `LinkRequirementToControlUseCase`
-        // now enforces both halves of the pairing.
         'control:view',
       ]);
       const { frameworkId, versionId: sourceVersionId } =

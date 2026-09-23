@@ -8,14 +8,6 @@ import {
   useNavigate,
 } from './navigation-pending';
 
-/**
- * `specs/014-institutional-loader` — the shell turns Next's own per-link
- * navigation status into one overlay. `useLinkStatus` is mocked because it is
- * the router's signal, not this component's logic: what is under test is that
- * several links aggregate into a single pending state, that the delay keeps a
- * fast navigation from flashing anything, and that a link unmounting
- * mid-navigation cannot leave the overlay stuck.
- */
 const { linkStatusMock, routerMock } = vi.hoisted(() => ({
   linkStatusMock: vi.fn(),
   routerMock: { push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn() },
@@ -24,8 +16,6 @@ const { linkStatusMock, routerMock } = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({ useRouter: () => routerMock }));
 
 vi.mock('next/link', () => ({
-  // `href` is irrelevant here (nothing navigates in jsdom) and deliberately
-  // not a real route: `next/link` is what owns in-app navigation.
   default: ({ children }: { children: React.ReactNode }) => <a href="#stub">{children}</a>,
   useLinkStatus: linkStatusMock,
 }));
@@ -98,7 +88,6 @@ describe('navigation pending overlay', () => {
     act(() => void vi.advanceTimersByTime(200));
     expect(overlay()).not.toBeNull();
 
-    // The screen that owned the link is replaced while it was still pending.
     rerender(<Shell signals={0} />);
     act(() => void vi.advanceTimersByTime(1000));
 
@@ -106,13 +95,6 @@ describe('navigation pending overlay', () => {
   });
 });
 
-/**
- * `useNavigate` is the product's imperative navigation. What matters here is
- * that it reaches the router with the same intent the `router.*` call it
- * replaced had — the pending state it feeds is a React transition, which only
- * means anything against a real router, so `e2e/navigation-loader.spec.ts`
- * proves that half against the running application.
- */
 describe('useNavigate', () => {
   function Trigger({ run }: { run: (navigate: ReturnType<typeof useNavigate>) => void }): null {
     const navigate = useNavigate();

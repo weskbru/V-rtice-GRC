@@ -1,18 +1,3 @@
-/**
- * PharosGRC — control lifecycle/effectiveness display mapping (FR-091
- * equivalent for Controls, CLAUDE.md §18.8).
- *
- * Maps `ControlStatus`/`ControlEffectiveness` to a `StatusBadge` variant
- * and icon. Purely presentational — the lifecycle table itself (which
- * transitions are legal, which preconditions apply) is owned entirely by
- * the server (D-6); nothing here encodes or duplicates that rule set.
- *
- * Effectiveness and status are NEVER conveyed by colour alone (CLAUDE.md
- * §18.8): every value below pairs a distinct icon with its colour and text
- * label, so `EXPIRED` (warning) is never confusable with
- * `PARTIALLY_EFFECTIVE` (also warning) by a colour-blind reader — the icon
- * and the word both differ.
- */
 import {
   Ban,
   CheckCircle2,
@@ -74,5 +59,4 @@ export function controlEffectivenessLabel(effectiveness: ControlEffectiveness): 
   return controls.effectivenessLabels[effectiveness];
 }
 
-/** A generic "not set" glyph for a `null` classification field (nature/type/frequency) — never `CircleDashed` reused as a semantic status, only as a neutral placeholder icon. */
 export const NOT_SET_ICON: Icon = CircleDashed;

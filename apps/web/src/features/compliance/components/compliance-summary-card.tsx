@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the version's calculated compliance summary (US3, FR-020,
- * operation 18). Purely a read of `ComplianceSummaryService`'s own
- * aggregate — this card computes nothing itself, mirroring FR-017's "único
- * ponto de cálculo" discipline down to the frontend: every number here is
- * exactly what the server returned, never re-derived client-side.
- *
- * `compliancePercentage: null` (a version with zero applicable
- * requirements) renders as an explicit "nothing to measure" state, never as
- * `0%` — the distinction the contract itself insists on.
- */
 import { ErrorState, LoadingState, StatusBadge } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -30,9 +19,7 @@ import type { ErrorStateProblem } from '@pharos/design-system/components';
 export interface ComplianceSummaryCardProps {
   frameworkId: string;
   versionId: string;
-  /** Bump to force a reload — e.g. after a requirement is created or a control link changes elsewhere on this screen. */
   refreshToken?: number;
-  /** Called with the version's real requirement total on every successful load — lets a sibling (e.g. `PublishVersionAction`) get an accurate count without fetching it a second time. */
   onLoaded?: (summary: ComplianceSummary) => void;
 }
 

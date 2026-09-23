@@ -1,15 +1,3 @@
-/**
- * 009-indicators-reports, Fase 2 (T013) — `evaluateThresholdBreach`
- * (data-model.md §4, spec.md FR-016/FR-019). No I/O, no NestJS container —
- * matches `risk-scoring.spec.ts`'s own "pure function, exhaustive by
- * construction" shape.
- *
- * Covers the four comparators, both sides of the boundary for each
- * (exact-equality behavior is exactly where GTE/LTE differ from GT/LT —
- * spec.md's own warning in this task's brief), and the "no threshold
- * configured" case (FR-019) via every combination of a null comparator/
- * value.
- */
 import { describe, expect, it } from 'vitest';
 
 import { evaluateThresholdBreach } from '../../src/modules/indicators/domain/indicator-threshold';

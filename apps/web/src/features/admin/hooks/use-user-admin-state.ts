@@ -1,36 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, the users screen's URL state.
- *
- * Mirrors `features/audit-engagements/hooks/use-engagement-catalog-state.ts`
- * exactly (CLAUDE.md §18.12 — a new screen extends an established pattern,
- * it does not invent its own), through the same shared mechanism
- * (`@/lib/register/url-state`) `use-role-surface-state.ts` already brought
- * into this same administration area: one change committed to the CURRENT
- * query string with `router.replace`, a debounced search box that cannot
- * lose a filter changed mid-debounce, and no default ever written into the
- * URL.
- *
- * This SUPERSEDES this screen's former local `useState` filters (`search`,
- * `status`, `page`) — the previous header comment said the screen
- * deliberately avoided URL state because "no requirement calls for a
- * shareable admin-users link". That reasoning no longer holds: the user has
- * asked for the same filterable/sortable/paginated register shape every
- * other list in the product already has, and a shareable, Back-button-safe
- * URL is what that shape means everywhere else in this codebase.
- *
- * `status`/`orgUnitId`/`roleId` are each a SINGLE value in the query string,
- * never CSV-joined: `GET /admin/users` accepts exactly one value per filter
- * field (`ListUsersQuery` in `../api`), not an array — the same contract
- * shape `use-engagement-catalog-state.ts` documents for `GET /audits`. The
- * filter toolbar therefore uses single-value `Select`s, never
- * `MultiSelectFilter`.
- */
-
-// Reads the current screen's own query string. The WRITE side — and the
-// `useRouter` import the loader policy restricts — lives in the shared
-// `@/lib/register/url-state` (specs/014-institutional-loader §2.3).
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -43,7 +12,6 @@ const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_SORT: AdminUserSortField = 'fullName';
 type SortDirection = 'asc' | 'desc';
 const DEFAULT_DIRECTION: SortDirection = 'asc';
-/** Tabela is this screen's default presentation — unlike the business registers, where Cards is primary (CLAUDE.md §18): an administrative listing is read densely, row by row, not browsed. */
 const DEFAULT_VIEW: UserAdminView = 'table';
 
 const SORTABLE_FIELDS: readonly AdminUserSortField[] = [
@@ -81,13 +49,10 @@ function parseSingleValue(value: string | null): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
-/** Which presentation the results area is currently rendering — Tabela is the default here (see `DEFAULT_VIEW` above). */
 export type UserAdminView = 'cards' | 'table';
 
 export interface UserAdminUrlState {
-  /** Committed (URL) search term — for display use `searchInputValue` instead, which updates immediately on every keystroke. */
   q: string;
-  /** 1-based page number. */
   page: number;
   pageSize: number;
   sort: AdminUserSortField;
@@ -100,29 +65,22 @@ export interface UserAdminUrlState {
 
 export interface UseUserAdminStateResult {
   state: UserAdminUrlState;
-  /** The search box's live value — always current, even before the debounced URL commit fires. */
   searchInputValue: string;
   setSearch: (value: string) => void;
   setStatus: (value: AdminUserStatus | undefined) => void;
   setOrgUnitId: (value: string | undefined) => void;
   setRoleId: (value: string | undefined) => void;
   setSort: (field: AdminUserSortField, direction: SortDirection) => void;
-  /** 1-based. */
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
   setView: (view: UserAdminView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows. Ordering and presentation are not filters and are not counted. */
   activeFilterCount: number;
 }
 
 export function useUserAdminState(): UseUserAdminStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism — one change applied to the CURRENT query string,
-  // `replace` not `push`, page reset by default — is shared with every
-  // other register (`@/lib/register/url-state`). What stays here is only
-  // what this screen knows: its enums, sortable fields and defaults.
   const commit = useUrlQueryCommit();
 
   const urlQ = searchParams.get('q') ?? '';
@@ -222,7 +180,6 @@ export function useUserAdminState(): UseUserAdminStateResult {
     });
   }, [commit, clearSearchInput]);
 
-  /** Which filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows, from the same conditions the chip row is built on. */
   const activeFilterCount =
     (state.q !== '' ? 1 : 0) +
     (state.status !== undefined ? 1 : 0) +

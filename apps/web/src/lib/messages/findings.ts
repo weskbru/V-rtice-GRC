@@ -1,36 +1,12 @@
-/**
- * PharosGRC — Achado (pt-BR), 002-shared-grc-foundation, T004.
- *
- * See `evidence.ts`'s header for the full explanation of the modular
- * convention and the hand-authored-union-type approach this file follows
- * identically.
- *
- * `severityLabels`/`priorityLabels` are deliberately separate maps, even
- * though the two unions share the same four-value LOW/MEDIUM/HIGH/
- * (CRITICAL|URGENT) shape — R-005: severity (gravity of the fact) and
- * priority (urgency to treat) are distinct GRC concepts that must never
- * collapse into one, in the data model or in the vocabulary shown to a
- * user.
- */
-
-/** Mirrors `enum FindingCategory` (data-model.md §5). */
 export type FindingCategory =
   'NONCONFORMITY' | 'CONTROL_DEFICIENCY' | 'OBSERVATION' | 'IMPROVEMENT_OPPORTUNITY';
 
-/** Mirrors `enum FindingOrigin` (data-model.md §5). Only the three members
- * the enum currently declares — a future origin arrives with its own
- * module and adds its own label here at that time. */
 export type FindingOrigin = 'INTERNAL_ASSESSMENT' | 'CONTROL_TESTING' | 'MANAGEMENT_REVIEW';
 
-/** Mirrors `enum FindingSeverity` (data-model.md §5, R-005) — gravity of
- * the fact, distinct from `FindingPriority` below. */
 export type FindingSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-/** Mirrors `enum FindingPriority` (data-model.md §5, R-005) — urgency of
- * treatment, distinct from `FindingSeverity` above. */
 export type FindingPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
-/** Mirrors `enum FindingStatus` (data-model.md §5). */
 export type FindingStatus = 'OPEN' | 'IN_REMEDIATION' | 'CLOSED' | 'ARCHIVED';
 
 export const findings = {
@@ -47,7 +23,6 @@ export const findings = {
     MANAGEMENT_REVIEW: 'Revisão da administração',
   } satisfies Record<FindingOrigin, string>,
 
-  /** Gravity of the fact — distinct from `priorityLabels` (R-005). */
   severityLabels: {
     LOW: 'Baixa',
     MEDIUM: 'Média',
@@ -55,7 +30,6 @@ export const findings = {
     CRITICAL: 'Crítica',
   } satisfies Record<FindingSeverity, string>,
 
-  /** Urgency of treatment — distinct from `severityLabels` (R-005). */
   priorityLabels: {
     LOW: 'Baixa',
     MEDIUM: 'Média',
@@ -70,15 +44,6 @@ export const findings = {
     ARCHIVED: 'Arquivado',
   } satisfies Record<FindingStatus, string>,
 
-  /**
-   * T075/002-shared-grc-foundation, US3 — the findings panel on the risk
-   * detail screen (the ONE frontend surface this phase gives Finding — see
-   * `findings-panel.tsx`'s own header for why: this phase models no direct
-   * Finding-to-Risk relationship, so the panel scopes by organizational
-   * unit instead of a persisted link). Follows `evidence.ts`'s `panel`
-   * block as the established shape for a collaboration-style panel
-   * embedded in another entity's detail screen.
-   */
   panel: {
     cardTitle: 'Achados',
     cardDescription:
@@ -119,9 +84,6 @@ export const findings = {
     archiveError: 'Não foi possível arquivar o achado.',
   },
 
-  /** `FindingCreateDialog`/`FindingEditDialog` (T075) — matches
-   * `contracts/grc-foundation.openapi.yaml`'s `CreateFindingRequest`/
-   * `UpdateFindingRequest`. */
   form: {
     createTitle: 'Registrar achado',
     createDescription:
@@ -157,7 +119,6 @@ export const findings = {
     },
   },
 
-  /** `FindingCloseDialog` (T075) — Invariant F1/F2. */
   close: {
     title: 'Encerrar achado',
     description:
@@ -173,7 +134,6 @@ export const findings = {
       'permissão de encerramento realize esta ação.',
   },
 
-  /** `FindingReopenDialog` (T075) — requires a reason (FR-027). */
   reopen: {
     title: 'Reabrir achado',
     description: 'A reabertura preserva o encerramento anterior na trilha de auditoria.',

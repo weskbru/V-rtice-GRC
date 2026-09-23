@@ -1,36 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident detail, Problems relationship section (008-
- * incidents-problems, US3), READ-ONLY from this side (research.md D-14):
- * `problems.openapi.yaml`/`problemsApi.linkToIncident`/`.unlinkFromIncident`
- * own the write path for this shared many-to-many —
- * `incidents.relationships.problems`'s own catalog comment says as much,
- * and carries no `pickerLabel`/`linkAction`/`unlinkAction` at all (unlike
- * `incident-relationships-section.tsx`'s three writable siblings). This
- * component therefore renders `GET /incidents/{id}/problems`'s list and
- * nothing else — no picker, no unlink button, no `canLink` prop.
- *
- * The linked problem's own status (`ProblemStatusRef`) is shown with
- * `StatusBadge` — colour plus the real pt-BR word, never colour alone
- * (CLAUDE.md §18.8) — using this module's own `PROBLEM_STATUS_VARIANT`,
- * deliberately separate from `status.ts`'s `STATUS_VARIANT` for
- * `IncidentStatus`: the two enums are not the same type and must never be
- * conflated even where a value name coincides.
- *
- * ## C5 (018-incident-detail-experience, Fase 6) — same column-width
- * discipline as the writable siblings
- *
- * The coordinator's own volume measurement (16/15/15 links, Fase 5 review)
- * targeted `incident-relationships-section.tsx` directly, but named this
- * file for the same check "with the same criteria": `linkedBy.fullName`
- * carried `whitespace-nowrap` with no width cap, the exact mechanism that
- * pushed a column off-screen there. Fixed here even though a rendered
- * overflow was never independently measured for this specific table — the
- * cause (an unbounded single-line name) is identical, and this table has
- * one fewer column of slack to absorb it (no "Desvincular" column, but also
- * no `min-w`/`max-w` on the problem column at all before this fix).
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -111,12 +80,6 @@ export function IncidentProblemLinksSection({
           <p className="text-sm text-muted-foreground">{messages.empty}</p>
         ) : (
           <div className="overflow-x-auto">
-            {/* `table-fixed` — see `incident-relationships-section.tsx`'s
-                own C5 comment: `max-w-*` alone on a `<td>` is only a hint
-                under `table-layout: auto`, which still grows a column to
-                fit its longest unbroken content. Explicit percentage
-                widths on `TableHead`, paired with `table-fixed`, make the
-                table's own total width authoritative. */}
             <Table className="table-fixed">
               <TableCaption className="sr-only">{messages.sectionTitle}</TableCaption>
               <TableHeader>

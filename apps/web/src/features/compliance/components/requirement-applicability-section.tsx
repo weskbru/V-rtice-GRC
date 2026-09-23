@@ -1,21 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the applicability section of a requirement's detail screen
- * (US3, FR-015, FR-016). A requirement with no active declaration is
- * applicable by default — this section states that plainly (never leaves it
- * implicit), and when a declaration IS active, states just as plainly that
- * the clause is excluded from the version's compliance calculation
- * (CLAUDE.md §18.11 — a non-applicable clause "leaves the compliance
- * calculation, and the screen must make that visible rather than looking
- * like a contradiction").
- *
- * Fetches the requirement's own history (`listRequirementApplicabilityDeclarations`,
- * which already returns current AND revoked declarations, newest first)
- * rather than trusting a possibly-stale `requirement.applicability` prop —
- * the active declaration, if any, is simply the one entry with
- * `revokedAt: null` (data-model.md §6: at most one at a time).
- */
 import {
   ConfirmDialog,
   EmptyValue,
@@ -57,7 +41,6 @@ import type { RequirementApplicability } from '../types';
 export interface RequirementApplicabilitySectionProps {
   requirementId: string;
   canAdminister: boolean;
-  /** Called after a successful declare/revoke — the requirement's own `complianceState` changes as a result, so the caller re-reads the requirement. */
   onChanged: () => void;
 }
 
@@ -69,10 +52,6 @@ export function RequirementApplicabilitySection({
   const [declarations, setDeclarations] = useState<readonly RequirementApplicability[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  // Fetched independently, purely to decide whether `activeWithLinksNotice`
-  // applies (edge case "cláusula não aplicável ligada a controle") — this
-  // section does not otherwise render the links themselves; that is
-  // `RequirementControlsSection`'s own responsibility.
   const [hasControlLinks, setHasControlLinks] = useState(false);
 
   useEffect(() => {

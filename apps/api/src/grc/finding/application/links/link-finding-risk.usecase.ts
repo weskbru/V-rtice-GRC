@@ -1,20 +1,3 @@
-/**
- * T065/005-audit-findings, US3 — `LinkFindingRiskUseCase`/
- * `UnlinkFindingRiskUseCase`/`ListFindingRiskLinksUseCase`
- * (`linkFindingToRisk`/`unlinkFindingFromRisk`/`listFindingRiskLinks`,
- * FR-013-FR-016, research.md D-4, D-11). Mirrors
- * `link-finding-control.usecase.ts` exactly — see that file's header for
- * the full ADR-020 five-part account this one does not repeat.
- *
- * The one asymmetry from the control pair: `RiskDirectoryPort` is a NEW
- * port (research.md D-4) — the first read-of-identity port `Risk` ever
- * exposes to an external consumer, `orgUnitId` is never `null` (`Risk`'s
- * own column is `NOT NULL`, unlike `Control`'s), and `isActive` means
- * `archivedAt === null` rather than `status === 'ACTIVE'` — `RiskDirectoryPort`'s
- * own header explains why that is deliberately MORE permissive (a finding
- * may legitimately point at an `ACCEPTED`/`CLOSED` risk; only `ARCHIVED`
- * is excluded).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -67,8 +50,6 @@ export class LinkFindingRiskUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the finding actually exists outside `scope`.
     const finding = await this.findingRepository.findById(scope, input.findingId);
     if (!finding) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -84,9 +65,6 @@ export class LinkFindingRiskUseCase {
     }
     assertFindingEditable(finding.status);
 
-    // ADR-020 parts 4+5 — checked BEFORE any write; a missing, archived,
-    // out-of-scope risk and a risk the actor lacks `risk:view` for all
-    // answer with the exact same refusal.
     const [risk, canViewRisk] = await Promise.all([
       this.riskDirectory.findById(input.riskId),
       this.permissionResolver.hasPermission(input.actorUserId, 'risk:view'),
@@ -130,8 +108,6 @@ export interface UnlinkFindingRiskInput {
   readonly linkId: string;
 }
 
-/** ADR-020 part 5 deliberately NOT extended here — same exemption
- * `UnlinkFindingControlUseCase` documents for its own unlink path. */
 @Injectable()
 export class UnlinkFindingRiskUseCase {
   constructor(

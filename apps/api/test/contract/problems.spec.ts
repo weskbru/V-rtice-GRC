@@ -1,22 +1,3 @@
-/**
- * 008-incidents-problems, US2 — contract coverage for the catalogue and
- * lifecycle operations of `contracts/problems.openapi.yaml`
- * (`listProblems`, `createProblem`, `getProblem`, `updateProblem`,
- * `transitionProblem` — operations 1-2/4-5 of 9). Link operations
- * (3, 6-9, Problem<->Risk/Problem<->Incident) belong to a separate front
- * and are not covered here.
- *
- * Uses `buildContractTestApp` (`support/contract-app.ts`) — the REAL
- * `AppModule`, unmodified; this task owns `problems.module.ts`'s own
- * wiring in full, unlike `control-catalog.spec.ts`'s override harness.
- *
- * Every response this suite produces is checked automatically against
- * `contracts/problems.openapi.yaml`'s declared schema by
- * `support/auto-validate-responses.ts` (registered via
- * `support/openapi-documents.ts`'s `CONTRACT_DOCUMENTS.Problems`) — no
- * assertion here duplicates that shape check; this file asserts BEHAVIOUR
- * (permission, scope, invariants), not "does the body have field X".
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -124,11 +105,6 @@ describe('Problem catalogue and lifecycle (008-incidents-problems, US2)', () => 
     return response.body as ProblemDetailBody;
   }
 
-  /** Creates a `COMPLETED` `Action` of origin `PROBLEM` for `problemId`,
-   * completed by `completerAgent`'s own session — the fixture Invariant
-   * P2/P3 tests need. Mirrors `actions.spec.ts`'s own
-   * create-then-transition-to-COMPLETED sequence (`OPEN -> IN_PROGRESS ->
-   * COMPLETED`, skipping `IN_PROGRESS` is illegal). */
   async function createCompletedProblemAction(
     completerAgent: ReturnType<typeof request.agent>,
     problemId: string,
@@ -465,12 +441,6 @@ describe('Problem catalogue and lifecycle (008-incidents-problems, US2)', () => 
       expect(response.status).toBe(401);
     });
 
-    // -----------------------------------------------------------------
-    // Closure — Invariants P2 (completed corrective action required) and
-    // P3 (segregation of duties). The security-critical path this
-    // module's own report names as its central requirement.
-    // -----------------------------------------------------------------
-
     it('RESOLVED -> CLOSED without any completed corrective Action is refused — 422 (Invariant P2)', async () => {
       const { agent } = await agentWithPermissions([
         'problem:create',
@@ -516,7 +486,6 @@ describe('Problem catalogue and lifecycle (008-incidents-problems, US2)', () => 
 
       await createCompletedProblemAction(owner.agent, created.id, owner.userId);
 
-      // The SAME user who completed the action attempts to close.
       const response = await owner.agent
         .post(`/api/v1/problems/${created.id}/transitions`)
         .set('Origin', appOrigin)

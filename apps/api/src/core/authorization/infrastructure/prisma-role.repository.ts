@@ -1,21 +1,4 @@
-/**
- * `RoleRepositoryPort` implementation backed by PostgreSQL via
- * `PrismaService` (T177, ADR-003). Lives in
- * `core/authorization/infrastructure` because `PrismaService` is the
- * top-level `infrastructure` element, which only `core-infrastructure`/
- * `core-presentation` may import under the ADR-011 boundary rules.
- *
- * Every write here participates in whatever transaction is ambient on
- * `PrismaService`'s `AsyncLocalStorage` (opened by `RoleAdminService` via
- * `TransactionRunnerPort`) — this class never opens one itself.
- */
 import { Injectable } from '@nestjs/common';
-// Value import (not `import type`) since 015-roles-permissions-surface:
-// `getSummaryCounts` below needs `Prisma.sql` at runtime, the same tagged
-// template every other `$queryRaw` call site in this codebase uses
-// (`prisma-audit-event-reader.ts`, `control-query.service.ts`, ...). The
-// type-only uses further down (`Prisma.RoleSelect`, `Prisma.RoleGetPayload`)
-// are unaffected — a value import serves both.
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -131,29 +114,6 @@ export class PrismaRoleRepository extends RoleRepositoryPort {
     return this.prisma.client.userRole.count({ where: { roleId } });
   }
 
-  /**
-   * 2026-09-13 (015-roles-permissions-surface, FR-039/FR-040). Four
-   * aggregate queries, issued in parallel — a CONSTANT number regardless of
-   * how many roles or users exist, which is the whole point of this
-   * endpoint existing instead of the screen deriving the numbers from a
-   * page of roles (`spec.md` D-02).
-   *
-   * `customRoles` is counted independently (`is_system = false`) rather
-   * than derived as `totalRoles - systemRoles`. Deriving would be one query
-   * cheaper and would make `totalRoles = systemRoles + customRoles` an
-   * arithmetic identity — i.e. a test asserting it would prove nothing.
-   * Three independent `COUNT(*)`s make that invariant a real property of
-   * the stored data, which is what `plan.md` §4 asks to have under test.
-   *
-   * `usersWithRoles` is raw SQL for the same reason
-   * `PrismaPermissionRepository.getEffectivePermissionIdentifiers` explains
-   * for its own de-duplication: Prisma's query API has no `COUNT(DISTINCT
-   * column)`. The alternatives are `groupBy({ by: ['userId'] })`, which
-   * transfers ONE ROW PER USER just to take `.length` (exactly the
-   * proportional-to-data-size cost this endpoint exists to avoid), or
-   * `findMany({ distinct })`, which is worse still. This is one aggregate
-   * row, computed in the database.
-   */
   async getSummaryCounts(): Promise<RoleSummaryCounts> {
     const [totalRoles, systemRoles, customRoles, usersWithRolesRows] = await Promise.all([
       this.prisma.client.role.count(),
@@ -168,17 +128,11 @@ export class PrismaRoleRepository extends RoleRepositoryPort {
       totalRoles,
       systemRoles,
       customRoles,
-      // `COUNT(...)` over an empty table still returns exactly one row
-      // holding `0`, so the fallback is unreachable defensive code rather
-      // than the empty-database path (which the integration suite proves
-      // returns `0` against a real, emptied `user_roles`).
       usersWithRoles: usersWithRolesRows[0]?.users_with_roles ?? 0,
     };
   }
 
   async delete(id: string): Promise<void> {
-    // `RolePermission` rows are FK-restricted to the role (schema.prisma),
-    // so they must be removed first, in the same ambient transaction.
     await this.prisma.client.rolePermission.deleteMany({ where: { roleId: id } });
     await this.prisma.client.role.delete({ where: { id } });
   }
@@ -240,10 +194,6 @@ export class PrismaRoleRepository extends RoleRepositoryPort {
   }
 }
 
-/** The single aggregate row `getSummaryCounts`' raw query returns. `::int`
- * (not the default `bigint` PostgreSQL gives `COUNT`) so the driver hands
- * back a JavaScript `number` — the same cast
- * `prisma-audit-event-reader.ts`'s own `COUNT(*)::int AS total` uses. */
 interface UsersWithRolesRow {
   readonly users_with_roles: number;
 }

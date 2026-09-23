@@ -1,10 +1,3 @@
-/**
- * 008-incidents-problems, US3 (research.md D-14) — `ListIncidentProblemLinksUseCase`,
- * backing `GET /incidents/{incidentId}/problems`. READ-ONLY: `modules/incidents`
- * never writes to `ProblemIncidentLink` — `modules/problems` owns that
- * write path (`link-problem-incident.usecase.ts`). Mirrors the read half of
- * `link-incident-risk.usecase.ts`'s `ListIncidentRiskLinksUseCase` exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { OrgScopeEnforcerService } from '../../../../core/organizations/application/org-scope-enforcer.service';

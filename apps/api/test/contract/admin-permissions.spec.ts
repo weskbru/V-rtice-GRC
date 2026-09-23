@@ -1,21 +1,3 @@
-/**
- * T172 — every administrative endpoint refuses a caller who lacks its
- * stated permission (`contracts/admin.openapi.yaml`, US8, D-11). Enumerated
- * exhaustively (22 operations across `/admin/users`, `/admin/roles`,
- * `/admin/permissions`, `/admin/org-units` and their sub-resources) rather
- * than sampled — D-11 exists specifically because a sampled/assumed
- * approach previously let two endpoints ship with no coverage at all.
- *
- * One unprivileged, real, logged-in user is reused for every check: they
- * hold `risk:view` (an unrelated resource, deliberately) and a `UNIT`
- * scope grant over some unit — both irrelevant to every assertion here,
- * proving the refusal is about the MISSING administrative permission, not
- * about session validity or organizational scope. `PermissionGuard` runs
- * before the body-validation `Pipe` in Nest's request pipeline (Guards,
- * then Pipes), so a minimal/empty body and random path-parameter UUIDs are
- * sufficient — the request never reaches DTO validation or the controller
- * body for any of these checks.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -40,7 +22,6 @@ interface EndpointCase {
 }
 
 const ENDPOINTS: readonly EndpointCase[] = [
-  // /admin/users
   { method: 'get', path: () => '/api/v1/admin/users', requiredPermission: 'user:administer' },
   { method: 'post', path: () => '/api/v1/admin/users', requiredPermission: 'user:administer' },
   {
@@ -88,7 +69,6 @@ const ENDPOINTS: readonly EndpointCase[] = [
     path: () => `/api/v1/admin/users/${randomUUID()}/scope-grants/${randomUUID()}`,
     requiredPermission: 'user:administer',
   },
-  // /admin/roles
   { method: 'get', path: () => '/api/v1/admin/roles', requiredPermission: 'role:administer' },
   { method: 'post', path: () => '/api/v1/admin/roles', requiredPermission: 'role:administer' },
   {
@@ -106,13 +86,11 @@ const ENDPOINTS: readonly EndpointCase[] = [
     path: () => `/api/v1/admin/roles/${randomUUID()}`,
     requiredPermission: 'role:administer',
   },
-  // /admin/permissions
   {
     method: 'get',
     path: () => '/api/v1/admin/permissions',
     requiredPermission: 'role:administer',
   },
-  // /admin/org-units
   {
     method: 'get',
     path: () => '/api/v1/admin/org-units',
@@ -158,9 +136,6 @@ describe('Administrative endpoints refuse a non-administrator (T172, US8)', () =
       email: `${uniqueTestMarker('admin-permissions-unpriv')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // `risk:view` (an unrelated resource) proves the refusal below is
-    // specifically about the missing ADMINISTRATIVE permission — this is a
-    // real, authenticated, in-scope user, not a bare session.
     const role = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-admin-permissions-unpriv-role-${randomUUID()}`,
     });
@@ -189,8 +164,6 @@ describe('Administrative endpoints refuse a non-administrator (T172, US8)', () =
       const body = response.body as { status: number; detail: string };
       expect(body.status).toBe(403);
 
-      // FR-107: no stack trace, no SQL fragment, no internal identifier —
-      // and never a hint at which specific permission was checked.
       const raw = JSON.stringify(response.body);
       expect(raw).not.toMatch(/stack/i);
       expect(raw).not.toMatch(/prisma/i);
@@ -199,11 +172,6 @@ describe('Administrative endpoints refuse a non-administrator (T172, US8)', () =
   );
 
   it('every operation in contracts/admin.openapi.yaml is covered above (no silent gaps, D-11)', () => {
-    // 11 /admin/users operations (incl. roles + scope-grants sub-resources)
-    // + 6 /admin/roles + /admin/permissions operations + 5 /admin/org-units
-    // operations = 22. A future endpoint added to the contract without a
-    // matching entry above should be caught here first, before it ships
-    // with no permission-refusal coverage at all (D-11's own root cause).
     expect(ENDPOINTS).toHaveLength(22);
   });
 });

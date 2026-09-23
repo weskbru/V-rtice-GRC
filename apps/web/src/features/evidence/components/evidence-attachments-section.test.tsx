@@ -7,15 +7,6 @@ import { EvidenceAttachmentsSection } from './evidence-attachments-section';
 
 import type { Attachment } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for `EvidenceAttachmentsSection` (assurance-audit
- * Fix 1, HIGH). Mirrors `risk-attachments-section.test.tsx`'s own shape —
- * this component's data-fetching wiring is a deliberate duplication of
- * that one's, not a shared abstraction (see the component's own header
- * comment for why), so the tests it needs are the same ones by
- * construction.
- */
-
 const { listAttachmentsMock, uploadAttachmentMock, withdrawAttachmentMock } = vi.hoisted(() => ({
   listAttachmentsMock: vi.fn(),
   uploadAttachmentMock: vi.fn(),
@@ -37,7 +28,7 @@ function attachmentFixture(overrides: Partial<Attachment>): Attachment {
     entityId: 'evidence-1',
     fileName: 'laudo.pdf',
     contentType: 'application/pdf',
-    sizeBytes: 1_258_291, // ~1.2 MB
+    sizeBytes: 1_258_291,
     uploadedBy: { id: 'user-1', fullName: 'Ana Souza' },
     createdAt: '2026-09-05T14:32:00.000Z',
     contentUrl: '/api/v1/attachments/attachment-1/content',
@@ -59,9 +50,6 @@ beforeEach(() => {
 const LABEL = 'EVD-2026-0001 — Relatório de teste de intrusão';
 
 describe('EvidenceAttachmentsSection', () => {
-  // The central assurance-audit Fix 1 assertion: a file attached to
-  // evidence is now actually VISIBLE and DOWNLOADABLE — before this fix,
-  // `evidenceApi.listAttachments` had zero callers anywhere in the product.
   it('lists the attachments scoped to this evidence, each linking to its authorizing download path', async () => {
     listAttachmentsMock.mockResolvedValue(pageOf([attachmentFixture({})]));
 

@@ -1,12 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T054) — `ListReportDefinitionsUseCase`
- * (`listReportDefinitions`). No `ScopeFilter` (research.md D-8, data-
- * model.md §8: "nenhum — catálogo compartilhado") — every caller with
- * `report:view` sees every configured `ReportDefinition`, paginated and
- * optionally filtered by `isActive`. Mirrors
- * `modules/indicators/application/list-indicator-definitions.usecase.ts`
- * exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ReportDefinitionRepositoryPort } from '../domain/ports/report-definition-repository.port';
@@ -46,11 +37,6 @@ export class ListReportDefinitionsUseCase {
       isActive: input.isActive,
     });
 
-    // A saved report catalog is small by construction (an operator-curated
-    // set of named compositions, not a growing transactional table) — a
-    // per-row lookup here is never an unbounded N+1, mirroring
-    // `ListIndicatorDefinitionsUseCase`'s own identical reasoning (bounded
-    // at eleven there; unbounded but operator-curated here).
     const items = await Promise.all(
       page.items.map(async (record) => ({
         record,

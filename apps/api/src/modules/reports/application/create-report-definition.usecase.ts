@@ -1,38 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T051) — `CreateReportDefinitionUseCase`
- * (`createReportDefinition`, spec.md FR-022/FR-023/FR-024,
- * contracts/reports.openapi.yaml). Mirrors
- * `modules/indicators/application/create-indicator-definition.usecase.ts`'s
- * shape — see that file's header for the transaction-boundary reasoning
- * this one does not repeat.
- *
- * ## Order of checks (all before the transaction opens)
- *
- * 1. `metricKeys` must be non-empty (data-model.md §1).
- * 2. Every element of `metricKeys` must be a member of the closed
- *    `IndicatorMetricKey` catalog (FR-022).
- *
- * Both of the above are `assertValidReportMetricKeys`'s own job
- * (`./assert-report-metric-keys.ts`, Fase 8, T068 prep) — extracted out of
- * this file (unchanged in behavior) the first time a SECOND caller
- * (`UpdateReportDefinitionUseCase`) needed the identical rule (CLAUDE.md
- * §19.7, "one validator, never a second copy"). See that file's own header
- * for why membership is checked against `Object.values(IndicatorMetricKey)`
- * — the Prisma-GENERATED enum — rather than against
- * `modules/indicators/domain/indicator-metric-catalog.ts`'s own
- * `isIndicatorMetricKey` (module-isolation, `apps/api/eslint.config.mjs`).
- * This use case's own input stays a raw `readonly string[]`, never
- * `readonly IndicatorMetricKey[]`, so this check runs regardless of
- * whatever the DTO (`CreateReportDefinitionRequestDto`, T054) also
- * enforces — defense-in-depth, reached by a caller bypassing the DTO
- * entirely (e.g. this feature's own integration tests).
- *
- * `code` is never client-supplied — allocated from
- * `EntityCodeGeneratorPort.nextCode('RPT', year)` inside the same
- * transaction as the row insert (research.md D-9). Always created
- * `isActive: true` (schema default, FR-023) — no `isActive` field on this
- * use case's input at all.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -52,9 +17,6 @@ export interface CreateReportDefinitionInput {
   readonly actorUserId: string;
   readonly name: string;
   readonly description: string;
-  /** Validated against the closed catalog INSIDE this use case (see this
-   * file's own header) — hence `readonly string[]`, not
-   * `readonly IndicatorMetricKey[]`. */
   readonly metricKeys: readonly string[];
 }
 

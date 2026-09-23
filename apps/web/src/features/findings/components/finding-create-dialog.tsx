@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Finding create dialog (T075, 002-shared-grc-foundation, US3).
- * `POST /findings`, always scoped to the panel's own organizational unit
- * (`FindingsPanel`'s own header explains why: this phase models no direct
- * Finding-to-Risk relationship). Mirrors `EvidenceCreateDialog`'s shape.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -64,11 +58,6 @@ const SEVERITIES: readonly FindingSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITIC
 const PRIORITIES: readonly FindingPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 function todayDateOnly(): string {
-  // Local calendar date, never `Date#toISOString()`'s UTC date: in any
-  // timezone behind UTC, an evening `toISOString().slice(0, 10)` returns
-  // TOMORROW, so this field defaulted to a date that had not happened yet.
-  // Found on the rendered screen (CLAUDE.md §18.1) defaulting to 09/09
-  // on 08/09. Same rule as `features/*/date.ts`'s own `todayDateOnly`.
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -94,10 +83,6 @@ export function FindingCreateDialog({
   const { user: currentUser } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // S-10 — searched server-side now (`UserPicker`), not a preloaded bounded
-  // list. `FindingsPanel`'s only caller always passes the CURRENT USER's
-  // own id as `defaultOwnerUserId` (self-assign default), so that label is
-  // already known from the session, with no fetch for the common case.
   const defaultOwner: UserRef | undefined =
     currentUser.id === defaultOwnerUserId
       ? { id: currentUser.id, fullName: currentUser.fullName, email: currentUser.email }
@@ -123,8 +108,6 @@ export function FindingCreateDialog({
     if (submitting) return;
     if (!next) {
       form.reset();
-      // The picker shows `owner`, not the form value: reset both, or a reopened
-      // dialog would display the previous pick while submitting the default.
       setOwner(defaultOwner);
       setFormError(null);
     }

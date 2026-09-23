@@ -1,10 +1,3 @@
-/**
- * T176 — `DELETE /admin/users/{userId}/sessions` (`contracts/admin.openapi.yaml`,
- * FR-015, FR-018). Revokes every active session for the user with reason
- * `ADMIN_REVOKED`. Idempotent: revoking a user with zero active sessions
- * succeeds silently (`SessionService.revokeAllForUser` already excludes
- * already-revoked rows rather than re-revoking/re-auditing them).
- */
 import { Injectable } from '@nestjs/common';
 import { SessionRevocationReason } from '@prisma/client';
 

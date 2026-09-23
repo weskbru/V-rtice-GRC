@@ -1,33 +1,14 @@
 'use client';
 
-/**
- * PharosGRC — problem register compact summary row (CLAUDE.md §18.5,
- * §19.7), mirroring `risk-register-summary.tsx`'s own shape and reasoning.
- *
- * Every figure comes from ONE call, `dashboardApi.getSummary()`
- * (`GET /dashboard/summary`), reading its `breakdowns.problems` block —
- * never a second count computed on this screen, and never N requests of
- * `pageSize: 1` (CLAUDE.md §19.7, coordinator's explicit instruction for
- * this task). That block is ABSENT when the caller lacks `problem:view`
- * (the server's own permission gate) — this component then renders no
- * strip at all, never a row of zeros.
- *
- * Each card links into THIS register's own `status` filter — a real,
- * already-existing filter field (`status[]`), so the number shown and the
- * list it opens into can never disagree.
- *
- * A failure here degrades to one quiet message in place of the row — it
- * must never hide or block the register underneath it.
- */
 import { Ban, CheckCircle2, CircleDot, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import type { DashboardBreakdowns } from '@/features/dashboard/types';
-import type { ComponentType, SVGProps } from 'react';
 
 import { RegisterSummaryCard } from '@/components/register/register-summary-card';
 import { dashboardApi } from '@/features/dashboard/api';
 import { problems } from '@/lib/messages/problems';
+
+import type { DashboardBreakdowns } from '@/features/dashboard/types';
+import type { ComponentType, SVGProps } from 'react';
 
 type ProblemsBreakdown = DashboardBreakdowns['problems'];
 
@@ -90,10 +71,6 @@ function buildCardDefinitions(data: ProblemsBreakdown | undefined): SummaryCardD
 }
 
 export function ProblemRegisterSummary(): React.JSX.Element | null {
-  // `undefined` = not yet loaded; `null` = loaded, and the caller's scope
-  // has no `breakdowns.problems` block (no `problem:view`) — the two are
-  // deliberately distinct, since the first renders a loading strip and the
-  // second renders NOTHING.
   const [breakdown, setBreakdown] = useState<ProblemsBreakdown | null | undefined>(undefined);
   const [hasError, setHasError] = useState(false);
 

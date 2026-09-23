@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Finding reopen dialog (T075, 002-shared-grc-foundation, US3,
- * FR-027). Mirrors `features/actions/components/reopen-action-dialog.tsx`'s
- * shape exactly — a non-empty reason is enforced authoritatively by the
- * server (`finding.entity.ts#assertReopenReasonProvided`, 422); this
- * dialog's own check is a courtesy (CLAUDE.md §18.9).
- */
 import { FormField } from '@pharos/design-system/components';
 import { useState } from 'react';
 

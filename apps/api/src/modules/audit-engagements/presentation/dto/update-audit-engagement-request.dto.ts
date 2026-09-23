@@ -1,12 +1,3 @@
-/**
- * T040/005-audit-findings, User Story 1 — matches
- * `contracts/audit.openapi.yaml`'s `UpdateAuditEngagementRequest`: every
- * property optional (partial update), `additionalProperties: false`,
- * `minProperties: 1` enforced by the controller (see
- * `audit-engagement.controller.ts`, mirroring `UpdateControlRequestDto`'s
- * identical convention and the identical reason given there — a single
- * call site, no dedicated custom validator class).
- */
 import { IsDateString, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

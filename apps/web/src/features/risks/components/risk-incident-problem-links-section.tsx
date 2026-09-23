@@ -1,29 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Incidents/Problems relationship sections
- * (013-incidents-problems-reverse-links).
- *
- * READ-ONLY from this side, mirroring `features/incidents/components/
- * incident-problem-links-section.tsx`'s own `IncidentProblemLinksSection`
- * shape exactly (CLAUDE.md §18.12): `modules/risk` never writes
- * `IncidentRiskLink`/`ProblemRiskLink` — `POST`/`DELETE
- * /incidents/{incidentId}/risks` and `POST`/`DELETE
- * /problems/{problemId}/risks` own those write paths respectively. This
- * component therefore renders `GET /risks/{riskId}/incidents`/`.../problems`
- * and nothing else — no picker, no unlink button, no `canLink` prop,
- * exactly like `IncidentProblemLinksSection`'s own justification.
- *
- * Risk's own established relationship-section pattern is a `Card` (see
- * `risk-controls-section.tsx`), unlike Asset/Process's plain, card-less
- * tabs (`asset-linked-entities-section.tsx`) — this component follows the
- * pattern the screen it renders into already uses, per the coordinator's
- * explicit instruction not to import one family's visual pattern into the
- * other.
- *
- * The linked incident's/problem's own status is shown with `StatusBadge` —
- * colour plus the real pt-BR word, never colour alone (CLAUDE.md §18.8).
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 

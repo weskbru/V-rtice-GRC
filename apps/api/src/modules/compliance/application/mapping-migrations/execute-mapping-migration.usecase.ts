@@ -1,31 +1,3 @@
-/**
- * T036/T042/004-compliance-management, User Story 2 —
- * `ExecuteMappingMigrationUseCase`. `POST
- * /frameworks/{frameworkId}/versions/{versionId}/mapping-migrations`
- * (`executeMappingMigration` operation, FR-012/FR-013/FR-014, research.md
- * D-6). The human decides every correspondence; this use case only
- * classifies (`classifyMappingMigrationTarget`, pure, D-6) and copies —
- * see that function's own doc comment for why no heuristic ever runs
- * here.
- *
- * ## Re-runnable by construction (research.md D-6)
- *
- * Every execution classifies EVERY requirement of the target version
- * fresh, against the CURRENT state of `RequirementControlLink` — a
- * requirement already `COPIED` or `SKIPPED_ALREADY_MAPPED` (by a prior
- * run or a manual link) now has an active link of its own, so
- * `classifyMappingMigrationTarget` returns `SKIPPED_ALREADY_MAPPED` for it
- * again regardless of whether it also appears in this run's
- * `correspondences` — never re-copied, never overwritten (FR-014).
- *
- * ## One audit event, not one per link (SC-004)
- *
- * `RequirementControlMappingMigrationRepository.create` writes every
- * `COPIED` item's new `RequirementControlLink` rows with no per-link audit
- * call; the ONE `REQUIREMENT_CONTROL_MAPPING_MIGRATION` event below,
- * carrying the outcome counts, is the only audit trace of the whole
- * execution (US2 AS4).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -188,8 +160,6 @@ export class ExecuteMappingMigrationUseCase {
       return created;
     });
 
-    // research.md D-11 — only `COPIED` targets actually gained a link, so
-    // only those can have a fresh compliance state to audit.
     await Promise.all(
       detail.items
         .filter((item) => item.outcome === 'COPIED')

@@ -1,13 +1,3 @@
-/**
- * T176 — deactivating a user through the ADMINISTRATIVE endpoint
- * (`PUT /admin/users/{userId}/status`) genuinely kills a LIVE session, not
- * merely flags the account (FR-011, FR-017). Distinct from
- * `test/integration/user-deactivation-auth.spec.ts` (T055), which exercises
- * `AuthUseCasesPort.deactivateUser` directly — this proves the same
- * guarantee through the real HTTP admin surface `SetUserStatusUseCase`
- * backs, with the target's session cookie presented to a SEPARATE request
- * afterward (not just a database read of `revokedAt`).
- */
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -58,9 +48,6 @@ describe('Admin deactivation kills a live session (T176, FR-011, FR-017)', () =>
       .send({ email: admin.user.email, password: admin.rawPassword });
     expect(adminLogin.status).toBe(200);
 
-    // A REAL, live session for the target user, established independently
-    // of the admin's own session (a separate agent = a separate cookie
-    // jar).
     const targetAgent = request.agent(ctx.app.getHttpServer());
     const targetLogin = await targetAgent
       .post('/api/v1/auth/login')
@@ -68,7 +55,6 @@ describe('Admin deactivation kills a live session (T176, FR-011, FR-017)', () =>
       .send({ email: target.user.email, password: target.rawPassword });
     expect(targetLogin.status).toBe(200);
 
-    // Proven live BEFORE deactivation.
     const beforeMe = await targetAgent.get('/api/v1/auth/me').set('Origin', appOrigin);
     expect(beforeMe.status).toBe(200);
 
@@ -78,9 +64,6 @@ describe('Admin deactivation kills a live session (T176, FR-011, FR-017)', () =>
       .send({ status: 'INACTIVE', reason: 'Fixture: T176 admin deactivation test' });
     expect(deactivateResponse.status).toBe(200);
 
-    // The target's SAME session cookie, presented again, no re-login: the
-    // live session must now be refused (FR-015/FR-017), not merely the
-    // account flagged.
     const afterMe = await targetAgent.get('/api/v1/auth/me').set('Origin', appOrigin);
     expect(afterMe.status).toBe(401);
 
@@ -128,7 +111,6 @@ describe('Admin deactivation kills a live session (T176, FR-011, FR-017)', () =>
 
     expect(response.status).toBe(422);
 
-    // Still active, still logged in.
     const me = await agent.get('/api/v1/auth/me').set('Origin', appOrigin);
     expect(me.status).toBe(200);
   });

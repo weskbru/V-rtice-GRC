@@ -1,11 +1,3 @@
-/**
- * T030/004-compliance-management — maps `FrameworkRecord`
- * (`domain/framework.entity.ts`) to the wire shape
- * `contracts/compliance.openapi.yaml`'s `Framework` schema describes. This
- * is the ONLY place a `Framework` becomes this response body — no Prisma
- * model, and no `FrameworkRecord` either, is ever returned directly from
- * `FrameworkController` (ADR-009).
- */
 import type { FrameworkRecord } from '../../domain/framework.entity';
 import type { FrameworkOrigin } from '@prisma/client';
 

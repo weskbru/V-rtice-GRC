@@ -1,13 +1,3 @@
-/**
- * T010/005-audit-findings — guards FR-019's naming decision in code, not
- * only in `research.md` D-7: `audit-engagement:*` (this module's own
- * permission resource) never collides with `audit:*` (the CORE audit-trail
- * read permission, `audit:view`, already seeded to the `Auditor` role
- * before this module existed). Also proves the structural backstop:
- * `combinePermissionDefinitions`'s own duplicate-identifier guard would
- * throw if a future change accidentally introduced an `audit:*` (or any
- * other already-claimed) identifier into `AUDIT_ENGAGEMENT_PERMISSION_DEFINITIONS`.
- */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -23,9 +13,6 @@ describe('audit-engagement:* permission namespace (FR-019, research.md D-7)', ()
     for (const definition of AUDIT_ENGAGEMENT_PERMISSION_DEFINITIONS) {
       expect(definition.resource).toBe('audit-engagement');
       expect(definition.identifier.startsWith('audit-engagement:')).toBe(true);
-      // The exact collision this task's research found and avoided: a
-      // literal `audit:*` identifier (the CORE audit-trail permission's
-      // own namespace) must never appear among this module's definitions.
       expect(definition.identifier.startsWith('audit:')).toBe(false);
     }
   });
@@ -40,8 +27,6 @@ describe('audit-engagement:* permission namespace (FR-019, research.md D-7)', ()
     expect(identifiers).toContain('audit-engagement:scope');
     expect(identifiers).toContain('audit-engagement:transition');
 
-    // Exactly five audit-engagement:* identifiers, exactly one audit:*
-    // identifier — no accidental sixth/second value drifted in.
     expect(identifiers.filter((id) => id.startsWith('audit-engagement:'))).toHaveLength(5);
     expect(identifiers.filter((id) => id.startsWith('audit:'))).toHaveLength(1);
   });

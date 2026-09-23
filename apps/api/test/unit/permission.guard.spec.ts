@@ -1,9 +1,3 @@
-/**
- * Unit tests for `PermissionGuard` (T035, ADR-003, FR-030). Pure unit
- * tests, no I/O, no NestJS testing module — a real `Reflector` reading
- * metadata off real decorated class members, and fakes for every injected
- * port/service.
- */
 import { Reflector } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
 
@@ -28,22 +22,16 @@ import type { ExecutionContext } from '@nestjs/common';
 
 class FixtureController {
   @RequirePermission('risk:edit')
-  requiresEdit(): void {
-    /* fixture only */
-  }
+  requiresEdit(): void {}
 
   @Public()
-  publicRoute(): void {
-    /* fixture only */
-  }
+  publicRoute(): void {}
 
   @NoPermissionRequired()
-  authenticatedOnlyRoute(): void {
-    /* fixture only */
-  }
+  authenticatedOnlyRoute(): void {}
 
   noDecorator(): void {
-    /* fixture only */
+    return;
   }
 }
 
@@ -54,10 +42,6 @@ function createContext(handler: () => void): ExecutionContext {
   } as unknown as ExecutionContext;
 }
 
-// These are used purely as Reflect-metadata lookup keys (the identity of
-// the function `SetMetadata` attached metadata to) — never invoked as a
-// bound method — so the `this`-scoping `unbound-method` rule is guarding
-// against a hazard that does not apply here.
 /* eslint-disable @typescript-eslint/unbound-method */
 const requiresEditHandler = FixtureController.prototype.requiresEdit;
 const publicRouteHandler = FixtureController.prototype.publicRoute;
@@ -82,8 +66,6 @@ class FakeDenialRecorder extends PermissionDenialRecorderPort {
   }
 }
 
-/** A minimal stand-in for `PermissionResolverService` — only `hasPermission`
- * is called by the guard, so only it needs to be real for these tests. */
 function fakeResolver(allowedPermissions: readonly string[]): PermissionResolverService {
   return {
     hasPermission: (_userId: string, permission: string) =>
@@ -113,7 +95,7 @@ describe('PermissionGuard', () => {
   });
 
   it('denies with UnauthorizedDomainError when there is no resolved actor at all', async () => {
-    const actor = new FakeCurrentActor(); // userId left undefined
+    const actor = new FakeCurrentActor();
     const guard = new PermissionGuard(new Reflector(), fakeResolver(['risk:edit']), actor);
 
     await expect(guard.canActivate(createContext(requiresEditHandler))).rejects.toBeInstanceOf(
@@ -131,8 +113,6 @@ describe('PermissionGuard', () => {
   it('allows an authenticated actor through @NoPermissionRequired() with no permission check at all (T067)', async () => {
     const actor = new FakeCurrentActor();
     actor.userId = 'user-1';
-    // The resolver would deny anything here — proving the allow is about
-    // the explicit opt-in decorator, not about the actor's permissions.
     const guard = new PermissionGuard(new Reflector(), fakeResolver([]), actor);
 
     await expect(guard.canActivate(createContext(authenticatedOnlyRouteHandler))).resolves.toBe(
@@ -141,7 +121,7 @@ describe('PermissionGuard', () => {
   });
 
   it('still fails closed with UnauthorizedDomainError for @NoPermissionRequired() with no resolved actor', async () => {
-    const actor = new FakeCurrentActor(); // userId left undefined
+    const actor = new FakeCurrentActor();
     const guard = new PermissionGuard(new Reflector(), fakeResolver([]), actor);
 
     await expect(
@@ -152,8 +132,6 @@ describe('PermissionGuard', () => {
   it('FAILS CLOSED for a handler with no @RequirePermission and no @Public() — never a default that grants', async () => {
     const actor = new FakeCurrentActor();
     actor.userId = 'user-1';
-    // The resolver would allow anything here — proving the denial is about
-    // the missing declaration, not about the actor's permissions.
     const guard = new PermissionGuard(new Reflector(), fakeResolver(['*']), actor);
 
     await expect(guard.canActivate(createContext(noDecoratorHandler))).rejects.toBeInstanceOf(

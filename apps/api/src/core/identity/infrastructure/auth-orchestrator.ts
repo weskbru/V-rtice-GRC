@@ -1,18 +1,3 @@
-/**
- * `AuthUseCasesPort` implementation (T058-T068). See that port's header for
- * why this composition lives here (`core-infrastructure`) rather than in
- * `core/identity/application`: it needs `PrismaService.runInTransaction`
- * (top-level `infrastructure`) to make each write atomic with its
- * `AuditRecorder` call, exactly like `AuditPermissionDenialRecorder`/
- * `AuditOrgScopeDenialRecorder`/`AuditSessionExpiryRecorder` before it.
- *
- * Every dependency below is legal from `core-infrastructure` under the
- * ADR-011 boundary policies: `PrismaService` (top-level `infrastructure`),
- * `AuditRecorder` (a different capability's `core-application`),
- * `SessionService`/`PermissionResolverService`/`ScopeResolverService`
- * (other capabilities' `core-application`), and everything else from this
- * same capability's `domain`/`application`.
- */
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AuditEntityType,
@@ -89,11 +74,6 @@ export class AuthOrchestrator extends AuthUseCasesPort {
       });
     } catch (error) {
       if (error instanceof RateLimitedDomainError) {
-        // Assurance fix — a request refused because THIS account is
-        // already locked is its own semantic fact, distinct from the
-        // shared per-origin ceiling (D-6, not account-specific). Best
-        // effort: the refusal itself (already thrown/rethrown below) never
-        // depends on whether this succeeds.
         await this.recordAccountLockInForceIfApplicable(command.email);
       }
       throw error;
@@ -148,10 +128,6 @@ export class AuthOrchestrator extends AuthUseCasesPort {
       return session;
     });
 
-    // S-01: `warmCache` needs `mustChangePassword` to seed the validation
-    // cache correctly (`ValidatedSession.mustChangePassword`); it is
-    // already resolved below for the login response, so it is passed here
-    // too rather than re-derived a second time.
     await this.sessionService.warmCache(
       created.session,
       result.subject.profile.mustChangePassword ?? false,
@@ -184,27 +160,6 @@ export class AuthOrchestrator extends AuthUseCasesPort {
     };
   }
 
-  /**
-   * Assurance fix — records `auth.login_refused_locked` (`LOCAL_CREDENTIAL`,
-   * `DENIED`) when `assertNotThrottled` refused this attempt because the
-   * ACCOUNT itself is already locked (as opposed to the shared per-origin
-   * ceiling, which is not account-specific and gets no such event, D-6).
-   * Lives here rather than inside `LoginThrottleService.assertNotThrottled`
-   * because that pre-check runs BEFORE any transaction is open, and
-   * `AuditRecorder` requires one (ADR-005) — `AuthOrchestrator`
-   * (`core-infrastructure`) is the layer that legitimately holds
-   * `PrismaService` to open one; `LoginThrottleService`
-   * (`core-application`) cannot. A re-read of the lock state here (rather
-   * than threading a discriminant through `RateLimitedDomainError`) keeps
-   * that error's shape — and FR-007's identical-429-for-both-reasons
-   * guarantee — completely untouched.
-   *
-   * Best-effort deliberately: `login`'s caller always sees the original
-   * `RateLimitedDomainError` regardless of whether this succeeds — an
-   * audit-subsystem hiccup must never turn into an extra client-visible
-   * failure on top of an already-correct refusal (same discipline
-   * `AuditOrgScopeDenialRecorder` documents for its own DENIED writes).
-   */
   private async recordAccountLockInForceIfApplicable(email: string): Promise<void> {
     const lock = await this.loginThrottle.findActiveAccountLock(email);
     if (!lock) {
@@ -223,10 +178,6 @@ export class AuthOrchestrator extends AuthUseCasesPort {
         });
       });
     } catch (error) {
-      // Best-effort — see this method's own doc comment. Mirrors
-      // `AuditOrgScopeDenialRecorder`'s own failure handling: logged via
-      // `auditOps` (audit-plumbing failure, not the security fact itself),
-      // never rethrown.
       this.logger.auditOps('Failed to record a DENIED audit event for a login refused as locked.', {
         credentialId: lock.credentialId,
         error: error instanceof Error ? error.message : String(error),
@@ -287,8 +238,6 @@ export class AuthOrchestrator extends AuthUseCasesPort {
         newValues: { passwordChangedAt, mustChangePassword: false },
         outcome: AuditOutcome.SUCCESS,
       });
-      // FR-017: every session for the user, including the one making this
-      // request — the caller must authenticate again (auth.openapi.yaml).
       await this.sessionService.revokeAllForUser(
         command.userId,
         SessionRevocationReason.PASSWORD_CHANGED,
@@ -315,7 +264,6 @@ export class AuthOrchestrator extends AuthUseCasesPort {
         newValues: { status: UserStatus.INACTIVE },
         outcome: AuditOutcome.SUCCESS,
       });
-      // FR-017: deactivation revokes every session immediately.
       await this.sessionService.revokeAllForUser(
         command.userId,
         SessionRevocationReason.USER_DEACTIVATED,

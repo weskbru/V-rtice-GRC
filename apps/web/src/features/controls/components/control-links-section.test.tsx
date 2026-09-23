@@ -5,24 +5,6 @@ import { ControlLinksSection } from './control-links-section';
 
 import type { ControlProcessLink } from '../types';
 
-/**
- * Component-mount evidence for the control detail's Vínculos section
- * (021-control-detail-experience, Fase D — progressive disclosure).
- * `../api` is mocked at the network boundary.
- *
- * Central assertions, mirroring `problem-relationships-section.test.tsx`'s
- * own `gateLinkBehindAction` coverage:
- *
- *   - the picker is absent until the caller clicks the intent button, and
- *     appears immediately after;
- *   - the empty state is never silent — the intent trigger renders directly
- *     under the empty-state sentence, for a caller who can link;
- *   - "Cancelar" discards the draft and returns to the trigger, without
- *     linking anything;
- *   - the read-only Riscos subsection never offers a picker at all,
- *     regardless of `canLinkRelationships` (FR-021).
- */
-
 const {
   listRiskLinksMock,
   listProcessLinksMock,

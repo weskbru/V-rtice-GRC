@@ -1,84 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident detail screen (018-incident-detail-experience, Fase
- * 2+3 shell, Fase 4 contextual aside + overlay editing — supersedes the
- * flat `EntityHeader` + loose lifecycle-action card + one-level
- * `EntityTabs` strip this screen used before, itself built by
- * 008-incidents-problems mirroring `AssetDetailView`).
- *
- * ## What changed, and what did not
- *
- * The page composes `DetailLayout` (`@pharos/design-system/components`) —
- * the same two-column shell `RiskDetailView` established in
- * 016-risk-detail-experience — with a breadcrumb + code/badges/title/
- * metadata header, a two-level navigation (four groups, nine leaf sections)
- * in the main column, and a contextual aside beside it. Every section's
- * underlying component, endpoint, permission and behaviour is UNCHANGED —
- * this rodada reorganizes presentation only, never business logic,
- * authorization or lifecycle semantics (CLAUDE.md §18.9). The nine sections
- * that existed before Fase 2+3 all still exist, all with the same
- * capabilities: Visão geral, Riscos, Ativos, Processos, Problemas, Ações
- * corretivas, Evidência, Anexos, Comentários. None of them is gated by a
- * view permission — unlike `RiskDetailView`'s Audit/Evidence/Findings, no
- * incident section has ever needed one, and this rodada does not introduce
- * one.
- *
- * ## `summary` stays empty; `asideLead` stays omitted — both decisions, not
- * gaps
- *
- * `DetailLayout`'s `summary` slot stays empty — the user explicitly
- * declined a `SummaryStatCard` row for this screen (severity and status
- * already have a real presence in the header's own badges; "Reportado em"
- * is temporal context, not a KPI). `asideLead` is likewise never passed:
- * unlike Risk (`overdueReview`, `overdueTreatment`, pending approval, a
- * blocked transition), `Incident` has no honest pendency to list —
- * `IncidentContextAside`'s own header comment records this in full. `aside`
- * (Fase 4) fills the rest of the contextual column: "Ações rápidas",
- * "Relacionamentos" and "Última atualização", built entirely from data this
- * page already loaded.
- *
- * ## One request on mount, unchanged
- *
- * `GET /incidents/{incidentId}` (`incidentsApi.getById`) is the ONLY
- * request this page fires on mount, exactly as before Fase 2+3 and
- * unchanged by Fase 4's aside (which fetches nothing of its own). Unlike
- * `RiskDetailView`, there is no second `GET .../lifecycle` request to add:
- * `status.ts`'s own header comment explains why no such endpoint exists for
- * Incident — `availableIncidentTransitions` is a client-side table, and the
- * "Ciclo de vida" track (`components/detail/incident-lifecycle-track.ts`)
- * is derived entirely from the SAME `IncidentDetail` this request already
- * returns.
- *
- * ## Deep link (`?section=<id>`)
- *
- * The nine leaf ids are EXACTLY the ids this screen's tabs already used
- * before Fase 2+3 (`overview`, `risks`, `assets`, `processes`, `problems`,
- * `corrective-actions`, `evidence`, `attachments`, `comments`) — nothing
- * renamed, nothing invented. An unknown or no-longer-visible id resolves
- * silently to the first visible section (`resolveActiveDetailSection`,
- * `@/components/detail/detail-navigation`) — never an error, never nothing
- * selected.
- *
- * ## Leitura × edição (Fase 4 — overlay, no longer an inline swap)
- *
- * `Editar` opens `IncidentEditPanel` — an overlay `Sheet` composing
- * `DetailPanel mode="overlay"` around the SAME `IncidentForm`
- * (`mode="edit"`, untouched) — instead of swapping "Visão geral"'s own
- * content for the form inline, as it did through Fase 2+3. The page behind
- * the panel (Ciclo de vida, the aside) stays fully readable throughout;
- * saving closes the panel and updates `incident` through the same
- * `onSaved` shape as before.
- *
- * ## `Suspense` (`useDetailSection` reads `useSearchParams()`)
- *
- * `page.tsx` (out of this rodada's territory, left untouched) renders
- * `IncidentDetailView` directly, with no `Suspense` of its own. This
- * component therefore supplies the boundary itself, mirroring
- * `RiskDetailView`'s own split exactly: the exported component is a thin
- * wrapper, and every hook — including the search-params-reading
- * `useDetailSection` — lives in `IncidentDetailViewContent` underneath it.
- */
 import {
   DetailLayout,
   EmptyState,
@@ -136,14 +57,6 @@ export interface IncidentDetailViewProps {
   incidentId: string;
 }
 
-/**
- * Level-1 group icons only — `EntityTabs` itself ignores `icon` on a
- * `subordinate` strip, so the level-2 leaf tabs built from `group.sections`
- * below never need an entry here. Reused, not invented (CLAUDE.md §18.12):
- * `Eye`/`Wrench`/`Link2`/`History` are the EXACT icons `RiskDetailView`'s
- * own `GROUP_ICONS` already uses for the same four concepts (Visão geral,
- * a response-type group, relationships, register-type group).
- */
 const GROUP_ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   overview: Eye,
   response: Wrench,

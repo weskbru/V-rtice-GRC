@@ -1,9 +1,3 @@
-/**
- * T034/002-shared-grc-foundation, US1 — matches `GET /evidence`'s query
- * parameters (`contracts/grc-foundation.openapi.yaml`'s `listEvidence`
- * operation) exactly. `@Type(() => Number)`/explicit `@Transform` on the
- * page/pageSize pair follow `ListRisksQueryDto`'s own established pattern.
- */
 import { Type } from 'class-transformer';
 import {
   IsDateString,
@@ -73,9 +67,6 @@ export class ListEvidenceQueryDto {
   @MaxLength(200, { message: USER_MESSAGES.dto.evidenceListQuery.search.maxLength })
   search?: string;
 
-  /** Both-or-neither with `subjectId` — see `list-evidence.usecase.ts`'s
-   * own header for why this pair exists (the "evidence panel on a domain
-   * screen" read path, SC-001). */
   @IsOptional()
   @IsIn(EVIDENCE_SUBJECT_TYPE_VALUES, {
     message: USER_MESSAGES.dto.evidenceListQuery.subjectType.isIn,

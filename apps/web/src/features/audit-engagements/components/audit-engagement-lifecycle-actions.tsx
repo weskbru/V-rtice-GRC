@@ -1,31 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement detail, lifecycle action bar (T076, US1,
- * FR-002 to FR-004a, research.md D-3).
- *
- * Unlike `ControlLifecycleActions`, this contract has no `GET
- * /audits/{auditId}/lifecycle` endpoint returning a precomputed transition
- * table — `contracts/audit.openapi.yaml` exposes only the three POST
- * transitions themselves. The (small, closed) transition table is
- * therefore encoded once, locally, straight from `research.md` D-3 and
- * FR-004a, verified against `quickstart.md` §2:
- *
- *   - `PLANNING`    -> `IN_PROGRESS` (start, requires ≥1 scope link, FR-003)
- *   - `PLANNING`    -> `CANCELLED`   (cancel, requires justification, FR-004a)
- *   - `IN_PROGRESS` -> `COMPLETED`   (complete)
- *   - `IN_PROGRESS` -> `CANCELLED`   (cancel, requires justification, FR-004a)
- *   - `COMPLETED`/`CANCELLED` — both terminal, no further transition.
- *
- * Start's own precondition (at least one scope link) is checked
- * client-side too — via `listScope`, the same read the detail screen's own
- * `AuditScopeSection` uses — so the "sem escopo" fact is communicated
- * BEFORE the attempt (`lifecycle.start.noScopeNotice`), not only after a
- * `422` (CLAUDE.md §18.11). This is advisory only: the server re-validates
- * independently and this component still handles the `422` reactively
- * (`noScopeError`) for the race where scope changes between this read and
- * the click.
- */
 import { ConfirmDialog, FormField } from '@pharos/design-system/components';
 import { Ban, CheckCircle2, Loader2, PlayCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -52,27 +26,7 @@ import type { AuditEngagement } from '../types';
 
 export interface AuditEngagementLifecycleActionsProps {
   engagement: AuditEngagement;
-  /** The engagement's current `ETag` — required by every transition. */
   etag: string;
-  /**
-   * Bumped by the owning screen whenever a scope entry is added, so this
-   * component re-reads the scope count (FR-003's own start precondition).
-   *
-   * Not cosmetic, and not derivable from `etag`: adding a scope entry
-   * writes `audit_scope_*`, never `audit_engagements`, so the engagement's
-   * own `version`/`ETag` is UNCHANGED by it. Keying the effect below on
-   * `etag` alone therefore left "Iniciar engajamento" disabled, with its
-   * "adicione ao menos um item ao escopo" notice still showing, on a screen
-   * whose scope table right below it already listed the entry that had just
-   * been saved. Only a page reload cleared it.
-   *
-   * That is the defect shape AGENTS.md names under "Frontend state" —
-   * correct in the database, stale on screen, every test green — and it was
-   * found by looking at the rendered page (CLAUDE.md §18.1), not by any
-   * gate. A change TOKEN rather than the fetched entries themselves: this
-   * component still performs its own read, so nothing is drilled down as
-   * props from an ancestor.
-   */
   scopeChangeToken: number;
   onChanged: (result: AuditEngagementWithEtag) => void;
 }

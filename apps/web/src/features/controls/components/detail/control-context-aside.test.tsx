@@ -5,24 +5,6 @@ import { ControlContextAside } from './control-context-aside';
 
 import type { ControlDetail } from '../../types';
 
-/**
- * Component-mount evidence for the contextual aside
- * (021-control-detail-experience, Fase C). Rendered at the default (wide,
- * jsdom `matchMedia` stub) viewport, so every block is the plain,
- * always-expanded `<section>` — mirrors `problem-context-aside.test.tsx`'s
- * own convention for not duplicating narrow-mode coverage here.
- *
- * Central assertions this suite exists to prove:
- *
- *   - every quick action is a real LINK (`role="link"`), never a button —
- *     the exact defect class `ProblemContextAside`'s own header comment
- *     documents costing three specs on Risk;
- *   - the single "Vínculos" relationship row never shows a count —
- *     `ControlDetail` carries none, and the aside must never fabricate one;
- *   - "Última atualização" renders only when `control.updatedAt` is
- *     present, never "Invalid Date" for the optional field.
- */
-
 const baseControl: ControlDetail = {
   id: 'control-1',
   code: 'CTL-2026-0001',
@@ -122,9 +104,6 @@ describe('ControlContextAside', () => {
       />,
     );
 
-    // Accessible name concatenates label + hint with an explicit space —
-    // see this component's own doc comment and `ProblemContextAside`'s
-    // identical fix.
     const link = screen.getByRole('link', { name: 'Vínculos Ver' });
     expect(link).toHaveAttribute('href', '/controls/control-1?section=relationships');
     expect(link.textContent).not.toMatch(/\d/);

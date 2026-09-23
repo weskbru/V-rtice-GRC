@@ -1,33 +1,6 @@
-/**
- * PharosGRC — Gestão de Ativos (pt-BR), 006-assets-processes.
- *
- * Promoção do registro mínimo `Asset` (Fase 1) a domínio de negócio próprio
- * (CLAUDE.md §17 item 12, `docs/architecture/grc-roadmap.md`). Segue
- * identicamente a convenção que `controls.ts`/`audit-engagements.ts` já
- * estabeleceram (CLAUDE.md §18.12) — divergência de linguagem visual ou de
- * vocabulário entre módulos, sem justificativa registrada, é defeito.
- *
- * Rótulos de campo espelham `specs/006-assets-processes/data-model.md` e o
- * esquema de requisição/resposta em `contracts/assets.openapi.yaml`.
- *
- * **Sem conflito de versão.** Ao contrário de `controls.ts`/`audit-
- * engagements.ts`, este catálogo não contém nenhuma mensagem de conflito de
- * versão otimista ("alterado por outra pessoa") — o contrato deste recurso
- * não declara `If-Match`, `ETag` nem `409` (ver `features/assets/types.ts`).
- *
- * **Desativação nunca é exclusão (FR-012).** Todo texto de desativação
- * abaixo é redigido para deixar isso inequívoco: o ativo continua legível e
- * continua aparecendo nos vínculos já existentes — só deixa de aceitar
- * vínculo **novo**.
- *
- * Situação (ativo/inativo) nunca depende só de cor (CLAUDE.md §18.8, FR-019)
- * — `StatusBadge` já compõe cor + ícone + rótulo textual por padrão; este
- * catálogo fornece o rótulo e a variante, nunca cor isolada.
- */
 import type { AssetListSortField, IncidentStatusRef } from '@/features/assets/types';
 import type { StatusVariant } from '@pharos/design-system/components';
 
-/** Mirrors `isActive` — a two-state situation, never a third value (data-model.md §3). Distinguishable by more than color: label + `StatusBadge`'s own icon (FR-019, CLAUDE.md §18.8). */
 const SITUATION_LABELS = {
   active: 'Ativo',
   inactive: 'Inativo',
@@ -42,7 +15,6 @@ export const assets = {
   situationLabels: SITUATION_LABELS,
   situationVariant: SITUATION_VARIANT,
 
-  /** `/assets` — the asset inventory (US1, US2, US3). */
   register: {
     pageTitle: 'Ativos',
     pageDescription:
@@ -50,15 +22,6 @@ export const assets = {
     createAction: 'Novo ativo',
     tableCaption: 'Lista de ativos cadastrados',
 
-    /**
-     * Indicadores compactos do topo do inventário (T046, CLAUDE.md §19.7):
-     * cada figura lê `meta.total` da MESMA consulta `GET /assets` que o
-     * próprio inventário usa (`assetsApi.listCatalog`, `pageSize: 1`),
-     * filtrada exatamente como o link do próprio card filtra o inventário —
-     * um único calculador para "quantos ativos casam com X", nunca uma
-     * recontagem no cliente. Mirrors `controls.ts`'s/`audit-engagements.ts`'s
-     * own `register.summary` shape (CLAUDE.md §18.12).
-     */
     summary: {
       regionLabel: 'Resumo do inventário de ativos',
       error: 'Não foi possível carregar os indicadores.',
@@ -124,7 +87,6 @@ export const assets = {
       },
       customSortOption: (fieldLabel: string, directionLabel: string): string =>
         `${fieldLabel} — ${directionLabel}`,
-      /** Every field the contract accepts, in both directions — the same set this register has always offered, now declared instead of recomputed in the component. */
       sortOptions: {
         'code:asc': 'Código — crescente',
         'code:desc': 'Código — decrescente',
@@ -170,11 +132,7 @@ export const assets = {
     },
   },
 
-  /**
-   * `/assets/[id]` — asset detail (US1, 022-asset-detail-experience Fase A).
-   */
   detail: {
-    /** `DetailLayout`'s header breadcrumb — "Ativos › AST-…", mirroring `controls.detail.breadcrumbLabel`'s own naming exactly. */
     breadcrumbLabel: 'Ativos',
     loading: 'Carregando ativo…',
     notFoundTitle: 'Ativo não encontrado',
@@ -184,45 +142,16 @@ export const assets = {
     backToRegister: 'Voltar ao inventário de ativos',
     metadata: {
       orgUnit: (name: string): string => `Unidade: ${name}`,
-      /** Um ativo cadastrado antes deste módulo pode não ter unidade registrada (data-model.md §1/§6). */
       noOrgUnit: 'Unidade não definida',
       createdAt: (date: string): string => `Cadastrado em ${date}`,
       updatedAt: (date: string): string => `Atualizado em ${date}`,
     },
-    /**
-     * Tab labels for the flat, `size="compact"` `EntityTabs` strip
-     * (022-asset-detail-experience Fase A). `risks`/`controls`/`incidents`
-     * were shortened from "Riscos vinculados"/"Controles vinculados"/
-     * "Incidentes vinculados" — measured at 390px, with `compact` applied in
-     * both cases: the four tabs wrapped across **2** lines with the old,
-     * longer labels (`getBoundingClientRect().top` distinguishing 338px and
-     * 372px) versus a single line with these short ones. `stripOverflow` was
-     * already `0` either way (`compact`'s own `flex-wrap` never lets a tab
-     * clip), so this change is purely about how TALL the strip reads, not
-     * about eliminating overflow. It also aligns Asset with Risk's/
-     * Incident's/Problem's own bare nouns for their linked-entity tabs, which
-     * never carried "vinculados" either. See `asset-detail-view.tsx`'s own
-     * header comment for the fuller narrative. `e2e/accessibility.spec.ts`'s
-     * two asset-detail tab lookups were updated to these same short names in
-     * the same commit.
-     */
     sections: {
       overview: 'Visão geral',
       risks: 'Riscos',
       controls: 'Controles',
-      /** 013-incidents-problems-reverse-links — the reverse read of
-       * `IncidentAssetLink`, surfaced from the Asset side for the first
-       * time this phase. */
       incidents: 'Incidentes',
     },
-    /**
-     * "Visão geral" cards (022-asset-detail-experience Fase B — replaces the
-     * flat, card-less `<dl>` this section used to be). `situationLabel` was
-     * removed: `isActive` now shows ONLY in the header badge and in its own
-     * dedicated "Situação" card (`lifecycle.cardTitle` below) — mirroring
-     * `controls.detail.overview`'s own restraint for `status`, never a third
-     * copy in "Detalhes do ativo".
-     */
     overview: {
       descriptionCardTitle: 'Descrição',
       noDescription: 'Sem descrição.',
@@ -232,28 +161,7 @@ export const assets = {
       updatedAtLabel: 'Atualizado em',
       notSet: 'Não definido',
     },
-    /**
-     * Accessible name for `DetailLayout`'s `asideLabel` — the sticky
-     * `complementary` landmark holding "Relacionamentos"/"Última
-     * atualização" (022-asset-detail-experience Fase C). Mirrors
-     * `controls.detail.asideLabel`'s own naming exactly.
-     */
     asideLabel: 'Contexto do ativo',
-    /**
-     * The contextual aside's "Relacionamentos" block (`asset-context-aside.
-     * tsx`, Fase C). No "Ações rápidas" heading here — see that file's own
-     * header comment for why Asset's three relationship tabs (read-only by
-     * design, FR-008) offer no create/link verb to shortcut to.
-     *
-     * `risks`/`controls` take a REAL count — `AssetDetail.risks`/`.controls`
-     * arrive already embedded (active links, from the asset's own side),
-     * unlike Control's own "Vínculos" row, which carries no count for any
-     * of its three sub-relationships. `incidents` gets the same "Ver" hint
-     * `controls.detail.relationshipsPanel.viewHint`/`risks.detail.
-     * relationshipsPanel.viewHint` already use for an uncounted
-     * relationship — `GET /assets/{assetId}/incidents` is its own request,
-     * never fetched just to produce a number here (F-59).
-     */
     relationshipsPanel: {
       heading: 'Relacionamentos',
       risks: (count: number): string => `Riscos (${count})`,
@@ -264,13 +172,6 @@ export const assets = {
     lastUpdatedHeading: 'Última atualização',
   },
 
-  /**
-   * `AssetRiskLinksSection`/`AssetControlLinksSection` — leitura somente
-   * (FR-008, ADR-020 parte 4). O vínculo é criado e desfeito exclusivamente
-   * pelo lado do Risco e do Controle, nunca por aqui (`GET
-   * /assets/{assetId}` só mostra vínculos ATIVOS, do lado do ativo) — não há
-   * ação de vincular/desvincular nesta seção, deliberadamente.
-   */
   linkedRisks: {
     sectionDescription:
       'Riscos que referenciam este ativo. Vínculos são criados e desfeitos a partir do registro do risco.',
@@ -285,15 +186,6 @@ export const assets = {
     empty: 'Nenhum controle vinculado a este ativo.',
     loadError: 'Não foi possível carregar os controles vinculados a este ativo.',
   },
-  /**
-   * 013-incidents-problems-reverse-links — READ-ONLY reverse of
-   * `IncidentAssetLink` (`GET /assets/{assetId}/incidents`): `modules/assets`
-   * never writes this table — `POST`/`DELETE /incidents/{incidentId}/assets`
-   * on the Incident side owns that write path. Unlike `linkedRisks`/
-   * `linkedControls` above (embedded in `GET /assets/{assetId}` itself),
-   * this section issues its own `GET` — hence `loading`, which those two
-   * never needed.
-   */
   linkedIncidents: {
     sectionDescription:
       'Incidentes que referenciam este ativo. Vínculos são criados e desfeitos a partir do registro do incidente.',
@@ -310,7 +202,6 @@ export const assets = {
     } satisfies Record<IncidentStatusRef, string>,
   },
 
-  /** Asset create/edit form. */
   form: {
     createTitle: 'Novo ativo',
     createDescription:
@@ -331,7 +222,6 @@ export const assets = {
       orgUnit: {
         label: 'Unidade organizacional',
         placeholder: 'Selecione a unidade',
-        /** Torna a invariante A1 inconfundível na própria tela — nunca só o asterisco genérico de obrigatório. */
         helper: 'Obrigatória. Define quem enxerga e pode vincular este ativo.',
       },
     },
@@ -359,12 +249,6 @@ export const assets = {
     },
   },
 
-  /**
-   * `AssetLifecycleCard` — as duas transições de situação (desativar /
-   * reativar, US1, FR-005/FR-006). Nunca redigido como exclusão: um ativo
-   * desativado continua legível e continua nos vínculos já existentes —
-   * só deixa de aceitar vínculo **novo** (FR-012).
-   */
   lifecycle: {
     cardTitle: 'Situação',
     cardDescription: 'Situação atual do ativo e as ações disponíveis para alterá-la.',

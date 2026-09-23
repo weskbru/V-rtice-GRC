@@ -1,15 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T051) — unit tests for
- * `CreateReportDefinitionUseCase`. Every port is a hand-rolled fake
- * (`as unknown as <Port>`), the same convention
- * `indicator-calculation-service.spec.ts`/`get-dashboard-planned-areas.spec.ts`
- * already use — no NestJS test module, no Prisma connection.
- *
- * Covers this task's own scope: `metricKeys` validation (non-empty, closed
- * `IndicatorMetricKey` catalog membership) and the creation/audit happy
- * path. Contract/integration coverage (the HTTP route, the DTO's own
- * `400`) is T054/T055's scope, not this one's.
- */
 import { AuditEntityType, IndicatorMetricKey } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -155,7 +143,6 @@ describe('CreateReportDefinitionUseCase', () => {
         metricKeys: [IndicatorMetricKey.RISK_TOTAL_BY_LEVEL],
       }),
     ).rejects.toBeInstanceOf(UnauthorizedDomainError);
-    // Not touched here on purpose — `useCase` is unused otherwise.
     expect(useCase).toBeDefined();
   });
 

@@ -1,9 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `UpdateUserRequest`:
- * every property optional, `additionalProperties: false`, `minProperties:
- * 1` — enforced in `AdminUsersController` itself, the same pattern
- * `UpdateRiskRequestDto`'s header documents.
- */
 import {
   IsEmail,
   IsOptional,

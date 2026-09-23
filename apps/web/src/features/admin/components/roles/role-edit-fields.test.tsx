@@ -1,33 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `RoleEditFields`
- * (015-roles-permissions-surface FR-027 to FR-032, T042/T043/T044).
- *
- * ## Migrated coverage (D-07, T049)
- *
- * `role-edit-dialog.test.tsx` guarded two field-level facts that the request
- * body alone does not prove: for a SYSTEM role, the name field and every
- * permission checkbox are not editable; for a custom role, both are. The
- * request body itself (`{ description }` for a system role; name,
- * description and identifiers for a custom one) is guarded in
- * `role-admin-view.test.tsx`, where the whole screen is mounted — so the two
- * halves of the old file's coverage both survive its removal.
- *
- * One difference is deliberate and is itself asserted: the system role's
- * name is `readOnly`, not `disabled`. FR-031 asks for a LEGIBLE locked
- * field, and the platform's `Input` dims a disabled control to
- * `opacity-50` — measured on screen, the stored name became the faintest
- * text in the panel. `readOnly` keeps full contrast and keeps the field in
- * the tab order. The permission checkboxes stay `disabled`, because a
- * checkbox has no read-only state a browser honours.
- *
- * The real `useRoleEditor` drives the form through a small harness rather
- * than a hand-built stub: the locked/unlocked behaviour and the pending-diff
- * arithmetic are the hook's, and a stub would let them drift apart.
- */
-
 const { listPermissionsMock, updateRoleMock, createRoleMock } = vi.hoisted(() => ({
   listPermissionsMock: vi.fn(),
   updateRoleMock: vi.fn(),
@@ -65,31 +38,11 @@ function role(overrides: Partial<Role> = {}): Role {
   };
 }
 
-/**
- * Mounts the fields over the REAL editor hook, the way `RoleDetailPanel` and
- * `RoleCreatePanel` do. `target` is `null` while a new role is composed,
- * which is the only difference between the two callers.
- */
 function Harness({ target }: { target: Role | null }): React.JSX.Element {
   const editor = useRoleEditor(target, true);
-  // Submission is the panel footer's job and is covered end to end in
-  // `role-admin-view.test.tsx`; this harness only mounts the fields.
   return <RoleEditFields role={target} editor={editor} formId="test-form" onSubmit={vi.fn()} />;
 }
 
-/**
- * Opens one module's disclosure. `DisclosureGroup` UNMOUNTS its content
- * while closed (its own doc comment: a `hidden` subtree would keep the whole
- * permission catalogue mounted whether or not anyone opened it), so the
- * individual permission checkboxes simply do not exist until the module is
- * expanded — only the module's own tri-state toggle, which sits outside the
- * disclosure, does. A test that asserted over "every checkbox" without
- * expanding would be asserting over the module toggles alone and would pass
- * for the wrong reason.
- *
- * The toggle is named by title AND meta (`aria-labelledby` joins them), so
- * it matches as "Riscos 1 de 2 selecionadas" — hence the prefix match.
- */
 function expandModule(label: string): void {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label}\\b`) }));
 }
@@ -110,34 +63,25 @@ describe('RoleEditFields — a SYSTEM role is legible and locked (FR-031, migrat
     });
     render(<Harness target={target} />);
 
-    // `readOnly`, not `disabled` — legible and still in the tab order.
     const nameField = screen.getByLabelText(/^Nome/);
     expect(nameField).toHaveAttribute('readonly');
     expect(nameField).toHaveValue('Platform Administrator');
 
-    // Every checkbox in the tree is locked — the module toggle and each
-    // individual permission alike. The module is expanded first, so the
-    // individual ones are actually in the document to be asserted over.
     expandModule('Riscos');
     expect(screen.getByText('risk:view')).toBeInTheDocument();
     expect(screen.getByText('risk:edit')).toBeInTheDocument();
     const checkboxes = screen.getAllByRole('checkbox');
-    // 1 module toggle + 2 permissions.
     expect(checkboxes).toHaveLength(3);
     for (const checkbox of checkboxes) {
       expect(checkbox).toBeDisabled();
     }
 
-    // The reasons are WRITTEN, not merely enforced by a dimmed control.
     expect(screen.getByText('Papel do sistema: o nome não pode ser alterado.')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Papel do sistema: o conjunto de permissões não pode ser alterado. As permissões continuam visíveis abaixo.',
       ),
     ).toBeInTheDocument();
-    // F-68 — the notice covers all three fields. The string it replaced said
-    // the description could still be edited and saved, and that is exactly
-    // the statement the finding proved false.
     expect(
       screen.getByText(
         'Este papel é definido pela plataforma. Nome, descrição e permissões são mantidos pelo próprio sistema e não podem ser alterados aqui.',
@@ -148,24 +92,13 @@ describe('RoleEditFields — a SYSTEM role is legible and locked (FR-031, migrat
     ).not.toBeInTheDocument();
     expect(screen.getByText('Somente leitura')).toBeInTheDocument();
 
-    // No catalogue request: a system role cannot change its permission set,
-    // so fetching every permission that exists would buy nothing.
     await waitFor(() => expect(listPermissionsMock).not.toHaveBeenCalled());
   });
 
-  /**
-   * F-68 — this test used to assert the opposite ("leaves the description
-   * editable — the one field the server accepts"). It is replaced, not
-   * relaxed: the description is now locked like the other two, and the
-   * assertion below is the stronger one, because it also pins the SHAPE of
-   * the lock (`readOnly`, so the seeded text keeps full contrast) and the
-   * reason beside it.
-   */
   it('locks the description too, legibly, with its own reason (F-68)', () => {
     render(<Harness target={role({ isSystem: true, description: 'Descrição semeada.' })} />);
     const description = screen.getByLabelText(/^Descrição/);
 
-    // `readOnly`, not `disabled`: legible, full contrast, still focusable.
     expect(description).toHaveAttribute('readonly');
     expect(description).not.toBeDisabled();
     expect(description).toHaveValue('Descrição semeada.');
@@ -176,11 +109,6 @@ describe('RoleEditFields — a SYSTEM role is legible and locked (FR-031, migrat
       ),
     ).toBeInTheDocument();
 
-    // The pending-changes summary is not rendered at all for a locked role,
-    // so even a programmatic change — which `fireEvent.change` performs
-    // whatever `readOnly` says, unlike a real keystroke — surfaces nothing to
-    // save. "Nenhuma alteração pendente" over a sheet nothing can change
-    // would be noise, and a pending diff on it would be a lie.
     fireEvent.change(description, { target: { value: 'Tentativa de edição.' } });
     expect(screen.queryByText('A descrição foi alterada.')).not.toBeInTheDocument();
     expect(screen.queryByText('Alterações pendentes')).not.toBeInTheDocument();
@@ -191,8 +119,6 @@ describe('RoleEditFields — a CUSTOM role is fully editable (migrated)', () => 
   it('leaves the name and every permission checkbox operable, and states no lock reason', async () => {
     render(<Harness target={role({ isSystem: false })} />);
 
-    // Waits for the catalogue request to resolve — the module only appears
-    // once `GET /admin/permissions` has come back.
     await screen.findByRole('button', { name: /^Riscos\b/ });
     expandModule('Riscos');
 
@@ -215,8 +141,6 @@ describe('RoleEditFields — a CUSTOM role is fully editable (migrated)', () => 
 
 describe('RoleEditFields — the tri-state module selector (FR-028)', () => {
   it('distinguishes none, some and all — in shape AND in words, so the distinction survives greyscale (NFR-004)', async () => {
-    // The role holds 1 of the 2 risk permissions in the catalogue, and none
-    // of the 1 control permission.
     render(<Harness target={role({ isSystem: false, permissions: [CATALOG[0]!] })} />);
 
     const riskToggle = await screen.findByRole('checkbox', {
@@ -226,20 +150,16 @@ describe('RoleEditFields — the tri-state module selector (FR-028)', () => {
       name: 'Selecionar todas as permissões de Controles',
     });
 
-    // SOME — `aria-checked="mixed"`, and the count said in text.
     expect(riskToggle).toHaveAttribute('aria-checked', 'mixed');
     expect(screen.getByText('1 de 2 selecionadas')).toBeInTheDocument();
 
-    // NONE.
     expect(controlToggle).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Nenhuma selecionada')).toBeInTheDocument();
 
-    // ALL — reached by selecting the whole module at once.
     fireEvent.click(riskToggle);
     await waitFor(() => expect(riskToggle).toHaveAttribute('aria-checked', 'true'));
     expect(screen.getByText('Todas selecionadas')).toBeInTheDocument();
 
-    // And clearing a whole module from the same control.
     fireEvent.click(riskToggle);
     await waitFor(() => expect(riskToggle).toHaveAttribute('aria-checked', 'false'));
   });
@@ -252,7 +172,6 @@ describe('RoleEditFields — the pending change summary (FR-029, FR-030)', () =>
 
     expect(screen.getByText('Alterações pendentes')).toBeInTheDocument();
     expect(screen.getByText('Nenhuma alteração pendente.')).toBeInTheDocument();
-    // FR-030 — the change reaches each affected user on their NEXT request.
     expect(
       screen.getByText(
         'A alteração no conjunto de permissões passa a valer na próxima requisição de cada usuário afetado — sem necessidade de novo login.',
@@ -264,14 +183,12 @@ describe('RoleEditFields — the pending change summary (FR-029, FR-030)', () =>
     render(<Harness target={role({ isSystem: false, permissions: [CATALOG[0]!] })} />);
     await screen.findByRole('button', { name: /^Riscos\b/ });
 
-    // Add `control:view` (not held) and remove `risk:view` (held).
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Selecionar todas as permissões de Controles' }),
     );
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Selecionar todas as permissões de Riscos' }),
     );
-    // Selecting the whole risk module ADDED both; clear it to remove both.
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Selecionar todas as permissões de Riscos' }),
     );
@@ -293,17 +210,6 @@ describe('RoleEditFields — the pending change summary (FR-029, FR-030)', () =>
   });
 });
 
-/**
- * Composing a NEW role through the same fields (Fase 1 de "Novo papel").
- *
- * These describes carry the coverage migrated from the retired create
- * surface. `role-create-dialog.tsx` had no test file of its own, but
- * `permission-checklist.test.tsx` had nine, and every behaviour they guarded
- * is asserted here or in `permission-grouping.test.ts` — the search
- * predicate as a pure function there, the box that drives it here.
- */
-
-/** Includes a permission whose pt-BR verb appears nowhere in its raw data, which is what the search has to cope with. */
 const SEARCH_CATALOG: readonly Permission[] = [
   { identifier: 'risk:view', resource: 'risk', action: 'VIEW', description: 'View risks' },
   { identifier: 'risk:edit', resource: 'risk', action: 'EDIT', description: 'Edit risks' },
@@ -333,14 +239,12 @@ describe('RoleEditFields — composing a NEW role', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Papéis criados aqui são sempre personalizados/)).toBeInTheDocument();
 
-    // Nothing about a new role can be locked: the API forces isSystem false.
     expect(screen.queryByText('Somente leitura')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Papel do sistema: o nome não pode ser alterado.'),
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText(/^Nome/)).not.toHaveAttribute('readonly');
 
-    // The whole catalogue IS fetched here — a new role is composed from it.
     await waitFor(() => expect(listPermissionsMock).toHaveBeenCalledTimes(1));
   });
 
@@ -375,7 +279,6 @@ describe('RoleEditFields — composing a NEW role', () => {
       screen.getByText('Nenhuma permissão selecionada — o papel ainda não concede nada.'),
     ).toBeInTheDocument();
 
-    // Singular, then plural — both wordings the retired checklist guarded.
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Selecionar todas as permissões de Controles' }),
     );
@@ -478,7 +381,6 @@ describe('RoleEditFields — searching the permission tree (migrated from Permis
 
   it('opens the matching modules, so a result is visible rather than merely counted', async () => {
     const search = await renderSearchable();
-    // Collapsed to begin with: the permission itself is not in the document.
     expect(screen.queryByText('control:test')).not.toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: 'Testar' } });
@@ -487,7 +389,6 @@ describe('RoleEditFields — searching the permission tree (migrated from Permis
 
   it('keeps a module toggle meaning the WHOLE module while the search is narrowing it', async () => {
     const search = await renderSearchable();
-    // "risk:edit" alone matches; "Riscos" still holds two permissions.
     fireEvent.change(search, { target: { value: 'risk:edit' } });
     expect(screen.getByText('1 de 4 permissões')).toBeInTheDocument();
     expect(
@@ -500,7 +401,6 @@ describe('RoleEditFields — searching the permission tree (migrated from Permis
       screen.getByRole('checkbox', { name: 'Selecionar todas as permissões de Riscos' }),
     );
 
-    // BOTH risk permissions are selected, not only the one on screen.
     await waitFor(() => expect(screen.getByText('2 permissões selecionadas')).toBeInTheDocument());
   });
 });

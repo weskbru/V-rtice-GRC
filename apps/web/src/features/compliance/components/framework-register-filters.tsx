@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework register filter toolbar (US1), joining the shared
- * exploration frame (CLAUDE.md §18.12): the same collapsible `FilterBar` +
- * chip row composition `AssetRegisterFilters`/`RiskRegisterFilters` already
- * use. No reference-data fetch is needed — `origin` is a two-value closed
- * enum with no server-side option list, mirroring `RiskRegisterFilters`'s
- * own `RISK_LEVEL_OPTIONS` (a closed enum built from the catalog directly,
- * not fetched).
- *
- * `MultiSelectFilter`, not a single-value `Select`: `GET /frameworks`'s own
- * `origin` parameter accepts an array (`style: form, explode: false`,
- * `FrameworkListQuery.origin`), the same two-value shape `RiskRegisterFilters`'s
- * own status/level filters use — a single-value control here would silently
- * misrepresent what the endpoint can actually filter by.
- */
 import {
   FilterBar,
   MultiSelectFilter,
@@ -22,12 +7,12 @@ import {
   type MultiSelectFilterOption,
 } from '@pharos/design-system/components';
 
-import type { FrameworkOrigin } from '../types';
-import type { ReactNode } from 'react';
-
 import { common } from '@/lib/messages/common';
 import { compliance } from '@/lib/messages/compliance';
 import { multiSelectChip, searchChip } from '@/lib/register/filter-chips';
+
+import type { FrameworkOrigin } from '../types';
+import type { ReactNode } from 'react';
 
 const ORIGIN_OPTIONS: readonly MultiSelectFilterOption[] = (
   Object.keys(compliance.originLabels) as FrameworkOrigin[]
@@ -40,7 +25,6 @@ export interface FrameworkRegisterFiltersProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }

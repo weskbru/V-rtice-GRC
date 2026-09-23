@@ -1,11 +1,3 @@
-/**
- * T031/002-shared-grc-foundation, US1 — `PrismaEvidenceRepository`, the
- * sole implementation of `EvidenceRepositoryPort`. Extends
- * `EvidenceScopedRepository` (T013), which fixes `applyScope`/`withScope`
- * to `orgUnitId` — every method below is compile-time required to thread
- * the caller's `ScopeFilter` through it (FR-031/FR-032), the same
- * guarantee `RiskRepository` gets from its own `ScopedRepository` base.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -88,9 +80,6 @@ export class PrismaEvidenceRepository
     return row ? toEvidenceRecord(row) : undefined;
   }
 
-  /** F-38 — see `EvidenceRepositoryPort.findOrgUnitIdUnscoped`'s doc
-   * comment. One extra indexed-by-PK `SELECT`, paid only by a caller that
-   * already knows a scoped lookup just returned nothing. */
   async findOrgUnitIdUnscoped(id: string): Promise<string | undefined> {
     return this.resolveOrganizationalUnitIgnoringScope(() =>
       this.prisma.client.evidence.findUnique({ where: { id }, select: { orgUnitId: true } }),
@@ -163,12 +152,6 @@ export class PrismaEvidenceRepository
       ];
     }
     if (filter.subjectType !== undefined && filter.subjectId !== undefined) {
-      // "Evidence linked to this subject" — the risk detail panel's own
-      // read path (SC-001). `some` matches evidence with at least one
-      // currently-ACTIVE (`unlinkedAt: null`) link to this exact subject;
-      // the use case has already resolved the subject's own visibility
-      // before this filter is applied (see `EvidenceListFilter`'s own
-      // doc comment).
       where.links = {
         some: {
           subjectType: filter.subjectType,

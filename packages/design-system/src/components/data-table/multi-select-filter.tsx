@@ -13,7 +13,6 @@ export interface MultiSelectFilterOption {
 }
 
 export interface MultiSelectFilterProps {
-  /** Visible trigger text AND the disclosure panel's accessible name — keep it short and unique among sibling filters (e.g. "Status", "Categoria"). */
   label: string;
   options: readonly MultiSelectFilterOption[];
   selected: readonly string[];
@@ -23,60 +22,6 @@ export interface MultiSelectFilterProps {
   className?: string;
 }
 
-/**
- * Generic, keyboard-operable multi-select filter control (T109) — the
- * building block behind every checkbox-list filter in the risk register
- * (status, risk level, category, organizational unit, owner) and every
- * future module's register screen.
- *
- * A real `<button>` trigger plus a manually-controlled panel of native
- * `<input type="checkbox">` elements, not the native `<details>/<summary>`
- * disclosure or a Radix combobox: native checkboxes need no ARIA
- * choreography to be correct, and a plain `<button>` has an unambiguous,
- * cross-browser accessible role — see `use-disclosure-close.ts`'s doc
- * comment for why that matters to this project's E2E suite specifically.
- *
- * ## Why the panel is hidden rather than unmounted (F-71)
- *
- * Same reason, same mechanism and same measurement as `FilterBar`'s own
- * panel — read that component's doc comment for the full account. The short
- * version: React 19's `useId` is positional and shifts when a streamed
- * `<Suspense>` chunk races hydration; React does not patch an attribute
- * mismatch, so a trigger that was server-rendered keeps the SERVER id in its
- * `aria-controls` while a panel created later on click is born with the
- * CLIENT id, and the reference dangles with `aria-expanded="true"`.
- *
- * This component only became exposed to that when `FilterBar` stopped
- * unmounting its collapsed panel: before that, on a collapsible register,
- * these triggers were never in the server HTML at all, so trigger and panel
- * shared the client numbering. Measured immediately after that change, in a
- * production build: **22 of 32 Firefox loads of `/risks` had all four of
- * these triggers pointing at an id not in the document while their popover
- * was open** — and, unlike `FilterBar`'s disclosure button, NO GATE WOULD
- * EVER HAVE SAID SO. `aria-haspopup` is why: axe's own
- * `aria-valid-attr-value` rule downgrades a missing `aria-controls` target to
- * "needs review" for any element carrying it ("Unable to determine if
- * aria-controls referenced ID exists on the page while using
- * aria-haspopup"), so the violation is never reported. Hiding the panel
- * instead of unmounting it makes trigger and panel come from the same render
- * pass, and the question stops being asked.
- *
- * What survives both passes is the panel ELEMENT; the option checkboxes
- * still mount on open. The defect is entirely in two attributes — the
- * trigger's `aria-controls` and the panel's `id` — so that is enough, and it
- * keeps the change invisible to everything else. It is not a detail: the
- * first attempt DID keep the options mounted, and the suite caught it
- * immediately — `requirement-list-section.test.tsx` failed because a hidden
- * option labelled "Não atendido" made a `getByText` for the row's compliance
- * state ambiguous. Nothing a user could see had changed, and a real test had
- * still been broken; there is no reason to pay that to fix two attributes.
- *
- * `hidden` is the whole mechanism: the package's Tailwind preflight carries
- * `[hidden]:where(:not([hidden='until-found'])) { display: none !important }`,
- * and the explicit `hidden` utility is applied alongside so the panel is
- * `display: none` — out of the tab order and out of the accessibility tree —
- * even without preflight.
- */
 export function MultiSelectFilter({
   label,
   options,
@@ -126,7 +71,6 @@ export function MultiSelectFilter({
         id={panelId}
         role="group"
         aria-label={label}
-        // Present in every render pass, hidden while closed (F-71).
         hidden={!open}
         className={cn(
           'absolute z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-md',

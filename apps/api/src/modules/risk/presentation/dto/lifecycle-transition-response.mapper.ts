@@ -1,9 +1,3 @@
-/**
- * T158 — maps `LifecycleTransitionRecord`
- * (`domain/ports/risk-lifecycle-transition-repository.port.ts`) to
- * `contracts/risks.openapi.yaml`'s `RiskLifecycleTransition` wire shape.
- * The ONE place a lifecycle transition becomes a response body (ADR-009).
- */
 import type { UserRefResponse } from './risk-response.mapper';
 import type { LifecycleTransitionRecord } from '../../domain/ports/risk-lifecycle-transition-repository.port';
 import type { RiskStatus } from '@prisma/client';

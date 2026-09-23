@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — publish-a-framework-version action (US1, FR-005, research.md
- * D-3). A version's one legal transition, one-way — there is deliberately
- * no operation to revert it, mirroring `ControlLifecycleActions`'s own "the
- * server owns the rule, this renders the result" discipline.
- *
- * `requirementCount` is the version's real, server-fetched requirement
- * total (`ComplianceSummary.totalRequirements`, operation 18) — no longer a
- * session-scoped guess. A count of zero shows a warning before the attempt,
- * but never disables the button: the server's own `422` (FR-005 — a version
- * with no requirement cannot be published) stays the authority, and its
- * exact message is what actually renders on failure.
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
@@ -31,7 +18,6 @@ export interface PublishVersionActionProps {
   frameworkId: string;
   version: FrameworkVersion;
   etag: string;
-  /** The version's real requirement total (`ComplianceSummary.totalRequirements`), or `null` while it has not loaded yet — in which case the hint is simply not shown. */
   requirementCount: number | null;
   onPublished: (result: { version: FrameworkVersion; etag: string }) => void;
 }
@@ -110,10 +96,6 @@ export function PublishVersionAction({
         open={open}
         onOpenChange={handleOpenChange}
         title={compliance.versionDetail.publish.confirmTitle}
-        // `ConfirmDialog`'s `description` renders inside Radix's own `<p>`
-        // (`Dialog.Description`) — a nested `<span className="block">`,
-        // never a second `<p>`, keeps the two-line layout without invalid
-        // HTML nesting (a real hydration warning this capture run caught).
         description={
           <>
             <span className="block">{compliance.versionDetail.publish.confirmDescription}</span>

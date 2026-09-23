@@ -1,16 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T053) — unit tests for
- * `ExportReportCsvUseCase`. Pure serializer, no ports to fake — every test
- * feeds a hand-built `RunReportResult` and asserts the exact CSV text.
- *
- * Covers every edge case a hand-written CSV serializer characteristically
- * gets wrong (this use case's own header): a value containing the
- * delimiter, a value containing a double quote, a value containing a line
- * break, an empty/absent value, and `available: false` staying
- * distinguishable from a measured zero. Also covers the `BY_BUCKET`
- * representation `contracts/reports.openapi.yaml` already decided
- * (`bucket=count;bucket=count`).
- */
 import { IndicatorMetricKey } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
@@ -28,8 +15,6 @@ function buildResult(items: readonly ReportRunItemResult[]): RunReportResult {
 }
 
 function csvRows(content: string): readonly string[] {
-  // Split on the use case's own CRLF line break; drop the trailing empty
-  // element produced by the final line break.
   return content
     .split('\r\n')
     .filter((line, index, all) => !(index === all.length - 1 && line === ''));
@@ -223,10 +208,6 @@ describe('ExportReportCsvUseCase', () => {
 
     const { content } = useCase.execute(buildResult(items));
 
-    // The embedded line break makes this row span two PHYSICAL lines; the
-    // quoting is what keeps it one LOGICAL CSV record. Assert on the raw
-    // content directly rather than through `csvRows` (which splits on
-    // every `\r\n`, including the one inside the quoted field).
     expect(content).toContain(
       'ASSET_INACTIVE_COUNT,"Ativos inativos\ne descontinuados",true,4,ORGANIZATIONAL_UNIT',
     );

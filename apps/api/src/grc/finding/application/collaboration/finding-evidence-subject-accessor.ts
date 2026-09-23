@@ -1,17 +1,3 @@
-/**
- * T072/002-shared-grc-foundation, US3 — `grc/finding`'s own registration
- * against `EvidenceSubjectResolverPort`'s registry
- * (`grc/shared/domain/ports/evidence-subject-resolver.port.ts`) for
- * `EvidenceSubjectType.FINDING` (FR-023: "Um achado MUST poder referenciar
- * evidências que o comprovem"). Registered directly from `FindingModule`'s
- * own constructor — no cross-boundary adapter needed, since both
- * `grc/evidence` and `grc/finding` already live under `grc/**` (see that
- * registry's own header, "Who registers what").
- *
- * Mirrors `grc/action/application/collaboration/action-evidence-subject
- * -accessor.ts` exactly: `finding:view` permission PLUS `GetFindingUseCase`'s
- * own scope-checked read, neither substituting for the other.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PermissionResolverService } from '../../../../core/authorization/application/permission-resolver.service';

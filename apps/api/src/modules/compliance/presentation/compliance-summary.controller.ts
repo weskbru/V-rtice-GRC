@@ -1,8 +1,3 @@
-/**
- * T056/004-compliance-management, User Story 3 —
- * `ComplianceSummaryController`: `getFrameworkVersionComplianceSummary`
- * (operation 20).
- */
 import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 
 import { RequirePermission } from '../../../core/authorization/presentation/permission.guard';

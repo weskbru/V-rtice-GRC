@@ -1,17 +1,3 @@
-/**
- * 008-incidents-problems, US3 (data-model.md §6, research.md D-13 to
- * D-15) — `LinkProblemIncidentUseCase`/`UnlinkProblemIncidentUseCase`/
- * `ListProblemIncidentLinksUseCase`. The fifth link, and the one N:M pair:
- * owned by `Problem` (this module), resolving its Incident target through
- * `IncidentDirectoryPort` — neither module imports the other (ADR-011).
- * Mirrors `link-problem-risk.usecase.ts`'s own shape exactly; the only
- * difference is the target directory/permission (`incident:view` instead
- * of `risk:view`) and `IncidentDirectoryEntry.orgUnitId` being
- * non-nullable (no null-scope special case needed, unlike Asset/Process).
- *
- * Never gates either lifecycle (D-15): this link changes nothing about
- * what transitions either record may still make.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -77,9 +63,6 @@ export class LinkProblemIncidentUseCase {
       );
     }
 
-    // ADR-020 parts 4+5 — checked BEFORE any write; a missing, out-of-scope
-    // incident and an incident the actor lacks `incident:view` for all
-    // answer with the exact same refusal.
     const [incident, canViewIncident] = await Promise.all([
       this.incidentDirectory.findById(input.incidentId),
       this.permissionResolver.hasPermission(input.actorUserId, 'incident:view'),

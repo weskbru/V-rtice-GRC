@@ -1,8 +1,5 @@
 'use client';
 
-/**
- * PharosGRC application shell — signed-in identity and sign-out (T073, FR-040).
- */
 import { LogOut, User } from 'lucide-react';
 import { useState } from 'react';
 
@@ -40,11 +37,8 @@ export function UserMenu(): React.JSX.Element {
   async function handleSignOut(): Promise<void> {
     setSigningOut(true);
     try {
-      // FR-016: user-initiated sign-out. A failure here (e.g. the session was
-      // already gone) does not change the user's intent — they still leave.
       await apiClient.post<void>('/auth/logout', undefined, { skipUnauthorizedHandler: true });
     } catch {
-      // Intentionally ignored — see comment above.
     } finally {
       navigate('/login');
       navigate.refresh();

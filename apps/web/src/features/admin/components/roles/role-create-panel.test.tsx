@@ -1,31 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `RoleCreatePanel` (Fase 1 de "Novo papel").
- *
- * ## Migrated coverage
- *
- * `role-create-dialog.tsx` — the surface this panel replaces — had no test
- * file of its own. Its behaviours are guarded here: the catalogue is fetched
- * when composition starts (not before), the request body carries name,
- * description and the selected identifiers, a duplicate name comes back as
- * the catalogue's own 409 wording, an unexpected failure persists nothing,
- * and the controls are inert while the request is in flight — which is what
- * `PermissionChecklist`'s `disabled` prop used to guard.
- *
- * Deliberately NOT migrated, and recorded rather than dropped in silence:
- * the dialog showed `form.effectNotice` ("a alteração passa a valer na
- * próxima requisição de cada usuário afetado"). Against a role that does not
- * exist yet, nobody is affected and the sentence is vacuous. The notice
- * still stands where it is true — the edit path, guarded in
- * `role-edit-fields.test.tsx`.
- *
- * In jsdom this renders its INLINE mode: `useWideViewport` reads
- * `matchMedia`, whose stub answers `matches: true`. The overlay's focus trap
- * and `Escape` belong to `Sheet` and are only real in a browser.
- */
-
 const { listPermissionsMock, createRoleMock } = vi.hoisted(() => ({
   listPermissionsMock: vi.fn(),
   createRoleMock: vi.fn(),
@@ -96,7 +71,6 @@ describe('RoleCreatePanel — the shell', () => {
     expect(screen.getByRole('complementary', { name: 'Novo papel' })).toBeInTheDocument();
     await waitFor(() => expect(listPermissionsMock).toHaveBeenCalledTimes(1));
 
-    // Header counts start at zero and follow the selection.
     const header = screen.getByRole('complementary', { name: 'Novo papel' });
     expect(header).toHaveTextContent('Permissões');
     expect(header).toHaveTextContent('Módulos');
@@ -138,7 +112,6 @@ describe('RoleCreatePanel — submitting', () => {
     renderPanel();
     await screen.findByRole('button', { name: /^Riscos\b/ });
 
-    // Name and description filled, no permission selected.
     fireEvent.change(screen.getByLabelText(/^Nome/), { target: { value: 'Papel vazio' } });
     fireEvent.change(screen.getByLabelText(/^Descrição/), { target: { value: 'Nada.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Criar papel' }));
@@ -179,7 +152,6 @@ describe('RoleCreatePanel — submitting', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Já existe um papel com esse nome.'),
     );
     expect(onCreated).not.toHaveBeenCalled();
-    // The form is still filled: a rejected request must not cost the work.
     expect(screen.getByLabelText(/^Nome/)).toHaveValue('Leitor de Riscos');
   });
 
@@ -262,11 +234,6 @@ describe('RoleCreatePanel — leaving without creating', () => {
   });
 });
 
-/**
- * Defects the rendered verification found, each with the guard that holds
- * the correction (CLAUDE.md §18.1 — the reason interface work is inspected
- * in a browser and not only compiled).
- */
 describe('RoleCreatePanel — corrections measured on screen', () => {
   it('drops a field error as soon as that field is corrected, instead of contradicting the form', async () => {
     renderPanel();
@@ -279,8 +246,6 @@ describe('RoleCreatePanel — corrections measured on screen', () => {
     expect(screen.getByText('Informe o nome do papel.')).toBeInTheDocument();
     expect(screen.getByText('Informe uma descrição do papel.')).toBeInTheDocument();
 
-    // Measured on screen: "Selecione ao menos uma permissão." stayed put
-    // above a tree with ten permissions ticked.
     fireEvent.click(
       screen.getByRole('checkbox', { name: 'Selecionar todas as permissões de Riscos' }),
     );
@@ -311,8 +276,6 @@ describe('RoleCreatePanel — corrections measured on screen', () => {
     await screen.findByRole('button', { name: /^Riscos\b/ });
 
     const search = screen.getByLabelText('Buscar permissão');
-    // A `type="search"` input paints the browser's OWN clear affordance, so
-    // the field showed two Xs side by side — one unlabelled.
     expect(search).toHaveAttribute('type', 'text');
 
     fireEvent.change(search, { target: { value: 'risk' } });

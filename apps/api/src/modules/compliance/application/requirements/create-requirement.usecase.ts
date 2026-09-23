@@ -1,12 +1,3 @@
-/**
- * T027/004-compliance-management — `CreateRequirementUseCase`
- * (`POST /frameworks/{frameworkId}/versions/{versionId}/requirements`,
- * `createRequirement` operation, FR-003, FR-004, FR-007). Permitted only
- * while the parent version is `DRAFT` — refused with `422` once
- * `PUBLISHED` (FR-004). The same `externalRef` may legitimately repeat
- * across different norms' versions — never deduplicated (FR-007), and this
- * use case performs no uniqueness check of any kind on it.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

@@ -1,8 +1,3 @@
-/**
- * `SessionCachePort` implementation, forwarding to the real `CacheProvider`
- * (T062, ADR-002, D-2). Lives in `core/sessions/infrastructure` for the
- * same ADR-011 reason as `CacheProviderPermissionCacheAdapter`.
- */
 import { Inject, Injectable } from '@nestjs/common';
 
 import { CACHE_PROVIDER, type CacheProvider } from '../../../infrastructure/cache/cache-provider';
@@ -27,9 +22,6 @@ export class CacheProviderSessionCacheAdapter extends SessionCachePort {
   }
 
   private key(tokenHash: string): string {
-    // Keyed by the HASH, never the raw token (FR-107/FR-108) — the cache
-    // key itself must be as safe to log/inspect as the database column it
-    // mirrors.
     return `session:${tokenHash}`;
   }
 }

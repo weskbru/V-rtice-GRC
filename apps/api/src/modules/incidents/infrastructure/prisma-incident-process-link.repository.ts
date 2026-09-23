@@ -1,8 +1,3 @@
-/**
- * 008-incidents-problems, US3 — the sole implementation of
- * `IncidentProcessLinkRepositoryPort`. Mirrors
- * `prisma-incident-risk-link.repository.ts` exactly, against `Process`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

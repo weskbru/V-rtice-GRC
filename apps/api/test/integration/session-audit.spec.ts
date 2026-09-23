@@ -1,9 +1,3 @@
-/**
- * T053 — audit events for login, FAILED login, logout and revocation
- * (FR-018), against real PostgreSQL. Each assertion scopes its query by a
- * unique marker (the fixture user's own id/email) rather than assuming
- * `audit_event` is empty, per this harness's established convention.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType, AuditOutcome, SessionRevocationReason } from '@prisma/client';
@@ -44,18 +38,6 @@ describe('Authentication/session audit trail (T053, FR-018)', () => {
   it('audits a successful login as a SESSION creation event', async () => {
     const fixture = await createLocalUserFixture(ctx.prisma);
 
-    // This harness resolves `AuthUseCasesPort` directly (no HTTP listener,
-    // see test-app.ts's header), so `RequestContextMiddleware` — which
-    // establishes the per-request `AsyncLocalStorage` context in the real
-    // app — never runs here. Without it, `RequestContextEnricherPort
-    // .enrich(...)` legitimately no-ops (no ambient context to enrich into,
-    // same as outside any request), and this test would fail for a reason
-    // unrelated to whether the production fix is correct. Wrapping the call
-    // in the SAME `RequestContextStore.run(...)` the real middleware uses
-    // (precedent: `audit-transactional.spec.ts`) simulates exactly that one
-    // piece of infrastructure, deliberately WITHOUT pre-seeding
-    // `actorUserId`/`sessionId` — proving the login path itself is what
-    // populates them, not the test setup.
     await RequestContextStore.run(
       {
         correlationId: randomUUID(),
@@ -88,20 +70,8 @@ describe('Authentication/session audit trail (T053, FR-018)', () => {
     expect(rows[0]!.outcome).toBe(AuditOutcome.SUCCESS);
     expect(rows[0]!.actorLabel).toBe(fixture.user.fullName);
     expect(rows[0]!.newValues).toMatchObject({ authenticationMethod: 'LOCAL' });
-    // Never the raw or hashed token in the audit payload (FR-107/FR-108).
     expect(JSON.stringify(rows[0]!.newValues)).not.toMatch(/tokenHash|token_hash/i);
 
-    // D-13/V2/FR-026, regression: measured directly against the dev
-    // database, EVERY historical `session.created` row (1466/1466) had
-    // `actor_user_id`/`session_id` NULL — login is `@Public()`, so
-    // `SessionGuard` (the only other caller of
-    // `RequestContextEnricherPort.enrich`) never runs on it, while
-    // `ip_address`/`user_agent` were already populated by
-    // `RequestContextMiddleware` regardless of guards. This asserts the
-    // ROW ITSELF carries the real, server-resolved identity (never a
-    // client-supplied value) — not merely that some enrichment function was
-    // invoked. Fails against the code before `SessionService.createSession`
-    // enriches the request context; passes after.
     expect(rows[0]!.actorUserId).toBe(fixture.user.id);
     expect(rows[0]!.sessionId).toBe(session!.id);
   });
@@ -167,8 +137,6 @@ describe('Authentication/session audit trail (T053, FR-018)', () => {
       where: { userId: fixture.user.id },
     });
 
-    // Must run inside an ambient transaction (ADR-005) — `AuthOrchestrator`
-    // provides one in production; this test calls the service directly.
     await ctx.prisma.runInTransaction(() =>
       sessionService.revokeSession(
         session!.id,
@@ -204,9 +172,6 @@ describe('Authentication/session audit trail (T053, FR-018)', () => {
       where: { id: session!.id },
       data: { expiresAt: new Date(Date.now() - 1_000) },
     });
-    // See session-lifecycle.spec.ts's comment: real traffic never diverges
-    // the cache from the database like this direct backdating does; evict
-    // the now-stale cache entry so the fallback reads the backdated row.
     await sessionCache.del(hashSessionToken(outcome.rawToken));
 
     await sessionService.validateSession(outcome.rawToken);

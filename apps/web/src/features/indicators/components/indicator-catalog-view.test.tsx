@@ -1,16 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for the redesigned `IndicatorCatalogView`
- * (indicators-round, S1 ownership) — the "central de indicadores de GRC"
- * that replaces the previous static 11-card grid. Network boundary mocked
- * (`dashboardApi.getSummary`, `indicatorsApi.listDefinitions`) exactly like
- * `use-indicator-overview.test.tsx` (S2's own test) — everything between the
- * mocked responses and the rendered screen is real: `useIndicatorOverview`,
- * `useIndicatorOverviewState`, the filtering helper, and every view
- * component this file composes.
- */
 const { getSummaryMock, listDefinitionsMock, replaceMock } = vi.hoisted(() => ({
   getSummaryMock: vi.fn(),
   listDefinitionsMock: vi.fn(),
@@ -251,13 +241,6 @@ describe('IndicatorCatalogView', () => {
     });
     expect(await screen.findByText('Nenhum indicador encontrado')).toBeInTheDocument();
 
-    // Two controls share the "Limpar filtros" label while the result is
-    // empty — the filter toolbar's own (still relevant: the search term is
-    // still active) and the empty state's own prominent action (the same
-    // "Limpar filtros" wording `ReportRegisterEmpty` already reuses for its
-    // own no-results action, `report-register-empty.tsx`) — either one
-    // clears the same state, so this asserts the LAST one (the empty
-    // state's), the one a reader actually lands on.
     const clearButtons = screen.getAllByRole('button', { name: 'Limpar filtros' });
     const lastClearButton = clearButtons[clearButtons.length - 1];
     if (!lastClearButton) {

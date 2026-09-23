@@ -1,12 +1,3 @@
-/**
- * T027/005-audit-findings, User Story 1 — `UpdateAuditEngagementUseCase`:
- * partial descriptive-field update (`PATCH /audits/{auditId}`,
- * `updateAuditEngagement` operation), permitted only while `PLANNING`
- * (research.md D-3/D-13) and optimistic-lock conflict detection
- * (research.md D-18). Mirrors `modules/controls/application/update-control.usecase.ts`'s
- * structure — see that file's header for the transaction-boundary
- * reasoning this one does not repeat.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -37,7 +28,6 @@ import type {
 export interface UpdateAuditEngagementInput {
   readonly actorUserId: string;
   readonly auditEngagementId: string;
-  /** From the `If-Match` header (research.md D-18). */
   readonly expectedVersion: number;
   readonly objective?: string | undefined;
   readonly periodStart?: Date | undefined;
@@ -161,10 +151,6 @@ export class UpdateAuditEngagementUseCase {
         );
       }
 
-      // Only audit when something actually changed — an idempotent PATCH
-      // re-submitting the current values still succeeds (200), but leaves
-      // no misleading "nothing changed" audit row (same discipline
-      // `UpdateControlUseCase` documents).
       if (Object.keys(newValues).length > 0) {
         await this.auditRecorder.record({
           action: 'audit_engagement.updated',

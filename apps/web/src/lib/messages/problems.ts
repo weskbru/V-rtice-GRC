@@ -1,24 +1,5 @@
-/**
- * PharosGRC — Gestão de Problemas (pt-BR), 008-incidents-problems.
- *
- * Extends the frontend-facing scaffold (coordinator instruction,
- * 2026-09-11) with the strings the register, create/edit form, detail
- * view, lifecycle actions and relationship sections actually need — see
- * `lib/messages/incidents.ts`'s own header comment for the shared
- * reasoning this file does not repeat.
- *
- * `statusLabels`/`severityLabels` are exhaustive `Record`s typed against
- * this app's own union types (F-1) — a new enum value with no translation
- * here is a compile error, never a raw identifier shown at runtime.
- *
- * `relationships.incidents` below is the WRITE side of the shared
- * Problem<->Incident many-to-many (research.md D-14) — full `pickerLabel`/
- * `linkAction`/`unlinkAction`, unlike `incidents.ts`'s own
- * `relationships.problems`, which is read-only from that side.
- */
 import type { ProblemSeverity, ProblemStatus } from '@/features/problems/types';
 
-/** Mirrors `ProblemStatus` (data-model.md, research.md D-5) — same shape as `IncidentStatus`, with `IN_ANALYSIS` in place of `IN_PROGRESS` because a problem's own work is investigative (finding the root cause), not an ongoing mitigation. */
 const PROBLEM_STATUS_LABELS: Record<ProblemStatus, string> = {
   OPEN: 'Aberto',
   IN_ANALYSIS: 'Em análise',
@@ -27,7 +8,6 @@ const PROBLEM_STATUS_LABELS: Record<ProblemStatus, string> = {
   CANCELLED: 'Cancelado',
 };
 
-/** Mirrors `ProblemSeverity` — a domain-own enum (D-9), never shared with `IncidentSeverity` even though the four values read identically. */
 const PROBLEM_SEVERITY_LABELS: Record<ProblemSeverity, string> = {
   CRITICAL: 'Crítica',
   HIGH: 'Alta',
@@ -102,14 +82,6 @@ export const problems = {
       customSortOption: (field: string, direction: string): string => `${field} (${direction})`,
     },
 
-    /**
-     * Compact indicator row above the toolbar (CLAUDE.md §18.5, §19.7),
-     * mirroring `risks.register.summary`'s own reasoning: every figure comes
-     * from `GET /dashboard/summary`'s `breakdowns.problems` block — never a
-     * second count computed on this screen — and the strip renders nothing
-     * at all when the caller lacks `problem:view` (the block itself is then
-     * absent on the wire).
-     */
     summary: {
       regionLabel: 'Situação geral dos problemas no seu escopo',
       open: {
@@ -133,11 +105,9 @@ export const problems = {
         linkLabel: 'Filtrar o registro por problemas fechados',
       },
       loading: 'Carregando indicadores…',
-      /** The indicators are a summary on top of an otherwise working register — a failure here degrades to this one quiet line, never to an error state that hides the list. */
       error: 'Não foi possível carregar os indicadores.',
     },
 
-    /** Cards ↔ Tabela segmented control (CLAUDE.md §18) — cards is the primary view, mirroring every other register in the product. */
     view: {
       groupLabel: 'Modo de visualização',
       cards: 'Cards',
@@ -146,7 +116,6 @@ export const problems = {
       tableLabel: 'Ver os problemas em tabela',
     },
 
-    /** The card itself (CLAUDE.md §18, §18.12). No description row — `ProblemSummary` carries none (mirrors the Audit Engagements catalog's identical precedent). Whole-card stretched link to `/problems/{id}`; this register offers no quick view. */
     card: {
       regionLabel: 'Problemas',
       orgUnitLabel: 'Unidade',
@@ -173,7 +142,6 @@ export const problems = {
   form: {
     createHeading: 'Novo problema',
     editHeading: 'Editar problema',
-    /** `ProblemEditPanel`'s own overlay header description (019-problem-detail-experience, Fase C), mirroring `incidents.form.editDescription`'s exact wording pattern. */
     editDescription: 'Altere os dados cadastrais do problema.',
     createTitle: 'Novo problema',
     createDescription: 'Registre um problema para investigar sua causa raiz.',
@@ -241,16 +209,6 @@ export const problems = {
       comments: 'Comentários',
     },
 
-    /**
-     * The four top-level groups of the problem detail's two-level
-     * navigation (019-problem-detail-experience, Fase A) — level 1 of the
-     * `EntityTabs`/`EntityTabs` nesting `ProblemDetailView` builds. Leaf
-     * section labels stay exactly `sections` above; nothing here duplicates
-     * them. Same four group ids/labels as `incidents.detail.groups`
-     * (CLAUDE.md §18.12 — the same concept gets the same word on both
-     * screens), each grouping Problem's own seven existing sections instead
-     * of Incident's nine.
-     */
     groups: {
       overview: 'Visão geral',
       response: 'Resposta',
@@ -258,26 +216,9 @@ export const problems = {
       register: 'Registro',
     },
     groupsAriaLabel: 'Grupos de seções do problema',
-    /** Accessible name for a group's own leaf-section `EntityTabs`, e.g. "Seções de Relacionamentos". */
     sectionsAriaLabel: (groupLabel: string): string => `Seções de ${groupLabel}`,
-    /**
-     * Accessible name for `DetailLayout`'s `asideLabel` — the sticky
-     * `complementary` landmark holding Ações rápidas/Relacionamentos/Última
-     * atualização (019-problem-detail-experience, Fase C). Mirrors
-     * `incidents.detail.asideLabel`'s own naming exactly.
-     */
     asideLabel: 'Contexto do problema',
 
-    /**
-     * The contextual aside's "Ações rápidas" and "Relacionamentos" blocks
-     * (`problem-context-aside.tsx`, Fase C) — no "Atenção" block exists for
-     * Problem (see that file's own header comment: there is no honest
-     * pendency to report, unlike Risk's overdue review/treatment or pending
-     * approval). Five quick actions, not Incident's six: Problem has only
-     * two relationship sections of its own (Riscos, Incidentes — no Ativos/
-     * Processos), so there is no "vincular ativo"/"vincular processo"
-     * equivalent here.
-     */
     quickActions: {
       heading: 'Ações rápidas',
       linkRisk: 'Vincular risco',
@@ -290,24 +231,10 @@ export const problems = {
       heading: 'Relacionamentos',
       risks: 'Riscos',
       incidents: 'Incidentes',
-      /** Trailing hint for every relationship row — `ProblemDetail` carries no counts for either, mirroring `incidents.detail.relationshipsPanel.viewHint`'s own reasoning: never a fabricated number, never a second request just to produce one (F-59). */
       viewHint: 'Ver',
     },
     lastUpdatedHeading: 'Última atualização',
 
-    /**
-     * The problem's conditional lifecycle outcome facts — rendered inside
-     * `ProblemLifecycleSection`'s "Ciclo de vida" card
-     * (019-problem-detail-experience, Fase B), not inside `ProblemOverview`
-     * any more: each describes an OUTCOME OF A TRANSITION (resolving,
-     * closing, cancelling), not a fact about the record's identity. Mirrors
-     * `incidents.detail.lifecycleOutcomes`'s own shape, minus a
-     * `resolutionSummary` equivalent — `Problem` has no such field; its own
-     * resolution fact is `rootCause`, which gets its OWN first-class card in
-     * "Visão geral" instead (see `overview.rootCauseCardTitle` below), not a
-     * lifecycle outcome. Every field here renders only when the underlying
-     * value is actually present.
-     */
     lifecycleOutcomes: {
       resolvedAtLabel: 'Resolvido em',
       resolvedByLabel: 'Resolvido por',
@@ -316,25 +243,9 @@ export const problems = {
       cancellationReasonLabel: 'Motivo do cancelamento',
     },
 
-    /**
-     * The "Ciclo de vida" track visual (`ProblemLifecycleTrackView`) —
-     * labels for the four main-track `ProblemStatus` positions come from
-     * `problemStatusLabel`/`statusLabels` above, the exact same word the
-     * header's own `StatusBadge` uses. `stateLabels` mirrors
-     * `incidents.detail.lifecycleTrack.stateLabels`'s own vocabulary exactly
-     * (CLAUDE.md §18.12 — same concept, same word on both screens).
-     */
     lifecycleTrack: {
       mainAriaLabel: 'Posições do ciclo de vida do problema',
       cancelledAriaLabel: 'Problema cancelado',
-      /**
-       * Short context line under the `CANCELLED` node — this payload does
-       * not record which of the two possible origins (`OPEN`/`IN_ANALYSIS`)
-       * the cancellation came from, so the node is presented as a terminal
-       * of the WHOLE trajectory, never visually tied to a specific column
-       * (mirrors `incidents.detail.lifecycleTrack.cancelledContextLabel`'s
-       * own reasoning).
-       */
       cancelledContextLabel: 'Encerrado por cancelamento',
       stateLabels: {
         current: 'Atual',
@@ -345,22 +256,6 @@ export const problems = {
     },
   },
 
-  /**
-   * The overview section's cards — "Descrição", "Causa raiz" and "Detalhes
-   * do problema" (019-problem-detail-experience, Fase B), mirroring
-   * `incidents.overview`'s own shape. The record's lifecycle outcome facts
-   * are NOT here — see `detail.lifecycleOutcomes` above.
-   *
-   * `rootCauseCardTitle`/`rootCauseEmptyDescription` exist because
-   * `rootCause` is the point of registering a Problem at all (the
-   * coordinator's own framing, 2026-09-17): a problem's own work is
-   * investigative (`IN_ANALYSIS`, not `IN_PROGRESS`), and the identified
-   * root cause is the result of that investigation — it gets a dedicated
-   * card, directly after "Descrição", never a `<dl>` cell with the exact
-   * same visual weight as "Registrado em". The empty-state sentence names
-   * only what the data actually says (not yet identified) — never a
-   * placeholder that reads like content.
-   */
   overview: {
     descriptionCardTitle: 'Descrição',
     rootCauseCardTitle: 'Causa raiz',
@@ -376,17 +271,6 @@ export const problems = {
     notSet: 'Não definido',
   },
 
-  /**
-   * Legal moves per `problems.openapi.yaml`'s own `transitionProblem`
-   * description: `OPEN->IN_ANALYSIS`, `OPEN->CANCELLED`,
-   * `IN_ANALYSIS->RESOLVED`, `IN_ANALYSIS->CANCELLED`, `RESOLVED->CLOSED`,
-   * `RESOLVED->IN_ANALYSIS` (reopen). `CLOSED` requires a completed
-   * corrective `Action` AND a closer different from whoever completed it
-   * (D-7, segregation of duties) — `closeConfirm` below names both
-   * preconditions explicitly rather than leaving a generic "tem certeza?",
-   * since a caller who does not yet know why a close attempt failed cannot
-   * self-correct.
-   */
   lifecycle: {
     cardTitle: 'Ciclo de vida',
     cardDescription: 'Trajetória e transições disponíveis para este problema.',
@@ -397,15 +281,6 @@ export const problems = {
       cancel: 'Cancelar problema',
       reopen: 'Reabrir',
     },
-    /** Accessible name for `ProblemCloseDialog`'s confirm button — the
-     * visible label stays the short "Fechar" (`actions.close` above), but
-     * the dialog's own native dismiss ("X") button ALSO carries the
-     * accessible name "Fechar" (the shared `Dialog` component's own
-     * localized close label) — found by running the rendered dialog
-     * (CLAUDE.md §18.1): `getByRole('button', {name: 'Fechar'})` matched
-     * BOTH buttons. A distinct `aria-label` on the confirm button removes
-     * the ambiguity for assistive technology without changing the
-     * domain's own short visible verb. */
     closeConfirmAriaLabel: 'Fechar problema',
     fields: {
       rootCause: 'Causa raiz',
@@ -450,18 +325,10 @@ export const problems = {
     loadError: 'Não foi possível carregar as ações disponíveis.',
     transitionError: 'Não foi possível concluir esta transição. Tente novamente.',
     illegalTransitionError: 'Esta transição não é permitida a partir do status atual.',
-    /** `422` whose specific cause is "no completed corrective Action yet" or "same user resolved and closed" (D-7) — surfaced honestly rather than folded into the generic `transitionError` above, since the caller needs to know WHICH precondition failed to act on it. */
     closeMissingActionError:
       'Este problema ainda não tem uma ação corretiva concluída — feche depois que a ação de origem for concluída.',
     closeSameUserError:
       'Quem fecha o problema precisa ser diferente de quem concluiu a ação corretiva.',
-    /**
-     * CLAUDE.md §18.11 — checked proactively when the close dialog opens
-     * (a single `GET /actions?originType=PROBLEM&originId=&status=COMPLETED`
-     * call, exactly as cheaply knowable as `FindingCloseDialog`'s own
-     * evidence check), so the requirement is visible BEFORE any attempt,
-     * not only as a `422` after one.
-     */
     closeRequirement: {
       title: 'Ação corretiva concluída necessária',
       description:
@@ -470,19 +337,6 @@ export const problems = {
     },
   },
 
-  /**
-   * The problem detail's own "Ações corretivas" tab (008-incidents-problems
-   * follow-up, 2026-09-11) — the ONLY affordance in the product that lets a
-   * caller create the completed `Action` `lifecycle.confirm.close`
-   * above requires (data-model.md Invariant P2). Uses the shared `Action`
-   * capability directly (`features/actions/api.ts`'s `actionsApi`,
-   * `originType: 'PROBLEM'`) — CLAUDE.md §19.6: Action is a core capability
-   * consumed by every domain that needs corrective work, never a
-   * domain-specific task table. Status changes (start/complete/cancel/
-   * reopen) reuse `features/actions/status.ts`'s own transition table and
-   * `ReopenActionDialog` rather than restating the five-edge lifecycle a
-   * third time in this module.
-   */
   correctiveActions: {
     cardTitle: 'Ações corretivas',
     cardDescription:
@@ -524,7 +378,6 @@ export const problems = {
   },
 
   relationships: {
-    /** Shared across both subsections below — mirrors `findingLinks`'s own top-level placement in `lib/messages/audit-engagements.ts`. */
     includeWithdrawnLabel: 'Incluir vínculos desfeitos',
     withdrawnBadge: 'Desfeito',
     withdrawnAt: (date: string): string => `em ${date}`,
@@ -558,11 +411,6 @@ export const problems = {
       },
       columns: { risk: 'Risco', linkedBy: 'Vinculado por', linkedAt: 'Vinculado em' },
     },
-    /**
-     * WRITE side of the shared many-to-many (research.md D-14) — full
-     * picker/link/unlink, unlike `incidents.ts`'s own `relationships
-     * .problems`, which only ever renders a list.
-     */
     incidents: {
       sectionTitle: 'Incidentes',
       sectionDescription: 'Incidentes que este problema explica.',
@@ -587,13 +435,6 @@ export const problems = {
         'Este incidente não pôde ser vinculado — ele não existe ou está fora do seu escopo organizacional.',
       unlinkConfirm: {
         title: 'Desvincular incidente?',
-        // Deliberately says nothing about either record's status — a
-        // Brazilian user reads only what desvincular does, never a
-        // citation to research.md D-15 (no internal identifier belongs in
-        // user-facing text — `no-internal-identifiers.test.ts`'s own
-        // guard). The "unlink never touches either lifecycle" decision
-        // that citation names lives in the code comment above
-        // `relationships.incidents`, not in this string.
         description: (title: string): string =>
           `O incidente "${title}" será desvinculado deste problema. O vínculo não é apagado: ele continua registrado no histórico, com data e responsável pela remoção.`,
       },
@@ -606,13 +447,6 @@ export const problems = {
     },
   },
 
-  /**
-   * Comments (CLAUDE.md §19.10 remediation — `CommentableEntityType.PROBLEM`
-   * was registered on the backend with no reachable interface). Feeds
-   * `CommentThread` (`@pharos/design-system`), exactly mirroring
-   * `risks.ts`'s own `comments` catalog (D-10: every word supplied by the
-   * consuming feature, never the generic component).
-   */
   comments: {
     cardTitle: 'Comentários',
     cardDescription:
@@ -639,12 +473,6 @@ export const problems = {
     withdrawError: 'Não foi possível remover o comentário. Tente novamente.',
   },
 
-  /**
-   * Attachments (CLAUDE.md §19.10 remediation — `AttachableEntityType
-   * .PROBLEM` was registered on the backend with no reachable interface).
-   * Feeds `AttachmentList` (`@pharos/design-system`), mirroring `risks.ts`'s
-   * own `attachments` catalog exactly.
-   */
   attachments: {
     cardTitle: 'Anexos',
     cardDescription:

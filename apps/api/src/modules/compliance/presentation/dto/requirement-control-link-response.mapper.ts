@@ -1,8 +1,3 @@
-/**
- * T043/004-compliance-management — maps `RequirementControlLinkRecord`
- * to the wire shape `contracts/compliance.openapi.yaml`'s
- * `RequirementControlLink` schema describes.
- */
 import type {
   RequirementControlLinkControlRef,
   RequirementControlLinkRecord,

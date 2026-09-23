@@ -1,22 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — "nova migração de mapeamento" wizard (US2, FR-012 to FR-014,
- * research.md D-6). The compliance manager picks the source version, then
- * for each target requirement of THIS version decides zero or more source
- * requirements whose control links it should inherit — this dialog never
- * proposes a correspondence itself (no `externalRef`/text matching): every
- * chip on screen is a decision the caller clicked into place.
- *
- * A target left with no chip is simply omitted from `correspondences` —
- * the server then reports it `PENDING_DECISION` unless it already carries
- * its own mapping (FR-013/FR-014), and the result step below shows exactly
- * that, never disguised as a success.
- *
- * Requirement lists are fetched up to `MAX_PAGES` pages of 100 each (the
- * contract's own per-page cap), matching the spec's own 500-requirement
- * scale assumption (SC-008) — a version beyond that is not expected here.
- */
 import { Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -92,11 +75,6 @@ export function MappingMigrationDialog({
   const [targetRequirements, setTargetRequirements] = useState<readonly Requirement[] | null>(null);
   const [sourceRequirements, setSourceRequirements] = useState<readonly Requirement[] | null>(null);
   const [requirementsError, setRequirementsError] = useState(false);
-  // `loading` is DERIVED from comparing the in-flight request's key against
-  // the last one that actually resolved — never a synchronous `setState` at
-  // the top of the effect body, mirroring `RequirementListSection`'s/
-  // `ControlCatalogView`'s own convention (avoids the
-  // `react-hooks/set-state-in-effect` cascading-render pattern entirely).
   const [resolvedRequirementsKey, setResolvedRequirementsKey] = useState<string | null>(null);
   const loadingRequirements = sourceVersionId !== '' && resolvedRequirementsKey !== sourceVersionId;
 
@@ -141,7 +119,6 @@ export function MappingMigrationDialog({
     };
   }, [frameworkId, targetVersionId, sourceVersionId]);
 
-  /** The Select's own `onValueChange` — resets everything downstream of the source version choice, rather than an effect calling `setState` synchronously in its body (react-hooks/set-state-in-effect). */
   function handleSourceVersionChange(nextSourceVersionId: string): void {
     setSourceVersionId(nextSourceVersionId);
     setTargetRequirements(null);
@@ -222,14 +199,6 @@ export function MappingMigrationDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {/*
-        `min-w-0` on both branches below: `DialogContent` is a CSS grid
-        (shadcn's own base class), and a grid item's default `min-width:
-        auto` otherwise stops it from ever shrinking below the
-        migration-items table's own intrinsic width — a real, rendered
-        clipping defect this file's own capture run caught (CLAUDE.md
-        §18.1), not a hypothetical one.
-      */}
       <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{compliance.mappingMigration.dialog.title}</DialogTitle>

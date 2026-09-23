@@ -5,16 +5,6 @@ import { ProblemRegisterSummary } from './problem-register-summary';
 
 import type { DashboardSummaryResponse } from '@/features/dashboard/types';
 
-/**
- * Component-mount evidence for `ProblemRegisterSummary` (CLAUDE.md §19.7) —
- * `@/features/dashboard/api` is mocked at the network boundary, mirroring
- * `risk-register-summary.test.tsx`'s own approach.
- *
- * The permission-gated-by-omission contract is the behaviour most worth
- * pinning down here: a caller without `problem:view` never sees `breakdowns
- * .problems` on the wire, and this component must then render NO strip at
- * all — not a row of zeros.
- */
 const { getSummaryMock } = vi.hoisted(() => ({ getSummaryMock: vi.fn() }));
 
 vi.mock('@/features/dashboard/api', () => ({

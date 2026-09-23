@@ -1,28 +1,3 @@
-/**
- * 008-incidents-problems, US2 — `CreateProblemUseCase` (`POST /problems`,
- * `createProblem` operation, spec.md FR-001 to FR-003). Mirrors
- * `modules/controls/application/create-control.usecase.ts`'s structure —
- * see that file's header for the transaction-boundary/order-of-checks
- * reasoning this one does not repeat.
- *
- * ## Owner defaults to the caller, unlike Control's optional owner
- *
- * `ownerUserId` may be omitted (`CreateProblemRequest`'s own `required`
- * list excludes it, description: "Defaults to the caller when omitted.")
- * — but `problems.owner_user_id` is `NOT NULL` (data-model.md §1), unlike
- * `Control`'s genuinely optional owner. So an omitted `ownerUserId` here
- * becomes `input.actorUserId`, never `undefined` — the owner is always
- * validated (existence, active, assignable to `orgUnitId`'s line), never
- * skipped the way `CreateControlUseCase` skips validation for a truly
- * absent owner.
- *
- * ## Code generation reuses the GRC kernel's shared allocator
- *
- * `EntityCodeGeneratorPort.nextCode('PRB', year)` — the same allocator
- * `Evidence`/`Action`/`Finding`/`Control`/... already use (data-model.md
- * §3's own account of the `PRB` prefix addition). Never a second,
- * duplicated counter mechanism in this module.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -68,10 +43,6 @@ export class CreateProblemUseCase {
   async execute(input: CreateProblemInput): Promise<ProblemRecord> {
     const actor = await this.referenceData.findUser(input.actorUserId);
     if (!actor) {
-      // Defensive only: `SessionGuard` already proved this user has a
-      // live session, so the actor row existing is expected. Fails
-      // closed rather than attributing an audit event to a fabricated
-      // label — mirrors `CreateControlUseCase`'s own identical check.
       throw new UnauthorizedDomainError();
     }
 
@@ -152,9 +123,6 @@ export class CreateProblemUseCase {
   }
 }
 
-/** Mirrors `create-control.usecase.ts`'s own exported
- * `isOrgUnitWithinScope` — not imported from there (`modules/controls` and
- * `modules/problems` must not depend on each other). */
 export function isOrgUnitWithinScope(scope: ScopeFilter, orgUnitId: string): boolean {
   return scope.kind === 'GLOBAL' || scope.unitIds.has(orgUnitId);
 }

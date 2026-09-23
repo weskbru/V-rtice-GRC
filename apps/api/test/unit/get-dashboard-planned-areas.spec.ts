@@ -1,19 +1,3 @@
-/**
- * F-22 defect 2 — unit test proving `GET /dashboard`'s `plannedAreas` are
- * sourced from `core/dashboard/domain/planned-area-registry.ts`, not a
- * closed union/literal array owned by Risk Management
- * (`modules/risk/application/get-dashboard.usecase.ts` used to declare
- * `type PlannedAreaKey = 'PROBLEMS' | 'INCIDENTS' | 'CONTROLS'` and a
- * matching `PLANNED_AREAS` array directly).
- *
- * The test registers a planned area the exact way a FUTURE module's own
- * composition root would — a bare call to `registerPlannedArea(...)` from
- * OUTSIDE `modules/risk` and outside `core/**`'s own default registration
- * — and asserts it reaches `GetDashboardUseCase.execute()`'s output
- * without editing `modules/risk` or `core/dashboard` to know about it.
- * This is SC-011's property, exercised directly rather than through a
- * whole second business module and a real HTTP round trip.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -27,9 +11,6 @@ import type { PermissionResolverService } from '../../src/core/authorization/app
 import type { ScopeResolverService } from '../../src/core/organizations/application/scope-resolver.service';
 import type { DashboardQueryPort } from '../../src/modules/risk/domain/ports/dashboard-query.port';
 
-/** A zero-permission caller never reaches `DashboardQueryPort` (see
- * `GetDashboardUseCase`'s own header) — a stub that throws if called is
- * therefore a stronger assertion than a mock nobody inspects. */
 const unreachableDashboardQuery = new Proxy(
   {},
   {
@@ -62,11 +43,6 @@ describe('GetDashboardUseCase.plannedAreas sourced from the registry, not a lite
   });
 
   it('a planned area registered from OUTSIDE modules/risk and outside core/dashboard appears in the output', async () => {
-    // Simulates a future module's own composition root — e.g. a
-    // hypothetical `ProblemsModule` constructor — calling this registry
-    // directly, exactly like `RiskModule` registers its own audit
-    // allow-list and collaboration entity type from its own file, never
-    // from `core/**`.
     registerPlannedArea({ key: 'PROBE_AREA', label: 'Área de sondagem (teste)' });
 
     const useCase = buildUseCase();

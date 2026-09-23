@@ -1,16 +1,3 @@
-/**
- * T046/004-compliance-management, User Story 3 —
- * `DeclareRequirementNotApplicableUseCase`. `POST
- * /requirements/{requirementId}/applicability-declarations`
- * (`declareRequirementNotApplicable` operation, FR-015, FR-016,
- * research.md D-7). `justification` non-empty is enforced HERE, not by
- * `DeclareApplicabilityRequestDto` — the contract promises `422` for a
- * missing/empty justification, the domain-level "business rule" status
- * (ADR-009), not the generic `400` a hard class-validator-required field
- * would produce; see that DTO's own header for the full reasoning. This
- * use case's other responsibility is the `409` "already active" rule
- * research.md D-7 exists for, never overwriting a standing declaration.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -108,8 +95,6 @@ export class DeclareRequirementNotApplicableUseCase {
       return created;
     });
 
-    // FR-016 — the requirement is now excluded from its version's
-    // compliance calculation; research.md D-11's own side-effect audit.
     await this.complianceReader.deriveForOne(input.requirementId, declaredAt);
 
     return declaration;

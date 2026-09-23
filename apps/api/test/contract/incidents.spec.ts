@@ -1,21 +1,3 @@
-/**
- * 008-incidents-problems, US1 — coverage for `/incidents` and
- * `/incidents/{incidentId}/transitions` (`listIncidents`, `createIncident`,
- * `getIncident`, `updateIncident`, `transitionIncident`): the declared
- * shape, the stated permission per route, 401 for an unauthenticated
- * caller, organizational-scope non-disclosure, the six-state lifecycle
- * table (data-model.md D-4) enforced as a declared transition table, the
- * `updateIncident`/`status` adversarial path, and that resolution/closure
- * fields are stamped (and, on reopen, cleared live but preserved in the
- * audit trail) exactly as `transition-incident.usecase.ts`'s own header
- * documents.
- *
- * Every response here is additionally checked against
- * `contracts/incidents.openapi.yaml` by the module-level payload validator
- * (`installResponseValidation`, `openapi-documents.ts`'s `Incidents` entry)
- * — no test in this file needs to hand-assert every field the schema
- * already requires.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -155,10 +137,6 @@ describe('Incident contract (US1, 008-incidents-problems)', () => {
     return response.body as IncidentBody;
   }
 
-  // -------------------------------------------------------------------
-  // createIncident
-  // -------------------------------------------------------------------
-
   describe('POST /incidents', () => {
     it('succeeds for a caller holding incident:create and returns the declared shape, status OPEN', async () => {
       const { agent } = await agentWithPermissions(['incident:create', 'incident:view']);
@@ -238,10 +216,6 @@ describe('Incident contract (US1, 008-incidents-problems)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // listIncidents
-  // -------------------------------------------------------------------
-
   describe('GET /incidents', () => {
     it('refuses a caller lacking incident:view — 403, audited as DENIED', async () => {
       const prisma = ctx.app.get(PrismaService);
@@ -308,10 +282,6 @@ describe('Incident contract (US1, 008-incidents-problems)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // getIncident — scope non-disclosure
-  // -------------------------------------------------------------------
-
   describe('GET /incidents/{incidentId}', () => {
     it('an out-of-scope incident reads 404, byte-identical to an unknown id', async () => {
       const { agent: ownerAgent } = await agentWithPermissions(
@@ -344,10 +314,6 @@ describe('Incident contract (US1, 008-incidents-problems)', () => {
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // updateIncident — C5 adversarial
-  // -------------------------------------------------------------------
 
   describe('PATCH /incidents/{incidentId}', () => {
     it('updates descriptive fields', async () => {
@@ -402,10 +368,6 @@ describe('Incident contract (US1, 008-incidents-problems)', () => {
       expect(response.status).toBe(403);
     });
   });
-
-  // -------------------------------------------------------------------
-  // transitionIncident — data-model.md D-4's six-state machine
-  // -------------------------------------------------------------------
 
   describe('POST /incidents/{incidentId}/transitions', () => {
     it('OPEN -> IN_PROGRESS emits incident.started', async () => {
@@ -487,8 +449,6 @@ describe('Incident contract (US1, 008-incidents-problems)', () => {
       const body = response.body as IncidentBody;
       expect(body.status).toBe('CLOSED');
       expect(body.closedAt).not.toBeNull();
-      // Nothing that carries history is overwritten — the resolution
-      // recorded on the PRIOR transition survives closure unchanged.
       expect(body.resolutionSummary).toBe('Causa raiz corrigida.');
       expect(body.resolvedAt).not.toBeNull();
 

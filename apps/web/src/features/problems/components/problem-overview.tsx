@@ -1,52 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem detail, "Visão geral" section, three of its four
- * cards (019-problem-detail-experience, Fase B — replaces the flat,
- * card-less `<dl>` this component used to be, mirroring `IncidentOverview`'s
- * own Fase 2+3 correction on the sibling screen).
- *
- * Three cards, mirroring `IncidentOverview`'s own hierarchy (CLAUDE.md
- * §18.12 — Incident is this product's established visual language for this
- * exact section shape, not a template every field must copy blindly):
- * "Descrição" gets its own prominent card, "Causa raiz" gets its OWN card
- * right after it (see below for why), and the record's remaining
- * classification/ownership facts sit together in "Detalhes do problema",
- * each field anchored by a small semantic icon via the shared `DetailField`
- * (`@/components/detail/detail-field`).
- *
- * ## Why "Causa raiz" is not a `DetailField` cell (the point of this phase)
- *
- * For a Problem, the root cause is the POINT of the record — it is the
- * result of the investigative work `IN_ANALYSIS` exists to name (unlike
- * Incident's own `IN_PROGRESS`, a Problem's own status vocabulary names its
- * central activity as analysis, not mitigation). Before this phase it was
- * the seventh cell of a flat `<dl>`, with the exact same typographic weight
- * as "Registrado em" — the coordinator's own rendered measurement of the
- * defect this phase exists to fix. It now gets a dedicated card, directly
- * after "Descrição", with an honest empty state
- * (`overview.rootCauseEmptyDescription`) when `rootCause` is still `null` —
- * never a placeholder that reads like content, never a claim the data does
- * not support.
- *
- * The FOURTH card this section shows on screen — "Ciclo de vida" — is
- * `ProblemLifecycleSection` (`components/detail/`), composed by the detail
- * view alongside this component, not inside it: it is a different concern
- * (lifecycle trajectory, transitions, outcome facts), not a classification
- * fact about the record's identity.
- *
- * The resolution/closure/cancellation outcome facts that used to live in
- * this component's own flat `<dl>` (`resolvedAt`/`resolvedBy`, `closedAt`/
- * `closedBy`, `cancellationReason`) moved to that same "Ciclo de vida" card
- * — they describe an OUTCOME OF THE LIFECYCLE, not the record's identity,
- * and this component no longer renders them at all.
- *
- * No `SummaryStatCard` row was added above these cards — `ProblemDetailView`
- * (Fase A)'s own header comment already records the same decision Incident
- * made: severity has a real presence in the header's own badges, and
- * "Registrado em"/"Atualizado em" are temporal context, not a KPI.
- * `DetailLayout`'s `summary` slot stays omitted.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import {
   AlertTriangle,
@@ -140,9 +93,6 @@ export function ProblemOverview({ problem }: ProblemOverviewProps): React.JSX.El
               value={formatDateOnly(problem.identifiedOn)}
               emptyLabel={overview.notSet}
             />
-            {/* `createdAt` is absent from `ProblemDetail`'s generated
-                `required` array even though the server always sets it —
-                see `problem-detail-view.tsx`'s identical comment. */}
             {problem.createdAt ? (
               <DetailField
                 icon={CalendarClock}

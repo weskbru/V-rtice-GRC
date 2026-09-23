@@ -1,11 +1,3 @@
-/**
- * T142 — the sole implementation of `RiskControlLinkRepositoryPort`/
- * `RiskProcessLinkRepositoryPort`/`RiskAssetLinkRepositoryPort`
- * (`domain/ports/risk-relationship-repository.port.ts`). No scope predicate
- * anywhere in this file — the caller (`Link*UseCase`) has already resolved
- * and scope-checked the parent `Risk` before any of these run, same
- * reasoning as `RiskAssessmentRepository`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

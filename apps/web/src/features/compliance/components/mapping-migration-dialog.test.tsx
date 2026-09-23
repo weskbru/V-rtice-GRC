@@ -5,14 +5,6 @@ import { MappingMigrationDialog } from './mapping-migration-dialog';
 
 import type { FrameworkVersion, MappingMigrationDetail, Requirement } from '../types';
 
-/**
- * Component-mount evidence for `MappingMigrationDialog` (US2, FR-012 to
- * FR-014, research.md D-6). `../api` is mocked at the network boundary —
- * this test exercises the decision the spec insists is the human's, never
- * the system's: nothing here is auto-selected, every correspondence is a
- * deliberate click, and a target left with no chip is simply omitted from
- * `correspondences`.
- */
 const { listFrameworkVersionsMock, listRequirementsMock, executeMappingMigrationMock } = vi.hoisted(
   () => ({
     listFrameworkVersionsMock: vi.fn(),

@@ -29,11 +29,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.JSX.Element {
   return (
-    // `suppressHydrationWarning` is required by next-themes (ThemeProvider):
-    // its blocking pre-hydration script sets `class` on this element from
-    // the persisted/system preference, which will not match what the server
-    // rendered (the server cannot know it) — without this, React logs a
-    // spurious hydration mismatch warning for a class it never controls.
     <html lang="pt-BR" suppressHydrationWarning>
       <body className="bg-background font-sans text-foreground antialiased">
         <ThemeProvider>

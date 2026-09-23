@@ -1,8 +1,3 @@
-/**
- * T043/004-compliance-management, User Story 2 —
- * `MappingMigrationController`: `listMappingMigrations`,
- * `executeMappingMigration`, `getMappingMigration` (operations 21-23).
- */
 import {
   Body,
   Controller,

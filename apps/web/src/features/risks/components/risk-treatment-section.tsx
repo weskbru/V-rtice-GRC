@@ -1,56 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Treatment section (T144, US5, FR-071 to FR-073,
- * FR-102, ADR-013).
- *
- * Shows the risk's current (non-superseded) treatment decision —
- * `risk.currentTreatment`, already returned inline by `GET /risks/{riskId}`
- * exactly like `RiskAssessmentSection` reads `risk.currentAssessment` — and,
- * for a caller holding `risk:treat`, lets them record a new one.
- *
- * ## Supersession is made obvious BEFORE the user commits (FR-073)
- *
- * Recording a new decision does not edit the current one — it SUPERSEDES
- * it server-side. `supersessionWarning` below renders as a persistent,
- * non-dismissible `Alert` inside the record-decision form itself, visible
- * from the moment the form is shown (whenever a current decision already
- * exists) — not only after the user tries to submit. It names the exact
- * strategy being replaced and states plainly that the current decision is
- * preserved in the history below, never erased. This is the same
- * "consequence visible before commit" standard `RiskCausesConsequences` and
- * `AssessmentForm`'s conflict banners already hold this project to.
- *
- * ## History (append-only, FR-073)
- *
- * `TreatmentHistory` below lists every decision ever recorded for this
- * risk, newest first, via `GET /risks/{riskId}/treatments` — which returns
- * superseded decisions INCLUDED, never only the current one. A superseded
- * row is rendered with a "Substituída em" badge instead of "Vigente",
- * never removed from the list — mirroring `AssessmentHistory`'s own
- * append-only convention (ADR-007's sibling guarantee for treatment,
- * FR-073).
- *
- * ## The decision form is now a contextual action (016-risk-detail-
- * experience, Área 3, 2026-09-17)
- *
- * The record-decision form used to be its own, permanently rendered `Card`
- * whenever `canTreat` was true — occupying the page whether or not anyone
- * was about to use it. It is now an inline block gated by `showForm`,
- * folded into the SAME `Card` as the current-decision read view, matching
- * `treatment-actions-table.tsx`'s own canonical "list/state first, form
- * behind a button, inline — not its own Card" shape exactly (the
- * coordinator's own reference for this rodada: "Planos de Ação já está
- * correto — alinhe os outros a ele"). It auto-collapses again once a
- * decision is successfully recorded.
- *
- * The capability is never hidden: when there is no current treatment at
- * all, the empty state itself carries the "Registrar nova decisão" button
- * right below its own sentence — an evident next step, not a mute empty
- * state and not a form forced open ("um estado vazio que oferece a ação é
- * melhor que um formulário aberto, mas muito melhor que um estado vazio
- * mudo").
- */
 import { FormField, ReadOnlyField, StatusBadge } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -96,10 +45,8 @@ const TREATMENT_STRATEGIES: readonly TreatmentStrategy[] = [
 
 export interface RiskTreatmentSectionProps {
   risk: RiskDetail;
-  /** The risk's current `ETag` (ADR-013) — required by `POST .../treatments`. */
   etag: string;
   canTreat: boolean;
-  /** Called after a successful decision. Like `AssessmentForm.onAssessed`, the response carries only the new decision, not the risk's updated `currentTreatment` pointer — the caller re-reads the whole risk. */
   onTreated: () => void;
 }
 
@@ -451,9 +398,6 @@ export function RiskTreatmentSection({
                 </p>
               ) : null}
 
-              {/* FR-073 — the supersession consequence is shown BEFORE the
-                  user can submit, whenever a current decision already
-                  exists, not only after they try. */}
               {current ? (
                 <Alert>
                   <AlertTitle>{risks.treatment.section.recordNewAction}</AlertTitle>

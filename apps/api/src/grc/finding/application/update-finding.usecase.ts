@@ -1,26 +1,3 @@
-/**
- * T070/002-shared-grc-foundation, US3 — `UpdateFindingUseCase`
- * (`updateFinding`). Field-by-field audit diff, mirroring
- * `grc/action/application/update-action.usecase.ts`'s own reasoning.
- *
- * `status` is NOT part of `UpdateFindingInput` at all — matching
- * `contracts/grc-foundation.openapi.yaml`'s `UpdateFindingRequest`, which
- * simply does not declare it, and the global `ValidationPipe`'s
- * `forbidNonWhitelisted` rejects a caller who tries anyway (C5, the
- * adversarial test this task requires).
- *
- * ## Priority changes get their own semantic event (FR-022, R-005)
- *
- * Severity (gravity of the fact) and priority (urgency to treat) are
- * distinct GRC concepts that move independently. When `priority` is among
- * the changed fields, this use case emits `finding.priority_changed` IN
- * ADDITION TO — or, if priority is the ONLY changed field, INSTEAD OF —
- * the generic `finding.updated` event, so "which severe findings were
- * deprioritised, and by whom" stays answerable without scanning every
- * `finding.updated` row's `newValues` for a `priority` key. Every other
- * field change (including `severity`) is reported by the generic
- * `finding.updated` event only.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -71,8 +48,6 @@ export class UpdateFindingUseCase {
     }
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the finding actually exists outside `scope`.
     const current = await this.findingRepository.findById(scope, input.findingId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -168,12 +143,6 @@ export class UpdateFindingUseCase {
         });
       }
 
-      // The generic `finding.updated` event carries every OTHER changed
-      // field — `priority` is deliberately excluded from it whenever it
-      // changed, since `finding.priority_changed` above already carries
-      // that fact; duplicating it in both events would be noise, not
-      // signal (the same "no second column carrying the identical value"
-      // discipline `grc-audit-allowlist.ts`'s header documents elsewhere).
       const { priority: _priorityPrev, ...otherPreviousValues } = previousValues;
       const { priority: _priorityNew, ...otherNewValues } = newValues;
       if (Object.keys(otherNewValues).length > 0) {

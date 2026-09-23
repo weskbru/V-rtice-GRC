@@ -1,24 +1,3 @@
-/**
- * T032/002-shared-grc-foundation, US1 — `ListEvidenceUseCase` (`listEvidence`,
- * FR-006, SC-010). Scoped register listing, mirroring
- * `modules/risk/application/list-risks.usecase.ts`'s shape.
- *
- * ## `subjectType`/`subjectId` — the "evidence panel on a domain screen" filter
- *
- * The original design contract had no way for a domain screen (the risk
- * detail page, US1's own SC-001: "vincula um risco ... sem sair do
- * contexto do risco") to ask "which evidence is linked to THIS record" —
- * `listEvidenceLinks` only answers the opposite direction (a known
- * evidence's own subjects). This is a spec/reality gap closed here,
- * additively: an optional pair of query parameters on the SAME endpoint,
- * both-or-neither. When present, the subject's own visibility is resolved
- * FIRST, through the exact same `EvidenceSubjectResolverPort` accessor
- * `LinkEvidenceUseCase`/`ListEvidenceLinksUseCase` already use — so this
- * filter can never become a side channel that discloses "evidence exists
- * for subject X" to a caller who could not otherwise see subject X at all
- * (R-010's own reasoning, applied to a new read path rather than only the
- * one the original design anticipated).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';
@@ -41,8 +20,6 @@ export interface ListEvidenceInput {
   readonly type?: EvidenceType | undefined;
   readonly ownerUserId?: string | undefined;
   readonly orgUnitId?: string | undefined;
-  /** ISO `YYYY-MM-DD` — evidence whose `validUntil` falls before this date
-   * (the expiry view, FR-006). */
   readonly expiringBefore?: string | undefined;
   readonly search?: string | undefined;
   readonly subjectType?: EvidenceSubjectType | undefined;
@@ -74,10 +51,6 @@ export class ListEvidenceUseCase {
     }
 
     if (input.subjectType !== undefined && input.subjectId !== undefined) {
-      // See this file's header — resolved BEFORE the filter reaches the
-      // repository, so an actor who cannot see the subject gets the SAME
-      // 404 `LinkEvidenceUseCase` would give them, never a filtered
-      // (but silently non-empty-implying) evidence list.
       const accessor = getEvidenceSubjectAccessor(input.subjectType);
       await accessor.resolveViewableSubject(input.actorUserId, input.subjectId);
     }
@@ -100,8 +73,6 @@ export class ListEvidenceUseCase {
       input.pageSize,
     );
 
-    // See `EvidenceLinkVisibilityService`'s own header for the accepted
-    // per-row cost of this loop (R-010's visible-only `linkCount`).
     const items = await Promise.all(
       page.items.map(async (record) => ({
         ...record,

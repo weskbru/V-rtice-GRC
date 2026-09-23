@@ -1,21 +1,3 @@
-/**
- * T016/004-compliance-management — proves the two deliberately-duplicated
- * closed vocabularies never drift apart (research.md D-9):
- * `ControlEffectivenessLevel` (`shared/grc-ports/control-effectiveness.port.ts`,
- * T014) and `ControlEffectiveness`
- * (`modules/controls/domain/control-effectiveness.service.ts`). Same
- * pattern as `control-effectiveness-parity.spec.ts` (Fase 2, T016 of
- * 003-controls-management) — that test confronts the domain calculator
- * against its SQL twin over real data; this one confronts two RUNTIME
- * value sets (a type is erased at compile time, so a "did the two enums
- * drift" question can only be answered by comparing actual arrays).
- *
- * Also exercises `PrismaControlEffectivenessAdapter.getEffectivenessBatch`
- * (T015) end to end against real seeded data — a batch of controls with
- * distinct assessment histories, confirming the port's own output values
- * are drawn from exactly the parity-checked vocabulary and agree with the
- * same domain calculator `ControlRepository` already uses.
- */
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 import {
@@ -90,8 +72,6 @@ describe('ControlEffectivenessLevel (port) and ControlEffectiveness (domain) nev
       expect(batch.get(unassessedControl.id)).toBe('NOT_ASSESSED');
       expect(batch.get(assessedControl.id)).toBe('EFFECTIVE');
 
-      // Every value the port produced is drawn from the parity-checked
-      // vocabulary, and agrees with the SAME domain calculator directly.
       for (const value of batch.values()) {
         expect(CONTROL_EFFECTIVENESS_LEVELS).toContain(value);
       }

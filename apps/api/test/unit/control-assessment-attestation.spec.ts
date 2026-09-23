@@ -1,8 +1,3 @@
-/**
- * T030/003-controls-management, User Story 2 — unit coverage for
- * `domain/control-assessment-attestation.ts`: C1 (assessor), C2 (owner),
- * and both together (research.md D-3, FR-017/FR-018/FR-019).
- */
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -1,53 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control detail, assessment history + attestation (T048, US2,
- * FR-009 to FR-020, FR-027).
- *
- * Lists every assessment ever recorded, newest first — an immutable,
- * append-only record (FR-010): no edit or delete affordance exists here at
- * all, by construction (there is nothing in this file that could mutate a
- * past row).
- *
- * The two segregation-of-duties refusals (FR-017, FR-018) are explained
- * proactively, in plain pt-BR, next to the attestation controls — not only
- * after a server refusal (CLAUDE.md §18.11). The decide buttons
- * (Atestar/Rejeitar) are additionally withheld client-side for a caller who
- * IS the assessor or IS the control's owner (an advisory courtesy, exactly
- * like `RiskLifecycleActions`'s own self-approval handling) — the server
- * remains the sole authority and re-checks unconditionally regardless.
- *
- * ## Volume-safe table (021-control-detail-experience, Fase D)
- *
- * `sm:table-fixed` with percentage `TableHead` widths — mirrors
- * `control-links-section.tsx`'s own identical Fase D fix, applied here
- * because this table's own two widest columns ("Conclusão", "Atestação")
- * previously relied on `min-w-[12rem]`/`min-w-[14rem]` with no
- * `table-fixed` at all, which forces the SAME per-cell floor at every
- * width (including 1440/1024, not just 390) that `min-width` always does,
- * regardless of table layout mode.
- *
- * No real assessment exists to measure this with at volume — an
- * assessment is immutable and append-only (FR-010, this file's own header
- * above): there is no delete endpoint (confirmed by reading `control-
- * assessment.controller.ts`), so creating real ones for this measurement
- * would leave data this task could never revert, exactly what the
- * coordinator's own instruction for this phase says not to do. Measured
- * instead by intercepting `GET .../assessments` with six FABRICATED rows
- * (long pt-BR conclusion text, a long assessor display name, every
- * attestation state) — this is evidence about RENDERING/LAYOUT only
- * (whether given text of a given length overflows a given column), never
- * a claim that any particular data combination is server-reachable, which
- * is the distinction `control-lifecycle-track.ts`'s own header comment
- * draws for the exact same reason. Found and fixed in the same pass: the
- * ORIGINAL 28%/30% split (Conclusão/Atestação) overflowed the Atestação
- * column by 12px at 1024 — a `REJEITADA` badge next to "Abrir ação de
- * remediação" (`Button`'s own base class hardcodes `whitespace-nowrap`,
- * so neither can wrap) — corrected to 26%/32%, reverified at 0px overflow
- * (a 1px difference remaining is sub-pixel rounding on the date column,
- * not a defect). Below `sm` the table reverts to `table-layout: auto`,
- * scrolling honestly within the existing `overflow-x-auto` wrapper.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -80,9 +32,7 @@ export interface ControlAssessmentHistoryProps {
   controlId: string;
   controlOwnerId: string | null;
   currentUserId: string;
-  /** `control:test` — required both to record an assessment and to request its attestation (contract). */
   canTest: boolean;
-  /** `control:approve` — required to decide a pending attestation. */
   canApprove: boolean;
   refreshToken?: number;
 }
@@ -231,14 +181,6 @@ export function ControlAssessmentHistory({
                     <TableHead className="w-[26%]">
                       {controls.assessment.history.columns.conclusion}
                     </TableHead>
-                    {/* 32%, not 28%: measured directly at 1024 (no aside —
-                        below `xl`, but still narrower here than 1440's own
-                        aside-bearing main column) with a `REJEITADA`
-                        attestation badge plus "Abrir ação de remediação" —
-                        `Button`'s own base class hardcodes
-                        `whitespace-nowrap`, so the stacked badge+buttons'
-                        natural width overflowed a 28% share by 12px. 32%
-                        clears it with margin. */}
                     <TableHead className="w-[32%]">
                       {controls.assessment.history.columns.attestation}
                     </TableHead>

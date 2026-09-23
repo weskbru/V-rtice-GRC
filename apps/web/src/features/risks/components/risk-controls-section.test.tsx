@@ -5,11 +5,6 @@ import { RiskControlsSection } from './risk-controls-section';
 
 import type { RiskControlLink, RiskDetail, RiskEntityLink } from '../types';
 
-/**
- * Component-mount evidence for T146 (`RiskControlsSection`, FR-076 to
- * FR-078, ADR-008, FR-102). `../api` is mocked at the network boundary.
- */
-
 const {
   listControlsMock,
   listProcessesMock,
@@ -161,9 +156,6 @@ describe('RiskControlsSection', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Desvincular' })).not.toBeInTheDocument();
-    // The picker's own trigger accessible name is `pickerAriaLabel`
-    // ("Selecionar X"), deliberately DIFFERENT from the adjacent button's
-    // "Vincular X" — see the identical fix in the e2e specs (Front H).
     expect(screen.getByRole('combobox', { name: 'Selecionar processo' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Selecionar ativo' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Selecionar controle' })).not.toBeInTheDocument();
@@ -196,14 +188,8 @@ describe('RiskControlsSection', () => {
       />,
     );
 
-    // 2026-09-17, Área 3 — controls' own picker is now behind a "Vincular
-    // controle" trigger (list/state first, link behind an action); reveal
-    // it before interacting, exactly like a real user would.
     fireEvent.click(screen.getByRole('button', { name: 'Vincular controle' }));
 
-    // The picker searches server-side as the user types (Front H) — opening
-    // it alone is no longer enough to reach an option; this mirrors the
-    // identical fix applied to the e2e specs driving the real component.
     fireEvent.click(screen.getByRole('combobox', { name: 'Selecionar controle' }));
     fireEvent.change(screen.getByPlaceholderText('Buscar controle por nome ou código'), {
       target: { value: 'acesso' },
@@ -235,7 +221,6 @@ describe('RiskControlsSection', () => {
     expect(
       screen.getByText(/O vínculo não é apagado: ele continua registrado no histórico/),
     ).toBeInTheDocument();
-    // Not yet unlinked — only confirming triggers the API call.
     expect(unlinkControlMock).not.toHaveBeenCalled();
   });
 
@@ -256,18 +241,11 @@ describe('RiskControlsSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Desvincular' }));
     await screen.findByText('Desvincular processo?');
-    // Once the dialog is open, Radix marks the rest of the page inert
-    // (`aria-hidden`), so the row's own "Desvincular" trigger is no longer
-    // reachable by role — the ONE remaining match is the dialog's own
-    // confirm button.
     fireEvent.click(screen.getByRole('button', { name: 'Desvincular' }));
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
   });
 
-  // 016-risk-detail-experience §4.4, R-6 — Controles moves to "Resposta",
-  // Processos/Ativos to "Relacionamentos"; `families` is what makes the
-  // split a rendering choice, never a second component.
   it('renders only the requested families, same endpoints and permissions either way', () => {
     const risk: RiskDetail = {
       ...baseRisk,
@@ -290,9 +268,6 @@ describe('RiskControlsSection', () => {
     expect(screen.queryByText('Nenhum ativo vinculado a este risco.')).not.toBeInTheDocument();
   });
 
-  // 2026-09-17, Área 3 — "Controles" gets the "list first, link behind an
-  // action" treatment; a non-empty list still shows a trigger, not the
-  // picker directly, and cancelling collapses it again without linking.
   it('keeps the picker behind a "Vincular controle" trigger even once controls are already linked, and cancel discards the draft', () => {
     const risk: RiskDetail = { ...baseRisk, controls: [controlLinkFixture({})] };
     render(
@@ -315,11 +290,6 @@ describe('RiskControlsSection', () => {
     expect(screen.getByRole('button', { name: 'Vincular controle' })).toBeInTheDocument();
   });
 
-  // Constraint from the coordinator's own blast-radius survey: gating is
-  // controls-only. Processos e Ativos must keep their picker immediately
-  // visible, exactly as before this rodada — `RelationshipSubsection` is
-  // shared by all three families, so a regression here would silently reach
-  // an area nobody asked to change.
   it('does NOT gate Processos/Ativos behind an action — their picker stays immediately visible', () => {
     render(
       <RiskControlsSection

@@ -1,14 +1,3 @@
-/**
- * T024/003-controls-management, User Story 1 — contract coverage for the
- * catalog and record operations of `contracts/controls.openapi.yaml`
- * (operations 1-4 of 6: `listControlCatalog`, `createControl`,
- * `getControl`, `updateControl`).
- *
- * Uses `buildControlsContractTestApp` (`support/controls-contract-app.ts`)
- * — the REAL `AppModule` with `ControlsModule` overridden by
- * `ControlsTestModule`, since this task does not own
- * `controls.module.ts`'s own wiring (see that file's header).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -40,7 +29,6 @@ interface ControlSummaryBody {
   readonly code: string;
   readonly name: string;
   readonly descriptionExcerpt: string | null;
-  /** Task A superset field — see `control-response.mapper.ts`'s header. */
   readonly description: string | null;
   readonly orgUnit: { readonly id: string } | null;
   readonly owner: { readonly id: string } | null;
@@ -48,7 +36,6 @@ interface ControlSummaryBody {
   readonly type: string | null;
   readonly frequency: string | null;
   readonly status: string;
-  /** Task A superset field. */
   readonly isActive: boolean;
   readonly effectiveness: string;
   readonly version: number;
@@ -197,11 +184,6 @@ describe('Control catalog and record (US1, operations 1-4)', () => {
 
       const response = await agent.get(`/api/v1/controls/${id}`).set('Origin', appOrigin);
       expect(response.status).toBe(200);
-      // The concurrency token (version, echoed via PATCH's ETag) and the
-      // cache validator are deliberately NOT conflated here: this GET's
-      // body carries `effectiveness`, derived fresh on every read and not
-      // reflected in `version` at all, so it cannot honestly assert a
-      // version-based ETag as a freshness validator.
       expect(response.headers.etag).toBeUndefined();
       expect(response.headers['cache-control']).toBe('no-store');
       const body = response.body as ControlDetailBody;
@@ -216,8 +198,6 @@ describe('Control catalog and record (US1, operations 1-4)', () => {
           name: 'Controle legado',
           orgUnitId,
           isActive: true,
-          // status defaults to DRAFT; owner/nature/type/frequency all
-          // omitted — exactly the Fase 1 minimal-registry shape.
         },
       });
       const agent = await agentWithPermissions(['control:view']);
@@ -379,15 +359,10 @@ describe('Control catalog and record (US1, operations 1-4)', () => {
         .query({ q: created.code });
 
       expect(response.status).toBe(200);
-      // Every row carries `effectiveness`, derived fresh on this read and
-      // never tied to that row's `version` — see `findById`'s own
-      // Cache-Control assertion below for the full reasoning this mirrors.
       expect(response.headers['cache-control']).toBe('no-store');
       const body = response.body as CatalogPageBody;
       expect(body.data).toHaveLength(1);
       const row = body.data[0]!;
-      // Superset of the retired `RegistryItem` shape (Task A): id/code/
-      // name/description/isActive all survive under the SAME field names.
       expect(row.id).toBe(id);
       expect(row.code).toBe(created.code);
       expect(row.name).toBe(created.name);

@@ -1,30 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, next-review capture and overdue indication
- * (T132, US4, FR-070).
- *
- * ## The date-only timezone bug (see `../date.ts`)
- *
- * `nextReviewOn` is a `date`, not a `date-time` (data-model.md §8,
- * risks.openapi.yaml). `new Date('2026-01-02')` parses a date-only string as
- * UTC midnight; formatting that with `toLocaleDateString()` in any timezone
- * behind UTC then renders as the PREVIOUS calendar day — a real bug this
- * project already hit and fixed once (`../date.ts`'s own header comment).
- * This component reuses `formatDateOnly`/`todayDateOnly` from that module
- * rather than touching `Date` directly, both to display the current value
- * and to seed the edit field's `defaultValue`.
- *
- * ## Overdue is never recomputed here
- *
- * `risk.overdueReview` arrives already computed by the server
- * (`isOverdueReview` in `risk-response.mapper.ts`, evaluated against the
- * server's own clock) — this component only reads that boolean. Comparing
- * `nextReviewOn` against `new Date()` here instead would risk exactly the
- * same client/server clock and timezone drift ADR-006 rejects for scores,
- * for the same underlying reason: two different clocks must never be
- * allowed to disagree about a fact the platform reports as objective.
- */
 import { FormField, StatusBadge } from '@pharos/design-system/components';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -44,7 +19,6 @@ import type { RiskDetail } from '../types';
 
 export interface RiskReviewScheduleProps {
   risk: RiskDetail;
-  /** The risk's current `ETag` (ADR-013) — required by `PATCH /risks/{riskId}`. */
   etag: string;
   onSaved: (result: { risk: RiskDetail; etag: string }) => void;
 }

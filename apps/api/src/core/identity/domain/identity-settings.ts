@@ -1,10 +1,3 @@
-/**
- * DI tokens + settings shapes for the identity capability (T059, T060,
- * T066). Duplicated from `AppConfigService`'s shapes rather than importing
- * them — `core-domain` may not import top-level `infrastructure` under
- * ADR-011; `identity.module.ts` is the only place that reads the real
- * `AppConfigService` and provides these tokens.
- */
 import type { PasswordPolicySettings } from './password-policy';
 
 export interface Argon2Settings {

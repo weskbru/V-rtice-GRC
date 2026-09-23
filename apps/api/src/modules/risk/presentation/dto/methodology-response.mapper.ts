@@ -1,9 +1,3 @@
-/**
- * T126 — maps `MethodologyVersionRecord` (`domain/ports/risk-methodology-
- * repository.port.ts`) plus its computed `isActive` flag
- * (`MethodologyQueryUseCase`) to `contracts/platform.openapi.yaml`'s
- * `RiskMethodologyVersion` response shape.
- */
 import type { MethodologyVersionWithActiveFlag } from '../../application/methodology-query.usecase';
 import type { MethodologyVersionRecord } from '../../domain/ports/risk-methodology-repository.port';
 

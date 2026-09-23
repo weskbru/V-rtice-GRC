@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework register column definitions (US1), mirroring
- * `features/controls/components/control-register-columns.tsx` (CLAUDE.md
- * §18.12). `origin` is a plain classification, not a lifecycle/severity
- * status — rendered as quiet text, the same treatment `control-register-
- * columns.tsx` gives `nature`/`type`/`frequency`, never a `StatusBadge`.
- */
 import { Link } from '@/components/navigation/link';
 import { compliance } from '@/lib/messages/compliance';
 

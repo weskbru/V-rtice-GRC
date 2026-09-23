@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — action detail, edit form. Edits exactly the four fields
- * `UpdateActionRequest` accepts — title, description, responsible, due
- * date — nothing else (origin, org unit and status are read-only here;
- * status changes only through a lifecycle transition, `ActionLifecycleActions`).
- *
- * Submits only the fields that actually changed from the loaded `action`
- * (a `PATCH` with every field restated would still be correct — the server
- * accepts a partial body — but sending only the diff keeps the audit
- * trail's own "changed fields" honest: `AUDIT_FIELD_LABELS`-driven rows in
- * `ActionAuditSection` should reflect what a person actually touched).
- */
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -50,10 +38,6 @@ export function ActionEditForm({
 
   const [title, setTitle] = useState(action.title);
   const [description, setDescription] = useState(action.description ?? '');
-  // Initialized from the loaded `action` itself, never from a fetched
-  // list (S-10) — `action.responsible` already carries its own `fullName`,
-  // so the current value's label is known even when this user falls
-  // outside whatever page a directory search would return.
   const [responsible, setResponsible] = useState(action.responsible);
   const [dueOn, setDueOn] = useState(action.dueOn);
   const [submitting, setSubmitting] = useState(false);
@@ -68,7 +52,6 @@ export function ActionEditForm({
     return Object.keys(next).length === 0;
   }
 
-  /** Only the fields that actually differ from the loaded `action` — see this file's own header. A key omitted entirely means "not part of this request", never "clear this field" (there is no way to clear `title`/`responsibleUserId`/`dueOn` — all three are required on `Action` itself; `description` clears via an explicit empty string, distinct from "unchanged"). */
   function buildDiff(): UpdateActionRequest {
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();

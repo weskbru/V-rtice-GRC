@@ -1,10 +1,3 @@
-/**
- * T030/004-compliance-management — matches
- * `contracts/compliance.openapi.yaml`'s `UpdateFrameworkRequest`: every
- * property optional (partial update), `additionalProperties: false`,
- * `minProperties: 1` enforced by the controller (mirrors
- * `UpdateControlRequestDto`'s identical convention).
- */
 import { IsIn, IsOptional, IsString, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

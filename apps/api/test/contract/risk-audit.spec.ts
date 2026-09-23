@@ -1,20 +1,3 @@
-/**
- * T164/US7 — the audit view requires `audit:view` (and `risk:view`) and is
- * scope-filtered: `GET /risks/{riskId}/audit-events`
- * (`contracts/risks.openapi.yaml`'s `listRiskAuditEvents` operation).
- *
- * D-11 coverage: the stated authorization rule (BOTH `risk:view` AND
- * `audit:view`, with the contract's own two-tier refusal — 404 for "cannot
- * see the risk at all", 403 for "can see it but lacks `audit:view`"), a
- * `401` for an unauthenticated caller, and the declared `{data, meta}`
- * response shape.
- *
- * US7 AS4/AS5's specific assertions: a caller without `audit:view` cannot
- * learn audit entries exist (403, not a 200 with an empty/partial page —
- * and never a stack trace or a hint of what the entries contain), and
- * there is no endpoint that modifies or deletes an audit entry (this
- * controller only ever exposes `GET`).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -81,7 +64,6 @@ describe('GET /risks/{riskId}/audit-events (T164, T168, D-11, US7)', () => {
     orgUnitId = orgUnit.id;
     const owner = await createUserFixture(prisma, { email: `${marker}-owner@example.test` });
     ownerUserId = owner.id;
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const category = await prisma.client.riskCategory.create({
       data: {
@@ -172,9 +154,6 @@ describe('GET /risks/{riskId}/audit-events (T164, T168, D-11, US7)', () => {
     const creator = await agentWithPermissions(['risk:create', 'risk:view', 'audit:view']);
     const id = await createRisk(creator);
 
-    // Holds `audit:view` but NOT `risk:view` — proves the 404 gate for
-    // "cannot see the risk" is checked BEFORE `audit:view`, per the
-    // contract's own stated order.
     const auditOnly = await agentWithPermissions(['audit:view']);
     const response = await auditOnly
       .get(`/api/v1/risks/${id}/audit-events`)

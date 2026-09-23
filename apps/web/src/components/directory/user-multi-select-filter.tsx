@@ -1,35 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — S-10, the multi-select sibling of `UserPicker` for register
- * filter toolbars (risk/control owner, and any future multi-value user
- * filter). `@pharos/design-system`'s own `MultiSelectFilter` has no search —
- * it is correct for bounded option sets (status, category, risk level) but
- * was never meant for an unbounded directory, and this component does not
- * modify it (owned by another workstream this phase; CLAUDE.md §18.3 still
- * applies: reuse its exact visual language — trigger button with a count
- * badge, popover panel, checkbox rows, `clear` action — rather than invent
- * a third one). The search row itself (icon, input, loading spinner) copies
- * `SearchablePicker`'s own markup verbatim for the same reason.
- *
- * ## Resolving a label for an ALREADY-selected id outside the current search
- *
- * `GET /users` (`list-directory-users-query.dto.ts`) accepts `q` (name/
- * e-mail) and `assignableForOrgUnitId`, never a lookup by id, and no id-based
- * endpoint is reachable without administrative permission
- * (`GET /admin/users/{userId}` requires `user:administer`) — so a filter
- * value persisted in the URL cannot always be re-resolved to a name by this
- * component alone. `knownUsers` lets the caller pass in labels it already
- * has for free — every register view already renders each row's own
- * owner/lead-auditor object, so a selected id that matches at least one
- * visible row (the common case: that is usually WHY the filter matched
- * anything) resolves with no extra request. When a selected id is in
- * neither `knownUsers` nor anything this component has itself searched up
- * so far, it falls back to showing the raw id — the same degraded, but
- * never silently wrong, behaviour the register filters already had before
- * this fix, now scoped to a documented, residual edge case instead of the
- * common one (S-10's actual defect).
- */
 import { Command as CommandPrimitive } from 'cmdk';
 import { Check, ChevronDown, Loader2, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -41,7 +11,6 @@ import { cn } from '@/lib/utils';
 import type { UserOption, UserSearchResult } from './user-option';
 
 export interface UserMultiSelectFilterLabels {
-  /** Visible trigger text AND the popover panel's accessible name (e.g. "Responsável"). */
   readonly label: string;
   readonly clearLabel?: string;
 }
@@ -51,15 +20,11 @@ export interface UserMultiSelectFilterProps {
   readonly selected: readonly string[];
   readonly onChange: (next: readonly string[]) => void;
   readonly onSearch: (query: string) => Promise<UserSearchResult>;
-  /** Labels for already-selected ids the caller already knows about (e.g.
-   * derived from the currently loaded register rows) — see this file's own
-   * header for why this exists instead of a by-id lookup. */
   readonly knownUsers?: ReadonlyMap<string, UserOption>;
   readonly disabled?: boolean;
   readonly className?: string;
 }
 
-/** Debounce window — mirrors `SearchablePicker`'s own default exactly. */
 const DEBOUNCE_MS = 300;
 
 export function UserMultiSelectFilter({
@@ -76,20 +41,12 @@ export function UserMultiSelectFilter({
   const [result, setResult] = useState<UserSearchResult | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const requestIdRef = useRef(0);
-  // Every user this component has ever seen (any search result, plus
-  // `knownUsers`) — accumulated so a row already shown once does not lose
-  // its name if it scrolls out of the current search result set.
   const [seen, setSeen] = useState<ReadonlyMap<string, UserOption>>(new Map());
 
   useEffect(() => {
     if (!open) return undefined;
     const requestId = ++requestIdRef.current;
 
-    // Nested and invoked, rather than a bare top-level `setState` in the
-    // effect body — `react-hooks/set-state-in-effect` (a synchronous
-    // setState directly in an effect risks a cascading render); one that
-    // kicks off an async fetch and reports its outcome does not. Mirrors
-    // `RiskForm`'s own identical `run()`/`void run()` shape.
     function start(): ReturnType<typeof setTimeout> {
       setIsLoading(true);
       return setTimeout(
@@ -117,15 +74,11 @@ export function UserMultiSelectFilter({
 
     const timeout = start();
     return () => clearTimeout(timeout);
-    // `onSearch` deliberately excluded — same reasoning as `SearchablePicker`
-    // (`packages/design-system/src/components/form/searchable-picker.tsx`):
-    // it is expected to be referentially stable per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, query]);
 
   useEffect(() => {
     if (!open) {
-      // Nested and invoked — same `react-hooks/set-state-in-effect` reasoning as above.
       function reset(): void {
         setQuery('');
         setResult(undefined);
@@ -157,8 +110,6 @@ export function UserMultiSelectFilter({
   const options = result?.data ?? [];
   const showEmpty = !isLoading && result !== undefined && options.length === 0;
   const showPartialHint = !isLoading && (result?.isPartial ?? false) && options.length > 0;
-  // Selected ids not present in the current search result still need a row
-  // so the user can see what is active and clear it from here too.
   const selectedNotInResults = selected.filter((id) => !options.some((user) => user.id === id));
 
   return (
@@ -280,5 +231,4 @@ export function UserMultiSelectFilter({
   );
 }
 
-/** Re-exported so callers don't need a second import for the same shape `UserPicker` already exports. */
 export type { UserOption, UserSearchResult };

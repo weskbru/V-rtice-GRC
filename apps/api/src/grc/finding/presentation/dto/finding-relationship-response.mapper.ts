@@ -1,12 +1,3 @@
-/**
- * T072/005-audit-findings, US3 — maps `FindingControlLinkRecord`/
- * `FindingRiskLinkRecord` to the wire shape
- * `specs/005-audit-findings/contracts/audit.openapi.yaml`'s
- * `FindingControlLink`/`FindingRiskLink` schemas describe. Mirrors
- * `modules/risk/presentation/dto/risk-relationship-response.mapper.ts`
- * exactly — ONE mapper per resource is the only place a domain object
- * becomes this DTO (ADR-009).
- */
 import type {
   FindingControlLinkRecord,
   FindingControlLinkUserRef,

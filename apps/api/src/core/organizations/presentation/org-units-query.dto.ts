@@ -1,8 +1,3 @@
-/**
- * T096a — matches `GET /org-units`'s `status` query parameter
- * (`contracts/admin.openapi.yaml`): `ACTIVE | INACTIVE`, defaulting to
- * `ACTIVE`.
- */
 import { IsIn, IsOptional } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../shared/messages/user-messages';

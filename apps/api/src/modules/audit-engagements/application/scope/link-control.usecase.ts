@@ -1,15 +1,3 @@
-/**
- * T030/005-audit-findings, User Story 1 — `LinkAuditScopeToControlUseCase`
- * (`POST /audits/{auditId}/scope/controls`, `addControlToScope` operation).
- * Reuses `ControlDirectoryPort` unchanged (ADR-020 part 3) — the same
- * boundary port `modules/risk`/`modules/compliance` already depend on.
- * The control must exist, be `ACTIVE`, and its organizational unit must
- * lie within the caller's resolved scope — checked and recorded BEFORE
- * any write (ADR-020 part 4, research.md D-11); AND the caller must hold
- * `control:view` (ADR-020 part 5) — all four failures fold into the SAME
- * `422`, indistinguishable from a nonexistent control, mirroring
- * `LinkRequirementToControlUseCase`'s own shape exactly.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

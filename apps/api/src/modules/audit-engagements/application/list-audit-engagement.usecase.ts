@@ -1,9 +1,3 @@
-/**
- * T026/005-audit-findings, User Story 1 — `ListAuditEngagementUseCase`: the
- * read side of `GET /audits` (`listAuditEngagements` operation, FR-018).
- * No transaction, no audit entry — reads are not audited (ADR-005),
- * mirroring `ListControlsUseCase`'s own reasoning.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

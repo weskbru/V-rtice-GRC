@@ -1,31 +1,3 @@
-/**
- * 009-indicators-reports, T032 — SC-001. Proves, for every
- * `IndicatorMetricKey` whose `scopeApplicability` is `'ORGANIZATIONAL_UNIT'`
- * (ten of the eleven, data-model.md §3), that the value
- * `GetIndicatorCurrentValueUseCase` returns for a caller scoped to exactly
- * ONE organizational unit is identical to a manual count built by a query
- * this file writes itself — directly against Prisma, filtered by the SAME
- * unit — never by calling the metric provider or its underlying port under
- * test. Two independently-written paths landing on the same number is the
- * actual proof; a test that only re-invoked the provider under a different
- * name would prove nothing (spec.md SC-001, this task's own instructions).
- *
- * Each scenario also proves the SYMMETRIC half spec.md's own edge cases and
- * research.md D-8/FR-007 require: data seeded in a SECOND organizational
- * unit, never visible to the caller, is verified to exist (a nonzero
- * independent count) and yet never reflected in the caller's result — a
- * test that only checked "what's inside" would pass identically whether or
- * not the scope filter had been deleted, exactly the vacuous-guard pattern
- * this repository has already paid for more than once (see this task's own
- * briefing, and `incident-problem-links-source-scope.spec.ts`, the model
- * this file follows for shape and rigor).
- *
- * `COMPLIANCE_PERCENTAGE` (the ONE `'ORGANIZATION_WIDE'` key, research.md
- * D-8: `Requirement`/`FrameworkVersion` have no `orgUnitId` column at all)
- * gets the OPPOSITE proof at the end of this file: two callers scoped to
- * two DIFFERENT organizational units must see the IDENTICAL value — turning
- * a documented decision into a verified one, not merely a comment.
- */
 import { randomUUID } from 'node:crypto';
 
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
@@ -63,9 +35,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     await ctx.close();
   });
 
-  /** Two fresh organizational units per scenario: `unitA` is where the
-   * caller is scoped; `unitB` exists purely to prove out-of-scope data
-   * never leaks in. */
   async function createTwoUnits(prefix: string): Promise<{
     unitA: OrganizationalUnit;
     unitB: OrganizationalUnit;
@@ -75,7 +44,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     return { unitA, unitB };
   }
 
-  /** A caller scoped to exactly `orgUnit`, holding `permissions`. */
   async function createUnitScopedActor(
     prefix: string,
     orgUnit: OrganizationalUnit,
@@ -93,9 +61,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     return actor;
   }
 
-  // ---------------------------------------------------------------------
-  // RISK_TOTAL_BY_LEVEL — BY_BUCKET (data-model.md §3)
-  // ---------------------------------------------------------------------
   it('RISK_TOTAL_BY_LEVEL — bucket count by residualLevel matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('risk-level');
     const actor = await createUnitScopedActor('risk-level-actor', unitA, [
@@ -120,8 +85,7 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     await createRisk(unitA.id, 'HIGH');
     await createRisk(unitA.id, 'HIGH');
     await createRisk(unitA.id, 'LOW');
-    await createRisk(unitA.id, null); // No residual level yet — must fall into no bucket.
-    // unitB — must never be counted for the unitA-scoped caller.
+    await createRisk(unitA.id, null);
     await createRisk(unitB.id, 'HIGH');
     await createRisk(unitB.id, 'HIGH');
     await createRisk(unitB.id, 'HIGH');
@@ -142,7 +106,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     };
     expect(expectedUnitA).toEqual({ LOW: 1, MEDIUM: 0, HIGH: 2, CRITICAL: 0 });
 
-    // unitB has qualifying data — proves there is something real to leak.
     const unitBHighCount = await ctx.prisma.client.risk.count({
       where: { orgUnitId: unitB.id, residualLevel: 'HIGH' },
     });
@@ -157,9 +120,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.valueByBucket).toEqual(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // RISK_TREATMENT_OVERDUE_COUNT — SINGLE_VALUE, join through Action.originId
-  // ---------------------------------------------------------------------
   it('RISK_TREATMENT_OVERDUE_COUNT — overdue treatment-action count matches a manual risk->action join, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('risk-treatment');
     const actor = await createUnitScopedActor('risk-treatment-actor', unitA, [
@@ -199,15 +159,10 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
       return risk;
     }
 
-    // unitA: one genuinely overdue treatment action, one not-yet-due.
     await createRiskWithTreatmentAction(unitA.id, 'OPEN', yesterday);
     await createRiskWithTreatmentAction(unitA.id, 'OPEN', tomorrow);
-    // unitB: an overdue treatment action that must never leak into unitA's count.
     await createRiskWithTreatmentAction(unitB.id, 'OPEN', yesterday);
 
-    // Manual, independent path: find risk ids per unit, then count actions
-    // by that origin id set — never calling `RiskDashboardMetricsPort`/
-    // `DashboardQueryService` (the code under test).
     async function manualOverdueTreatmentCount(orgUnitId: string): Promise<number> {
       const riskIds = (
         await ctx.prisma.client.risk.findMany({ where: { orgUnitId }, select: { id: true } })
@@ -228,7 +183,7 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     const expectedUnitA = await manualOverdueTreatmentCount(unitA.id);
     expect(expectedUnitA).toBe(1);
     const unitBCount = await manualOverdueTreatmentCount(unitB.id);
-    expect(unitBCount).toBe(1); // Real, qualifying data exists to leak.
+    expect(unitBCount).toBe(1);
 
     const result = await useCase.execute({
       actorUserId: actor.id,
@@ -238,9 +193,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.value).toBe(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // CONTROL_INACTIVE_COUNT — SINGLE_VALUE
-  // ---------------------------------------------------------------------
   it('CONTROL_INACTIVE_COUNT — non-ACTIVE control count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('control-inactive');
     const actor = await createUnitScopedActor('control-inactive-actor', unitA, [
@@ -261,8 +213,8 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
 
     await createControl(unitA.id, 'DRAFT');
     await createControl(unitA.id, 'SUSPENDED');
-    await createControl(unitA.id, 'ACTIVE'); // must not count
-    await createControl(unitB.id, 'RETIRED'); // must not leak
+    await createControl(unitA.id, 'ACTIVE');
+    await createControl(unitB.id, 'RETIRED');
 
     const expectedUnitA = await ctx.prisma.client.control.count({
       where: { orgUnitId: unitA.id, status: { in: ['DRAFT', 'SUSPENDED', 'RETIRED'] } },
@@ -281,9 +233,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.value).toBe(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // AUDIT_ENGAGEMENT_OPEN_COUNT — SINGLE_VALUE
-  // ---------------------------------------------------------------------
   it('AUDIT_ENGAGEMENT_OPEN_COUNT — open-engagement count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('audit-open');
     const actor = await createUnitScopedActor('audit-open-actor', unitA, [
@@ -306,8 +255,8 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     }
 
     await createEngagement(unitA.id, 'PLANNING');
-    await createEngagement(unitA.id, 'COMPLETED'); // must not count
-    await createEngagement(unitB.id, 'IN_PROGRESS'); // must not leak
+    await createEngagement(unitA.id, 'COMPLETED');
+    await createEngagement(unitB.id, 'IN_PROGRESS');
 
     const expectedUnitA = await ctx.prisma.client.auditEngagement.count({
       where: { orgUnitId: unitA.id, status: { in: ['PLANNING', 'IN_PROGRESS'] } },
@@ -326,9 +275,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.value).toBe(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // FINDING_OPEN_COUNT_BY_SEVERITY — BY_BUCKET
-  // ---------------------------------------------------------------------
   it('FINDING_OPEN_COUNT_BY_SEVERITY — open-finding bucket count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('finding-open');
     const actor = await createUnitScopedActor('finding-open-actor', unitA, [
@@ -356,8 +302,8 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
 
     await createFinding(unitA.id, 'CRITICAL', 'OPEN');
     await createFinding(unitA.id, 'HIGH', 'IN_REMEDIATION');
-    await createFinding(unitA.id, 'MEDIUM', 'CLOSED'); // must not count (not open)
-    await createFinding(unitB.id, 'CRITICAL', 'OPEN'); // must not leak
+    await createFinding(unitA.id, 'MEDIUM', 'CLOSED');
+    await createFinding(unitB.id, 'CRITICAL', 'OPEN');
 
     const severities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const;
     const expectedUnitA: Record<string, number> = {};
@@ -389,9 +335,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.valueByBucket).toEqual(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // ASSET_INACTIVE_COUNT — SINGLE_VALUE
-  // ---------------------------------------------------------------------
   it('ASSET_INACTIVE_COUNT — inactive-asset count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('asset-inactive');
     const actor = await createUnitScopedActor('asset-inactive-actor', unitA, [
@@ -412,8 +355,8 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
 
     await createAsset(unitA.id, false);
     await createAsset(unitA.id, false);
-    await createAsset(unitA.id, true); // must not count
-    await createAsset(unitB.id, false); // must not leak
+    await createAsset(unitA.id, true);
+    await createAsset(unitB.id, false);
 
     const expectedUnitA = await ctx.prisma.client.asset.count({
       where: { orgUnitId: unitA.id, isActive: false },
@@ -432,9 +375,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.value).toBe(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // PROCESS_INACTIVE_COUNT — SINGLE_VALUE
-  // ---------------------------------------------------------------------
   it('PROCESS_INACTIVE_COUNT — inactive-process count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('process-inactive');
     const actor = await createUnitScopedActor('process-inactive-actor', unitA, [
@@ -454,8 +394,8 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     }
 
     await createProcess(unitA.id, false);
-    await createProcess(unitA.id, true); // must not count
-    await createProcess(unitB.id, false); // must not leak
+    await createProcess(unitA.id, true);
+    await createProcess(unitB.id, false);
 
     const expectedUnitA = await ctx.prisma.client.process.count({
       where: { orgUnitId: unitA.id, isActive: false },
@@ -474,11 +414,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.value).toBe(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // ACTION_OVERDUE_COUNT — SINGLE_VALUE (basic per-domain parity; the
-  // predicate-parity guard against `isActionOverdue` lives in its own file,
-  // `action-overdue-count-predicate-parity.spec.ts` — item 2 of this task).
-  // ---------------------------------------------------------------------
   it('ACTION_OVERDUE_COUNT — overdue-action count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('action-overdue');
     const actor = await createUnitScopedActor('action-overdue-actor', unitA, [
@@ -493,10 +428,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     async function createAction(orgUnitId: string, status: string, dueOn: Date) {
-      // Invariant A1 (DB CHECK `actions_completed_status_check`): `status =
-      // 'COMPLETED'` iff `completedAt IS NOT NULL`, paired with
-      // `completedByUserId` — both filled together whenever this helper is
-      // asked for a COMPLETED row.
       const completed = status === 'COMPLETED';
       return ctx.prisma.client.action.create({
         data: {
@@ -514,16 +445,11 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
       });
     }
 
-    await createAction(unitA.id, 'OPEN', yesterday); // overdue
-    await createAction(unitA.id, 'OPEN', tomorrow); // not yet due
-    await createAction(unitA.id, 'COMPLETED', yesterday); // terminal — never overdue
-    await createAction(unitB.id, 'OPEN', yesterday); // must not leak
+    await createAction(unitA.id, 'OPEN', yesterday);
+    await createAction(unitA.id, 'OPEN', tomorrow);
+    await createAction(unitA.id, 'COMPLETED', yesterday);
+    await createAction(unitB.id, 'OPEN', yesterday);
 
-    // Manual, independent path: the two eligible statuses spelled out
-    // directly from data-model.md §6 ("status ∈ {OPEN, IN_PROGRESS}"), not
-    // imported from `grc/shared/domain/overdue.service.ts`'s own constant —
-    // this is a genuinely separate restatement of the rule, not the
-    // production code under test.
     const expectedUnitA = await ctx.prisma.client.action.count({
       where: { orgUnitId: unitA.id, status: { in: ['OPEN', 'IN_PROGRESS'] }, dueOn: { lt: today } },
     });
@@ -541,9 +467,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.value).toBe(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // INCIDENT_OPEN_COUNT_BY_SEVERITY — BY_BUCKET
-  // ---------------------------------------------------------------------
   it('INCIDENT_OPEN_COUNT_BY_SEVERITY — open-incident bucket count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('incident-open');
     const actor = await createUnitScopedActor('incident-open-actor', unitA, [
@@ -568,9 +491,9 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     }
 
     await createIncident(unitA.id, 'CRITICAL', 'OPEN');
-    await createIncident(unitA.id, 'HIGH', 'RESOLVED'); // still "open" per OPEN_INCIDENT_STATUSES
-    await createIncident(unitA.id, 'MEDIUM', 'CLOSED'); // must not count
-    await createIncident(unitB.id, 'CRITICAL', 'OPEN'); // must not leak
+    await createIncident(unitA.id, 'HIGH', 'RESOLVED');
+    await createIncident(unitA.id, 'MEDIUM', 'CLOSED');
+    await createIncident(unitB.id, 'CRITICAL', 'OPEN');
 
     const severities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const;
     const expectedUnitA: Record<string, number> = {};
@@ -602,9 +525,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.valueByBucket).toEqual(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // PROBLEM_OPEN_COUNT_BY_SEVERITY — BY_BUCKET
-  // ---------------------------------------------------------------------
   it('PROBLEM_OPEN_COUNT_BY_SEVERITY — open-problem bucket count matches a per-unit Prisma count, unitB excluded', async () => {
     const { unitA, unitB } = await createTwoUnits('problem-open');
     const actor = await createUnitScopedActor('problem-open-actor', unitA, [
@@ -628,9 +548,9 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     }
 
     await createProblem(unitA.id, 'CRITICAL', 'OPEN');
-    await createProblem(unitA.id, 'HIGH', 'IN_ANALYSIS'); // still "open"
-    await createProblem(unitA.id, 'MEDIUM', 'CLOSED'); // must not count
-    await createProblem(unitB.id, 'CRITICAL', 'OPEN'); // must not leak
+    await createProblem(unitA.id, 'HIGH', 'IN_ANALYSIS');
+    await createProblem(unitA.id, 'MEDIUM', 'CLOSED');
+    await createProblem(unitB.id, 'CRITICAL', 'OPEN');
 
     const severities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const;
     const expectedUnitA: Record<string, number> = {};
@@ -662,12 +582,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
     expect(result.valueByBucket).toEqual(expectedUnitA);
   });
 
-  // ---------------------------------------------------------------------
-  // COMPLIANCE_PERCENTAGE — the ONE 'ORGANIZATION_WIDE' key (research.md
-  // D-8). The opposite proof: two callers scoped to DIFFERENT units must
-  // see the IDENTICAL value, because `Requirement`/`FrameworkVersion` carry
-  // no organizational-unit column at all.
-  // ---------------------------------------------------------------------
   it('COMPLIANCE_PERCENTAGE — two callers scoped to different units see the identical value (research.md D-8)', async () => {
     const { unitA, unitB } = await createTwoUnits('compliance-orgwide');
     const actorA = await createUnitScopedActor('compliance-actor-a', unitA, [
@@ -679,10 +593,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
       'compliance:view',
     ]);
 
-    // A framework, a PUBLISHED version, one requirement, one ACTIVE control
-    // proven EFFECTIVE by an attested assessment, and the link between them
-    // — enough for `calculateRequirementComplianceState` to reach
-    // `COMPLIANT` (100%), a genuinely non-zero, non-trivial percentage.
     const framework = await ctx.prisma.client.framework.create({
       data: {
         code: uniqueTestMarker('fmk'),
@@ -750,8 +660,6 @@ describe('GetIndicatorCurrentValueUseCase — organizational-scope parity, one p
 
     expect(resultForUnitA.scopeApplicability).toBe('ORGANIZATION_WIDE');
     expect(resultForUnitB.scopeApplicability).toBe('ORGANIZATION_WIDE');
-    // Non-trivial: proves the calculation genuinely ran (not a stub always
-    // returning the same constant regardless of input).
     expect(resultForUnitA.value).toBe(100);
     expect(resultForUnitA.value).toBe(resultForUnitB.value);
   });

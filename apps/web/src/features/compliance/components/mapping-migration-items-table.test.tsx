@@ -5,12 +5,6 @@ import { MappingMigrationItemsTable } from './mapping-migration-items-table';
 
 import type { MappingMigrationItem } from '../types';
 
-/**
- * Component-mount evidence for `MappingMigrationItemsTable` (US2, SC-004).
- * `PENDING_DECISION` must render as unfinished work, never as success
- * (CLAUDE.md §18.11) — this is the one behaviour this table exists to get
- * right, so it is asserted directly against the rendered badge.
- */
 function itemFixture(overrides: Partial<MappingMigrationItem>): MappingMigrationItem {
   return {
     targetRequirement: { id: 'req-2', externalRef: 'A.5.1', title: 'Política de segurança' },

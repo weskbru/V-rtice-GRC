@@ -1,15 +1,3 @@
-/**
- * T176 — `GET /admin/users/{userId}` and the response body of every other
- * `/admin/users/{userId}/**` mutation (`contracts/admin.openapi.yaml`'s
- * `UserDetail` = `User` + `scopeGrants`).
- *
- * `scopeGrants` is fetched via `ScopeGrantService` (`core/organizations`,
- * cross-capability core-application dependency, unrestricted by ADR-011)
- * rather than duplicating its detailed-grant query in
- * `UserDirectoryPort` — one source of truth for "what does a scope grant
- * look like with its org-unit/granted-by refs resolved" (that service's
- * own `list` method).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';

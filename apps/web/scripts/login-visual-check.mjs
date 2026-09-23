@@ -4,7 +4,6 @@ import AxeBuilder from '@axe-core/playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-// Read-only visual/interaction checks against the running application. No accounts are created or rotated.
 const origin = process.env.APP_ORIGIN ?? 'http://localhost:3000';
 const output = process.argv[2] ?? '../../docs/reviews/ui/login-proteus';
 const sizes = [
@@ -82,7 +81,6 @@ try {
     'E-mail ou senha incorretos.',
   );
   results.push({ invalidCredentials: true, enter: true, passwordVisibility: true });
-  // A delayed real request verifies the loading state and prevents a duplicate submit.
   if (process.env.SEED_ADMIN_EMAIL && process.env.SEED_ADMIN_PASSWORD) {
     let submissions = 0;
     await page.route('**/api/v1/auth/login', async (route) => {

@@ -1,36 +1,8 @@
-/**
- * PharosGRC — Evidência (pt-BR), 002-shared-grc-foundation, T004.
- *
- * Follows `risks.ts`'s own modular convention (CLAUDE.md §11.1): one file
- * per GRC kernel capability, registered in `index.ts`, never inlined in a
- * component. `apps/web` has no `@prisma/client` dependency (that is an API
- * package concern), so the three union types below are hand-authored to
- * mirror `specs/002-shared-grc-foundation/data-model.md` §2's
- * `EvidenceType`/`EvidenceSource`/`EvidenceStatus` enums exactly — the same
- * choice `features/risks/types.ts` already makes for `RiskStatus`/
- * `RiskLevel` (see that file's own comment). A future
- * `features/evidence/types.ts` (US1, out of this task's scope) should
- * import these types from here rather than re-declaring them, the same way
- * `risks.ts` imports `RiskStatus`/`RiskLevel` FROM `features/risks/types.ts`
- * — whichever file is authored first for a given union is its source, and
- * the sibling file imports it.
- *
- * `satisfies Record<EvidenceType, string>` (F-1, `docs/deferred-findings.md`):
- * a value added to the union below without adding its label is a **compile
- * error**, never a raw English identifier silently shown to a Brazilian
- * user.
- */
-
-/** Mirrors `enum EvidenceType` (data-model.md §2). */
 export type EvidenceType =
   'DOCUMENT' | 'SCREENSHOT' | 'SYSTEM_LOG' | 'ATTESTATION' | 'INSPECTION' | 'OTHER';
 
-/** Mirrors `enum EvidenceSource` (data-model.md §2, FR-010). */
 export type EvidenceSource = 'MANUAL_UPLOAD' | 'SYSTEM_EXPORT' | 'THIRD_PARTY' | 'INSPECTION';
 
-/** Mirrors `enum EvidenceStatus` (data-model.md §2) — deliberately only
- * two members; `expired` is a derived, read-time boolean, never a status
- * value (see the enum's own comment in `schema.prisma`). */
 export type EvidenceStatus = 'ACTIVE' | 'ARCHIVED';
 
 export const evidence = {
@@ -55,13 +27,6 @@ export const evidence = {
     ARCHIVED: 'Arquivada',
   } satisfies Record<EvidenceStatus, string>,
 
-  /**
-   * T036-T038/002-shared-grc-foundation, US1 — the evidence panel
-   * consumed by any domain screen (currently the risk detail screen's own
-   * "Evidência" tab, R-009: no new sidebar entry). Follows `risks.ts`'s
-   * `attachments`/`comments` blocks as the established shape for a
-   * collaboration-style panel embedded in another entity's detail screen.
-   */
   panel: {
     cardTitle: 'Evidência',
     cardDescription:
@@ -102,14 +67,7 @@ export const evidence = {
     linkError: 'A evidência foi registrada, mas não foi possível vinculá-la automaticamente.',
   },
 
-  /**
-   * `EvidenceAttachmentsSection` (assurance-audit Fix 1) — one file list per
-   * evidence card, following `risks.ts`'s own `attachments` block as the
-   * established shape for `AttachmentList`'s labels
-   * (`@pharos/design-system/components`, D-10).
-   */
   attachments: {
-    /** Visible small-caps label above the per-evidence attachment list — not a `Card` title, since this section is not its own card (see that component's own comment). */
     sectionTitle: 'Anexos',
     caption: (evidenceLabel: string): string => `Anexos de ${evidenceLabel}`,
     loading: 'Carregando anexos…',
@@ -136,8 +94,6 @@ export const evidence = {
     withdrawError: 'Não foi possível remover o anexo. Tente novamente.',
   },
 
-  /** `EvidenceCreateDialog` (T036) — matches
-   * `contracts/grc-foundation.openapi.yaml`'s `CreateEvidenceRequest`. */
   form: {
     title: 'Registrar evidência',
     description:

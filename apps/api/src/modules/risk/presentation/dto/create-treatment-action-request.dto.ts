@@ -1,7 +1,3 @@
-/**
- * T143 — matches `contracts/risks.openapi.yaml`'s
- * `CreateRiskTreatmentActionRequest` exactly (`additionalProperties: false`).
- */
 import { IsDateString, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

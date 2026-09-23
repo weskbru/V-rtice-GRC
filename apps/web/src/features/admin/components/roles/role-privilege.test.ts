@@ -4,26 +4,6 @@ import { PRIVILEGED_PERMISSION_IDENTIFIERS, isPrivilegedRole } from './role-priv
 
 import type { Permission, Role } from '../../types';
 
-/**
- * 015-roles-permissions-surface — the client-side guard ADR-021 asks for
- * (spec.md FR-035/FR-036, SC-005).
- *
- * Two things are being protected here, and the second one is why this file
- * exists at all:
- *
- * 1. The classification is a PURE function of the role's own permission
- *    list: the three governance identifiers, and only those three, make it
- *    true. The `risk:administer` case below is the one that distinguishes
- *    the chosen rule from the alternative research.md R-001 discarded
- *    ("anything whose action is ADMINISTER"), which would have marked 6 of
- *    the 12 seeded roles and said something false about the security model.
- *
- * 2. The classification reaches nothing but the screen. This module imports
- *    a type and nothing else — no client, no store, no request — so a
- *    reviewer can see at a glance that no authorization decision, no fetch
- *    and no rendering of sensitive data can depend on it.
- */
-
 function permission(identifier: string): Permission {
   const separator = identifier.indexOf(':');
   return {
@@ -64,11 +44,6 @@ describe('isPrivilegedRole', () => {
     ).toBe(true);
   });
 
-  /**
-   * The case that makes the rule meaningful: `risk:administer` administers a
-   * business domain, not access. A role holding it — and none of the three —
-   * is NOT privileged, however many other permissions it carries.
-   */
   it('does NOT classify risk:administer as privileged, alone or among many', () => {
     expect(isPrivilegedRole(role(['risk:administer']))).toBe(false);
     expect(
@@ -114,11 +89,6 @@ describe('isPrivilegedRole', () => {
 });
 
 describe('PRIVILEGED_PERMISSION_IDENTIFIERS', () => {
-  /**
-   * ADR-021 names three identifiers. A fourth added here silently would
-   * widen the label without the ADR that authorizes it — so the set itself
-   * is asserted, not only its effect.
-   */
   it('is exactly the three governance identifiers ADR-021 names', () => {
     expect([...PRIVILEGED_PERMISSION_IDENTIFIERS].sort()).toEqual([
       'org_unit:administer',

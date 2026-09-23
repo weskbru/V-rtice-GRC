@@ -1,12 +1,3 @@
-/**
- * The sole implementation of `IncidentRiskLinkReadPort`
- * (`shared/grc-ports/incident-risk-link-read.port.ts`, ADR-020 part 3).
- * `modules/incidents` OWNS `IncidentRiskLink` (and `Incident`), so this
- * adapter is the one place in the platform allowed to query it on behalf
- * of another module — mirrors
- * `modules/risk/infrastructure/risk-control-link-read.adapter.ts` exactly,
- * for the opposite direction.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

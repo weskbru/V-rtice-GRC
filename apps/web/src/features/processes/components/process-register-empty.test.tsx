@@ -6,11 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { ProcessRegisterEmpty } from './process-register-empty';
 
-/**
- * Component-mount evidence mirroring `control-register-empty.test.tsx`
- * (T046/T051) — the two empty states must be textually distinct and each
- * drive its own next action (US1, CLAUDE.md §18.11).
- */
 describe('ProcessRegisterEmpty', () => {
   it('shows "no process registered yet" (never "no results") when no filters are applied', () => {
     render(

@@ -1,21 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement catalog column definitions (T076), mirroring
- * `features/controls/components/control-register-columns.tsx` (CLAUDE.md
- * §18.12).
- *
- * `enableSorting` is `false` on every column whose field is absent from
- * `GET /audits`'s `sort` enum (`code, periodStart, updatedAt` —
- * audit.openapi.yaml) — `objective`, `orgUnit`, `leadAuditor` and `status`
- * are shown but never offered as a sortable column header. The "Período"
- * column's own id is `periodStart` (not a made-up `period`) so it lines up
- * exactly with the one server sort field it represents.
- *
- * Status pairs an icon with its colour and text label (`StatusBadge`,
- * CLAUDE.md §18.8) — never colour alone; the four engagement states are
- * additionally distinguishable by their icon shape (see `../status`).
- */
 import { StatusBadge } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

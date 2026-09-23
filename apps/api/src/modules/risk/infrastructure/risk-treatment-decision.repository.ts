@@ -1,9 +1,3 @@
-/**
- * T139 — the sole implementation of `RiskTreatmentDecisionRepositoryPort`.
- * No scope predicate anywhere in this file — same "the caller already
- * authorized the parent risk" reasoning as `RiskAssessmentRepository`
- * (`risk-assessment.repository.ts`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -44,15 +38,6 @@ export class RiskTreatmentDecisionRepository implements RiskTreatmentDecisionRep
     return toRecord(created);
   }
 
-  /**
-   * FR-073 — the ONLY `UPDATE` this repository ever issues against this
-   * table, and the ONLY one the `risk_treatment_decisions_append_only`
-   * trigger (`20260905160100_risk_treatment_and_relationships_baseline`)
-   * will accept: setting exactly `superseded_at`/`superseded_by_id` on a
-   * row whose `superseded_at` is currently `NULL`. Any other shape of
-   * `UPDATE` against this table — from this repository or anywhere else —
-   * is rejected at the database level, not merely by convention.
-   */
   async supersede(id: string, supersededById: string, supersededAt: Date): Promise<void> {
     await this.prisma.client.riskTreatmentDecision.update({
       where: { id },

@@ -1,9 +1,3 @@
-/**
- * T153/T156 — the sole implementation of
- * `RiskLifecycleTransitionRepositoryPort`. No scope predicate anywhere in
- * this file — same "the caller already authorized the parent risk"
- * reasoning as `RiskAssessmentRepository`/`RiskTreatmentDecisionRepository`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

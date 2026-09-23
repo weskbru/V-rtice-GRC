@@ -1,13 +1,3 @@
-/**
- * T025-T037/005-audit-findings, User Story 1 — the one place every use case
- * in this module resolves "does this engagement exist, is it within the
- * caller's scope, and who is the caller" (FR-018), so the F-38
- * non-disclosure pattern (`OrgScopeEnforcerService.assertExistingRecordAccessible`)
- * is applied identically by every one of them. Mirrors
- * `modules/controls/application/control-access-resolver.service.ts`
- * exactly — see that file's header for the full reasoning this one does
- * not repeat.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -40,10 +30,6 @@ export class AuditEngagementAccessResolver {
     private readonly scopeEnforcer: OrgScopeEnforcerService,
   ) {}
 
-  /** Every use case in this module calls this first — mirrors
-   * `ControlAccessResolver.resolveActor`: an authenticated session whose
-   * user row has since been deleted/deactivated out from under it is
-   * treated as unauthenticated, never as "found with blank fields". */
   async resolveActor(actorUserId: string): Promise<ResolvedActor> {
     const actor = await this.referenceData.findUser(actorUserId);
     if (!actor) {
@@ -52,13 +38,6 @@ export class AuditEngagementAccessResolver {
     return { id: actor.id, fullName: actor.fullName };
   }
 
-  /**
-   * Resolves the caller's scope and the engagement within it. When the
-   * scoped lookup returns nothing, applies the F-38 pattern so an
-   * out-of-scope engagement is audited as a DENIED access attempt and a
-   * genuinely missing one is not — both answer identically to the caller
-   * (FR-018, US1 AS5).
-   */
   async resolveAuditEngagement(
     actorUserId: string,
     auditEngagementId: string,

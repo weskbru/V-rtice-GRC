@@ -1,9 +1,3 @@
-/**
- * T070/002-shared-grc-foundation, US3 — `ListFindingUseCase`
- * (`listFindings`, FR-021, SC-010). Scoped register listing, mirroring
- * `grc/evidence/application/list-evidence.usecase.ts`'s shape (minus the
- * `subjectType`/`subjectId` filter — no US3 requirement calls for it).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

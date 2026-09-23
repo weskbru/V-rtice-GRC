@@ -2,13 +2,13 @@
 
 import { DetailPanel } from '@pharos/design-system/components';
 
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { compliance } from '@/lib/messages/compliance';
+
 import { FrameworkForm } from '../framework-form';
 
 import type { Framework } from '../../types';
 import type { FrameworkFormSavedResult } from '../framework-form';
-
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { compliance } from '@/lib/messages/compliance';
 
 export interface FrameworkEditPanelProps {
   framework: Framework;

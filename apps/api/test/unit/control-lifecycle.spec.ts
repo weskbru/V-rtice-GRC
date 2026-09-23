@@ -1,9 +1,3 @@
-/**
- * T018/T018a/T019/003-controls-management — unit coverage for
- * `modules/controls/domain/control-lifecycle.ts` (D-6) and
- * `modules/controls/domain/control.entity.ts`'s `isActiveForControlStatus`
- * (T019). No I/O, no NestJS — pure domain logic.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -80,15 +74,6 @@ describe('CONTROL_LIFECYCLE_TRANSITIONS (D-6)', () => {
   });
 });
 
-/**
- * T018a — the unreachable-state defect the analysis gate found and
- * research.md D-6 corrected before implementation: a `DRAFT` control with
- * no owner can neither activate (FR-005 blocks it) nor be hard-deleted
- * (FR-006 forbids it). Without `DRAFT -> RETIRED`, such a control would be
- * trapped forever. This proves the escape hatch exists and is reachable
- * WITHOUT an owner — the defining fact that makes it an escape hatch at
- * all.
- */
 describe('T018a — a DRAFT control with no owner is not trapped: DRAFT -> RETIRED stays reachable', () => {
   it('DRAFT -> ACTIVE is refused (unmet HAS_OWNER) for an owner-less draft', () => {
     const rule = findControlLifecycleTransition('DRAFT', 'ACTIVE');
@@ -150,13 +135,6 @@ describe('isActiveForControlStatus (T019 — the single is_active/status sync po
   });
 });
 
-/**
- * T019's own "and the test that proves it is unique" — a static scan
- * proving `isActiveForControlStatus` is the ONLY place in `apps/api/src`
- * that computes `controls.is_active` from `status`. Modeled on
- * `action-model-convergence-guard.spec.ts`'s regex-scan approach: a plain
- * text scan, no NestJS DI, no database.
- */
 describe('T019 — isActiveForControlStatus is the single write point, provably', () => {
   function listSourceFiles(dir: string): string[] {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -175,11 +153,6 @@ describe('T019 — isActiveForControlStatus is the single write point, provably'
 
   it('no source file other than control.entity.ts defines the RETIRED<->isActive mapping', () => {
     const srcDir = path.resolve(__dirname, '../../src');
-    // Matches the shape of the rule itself: comparing a status-like value
-    // against the literal 'RETIRED' to derive a boolean — not merely the
-    // string "RETIRED" appearing anywhere (which would also match, e.g.,
-    // ControlStatus enum declarations and lifecycle-table rows, and is
-    // therefore too broad to be a useful guard).
     const pattern = /(?:!==|===)\s*'RETIRED'/g;
     const offendingFiles: string[] = [];
 

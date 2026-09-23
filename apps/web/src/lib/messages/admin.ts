@@ -1,31 +1,3 @@
-/**
- * PharosGRC — Administration (US8, T181–T183) pt-BR copy.
- *
- * Two consequences the interface must state plainly BEFORE the user commits,
- * because the backend genuinely does them (CLAUDE.md §11.1, task brief):
- * deactivating a user immediately kills their live sessions
- * (`users.statusDialog.deactivateDescription`), and revoking sessions signs
- * them out everywhere (`users.sessionsDialog.description`). A role's
- * permission change and a scope grant/revoke take effect on the affected
- * user's NEXT request, not immediately for an already-open session
- * (`roles.form.effectNotice`, `organization.scopeGrants.effectNotice`,
- * FR-028). Reparenting an organizational unit rewrites every descendant's
- * path and can change who can see what across the whole platform
- * (`organization.reparent.warning`).
- *
- * `roles.summary` and everything below it belongs to the roles and
- * permissions surface (015-roles-permissions-surface). Three of its strings
- * are statements about the platform's security model, not decoration, and
- * they are worded against the real model rather than the familiar one:
- * permissions are granted DIRECTLY by the role, there is NO inheritance
- * between roles, and a person's effective access is the UNION of the roles
- * assigned to them (`roles.permissionsTab.model`, FR-015 — "herdada de" and
- * any suggestion of hierarchy are forbidden); listing the people who hold a
- * role requires `user:administer`, which `role:administer` does not imply
- * (`roles.usersTab.restricted`, FR-020); and organizational scope is granted
- * per user, never by the role assignment (`roles.usersTab.scopeNotice`,
- * FR-022).
- */
 import type { RoleSortOption, RoleTypeFilter } from '@/features/admin/types';
 
 export const admin = {
@@ -39,17 +11,7 @@ export const admin = {
         fullName: 'Nome',
         email: 'E-mail',
         status: 'Status',
-        /**
-         * Full name — used only where there is real room for it: the
-         * `ColumnVisibilityMenu` checkbox list (`USER_ADMIN_HIDEABLE_COLUMNS`
-         * below), not the `<th>` itself. The `<th>` is fixed-width and
-         * `whitespace-nowrap` with no truncation (`data-table.tsx`), so this
-         * full label measurably overran its own header cell and bled into
-         * "Papéis" at 1024px — `orgUnitHeader` below is what the column
-         * definition's `header` actually renders.
-         */
         orgUnit: 'Unidade organizacional',
-        /** Short form for the `<th>` itself — see the comment on `orgUnit` above for why the two differ. Matches `card.orgUnitLabel`, the same field's label in the card view. */
         orgUnitHeader: 'Unidade',
         roles: 'Papéis',
         lastLoginAt: 'Último acesso',
@@ -58,20 +20,6 @@ export const admin = {
       noOrgUnit: '—',
       noRoles: 'Nenhum papel',
     },
-    /**
-     * Four indicators above the toolbar (CLAUDE.md §18.5, §19.7), mirroring
-     * `risks.register.summary`'s own reasoning: every figure is an O(1)
-     * server aggregate — `listUsers({ pageSize: 1, ... })`'s `meta.total`
-     * for the first three, `adminApi.getRolesSummary()` for the fourth —
-     * never a second count computed on this screen from the loaded page.
-     *
-     * "Sem papel" requires `role:administer` (the same permission
-     * `GET /admin/roles/summary` itself requires), which this screen's own
-     * `user:administer` does not imply — the caller may hold one without
-     * the other. When it is absent, the tile is not rendered at all (never
-     * a zero, never a skeleton that never resolves) and the strip lays out
-     * the remaining three.
-     */
     summary: {
       regionLabel: 'Resumo de usuários',
       total: {
@@ -89,14 +37,12 @@ export const admin = {
         hint: 'Não podem autenticar-se',
         linkLabel: 'Filtrar o registro por usuários inativos',
       },
-      /** Not a link: `GET /admin/users` has no filter for "sem papel" — see this screen's own doc comment (F-1 discipline: never fake a link the contract cannot honour). */
       withoutRole: {
         label: 'Sem papel',
         hint: 'Nenhum papel atribuído',
       },
       value: (count: number): string => count.toLocaleString('pt-BR'),
       loading: 'Carregando indicadores…',
-      /** A failure here degrades to one quiet line — it must never hide or block the register underneath it. */
       loadError: 'Não foi possível carregar os indicadores. A lista de usuários continua abaixo.',
     },
     filters: {
@@ -121,23 +67,12 @@ export const admin = {
       statusChipLabel: (statusLabel: string): string => `Status: ${statusLabel}`,
       removeStatusFilterLabel: 'Remover filtro de status',
     },
-    /**
-     * The active-filter chips, in the exact shape `@/lib/register/filter-chips`
-     * asks for (`searchChip`, `singleValueChip`) — mirrors
-     * `admin.roles.activeFilters`'s own precedent for this same
-     * administration area. Supersedes `filters.activeFiltersLabel`,
-     * `filters.searchChipLabel`, `filters.statusChipLabel` and their two
-     * `remove*FilterLabel` siblings, which produce the same strings through
-     * field-specific functions the shared builders cannot consume; those
-     * five stay in place as orphans rather than removed (015/STATE.md §4.1).
-     */
     activeFilters: {
       regionLabel: 'Filtros ativos',
       searchChip: (term: string): string => `Busca: "${term}"`,
       valueChip: (fieldLabel: string, value: string): string => `${fieldLabel}: ${value}`,
       removeLabel: (text: string): string => `Remover filtro: ${text}`,
     },
-    /** The results line: how many users the current search and filters left, and the ordering in force. */
     results: {
       count: (total: number): string =>
         total === 1 ? '1 usuário' : `${total.toLocaleString('pt-BR')} usuários`,
@@ -158,7 +93,6 @@ export const admin = {
       sortDirectionLabels: { asc: 'crescente', desc: 'decrescente' },
       customSortOption: (field: string, direction: string): string => `${field} (${direction})`,
     },
-    /** Cards ↔ Tabela segmented control (CLAUDE.md §18.12) — Tabela is this screen's default (an administrative listing is read densely, row by row), unlike the business registers where Cards is primary. */
     view: {
       groupLabel: 'Modo de visualização',
       cards: 'Cards',
@@ -166,7 +100,6 @@ export const admin = {
       cardsLabel: 'Ver os usuários em cards',
       tableLabel: 'Ver os usuários em tabela',
     },
-    /** One user, as a card in the list. Mirrors the table's own identity cell and fields — the two views must never disagree about what a user "is". */
     card: {
       regionLabel: 'Usuários',
       openLabel: (fullName: string): string => `Abrir usuário ${fullName}`,
@@ -174,14 +107,6 @@ export const admin = {
       rolesLabel: 'Papéis',
       lastLoginLabel: 'Último acesso',
     },
-    /**
-     * The "+N" roles overflow control (table cell and card, one shared
-     * component) — every role name must be reachable by a screen reader,
-     * not only by hover or a `title` tooltip, so the trigger's own
-     * accessible name already states which roles it hides, and the Radix
-     * `Popover` it opens lists them again for anyone who prefers to read
-     * rather than have them announced inline.
-     */
     rolesOverflow: {
       moreLabel: (count: number): string => `+${count}`,
       moreAriaLabel: (count: number, names: string): string =>
@@ -314,7 +239,6 @@ export const admin = {
         assignedUserCount: 'Usuários',
         actions: 'Ações',
       },
-      /** One-line inventory above the table: how many roles, and how many of each kind. */
       summary: (total: number, system: number, custom: number): string =>
         `${total === 1 ? '1 papel' : `${total} papéis`} · ${system} do sistema · ${
           custom === 1 ? '1 personalizado' : `${custom} personalizados`
@@ -323,12 +247,10 @@ export const admin = {
       assignedUsersLabel: (count: number): string =>
         count === 1 ? '1 usuário atribuído' : `${count} usuários atribuídos`,
     },
-    /** Role kind, shown as a discreet tag next to the role name. */
     type: {
       system: 'Sistema',
       custom: 'Personalizado',
     },
-    /** Compact permission overview in the roles table: a count, and the platform areas it reaches. */
     permissionOverview: {
       count: (count: number): string => (count === 1 ? '1 permissão' : `${count} permissões`),
       areaCount: (count: number): string => (count === 1 ? '1 área' : `${count} áreas`),
@@ -336,13 +258,6 @@ export const admin = {
       areasLabel: (areas: string): string => `Áreas: ${areas}`,
       none: 'Nenhuma permissão',
     },
-    /**
-     * pt-BR names for the permission catalogue's technical vocabulary. The
-     * identifiers themselves (`risk:view`, `audit-engagement:scope`) stay
-     * untouched and are always shown next to these labels — this only gives
-     * them a readable name. An identifier absent from these maps falls back to
-     * its raw value, so a catalogue entry added later is never hidden.
-     */
     permissionCatalog: {
       areas: {
         risk: 'Riscos',
@@ -382,7 +297,6 @@ export const admin = {
         org_unit: 'Estrutura organizacional',
         audit: 'Trilha de auditoria',
       } as Readonly<Record<string, string>>,
-      /** Keyed by the identifier's own verb (`control:test` → `test`), which is more precise than its `action` category. */
       verbs: {
         view: 'Visualizar',
         create: 'Criar',
@@ -402,11 +316,9 @@ export const admin = {
       } as Readonly<Record<string, string>>,
     },
 
-    /** FR-016, extended to the role's own name: the stored `Role.name` is revealed alongside the permission identifiers, never rewritten. */
     technicalName: {
       label: 'Nome técnico',
     },
-    /** Read-only role details, opened from the role name or the row menu. */
     details: {
       assignedUsers: 'Usuários atribuídos',
       permissions: 'Permissões',
@@ -424,7 +336,6 @@ export const admin = {
       noPermissions: 'Este papel não concede nenhuma permissão.',
       close: 'Fechar',
     },
-    /** Read-only preview of a role's granted permissions, shown inline in the roles table (T182, wave 4) so a reader understands what a role actually grants without opening the edit dialog. */
     permissionsSummary: {
       moreCount: (count: number): string => `+${count}`,
       expand: 'Ver todas as permissões',
@@ -441,7 +352,6 @@ export const admin = {
       edit: 'Editar',
       delete: 'Excluir',
       rowActionsLabel: (name: string): string => `Ações para o papel ${name}`,
-      /** Shown under a disabled "Excluir" so the restriction is explained, not just enforced. */
       deleteBlockedSystem: 'Papel do sistema',
       deleteBlockedAssigned: (count: number): string =>
         count === 1 ? 'Atribuído a 1 usuário' : `Atribuído a ${count} usuários`,
@@ -460,7 +370,6 @@ export const admin = {
             count === 1 ? '1 permissão selecionada' : `${count} permissões selecionadas`,
         },
       },
-      /** FR-028: an administrator granting/revoking a permission must know it does not affect an already-open session. */
       effectNotice:
         'A alteração no conjunto de permissões passa a valer na próxima requisição de cada usuário afetado — sem necessidade de novo login.',
       systemRoleNotice:
@@ -472,13 +381,6 @@ export const admin = {
       genericError: 'Não foi possível salvar o papel. Tente novamente.',
     },
     validation: {
-      /**
-       * The maxima mirror the server's own `Length(1, 100)` / `Length(1, 500)`
-       * (`write-role-request.dto.ts`, `update-role-request.dto.ts`) on SHAPE
-       * only — the server's refusal stands whatever the client does
-       * (015 FR-033). What the client owes the user is naming the limit
-       * before the request, instead of an opaque 400 after it.
-       */
       name: {
         required: 'Informe o nome do papel.',
         tooLong: 'O nome do papel deve ter no máximo 100 caracteres.',
@@ -501,7 +403,6 @@ export const admin = {
       deleteSuccess: 'Papel excluído com sucesso.',
       nameInUseError: 'Já existe um papel com esse nome.',
       systemRoleError: 'Papéis do sistema não podem ter o nome ou as permissões alterados.',
-      /** F-68 — the whole role is the platform's, so the refusal names all three fields. */
       systemRoleNotEditableError:
         'Papéis do sistema são definidos pela plataforma: nome, descrição e permissões não podem ser alterados.',
       deleteBlockedError:
@@ -511,21 +412,6 @@ export const admin = {
       genericError: 'Não foi possível concluir a ação. Tente novamente.',
     },
 
-    // =================================================================
-    // Roles and permissions surface (015-roles-permissions-surface).
-    // Everything from here down belongs to the redesigned screen: four
-    // indicators, search/filters/ordering, the role cards, the detail
-    // panel with its two tabs, in-panel editing, and the list states.
-    // =================================================================
-
-    /**
-     * The four indicators (FR-001 to FR-004). Every figure comes from
-     * `GET /admin/roles/summary` — none is hard-coded and none is recounted
-     * from the loaded page. The first three are interactive controls that
-     * apply the matching kind filter, so each carries its own accessible
-     * name (`filterLabel`); the fourth is deliberately inert (FR-003) and
-     * has none.
-     */
     summary: {
       regionLabel: 'Resumo de papéis e permissões',
       total: {
@@ -543,20 +429,16 @@ export const admin = {
         hint: 'Criados pela organização',
         filterLabel: 'Mostrar somente os papéis personalizados',
       },
-      /** FR-040: distinct people. Someone holding three roles is counted once — the hint says so, because the number next to "Papéis" invites the wrong reading. */
       usersWithRoles: {
         label: 'Usuários com papéis',
         hint: 'Pessoas com ao menos um papel; quem tem vários conta uma vez',
       },
       value: (count: number): string => count.toLocaleString('pt-BR'),
-      /** Non-colour channel for the selected indicator (NFR-004): the state is also said in text. */
       activeLabel: 'Filtro aplicado',
       loading: 'Carregando indicadores…',
-      /** A failure here degrades to one quiet line and never hides the list underneath. */
       loadError: 'Não foi possível carregar os indicadores. A lista de papéis continua abaixo.',
     },
 
-    /** Search, kind filter, module filter (FR-005, FR-005a). All applied over the page the screen already loaded (FR-005c). */
     filters: {
       regionLabel: 'Filtros de papéis',
       groupLabel: 'Filtros',
@@ -570,7 +452,6 @@ export const admin = {
       } satisfies Record<RoleTypeFilter, string>,
       moduleLabel: 'Módulo',
       moduleAllOption: 'Todos os módulos',
-      /** FR-005a — "at least one permission of that module", said plainly so the result set is never surprising. */
       moduleHint: 'Mostra os papéis que concedem ao menos uma permissão do módulo.',
       activeFiltersLabel: 'Filtros ativos',
       searchChipLabel: (term: string): string => `Busca: "${term}"`,
@@ -579,19 +460,6 @@ export const admin = {
       removeFilterLabel: (text: string): string => `Remover filtro: ${text}`,
     },
 
-    /**
-     * The active-filter chips, in the exact shape `@/lib/register/filter-chips`
-     * asks for — the same builders (`searchChip`, `singleValueChip`) the five
-     * business registers use, so this screen composes its chip row the same
-     * way they do instead of assembling chips by hand (CLAUDE.md §18.12).
-     *
-     * These four supersede `filters.activeFiltersLabel`, `filters.searchChipLabel`,
-     * `filters.typeChipLabel`, `filters.moduleChipLabel` and
-     * `filters.removeFilterLabel`, which produce the same strings through
-     * field-specific functions the shared builders cannot consume. Those five
-     * are left in place and listed as orphans rather than removed, per the
-     * standing rule of `015/STATE.md` §4.1.
-     */
     activeFilters: {
       regionLabel: 'Filtros ativos',
       searchChip: (term: string): string => `Busca: "${term}"`,
@@ -599,7 +467,6 @@ export const admin = {
       removeLabel: (text: string): string => `Remover filtro: ${text}`,
     },
 
-    /** The results line: how many roles the current search and filters left, and the ordering in force (FR-005b). */
     results: {
       count: (total: number): string =>
         total === 1 ? '1 papel' : `${total.toLocaleString('pt-BR')} papéis`,
@@ -607,7 +474,6 @@ export const admin = {
       countOfTotal: (shown: number, total: number): string =>
         `${shown.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} papéis`,
       sortLabel: 'Ordenar por',
-      /** The ordering in force is always nameable by the control itself — never an unlabelled arrow. */
       sortOptions: {
         'name:asc': 'Nome (A–Z)',
         'name:desc': 'Nome (Z–A)',
@@ -616,11 +482,9 @@ export const admin = {
       } satisfies Record<RoleSortOption, string>,
     },
 
-    /** One role, as a card in the list (FR-006 to FR-008). */
     card: {
       listLabel: 'Papéis da plataforma',
       openLabel: (name: string): string => `Abrir detalhes do papel ${name}`,
-      /** Selection is also said in text, never signalled by colour alone (NFR-004). */
       selectedLabel: 'Papel selecionado',
       permissionCount: (count: number): string =>
         count === 1 ? '1 permissão' : `${count.toLocaleString('pt-BR')} permissões`,
@@ -629,23 +493,13 @@ export const admin = {
       noPermissions: 'Nenhuma permissão',
       noUsers: 'Nenhum usuário',
       modulesLabel: 'Módulos alcançados',
-      /** FR-007 — the visible chips are capped; this names the rest. */
       moreModules: (count: number): string =>
         count === 1 ? '+1 módulo' : `+${count.toLocaleString('pt-BR')} módulos`,
-      /** FR-007 — the COMPLETE module list, for a screen reader, even when the visible chips are truncated. */
       modulesAccessibleLabel: (modules: string): string => `Módulos alcançados: ${modules}`,
       noModules: 'Não alcança nenhum módulo',
-      /** FR-008 — the card clamps the description visually; the stored text is never altered and the panel shows it whole. */
       noDescription: 'Sem descrição.',
     },
 
-    /**
-     * The privilege badge (FR-035, ADR-021). The wording says what the label
-     * is derived FROM and what it does NOT do: it is a reading aid of this
-     * screen, computed from the permissions listed right below it, and it
-     * takes part in no access check. Calling it a security rule here would
-     * be the first step towards someone treating it as one.
-     */
     privilege: {
       badge: 'Privilegiado',
       badgeAccessibleLabel: (name: string): string =>
@@ -655,7 +509,6 @@ export const admin = {
         'Este papel concede ao menos uma permissão de administração de acesso — papéis, usuários ou estrutura organizacional —, ou seja, permite alterar quem pode o quê na plataforma. É um destaque de leitura desta tela, calculado a partir das permissões listadas; nenhuma verificação de acesso depende dele.',
     },
 
-    /** The detail panel's shell: header, counts and the two tabs (FR-009 to FR-012). */
     panel: {
       regionLabel: 'Detalhes do papel',
       title: 'Detalhes do papel',
@@ -671,19 +524,7 @@ export const admin = {
         modules: 'Módulos',
       },
       editAction: 'Editar papel',
-      /**
-       * F-68 — a system role has nothing an administrator can write, so the
-       * panel must not offer "Editar papel" for one: the form behind it would
-       * carry no save, and the server refuses every field. This opens the same
-       * fields, read-only, as a definition sheet.
-       */
       viewDefinitionAction: 'Ver definição',
-      /**
-       * Companion to the button above: why this role has no edit action, said
-       * where the action would have been. Does not repeat "Papel do sistema" —
-       * the kind tag says it in the header, and the delete restriction says it
-       * again beside "Excluir".
-       */
       systemOwnedAction:
         'Nome, descrição e permissões são definidos pela plataforma e não podem ser alterados aqui.',
       tabs: {
@@ -692,11 +533,9 @@ export const admin = {
       },
     },
 
-    /** The Permissions tab: modules, their permissions, and the statement of how access really works. */
     permissionsTab: {
       expandAll: 'Expandir todos',
       collapseAll: 'Recolher todos',
-      /** FR-016 — the identifiers are revealed, never rewritten. */
       showIdentifiers: 'Ver identificadores técnicos',
       hideIdentifiers: 'Ocultar identificadores técnicos',
       identifiersHint:
@@ -705,12 +544,6 @@ export const admin = {
       modulePermissionCount: (count: number): string =>
         count === 1 ? '1 permissão' : `${count.toLocaleString('pt-BR')} permissões`,
       empty: 'Este papel não concede nenhuma permissão.',
-      /**
-       * FR-015 — the authorization model, stated by the interface because
-       * the interface is where the wrong mental model would form. There is
-       * no inheritance between roles anywhere in the platform: resolution
-       * is a flat union over the roles directly assigned to the person.
-       */
       model: {
         title: 'Como este papel concede acesso',
         directGrant: 'As permissões abaixo são concedidas diretamente por este papel.',
@@ -720,7 +553,6 @@ export const admin = {
       },
     },
 
-    /** The Users tab (FR-018 to FR-025), including the state where the reader may not see people at all. */
     usersTab: {
       title: 'Pessoas com este papel',
       count: (count: number): string =>
@@ -740,15 +572,8 @@ export const admin = {
       },
       notSet: '—',
       noOtherRoles: 'Nenhum outro papel',
-      /** FR-025 — other roles are real provenance of access, and are never presented as inheritance. */
       otherRolesHint:
         'Os demais papéis atribuídos à mesma pessoa. O acesso dela é a união de todos eles, inclusive deste.',
-      /**
-       * FR-018 to FR-020 — `role:administer` does not imply `user:administer`,
-       * and there is no alternative route around that boundary. Without it
-       * the tab shows only the aggregate count that `GET /admin/roles`
-       * legitimately provides: no name, e-mail, job title or unit.
-       */
       restricted: {
         title: 'Relação de pessoas indisponível',
         description:
@@ -758,11 +583,6 @@ export const admin = {
             ? '1 pessoa tem este papel'
             : `${count.toLocaleString('pt-BR')} pessoas têm este papel`,
       },
-      /**
-       * FR-022/FR-023 — organizational scope is a second dimension, granted
-       * per user, never a property of the role assignment. The link is shown
-       * only to someone authorized to consult it.
-       */
       scopeNotice: {
         title: 'Escopo organizacional',
         description:
@@ -771,7 +591,6 @@ export const admin = {
       },
     },
 
-    /** Editing inside the panel (FR-026 to FR-033). Server validation stays intact; the client is never the only protection. */
     edit: {
       title: 'Editar papel',
       fields: {
@@ -779,21 +598,8 @@ export const admin = {
         description: { label: 'Descrição' },
         permissions: { label: 'Permissões' },
       },
-      /**
-       * The permission tree's own controls (Fase 1 de "Novo papel"). The
-       * search migrates `PermissionChecklist`'s behaviour verbatim — it
-       * matched the pt-BR verb/resource/module vocabulary as well as the raw
-       * identifier and the catalogue description, which is the only reason
-       * typing "Testar" finds `control:test` (whose `action` is `ASSESS`).
-       *
-       * Selecting a whole module always means every permission of that
-       * module, search or no search: `filteredNotice` says so, because a
-       * control labelled "todas as permissões de Riscos" that silently
-       * selected only the ones currently on screen would be a trap.
-       */
       permissionTree: {
         searchLabel: 'Buscar permissão',
-        /** Short on purpose: the panel is 26rem wide and a longer placeholder was measured truncated mid-word on screen. */
         searchPlaceholder: 'Buscar permissão…',
         clearSearch: 'Limpar a busca de permissões',
         searchResultCount: (shown: number, total: number): string =>
@@ -809,7 +615,6 @@ export const admin = {
             : `${count.toLocaleString('pt-BR')} permissões selecionadas`,
         empty: 'Nenhuma permissão disponível no catálogo.',
       },
-      /** FR-028 — the per-module selector distinguishes all, some and none, in text as well as in shape. */
       moduleSelection: {
         toggleLabel: (moduleLabel: string): string =>
           `Selecionar todas as permissões de ${moduleLabel}`,
@@ -818,7 +623,6 @@ export const admin = {
           `${selected.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} selecionadas`,
         noneSelected: 'Nenhuma selecionada',
       },
-      /** FR-029 — what will change, before saving, split into what is added and what is removed. */
       pendingChanges: {
         title: 'Alterações pendentes',
         none: 'Nenhuma alteração pendente.',
@@ -832,37 +636,22 @@ export const admin = {
           `Nome: de "${previous}" para "${next}"`,
         descriptionChanged: 'A descrição foi alterada.',
       },
-      /** FR-031 — on a system role the reason is written out, not merely enforced by a disabled control. */
       locked: {
         badge: 'Somente leitura',
         nameReason: 'Papel do sistema: o nome não pode ser alterado.',
         permissionsReason:
           'Papel do sistema: o conjunto de permissões não pode ser alterado. As permissões continuam visíveis abaixo.',
-        /**
-         * F-68 — kept in the catalogue, no longer rendered anywhere: it says
-         * the description is editable, and since 2026-09-14 it is not. The
-         * notice actually shown is `platformOwnedNotice` below.
-         */
         editableFieldsNotice: 'Neste papel, apenas a descrição pode ser editada e salva.',
-        /** F-68 — the description has exactly one owner, and it is the platform seed. */
         descriptionReason:
           'Papel do sistema: a descrição não pode ser alterada. Ela é definida pela plataforma e restaurada a cada atualização do sistema.',
-        /**
-         * F-68 — one sentence covering all three fields, at the top of the
-         * definition sheet, so the reader knows before scrolling that nothing
-         * here is editable and why.
-         */
         platformOwnedNotice:
           'Este papel é definido pela plataforma. Nome, descrição e permissões são mantidos pelo próprio sistema e não podem ser alterados aqui.',
       },
-      /** F-68 — the heading of the read-only definition sheet of a system role, where "Editar papel" would be a promise the server refuses. */
       viewTitle: 'Definição do papel',
-      /** Leaves the definition sheet. Nothing was editable, so there is nothing to discard and nothing to save. */
       close: 'Voltar',
       save: 'Salvar alterações',
       saving: 'Salvando…',
       cancel: 'Cancelar',
-      /** FR-032 — cancelling persists nothing and returns the panel to reading. */
       cancelConfirm: {
         title: 'Descartar as alterações?',
         description: 'As alterações ainda não salvas serão perdidas. Nada será gravado.',
@@ -872,22 +661,9 @@ export const admin = {
       genericError: 'Não foi possível salvar o papel. Tente novamente.',
     },
 
-    /**
-     * Creating a role, in the SAME panel and the same visual language as
-     * reading and editing one (Fase 1 de "Novo papel"). The old
-     * `RoleCreateDialog` spoke a language this screen no longer uses: a flat
-     * checklist inside a modal, with no module state, no composition summary
-     * and no statement of what the validation requires.
-     *
-     * `kindNotice` is a fact of the server, not a reassurance: a role created
-     * through the API is ALWAYS custom — `prisma-role.repository.ts:69`
-     * forces `isSystem: false` — so the interface says so instead of offering
-     * a choice that does not exist.
-     */
     create: {
       title: 'Novo papel',
       regionLabel: 'Novo papel',
-      /** The panel's subject before it has one. Measured: repeating "Novo papel" under the "NOVO PAPEL" eyebrow said the same thing twice and never changed as the form was filled. */
       unnamed: 'Sem nome ainda',
       closeLabel: 'Fechar o formulário de novo papel',
       intro:
@@ -897,14 +673,12 @@ export const admin = {
       submit: 'Criar papel',
       submitting: 'Criando…',
       cancel: 'Cancelar',
-      /** Same idiom as `edit.cancelConfirm`: leaving with unsaved work asks first, and nothing is written either way. */
       discardConfirm: {
         title: 'Descartar o novo papel?',
         description: 'O que foi preenchido será perdido. Nenhum papel será criado.',
         confirm: 'Descartar',
         keepEditing: 'Continuar preenchendo',
       },
-      /** What the role WILL grant, counted while it is being composed — the create-mode counterpart of the edit mode's pending diff. */
       composition: {
         title: 'O que este papel concederá',
         permissionCount: (count: number): string =>
@@ -914,12 +688,6 @@ export const admin = {
         modulesLabel: 'Módulos alcançados',
         none: 'Nenhuma permissão selecionada — o papel ainda não concede nada.',
       },
-      /**
-       * What the form requires, stated up front and kept live. Each item
-       * carries its state in SHAPE (a check inside a circle when met, an empty
-       * circle when not) and in WORDS (`met`/`unmet` as the accessible name),
-       * never in colour alone (§18.8, NFR-004).
-       */
       requirements: {
         title: 'Para criar o papel',
         met: (requirement: string): string => `Atendido: ${requirement}`,
@@ -928,12 +696,10 @@ export const admin = {
         description: 'Uma descrição, de até 500 caracteres',
         permissions: 'Ao menos uma permissão selecionada',
       },
-      /** A 422 on create is the server refusing the request's shape — never the system-role rule, which cannot apply to a role that does not exist yet. */
       invalidError: 'Revise os campos: o servidor recusou os dados informados.',
       genericError: 'Não foi possível criar o papel. Tente novamente.',
     },
 
-    /** List states. The two empty states are distinct on purpose: "nothing matched" and "nothing exists" are different problems with different exits. */
     states: {
       loading: 'Carregando papéis…',
       loadingLabel: 'Carregando a lista de papéis',
@@ -1006,7 +772,6 @@ export const admin = {
       loadError: 'Não foi possível carregar a estrutura organizacional.',
       genericError: 'Não foi possível concluir a ação. Tente novamente.',
     },
-    /** The reparent blast radius (task brief): rewrites every descendant's path and can change who can see what. */
     reparent: {
       confirmTitle: 'Mover esta unidade organizacional?',
       warning: (unitName: string, descendantCount: number, newParentName: string): string =>
@@ -1051,7 +816,6 @@ export const admin = {
         submit: 'Conceder escopo',
         submitting: 'Concedendo…',
       },
-      /** FR-028: a grant/revoke takes effect on the user's next request, not immediately for an already-open session. */
       effectNotice:
         'A concessão ou revogação passa a valer na próxima requisição do usuário — sem necessidade de novo login.',
       revokeAction: 'Revogar',

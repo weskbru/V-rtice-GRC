@@ -1,33 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident detail, corrective actions section (008-incidents-
- * problems follow-up, 2026-09-11).
- *
- * Mirrors `features/problems/components/problem-corrective-actions.tsx`
- * exactly — see that file's own header for the full reasoning this one does
- * not repeat: the shared `Action` capability (`features/actions/api.ts`),
- * not a bespoke task table (CLAUDE.md §19.6), with `originType: 'INCIDENT'`
- * in place of `'PROBLEM'`. `Incident` has no equivalent to Invariant P2 —
- * closing an incident never requires a completed `Action` — so this section
- * exists purely so incident work has the SAME corrective-action affordance
- * every other domain gets, not to satisfy a lifecycle precondition.
- *
- * Creation is gated on `incident:edit` AND `action:create` — the same two
- * checks `IncidentActionOriginAccessor#resolveEditableOrigin` and the
- * shared `POST /actions` controller's own `@RequirePermission` actually
- * enforce.
- *
- * ## C5 (018-incident-detail-experience, Fase 6) — same column-width
- * discipline as the relationship tables
- *
- * `responsible.fullName` carried `whitespace-nowrap` with no width cap —
- * the exact mechanism the coordinator's own volume measurement found
- * pushing a column off-screen in `incident-relationships-section.tsx`
- * (C5). Fixed here on the same reasoning, not on an independently measured
- * overflow of this specific table: a long display name is exactly as
- * unbounded here as it was there.
- */
 import { FormField, StatusBadge } from '@pharos/design-system/components';
 import { Loader2, MoreHorizontal, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -75,9 +47,7 @@ const PAGE_SIZE = 20;
 
 export interface IncidentCorrectiveActionsProps {
   incidentId: string;
-  /** `incident:edit` AND `action:create` — see this file's own header. */
   canCreate: boolean;
-  /** `action:edit` — gates whether the status-change menu renders at all. */
   canTransition: boolean;
 }
 
@@ -102,9 +72,6 @@ export function IncidentCorrectiveActions({
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // S-10 — searched server-side now (`UserPicker`), never a preloaded
-  // bounded list; this create form has no existing action to seed a label
-  // from, so it starts unselected, exactly like the old `<Select>` did.
   const [responsible, setResponsible] = useState<UserRef | undefined>(undefined);
   const [dueOn, setDueOn] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -251,12 +218,6 @@ export function IncidentCorrectiveActions({
           <p className="text-sm text-muted-foreground">{copy.empty}</p>
         ) : (
           <>
-            {/* `table-fixed` — see `incident-relationships-section.tsx`'s
-                own C5 comment: `max-w-*` alone on a `<td>` is only a hint
-                under `table-layout: auto`, which still grows a column to
-                fit its longest unbroken content. Explicit percentage
-                widths on `TableHead`, paired with `table-fixed`, make the
-                table's own total width authoritative. */}
             <Table className="table-fixed">
               <TableCaption className="sr-only">{copy.cardTitle}</TableCaption>
               <TableHeader>

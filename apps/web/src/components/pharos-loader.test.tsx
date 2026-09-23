@@ -2,14 +2,6 @@ import { PharosLoader, useDelayedVisibility } from '@pharos/design-system/compon
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * `specs/014-institutional-loader` — the institutional loader and the timing
- * that keeps it from flashing. The animation itself is CSS (`globals.css`),
- * so what is asserted here is the structure it animates (three signal paths,
- * each with its own sequence class) and the semantics; the rendered motion and
- * the reduced-motion path are verified in the browser, not in jsdom.
- */
-
 describe('PharosLoader', () => {
   it('announces the wait once, hides the drawing from assistive technology, and draws the three signal arcs in order', () => {
     const { container } = render(<PharosLoader label="Carregando página…" />);
@@ -19,7 +11,6 @@ describe('PharosLoader', () => {
 
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('aria-hidden', 'true');
-    // The mark's own coordinate space, unchanged from pharos-mark.svg.
     expect(svg).toHaveAttribute('viewBox', '28 21 45 73');
 
     const arcs = container.querySelectorAll('.pharos-loader-signal');
@@ -27,11 +18,9 @@ describe('PharosLoader', () => {
     expect(arcs[0]).toHaveClass('pharos-loader-signal-1');
     expect(arcs[1]).toHaveClass('pharos-loader-signal-2');
     expect(arcs[2]).toHaveClass('pharos-loader-signal-3');
-    // Inner arc first (radius 20), outer last (radius 40) — the order they light up.
     expect(arcs[0]?.getAttribute('d')).toContain('A20.00 20.00');
     expect(arcs[2]?.getAttribute('d')).toContain('A40.00 40.00');
 
-    // The tower is not part of the sequence: it stays lit throughout.
     const towerPaths = container.querySelectorAll('path:not(.pharos-loader-signal)');
     expect(towerPaths).toHaveLength(6);
   });
@@ -77,7 +66,6 @@ describe('useDelayedVisibility', () => {
     act(() => void vi.advanceTimersByTime(200));
     expect(result.current).toBe(true);
 
-    // Result lands right after the indicator appeared.
     rerender({ active: false });
     act(() => void vi.advanceTimersByTime(399));
     expect(result.current).toBe(true);

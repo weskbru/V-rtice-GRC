@@ -2,13 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { userInitials } from './user-initials';
 
-/**
- * Regression coverage for the defect a rendered measurement at 1440×900
- * found: the first-raw-character approach (`components/shell/user-menu
- * .tsx`'s own `initialsOf`) produced a bracket, not a letter, for this
- * screen's bracketed fixture names. `userInitials` must derive from Unicode
- * LETTERS only.
- */
 describe('userInitials', () => {
   it('takes the first letter of each of the first two words, uppercased', () => {
     expect(userInitials('Platform Administrator')).toBe('PA');

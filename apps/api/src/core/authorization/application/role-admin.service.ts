@@ -1,49 +1,3 @@
-/**
- * T177 — role, role-permission and user-role administration
- * (`contracts/admin.openapi.yaml`'s `Roles`/`Permissions` tags plus
- * `PUT /admin/users/{userId}/roles`; ADR-003, FR-022, FR-023, FR-028).
- *
- * ## Permission-version invalidation — the single most important property
- *
- * ADR-003's `permissionsVersion` counter exists so a permission change
- * takes effect on the affected user's *next request*, not whenever a Redis
- * TTL happens to expire (`PermissionResolverService`'s own header explains
- * the mechanism: the cache key embeds the version, so bumping the counter
- * invalidates every affected user's cached entry for free). This service is
- * the FIRST real caller of `PermissionRepositoryPort.bumpPermissionsVersion`
- * — that method was published back in T036, unused, specifically so this
- * task could depend on the port without `core/authorization` growing an
- * administration feature of its own before now.
- *
- * `bumpPermissionsVersion` is called whenever a write here can change ANY
- * user's effective permission set:
- *   - a role's permission set is replaced (`update` with
- *     `permissionIdentifiers` present) — affects every user holding that
- *     role;
- *   - a role is deleted — only reachable when `assignedUserCount === 0`
- *     (checked below), so this technically affects nobody, but the bump is
- *     harmless and kept for defensive symmetry;
- *   - a user's role set is replaced (`replaceUserRoles`) — affects exactly
- *     that user.
- * Creating a brand-new role does NOT bump the counter: a role with no
- * `UserRole` rows yet (every newly-created role, by construction) cannot
- * change any user's effective permissions.
- *
- * ## No self-permission-ownership check — a privilege-escalation question
- * left to the architect
- *
- * `contracts/admin.openapi.yaml` gates every operation here by
- * `role:administer` alone; nothing in the contract requires that the
- * caller already hold a permission before they may place it into a role or
- * assign that role to a user (or themselves). CLAUDE.md's non-negotiable
- * ("an administrator must not be able to grant ... a permission they do
- * not themselves hold, unless the contract explicitly says otherwise ...
- * if the contract is silent, stop and report") applies here: the contract
- * IS silent, so this implementation does exactly what the contract
- * describes — permission-gated by `role:administer`/`user:administer`
- * only — and the absence of a self-ownership check is reported rather than
- * silently added or silently accepted. See the implementation report.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 
@@ -101,10 +55,6 @@ export class RoleAdminService {
     private readonly auditRecorder: AuditRecorder,
   ) {}
 
-  /** Defensive-only failure path (see `create-risk.usecase.ts`'s identical
-   * reasoning): `SessionGuard` already proved this actor has a live
-   * session, so the lookup succeeding is expected. Fails closed rather than
-   * attributing an audit event to a fabricated label. */
   private async resolveActorLabel(actorUserId: string): Promise<string> {
     const label = await this.actorDirectory.findActorLabel(actorUserId);
     if (!label) {
@@ -170,25 +120,6 @@ export class RoleAdminService {
     const actorLabel = await this.resolveActorLabel(command.actorUserId);
     const role = await this.getById(command.roleId);
 
-    /**
-     * A system role is owned by the platform, WHOLE — name, description and
-     * permission set alike (F-68, decided 2026-09-14).
-     *
-     * `description` used to pass this check, and that single omission gave
-     * the field two owners: an administrator could edit it through the
-     * product, the edit was recorded in the audit trail as `role.updated`,
-     * and the next `prisma db seed` silently reconciled it back to the
-     * literal in `platform.seed.ts` — writing no `audit_event`, because a
-     * seed run has no acting identity (ADR-005). The trail then asserted a
-     * state the database no longer had, which is exactly what CLAUDE.md §8
-     * and the trail's immutability exist to prevent.
-     *
-     * The resolution is ownership, not provenance: the seed file is the
-     * single declared owner of all three fields, the seed KEEPS reconciling
-     * `description` (that is what made the F-32 correction reach an existing
-     * database), and this service refuses every write that would compete
-     * with it. Custom roles are unaffected — they have no second writer.
-     */
     if (
       role.isSystem &&
       (command.name !== undefined ||
@@ -272,14 +203,6 @@ export class RoleAdminService {
     });
   }
 
-  /**
-   * `PUT /admin/users/{userId}/roles` (FR-023, FR-028, FR-033). The caller
-   * (`core/identity`'s admin-users controller) is responsible for
-   * confirming `userId` names a real user (404) before calling this —
-   * `RoleRepositoryPort.replaceUserRoles` operates on the `UserRole` table
-   * directly and has no independent way to distinguish "user does not
-   * exist" from "user exists with zero roles".
-   */
   async replaceUserRoles(command: ReplaceUserRolesCommand): Promise<SetDiff> {
     const actorLabel = await this.resolveActorLabel(command.actorUserId);
 
@@ -346,11 +269,6 @@ export class RoleAdminService {
     return resolved;
   }
 
-  /** One `role_permission.granted`/`role_permission.revoked` audit row per
-   * changed permission — see `RoleRepositoryPort.replaceRolePermissions`'s
-   * doc comment for why this is per-row rather than one synthetic
-   * "permission set" diff. Must be called inside the caller's ambient
-   * transaction. */
   private async auditPermissionDiff(
     roleId: string,
     diff: SetDiff,

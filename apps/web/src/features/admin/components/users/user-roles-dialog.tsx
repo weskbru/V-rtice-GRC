@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, assign roles to a user (T181, FR-023,
- * FR-028). Replaces the complete set (contract: `PUT
- * /admin/users/{userId}/roles`), takes effect on the user's NEXT request —
- * stated here so an administrator does not expect an already-open session
- * to change immediately (task brief, FR-028).
- */
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -32,12 +25,6 @@ import type { AdminUser, Role, UserRoleAssignment } from '../../types';
 export interface UserRolesDialogProps {
   user: AdminUser | null;
   onOpenChange: (open: boolean) => void;
-  /**
-   * Receives the operation's own minimized result (F-73) — the subject id
-   * and its resulting role set — never the administrative user record. The
-   * route is gated by `role:administer`, which does not imply
-   * `user:administer`, so there is no personal data here to hand on.
-   */
   onSaved: (assignment: UserRoleAssignment) => void;
   onError: (message: string) => void;
 }
@@ -57,13 +44,6 @@ export function UserRolesDialog({
     if (!user) return;
     let cancelled = false;
 
-    // A5-F02 — `GET /admin/roles` has no name search, only `page`/`pageSize`
-    // (`admin.openapi.yaml`), so this dialog cannot switch to a searched
-    // lookup the way a user picker does (S-10) — it must instead exhaust
-    // every page. Each module GRC futuro seeds its own roles (CLAUDE.md
-    // §1), so the catalog is small and grows slowly; paginating it in full
-    // once, per dialog open, is the correct fix here, not a bounded first
-    // page a role beyond it could never be assigned from.
     async function loadAllRoles(): Promise<readonly Role[]> {
       const collected: Role[] = [];
       let page = 1;
@@ -80,9 +60,6 @@ export function UserRolesDialog({
       .then((allRoles) => {
         if (cancelled) return;
         setRoles(allRoles);
-        // Set together with `roles`, from the SAME successful response, so
-        // the checklist never briefly renders roles with a stale `selected`
-        // computed from a previous target user.
         setSelected(new Set(user.roles.map((role) => role.id)));
       })
       .catch(() => {
@@ -97,11 +74,6 @@ export function UserRolesDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads only when a new target user opens the dialog; `onError` is a stable callback prop.
   }, [user]);
 
-  // Resets on CLOSE, not via an effect on `open`/`user` becoming true — this
-  // dialog stays mounted across different target users (unlike
-  // `UserEditDialog`, which the parent only mounts per-target) — mirrors
-  // `TransitionConfirmDialog`'s identical convention
-  // (`apps/web/src/features/risks/components/risk-lifecycle-actions.tsx`).
   function handleOpenChange(next: boolean): void {
     if (submitting) return;
     if (!next) {
@@ -165,7 +137,6 @@ export function UserRolesDialog({
                     </span>
                     <span className="text-sm text-muted-foreground">{role.description}</span>
                   </Label>
-                  {/* Legibility, not just names: a reader deciding whether to grant this role sees WHAT it grants right here, without leaving this dialog (task brief — "a role is a set of permissions"). */}
                   <RolePermissionsSummary
                     roleName={roleDisplayName(role.name)}
                     permissions={role.permissions}

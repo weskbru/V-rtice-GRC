@@ -5,15 +5,6 @@ import { AuditEngagementRegisterSummary } from './audit-engagement-register-summ
 
 import type { Page } from '../types';
 
-/**
- * Component-mount evidence for `AuditEngagementRegisterSummary` (T076/T080,
- * CLAUDE.md §19.7) — `auditEngagementsApi.listEngagements` is mocked at the
- * network boundary, mirroring `control-register-summary.test.tsx`'s own
- * approach. Each mocked call resolves a distinct `meta.total`, keyed by the
- * `status` filter it received, so a wrong filter (e.g. showing the
- * "concluídos" count under "Em execução") fails an assertion rather than
- * passing by coincidence.
- */
 const { listEngagementsMock } = vi.hoisted(() => ({ listEngagementsMock: vi.fn() }));
 
 vi.mock('../api', () => ({

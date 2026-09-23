@@ -1,41 +1,10 @@
 'use client';
 
-/**
- * PharosGRC — process create/edit form (T048), mirroring
- * `AuditEngagementForm`'s/`ControlForm`'s overall shape (CLAUDE.md §18.12) —
- * simpler than either in two ways that both trace back to `processes.
- * openapi.yaml`, not to a smaller ambition for this screen:
- *
- *   - **No conflict handling.** `processes` carries no `version` column
- *     (`features/processes/types.ts`'s own header comment) — `PATCH
- *     /processes/{processId}` applies last-write-wins directly, so this form
- *     never reads or writes an `ETag` and never renders a 409 banner.
- *   - **No org-unit-scoped assignment picker.** There is no owner field on
- *     this contract at all — only `name`/`description`/`orgUnitId` — so
- *     there is nothing here resembling `ControlForm`'s cascading
- *     assignable-users effect.
- *
- * Organizational unit is required (invariant A1, FR-004) — the field's own
- * `FormField` renders both the required `*` and an explanatory helper
- * (`processes.form.fields.orgUnit.helper`), so the invariant is unmistakable
- * on the screen itself, not only as a validation message after the fact
- * (CLAUDE.md §18.11).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-
-import { processesApi } from '../api';
-
-import type {
-  ProcessDetail,
-  CreateProcessRequest,
-  OrgUnitNode,
-  UpdateProcessRequest,
-} from '../types';
-import type { ApiProblem } from '@/lib/api-client';
 
 import { feedback } from '@/components/shell/feedback-provider';
 import { useNavigate } from '@/components/shell/navigation-pending';
@@ -54,6 +23,16 @@ import { common } from '@/lib/messages/common';
 import { processes } from '@/lib/messages/processes';
 import { processFormSchema, type ProcessFormValues } from '@/lib/validation/process';
 
+import { processesApi } from '../api';
+
+import type {
+  ProcessDetail,
+  CreateProcessRequest,
+  OrgUnitNode,
+  UpdateProcessRequest,
+} from '../types';
+import type { ApiProblem } from '@/lib/api-client';
+
 export interface ProcessFormProps {
   mode: 'create' | 'edit';
   process?: ProcessDetail;
@@ -68,15 +47,10 @@ function defaultValuesFor(process: ProcessDetail | undefined): ProcessFormValues
   return {
     name: process.name,
     description: process.description ?? '',
-    // A process minted before this module existed may carry no
-    // organizational unit at all (data-model.md §1/§6) — falls back to
-    // unset rather than crashing; `orgUnitId` is still required to SAVE
-    // the edit (schema validation), exactly as for a brand-new process.
     orgUnitId: process.orgUnit?.id ?? '',
   };
 }
 
-/** The server refuses `description: ''` outright (`MinLength(1)` whenever the property is present) — see `lib/validation/process.ts`'s own header comment. */
 function normalizedDescription(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;

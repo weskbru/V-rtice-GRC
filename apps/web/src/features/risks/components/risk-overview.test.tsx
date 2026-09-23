@@ -5,8 +5,6 @@ import { RiskOverview } from './risk-overview';
 
 import type { RiskDetail } from '../types';
 
-/** Component-mount evidence for T097 (`RiskOverview`, FR-069, SC-013). */
-
 const baseRisk: RiskDetail = {
   id: 'risk-1',
   code: 'RSK-2026-0001',
@@ -48,10 +46,6 @@ describe('RiskOverview', () => {
     expect(screen.getByText('Carlos Lima')).toBeInTheDocument();
   });
 
-  // 016-risk-detail-experience §4.3/§4.5 — inherent/residual level moved to
-  // the record's own executive summary row (`RiskSummaryRow`), which keeps
-  // SC-013's "never fabricate a level" guarantee now; this section no longer
-  // renders either level at all.
   it('no longer renders inherent/residual level — that moved to the executive summary row', () => {
     render(<RiskOverview risk={{ ...baseRisk, inherentLevel: 'HIGH', residualLevel: 'LOW' }} />);
     expect(screen.queryByText(/Inerente/)).not.toBeInTheDocument();

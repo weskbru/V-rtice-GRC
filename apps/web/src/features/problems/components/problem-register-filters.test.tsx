@@ -3,13 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ProblemRegisterFilters } from './problem-register-filters';
 
-/**
- * Component-mount evidence for `ProblemRegisterFilters` (CLAUDE.md §18.12)
- * — brought into the shared collapsible `FilterBar` disposition and the
- * shared chip builders (`@/lib/register/filter-chips`). The behaviour most
- * worth pinning down: an applied filter shows up as a removable chip, and
- * the chip's own remove button clears exactly that field.
- */
 function renderFilters(
   overrides: Partial<React.ComponentProps<typeof ProblemRegisterFilters>> = {},
 ): {

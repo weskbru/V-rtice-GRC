@@ -1,12 +1,3 @@
-/**
- * T042/005-audit-findings, User Story 2 — matches
- * `GET /audits/{auditId}/findings`'s query parameters exactly
- * (`contracts/audit.openapi.yaml`'s `listAuditEngagementFindings`
- * operation): `page`, `pageSize`, `status`. Mirrors
- * `grc/finding/presentation/dto/list-finding-query.dto.ts`'s own
- * page/pageSize/status shape — reuses `USER_MESSAGES.dto.findingListQuery`,
- * the SAME messages that DTO already uses for the identical constraints.
- */
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 

@@ -1,12 +1,3 @@
-/**
- * T034/002-shared-grc-foundation, US1 — matches
- * `contracts/grc-foundation.openapi.yaml`'s `CreateEvidenceRequest`
- * exactly (revised: no `fileId` — see that document's own revision note
- * and `schema.prisma`'s `Evidence` section header). `additionalProperties:
- * false` (the global `ValidationPipe`'s `forbidNonWhitelisted`) means this
- * class is also where a caller cannot smuggle `code`/`status`/
- * `archivedAt` past creation — not declaring them here IS the rejection.
- */
 import {
   IsDateString,
   IsIn,

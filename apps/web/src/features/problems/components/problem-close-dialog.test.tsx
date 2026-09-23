@@ -5,16 +5,6 @@ import { ProblemCloseDialog } from './problem-close-dialog';
 
 import type { ProblemDetail } from '../types';
 
-/**
- * Component-mount evidence for `ProblemCloseDialog` (008-incidents-problems,
- * US2, data-model.md D-7, Invariants P2/P3) — the closure-legibility screen
- * the coordinator asked particular care on (2026-09-11). `../api` is mocked
- * at the network boundary, mirroring `finding-close-dialog.test.tsx`'s own
- * pattern: these tests exercise the proactive "completed corrective action"
- * check (knowable client-side) and the honest post-hoc surfacing of
- * segregation of duties (NOT knowable client-side, deliberately).
- */
-
 const { transitionMock, hasCompletedCorrectiveActionMock } = vi.hoisted(() => ({
   transitionMock: vi.fn(),
   hasCompletedCorrectiveActionMock: vi.fn(),

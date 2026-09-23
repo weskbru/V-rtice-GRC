@@ -1,7 +1,3 @@
-/**
- * T180 — maps `RoleRecord`/`PermissionRecord` (domain-shaped) to
- * `contracts/admin.openapi.yaml`'s `Role`/`Permission` response schemas.
- */
 import type { PermissionRecord } from '../../domain/ports/permission-repository.port';
 import type { RoleRecord } from '../../domain/ports/role-repository.port';
 

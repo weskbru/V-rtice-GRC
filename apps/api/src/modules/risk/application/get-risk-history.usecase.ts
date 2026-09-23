@@ -1,12 +1,3 @@
-/**
- * T166/T167/US7 — `GetRiskHistoryUseCase`: the application-layer side of
- * `GET /risks/{riskId}/history` (`contracts/risks.openapi.yaml`'s
- * `getRiskHistory` operation). Requires `risk:view` and scope — enforced
- * exactly like `GetRiskUseCase`: an out-of-scope or nonexistent risk reads
- * as the SAME `NotFoundDomainError` (FR-025/FR-030, ADR-009 byte-identical
- * 404). No transaction and no audit entry — reads are not audited
- * (ADR-005).
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

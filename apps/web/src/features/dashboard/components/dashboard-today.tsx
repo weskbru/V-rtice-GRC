@@ -1,21 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — today's date in the dashboard header ("Sábado, 12 de setembro
- * de 2026").
- *
- * Client-only. The page is server-rendered first, and the server's clock and
- * time zone are not the reader's: printing the date during SSR would hydrate
- * against a different string around midnight or across zones. So the server
- * snapshot is `null` (an empty placeholder of the same line height, so the
- * header does not shift), and the browser supplies the real date.
- *
- * `useSyncExternalStore` rather than `useState` + `useEffect`: React's own
- * primitive for a value that differs between server and client, which
- * reconciles after hydration without a setState inside an effect (the
- * cascading-render pattern the React hooks lint rule rejects). The date does
- * not need to tick while the page is open, so the subscription is a no-op.
- */
 import { useSyncExternalStore } from 'react';
 
 function formatToday(date: Date): string {

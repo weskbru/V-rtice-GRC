@@ -1,10 +1,3 @@
-/**
- * T030/004-compliance-management — matches `GET /frameworks`'s query
- * parameters exactly (`contracts/compliance.openapi.yaml`'s
- * `listFrameworks` operation). Comma-separated array parameters use
- * `style: form, explode: false`, mirroring `ListControlsQueryDto`'s own
- * `splitCsv` convention exactly.
- */
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 

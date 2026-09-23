@@ -1,23 +1,3 @@
-/**
- * T042/T043/T057/005-audit-findings, User Story 2 —
- * `AuditEngagementFindingController`: `contracts/audit.openapi.yaml`'s
- * `/audits/{auditId}/findings` path (`listAuditEngagementFindings`,
- * `createFindingFromEngagement` — operations 12-13). Mirrors
- * `AuditEngagementScopeController`'s own structure.
- *
- * ## `POST` is `@NoPermissionRequired()`, not `@RequirePermission`
- *
- * This route needs TWO permissions with two DIFFERENT refusal shapes
- * (`audit-engagement:view` folds into the engagement's own `404`;
- * `finding:create` is a plain `403`) — the same reason
- * `AuditController.listRiskAuditEvents`
- * (`modules/risk/presentation/audit.controller.ts`) and
- * `ControlLifecycleController`'s transition route are both
- * `@NoPermissionRequired()` rather than `@RequirePermission`. See
- * `CreateFindingFromEngagementUseCase`'s own header for the full
- * reasoning; this decorator still requires a valid session
- * (`@NoPermissionRequired()` never bypasses `SessionGuard`).
- */
 import {
   Body,
   Controller,
@@ -67,9 +47,6 @@ export class AuditEngagementFindingController {
     private readonly listAuditEngagementFindingsUseCase: ListAuditEngagementFindingsUseCase,
   ) {}
 
-  /** `listAuditEngagementFindings`. Single permission
-   * (`audit-engagement:view`) — see that use case's own header for why
-   * `finding:view` is deliberately not re-required. */
   @RequirePermission('audit-engagement:view')
   @Get()
   async list(
@@ -96,9 +73,6 @@ export class AuditEngagementFindingController {
     };
   }
 
-  /** `createFindingFromEngagement`. See this file's own header for why
-   * this route is `@NoPermissionRequired()` rather than
-   * `@RequirePermission`. */
   @NoPermissionRequired()
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -123,16 +97,6 @@ export class AuditEngagementFindingController {
       identifiedOn: body.identifiedOn,
     });
 
-    // `Location` points at the finding's own canonical resource
-    // (`GET /findings/{id}`, `grc-foundation.openapi.yaml`), NOT at this
-    // route (which only lists, it has no single-item read). The API's
-    // version prefix is derived from this request's own `originalUrl`
-    // (`/api/v1/audits/{auditId}/findings`) rather than importing
-    // `infrastructure/http/api-prefix` — `module-presentation` may not
-    // depend on `infrastructure` (`apps/api/eslint.config.mjs`'s boundary
-    // rule), the same constraint `audit-engagement.controller.ts`'s own
-    // `create` handler already works within by building its `Location`
-    // from `request.originalUrl` too.
     const apiPrefix = request.originalUrl.split('/audits/')[0];
     response.set('Location', `${apiPrefix}/findings/${record.id}`);
 

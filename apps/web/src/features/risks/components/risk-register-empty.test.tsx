@@ -6,10 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { RiskRegisterEmpty } from './risk-register-empty';
 
-/**
- * Component-mount evidence for T113 (FR-045, US3 AS7) — the two empty
- * states must be textually distinct and each drive its own next action.
- */
 describe('RiskRegisterEmpty', () => {
   it('shows "no risk exists yet" (never "no results") when no filters are applied', () => {
     render(

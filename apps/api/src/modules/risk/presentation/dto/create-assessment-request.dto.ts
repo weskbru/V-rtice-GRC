@@ -1,14 +1,3 @@
-/**
- * T125 — matches `contracts/risks.openapi.yaml`'s `CreateRiskAssessmentRequest`
- * exactly: `additionalProperties: false` (global `ValidationPipe`'s
- * `forbidNonWhitelisted`, T022) means this class is also, by construction,
- * where FR-062 is enforced for assessments — `inherentScore`,
- * `inherentLevel`, `residualScore`, `residualLevel` are never declared
- * here, so a request supplying any of them is rejected with `400` before
- * this DTO's own validators even run (the identical mechanism
- * `CreateRiskRequestDto`'s header documents for `Risk` itself — T118's
- * contract test exercises this for assessments).
- */
 import { IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

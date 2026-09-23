@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — process detail screen (T047, US1, FR-008), mirroring
- * `ControlDetailView`'s/`AuditEngagementDetailView`'s structure exactly
- * (CLAUDE.md §18.12): `EntityHeader` + `EntityTabs`, a 404 rendered
- * identically whether the process does not exist or lies outside the
- * caller's organizational scope (non-disclosure, `features/processes/api.ts`'s
- * own doc comment).
- *
- * No `ETag`/conflict handling anywhere here — `processes` carries no `version`
- * column (`features/processes/types.ts`'s own header comment).
- */
 import {
   DetailLayout,
   EmptyState,
@@ -22,9 +11,6 @@ import {
 } from '@pharos/design-system/components';
 import { Eye, Pencil, ShieldAlert, ShieldCheck, Siren } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
-
-import type { ProcessDetail } from '@/features/processes/types';
-import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
 
 import { useDetailSection } from '@/components/detail/use-detail-section';
 import { Link } from '@/components/navigation/link';
@@ -45,6 +31,9 @@ import { ApiError } from '@/lib/api-client';
 import { common } from '@/lib/messages/common';
 import { processes } from '@/lib/messages/processes';
 import { usePermissions } from '@/lib/permissions';
+
+import type { ProcessDetail } from '@/features/processes/types';
+import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
 
 export interface ProcessDetailViewProps {
   processId: string;
@@ -122,11 +111,6 @@ function ProcessDetailViewContent({ processId }: ProcessDetailViewProps): React.
   const canEdit = hasPermission('process:edit');
   const canAdminister = hasPermission('process:administer');
 
-  // Reused, not invented (CLAUDE.md §18.12): same three icons
-  // `AssetDetailView` uses for its own Riscos/Controles/Incidentes tabs,
-  // which in turn are `navigation-registry.ts`'s own sidebar icons for
-  // those three modules. `Eye` for Visão geral matches every other detail
-  // screen's own overview tab.
   const tabs: EntityTab[] = [
     {
       id: 'overview',
@@ -163,10 +147,6 @@ function ProcessDetailViewContent({ processId }: ProcessDetailViewProps): React.
     },
   ];
 
-  // Mirrors `AssetDetailView`'s own `resolvedValue` fallback exactly —
-  // a stale/absent `sectionParam` resolves to the first tab, never to
-  // nothing. Needed here (not just inside `EntityTabs`) because
-  // `ProcessContextAside`'s own `aria-current` reads the SAME resolved id.
   const activeSectionId = tabs.some((tab) => tab.id === sectionParam) ? sectionParam! : tabs[0]!.id;
 
   return (

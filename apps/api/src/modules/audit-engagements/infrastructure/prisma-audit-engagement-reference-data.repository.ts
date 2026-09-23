@@ -1,10 +1,3 @@
-/**
- * T024/005-audit-findings — the sole implementation of
- * `AuditEngagementReferenceDataPort`. Deliberate direct `PrismaService`
- * queries against `organizational_units`/`users`, mirroring
- * `modules/controls/infrastructure/prisma-control-reference-data.repository.ts`
- * exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

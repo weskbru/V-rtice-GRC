@@ -1,26 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, assessment history (T131, US4, FR-064 to FR-068,
- * ADR-006, ADR-007, Constitution VI — audit defensibility).
- *
- * Lists every assessment ever recorded for the risk, newest first, exactly
- * as `GET /risks/{riskId}/assessments` returns them — an immutable,
- * append-only record (ADR-007): a reassessment is never rendered as
- * replacing a row here, only as adding one. Each row shows who assessed it,
- * when, and how the RESIDUAL level moved relative to the assessment it
- * superseded (`levelChange`, FR-066) — computed and returned by the server,
- * never recomputed in this component (ADR-006). A reassessment that lands
- * on the same level as before still gets its own row with an explicit
- * "Permaneceu em X" line: deliberately not collapsed as noise, because a
- * risk manager re-confirming a level unchanged is itself an auditable fact.
- *
- * Pagination is a real "Carregar mais" control, not an unbounded single
- * fetch — a long-lived risk can accumulate more assessments than fit one
- * page, and Constitution VI's audit-defensibility promise would be hollow
- * if this list silently truncated at whatever the first page happened to
- * hold.
- */
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -44,7 +23,6 @@ import type { RiskAssessment } from '../types';
 
 export interface AssessmentHistoryProps {
   riskId: string;
-  /** Bump this to force a re-fetch from page 1 (e.g. right after a new assessment was recorded elsewhere on the page). */
   refreshToken?: number;
 }
 
@@ -76,12 +54,6 @@ export function AssessmentHistory({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
 
-  // Derived, not an explicit `setLoading(true)` at the top of the effect
-  // (which would be a synchronous `setState` inside the effect body,
-  // `react-hooks/set-state-in-effect`) — mirrors `risk-register-view.tsx`'s
-  // own `resolvedRequestKey`/`loading` pattern: "loading" simply means "the
-  // last request this effect resolved doesn't match what `riskId`/
-  // `refreshToken` call for right now".
   const requestKey = `${riskId}|${refreshToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
   const loading = resolvedRequestKey !== requestKey;

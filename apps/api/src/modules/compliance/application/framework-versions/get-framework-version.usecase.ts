@@ -1,12 +1,3 @@
-/**
- * T023/004-compliance-management — `GetFrameworkVersionUseCase`: the read
- * side of `GET /frameworks/{frameworkId}/versions/{versionId}`
- * (`getFrameworkVersion` operation). Confirms the version belongs to the
- * `frameworkId` path parameter — a version resolvable by id but under the
- * wrong framework answers `NotFoundDomainError` exactly like a version
- * that does not exist at all (ADR-009's existence-non-disclosure
- * convention, applied here to routing rather than scope).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

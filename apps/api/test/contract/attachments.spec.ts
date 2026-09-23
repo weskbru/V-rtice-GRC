@@ -1,18 +1,3 @@
-/**
- * T190 — D-11 contract coverage for `/attachments` (FR-096 to FR-100,
- * ADR-010): for every operation, the stated authorization rule (including
- * a caller WITHOUT the permission being refused, and a
- * zero-additional-permission caller succeeding for the two routes gated
- * only by the parent's own view permission), an unauthenticated 401, the
- * success response's declared shape, the download response's required
- * security headers (FR-099), and the path-traversal guarantee (ADR-010).
- *
- * `attachment-access.spec.ts` (T184) and `attachment-validation.spec.ts`
- * (T185) cover the non-disclosure and upload-validation properties in
- * depth; this file covers the remaining D-11 surface those two do not:
- * withdraw's full authorization matrix, the metadata response shape, and
- * the download headers/path-traversal proof.
- */
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -106,8 +91,6 @@ describe('/attachments contract coverage (T190, D-11, FR-096 to FR-100)', () => 
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('at-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner for the risk this file's attachment
-    // coverage hangs off — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const risk = await ctx.app.get(CreateRiskUseCase).execute({
       actorUserId: setupUser.id,
@@ -192,10 +175,6 @@ describe('/attachments contract coverage (T190, D-11, FR-096 to FR-100)', () => 
       expect(response.status).toBe(200);
       const body = response.body as AttachmentPageBody;
       expect(body.data.length).toBeGreaterThan(0);
-      // Metadata only — never the internal storage key (FR-107, ADR-010).
-      // `checksumSha256` is itself a declared response FIELD name (and
-      // legitimately contains "sha256"), so it is asserted PRESENT, not
-      // absent; `storageKey`/the storage layout are what must never leak.
       const raw = JSON.stringify(body);
       expect(raw).not.toMatch(/storageKey/i);
       expect(raw).not.toMatch(/[/\\]sha256[/\\]/);
@@ -249,58 +228,20 @@ describe('/attachments contract coverage (T190, D-11, FR-096 to FR-100)', () => 
         .set('Origin', appOrigin)
         .field('entityType', 'RISK')
         .field('entityId', riskId)
-        // `filepath` (not `filename`): superagent's underlying `form-data`
-        // library runs `path.basename()` on a plain `filename` option
-        // before it ever reaches the wire — a CLIENT-side convenience that
-        // would silently defeat this exact test by never sending the
-        // traversal string at all. `filepath` is passed through verbatim
-        // (confirmed directly against `form-data`: the raw multipart body
-        // carries `filename="../../etc/passwd"`), so this genuinely
-        // exercises the SERVER's own handling.
-        // Content is unique PER TEST RUN (embeds a fresh UUID) — storage is
-        // content-addressed (`LocalDiskStorageProvider`) and the real
-        // `ATTACHMENT_STORAGE_PATH` directory is never cleaned between
-        // separate test runs on this machine, so reusing a fixed byte
-        // string across runs would make "exactly one NEW file appeared"
-        // pass or fail depending on whether an EARLIER run already wrote
-        // that exact content — a false pass/fail unrelated to this test.
-        .attach(
-          'file',
-          Buffer.from(`%PDF-1.7\ntraversal attempt ${randomUUID()}`, 'ascii'),
-          // `@types/superagent` only declares `filename`/`contentType` on
-          // this overload, but `form-data` (verified directly against its
-          // source) also honors `filepath`, taking precedence over
-          // `filename` and — unlike it — never running the value through
-          // `path.basename()`. Widening the type here is what lets this
-          // test send the traversal string over the wire at all.
-          { filepath: maliciousName, contentType: 'application/pdf' } as unknown as {
-            filename?: string;
-            contentType?: string;
-          },
-        );
+        .attach('file', Buffer.from(`%PDF-1.7\ntraversal attempt ${randomUUID()}`, 'ascii'), {
+          filepath: maliciousName,
+          contentType: 'application/pdf',
+        } as unknown as {
+          filename?: string;
+          contentType?: string;
+        });
 
       expect(response.status).toBe(201);
       const created = response.body as AttachmentBody;
-      // FIRST layer, found while writing this test: busboy (multer's own
-      // multipart parser) strips any directory component from a part's
-      // `filename` by default (`preservePath` defaults to `false` — see
-      // `busboy`'s `lib/types/multipart.js`), so `Attachment.fileName`
-      // never even RECEIVES the traversal string — only its basename.
-      // This platform does not opt into `preservePath`, so this defense is
-      // active by default, not by explicit configuration.
       expect(created.fileName).toBe('passwd');
-      // SECOND, independent layer — the one this platform's OWN code
-      // guarantees regardless of any multipart-parser behavior:
-      // `LocalDiskStorageProvider` never consults `fileName` at all when
-      // choosing a storage path (content-addressed by SHA-256 checksum
-      // only, see that class's header) — proven below: exactly one new
-      // file appeared, under the storage root, nowhere else.
       const after = countFilesRecursively(storageRoot);
       expect(after).toBe(before + 1);
 
-      // No file exists outside the storage root at the location the
-      // traversal string would have named if it HAD been used as a path
-      // (two directories up from the storage root).
       const escapedPath = path.resolve(storageRoot, maliciousName);
       expect(existsSync(escapedPath)).toBe(false);
     });

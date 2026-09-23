@@ -1,11 +1,3 @@
-/**
- * 013-incidents-problems-reverse-links — maps `IncidentProcessLinkReadRecord`
- * (`shared/grc-ports/incident-process-link-read.port.ts`) to the
- * `ProcessIncidentLinkResponse` wire shape backing
- * `GET /processes/{processId}/incidents`. Mirrors
- * `modules/assets/presentation/dto/asset-incident-link-response.mapper.ts`
- * exactly, against `Process`.
- */
 import type { IncidentProcessLinkReadRecord } from '../../../../shared/grc-ports/incident-process-link-read.port';
 import type { IncidentStatus } from '@prisma/client';
 
@@ -26,10 +18,6 @@ export interface ProcessIncidentLinkResponse {
   readonly incident: ProcessIncidentRefResponse;
   readonly linkedBy: ProcessIncidentLinkUserRefResponse;
   readonly linkedAt: string;
-  // No `unlinkedBy` — mirrors `IncidentRiskLinkResponse`/
-  // `IncidentProblemLinkResponse`'s own precedent (incidents.openapi.yaml):
-  // who withdrew the link is not exposed on this same entity's reverse
-  // read either, only that it was.
   readonly unlinkedAt: string | null;
 }
 

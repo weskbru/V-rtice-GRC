@@ -1,28 +1,17 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement catalog card view, one engagement (T076,
- * CLAUDE.md §18, §18.12).
- *
- * Deliberately simpler than `ControlCard`/`RiskCard`: this register offers
- * no quick-view side panel (the message catalog's own `card.selectLabel`
- * reads "Abrir engajamento X — Y", i.e. navigate to the full record, and
- * carries no `quickView`-shaped strings at all) — so the whole card is one
- * stretched link to `/audits/{id}`, with the code repeated as its own
- * smaller link purely so it can be opened in a new tab independently.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { Building2, User } from 'lucide-react';
-
-import { formatDateOnly, formatTimestampDate } from '../date';
-import { engagementStatusBadgeVariant, engagementStatusIcon } from '../status';
-
-import type { AuditEngagement } from '../types';
 
 import { Link } from '@/components/navigation/link';
 import registerCardStyles from '@/components/register/register-card.module.css';
 import { auditEngagements } from '@/lib/messages/audit-engagements';
 import { cn } from '@/lib/utils';
+
+import { formatDateOnly, formatTimestampDate } from '../date';
+import { engagementStatusBadgeVariant, engagementStatusIcon } from '../status';
+
+import type { AuditEngagement } from '../types';
 
 export interface AuditEngagementCardProps {
   engagement: AuditEngagement;

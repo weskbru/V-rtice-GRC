@@ -1,16 +1,3 @@
-/**
- * T143 — `RiskRelationshipController`: `GET`/`POST /risks/{riskId}/controls`,
- * `DELETE /risks/{riskId}/controls/{linkId}`, `POST`/`DELETE
- * /risks/{riskId}/processes[/{linkId}]` and `POST`/`DELETE
- * /risks/{riskId}/assets[/{linkId}]` per `contracts/risks.openapi.yaml`'s
- * "Risk Relationships" operations.
- *
- * Controls are gated by `risk:treat` (FR-078: "controls ... influence
- * residual risk" — the same permission governing treatment). Processes and
- * assets are gated by `risk:edit` — distinct permissions per the contract's
- * own descriptions ("Requires risk:treat and scope" vs "Requires risk:edit
- * and scope"), not a copy-paste of one onto the other.
- */
 import {
   Body,
   Controller,
@@ -75,10 +62,6 @@ export class RiskRelationshipController {
     private readonly listRiskProblemLinksUseCase: ListRiskProblemLinksUseCase,
   ) {}
 
-  // ---------------------------------------------------------------------
-  // Controls
-  // ---------------------------------------------------------------------
-
   @RequirePermission('risk:view')
   @Get('controls')
   async listControlLinks(
@@ -133,10 +116,6 @@ export class RiskRelationshipController {
     response.set('ETag', formatETag(risk.version));
   }
 
-  // ---------------------------------------------------------------------
-  // Processes
-  // ---------------------------------------------------------------------
-
   @RequirePermission('risk:edit')
   @Post('processes')
   @HttpCode(HttpStatus.CREATED)
@@ -178,10 +157,6 @@ export class RiskRelationshipController {
     response.set('ETag', formatETag(risk.version));
   }
 
-  // ---------------------------------------------------------------------
-  // Assets
-  // ---------------------------------------------------------------------
-
   @RequirePermission('risk:edit')
   @Post('assets')
   @HttpCode(HttpStatus.CREATED)
@@ -222,13 +197,6 @@ export class RiskRelationshipController {
     });
     response.set('ETag', formatETag(risk.version));
   }
-
-  // ---------------------------------------------------------------------
-  // Incidents / Problems (013-incidents-problems-reverse-links —
-  // READ-ONLY reverse of IncidentRiskLink/ProblemRiskLink: `modules/risk`
-  // never writes either table — `modules/incidents`/`modules/problems`
-  // own those write paths, see `list-risk-incident-problem-links.usecase.ts`)
-  // ---------------------------------------------------------------------
 
   @RequirePermission('risk:view')
   @Get('incidents')

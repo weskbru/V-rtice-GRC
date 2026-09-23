@@ -1,11 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `IncidentRiskLinkRepositoryPort`. Mirrors
- * `grc/finding/domain/ports/finding-risk-link-repository.port.ts` exactly
- * — see that file's header.
- *
- * `modules/incidents/infrastructure/prisma-incident-risk-link.repository.ts`
- * is the sole implementation, wired in `incidents.module.ts`.
- */
 import type { IncidentRiskLinkRecord } from '../incident-risk-link.entity';
 
 export abstract class IncidentRiskLinkRepositoryPort {
@@ -25,7 +17,6 @@ export abstract class IncidentRiskLinkRepositoryPort {
     linkId: string,
   ): Promise<IncidentRiskLinkRecord | undefined>;
 
-  /** FR-012 — ends the link WITHOUT deleting the row. */
   abstract unlink(
     linkId: string,
     unlinkedByUserId: string,

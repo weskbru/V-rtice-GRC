@@ -1,14 +1,3 @@
-/**
- * `CommentsModule` — the comments capability's composition root (T191/T192,
- * ADR-011). Sits directly under `src/core/comments/`, outside the
- * `domain`/`application`/`infrastructure`/`presentation` folders the
- * boundary lint rules classify.
- *
- * Exports nothing today — `core/files` reaches `entity-registry.ts`
- * directly (a plain TS module, not a Nest provider; see that file's
- * header), so there is no DI-level dependency for another module to
- * import.
- */
 import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
@@ -40,9 +29,6 @@ import { CommentController } from './presentation/comment.controller';
 })
 export class CommentsModule {
   constructor() {
-    // T192: register this capability's own AuditEntityType.COMMENT field
-    // allow-list from its own file, without editing `core/audit/**`
-    // (ADR-011).
     registerCommentsAuditAllowlist();
   }
 }

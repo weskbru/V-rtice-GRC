@@ -1,17 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount-free evidence for `useProblemRegisterState`, mirroring
- * `use-register-state.test.ts`'s own approach: `next/navigation` is mocked
- * so `currentSearch` stands in for "the URL right now".
- *
- * This hook was migrated onto the SHARED `useUrlQueryCommit`/
- * `useDebouncedSearchParam` mechanism (`@/lib/register/url-state`) in place
- * of its own former hand-rolled copy — these tests pin down that the
- * observable contract (defaults, filter commits, page reset, the `view`
- * axis) survived that migration unchanged.
- */
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 

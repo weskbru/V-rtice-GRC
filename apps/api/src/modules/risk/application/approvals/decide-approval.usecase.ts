@@ -1,44 +1,3 @@
-/**
- * T157 — `DecideApprovalUseCase` (ADR-006, FR-029, FR-029a, FR-029b,
- * FR-029c, ADR-013). `POST /risks/{riskId}/approvals/{approvalId}/decision`
- * (`contracts/risks.openapi.yaml`'s `decideRiskApproval` operation).
- * Requires `risk:approve` — enforced statically by
- * `@RequirePermission('risk:approve')` on the controller route, DISTINCT
- * from the `risk:transition` permission `RequestApprovalUseCase` requires
- * (`domain/risk-lifecycle.ts`'s own header explains why this split is the
- * whole point of FR-029a).
- *
- * ## Segregation of duties — two layers, deliberately
- *
- * `assertApproverDiffersFromRequester` (`domain/approval.ts`) throws BEFORE
- * either database write is attempted, for BOTH `APPROVED` and `REJECTED`
- * outcomes (the check constraint this backstops applies to any non-null
- * `decidedByUserId`, regardless of decision). The
- * `approvals_decided_by_requester_check` CHECK constraint
- * (`20260905170100_risk_lifecycle_and_approvals_baseline`) is the SECOND,
- * independent layer — it holds even if this assertion is ever bypassed by a
- * future code path that forgets to call it.
- *
- * ## Re-evaluating the gate on every decision (ADR-006)
- *
- * The risk's status may have changed between the request and the decision
- * (e.g. through a direct, non-gated transition applied while the approval
- * sat pending — nothing in this release prevents that). `APPROVED`
- * therefore re-resolves `findLifecycleTransition(current.status, toStatus)`
- * and re-evaluates its preconditions against the CURRENT risk state, exactly
- * as `PerformTransitionUseCase` does for a direct transition — "the server
- * re-evaluates the same declarative transition table on every request"
- * (the contract's own words for `POST .../transitions`, extended here to
- * the decision endpoint). If the gate is no longer valid, this is refused
- * with 422 and the risk is left unchanged.
- *
- * ## `REJECTED` — FR-029c
- *
- * Clears `pendingApprovalId` only; `Risk.status` is untouched. No
- * `RiskLifecycleTransition` row is written for a rejection — nothing
- * transitioned. The decision itself is the permanent record (FR-029b),
- * captured entirely on the `Approval` row.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -72,7 +31,6 @@ export interface DecideApprovalInput {
   readonly actorUserId: string;
   readonly riskId: string;
   readonly approvalId: string;
-  /** From the `If-Match` header (ADR-013) — the RISK's expected `version`. */
   readonly expectedVersion: number;
   readonly decision: 'APPROVED' | 'REJECTED';
   readonly justification?: string | null | undefined;
@@ -83,9 +41,6 @@ export interface DecideApprovalResult {
   readonly risk: RiskRecord;
 }
 
-/** `Approval.requestedTransition` is always written by
- * `RequestApprovalUseCase` as `${fromStatus}->${toStatus}` — parsing it
- * back is safe because this module is the only writer of that format. */
 function parseRequestedTransitionTarget(requestedTransition: string): RiskStatus {
   const [, toStatus] = requestedTransition.split('->');
   return toStatus as RiskStatus;
@@ -125,7 +80,6 @@ export class DecideApprovalUseCase {
       throw new ConflictDomainError(USER_MESSAGES.risk.lifecycle.approvalAlreadyDecided);
     }
 
-    // FR-029a — checked BEFORE either write, for both outcomes.
     assertApproverDiffersFromRequester(approval.requestedBy.id, input.actorUserId);
 
     const toStatus = parseRequestedTransitionTarget(approval.requestedTransition);
@@ -186,8 +140,6 @@ export class DecideApprovalUseCase {
       });
     }
 
-    // APPROVED — re-check preconditions against the CURRENT risk state
-    // (see this file's header for why).
     const preconditionResults = evaluatePreconditions(rule.preconditions, {
       risk: current,
       reassessedDuringReview: false,

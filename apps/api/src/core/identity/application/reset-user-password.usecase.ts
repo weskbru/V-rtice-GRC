@@ -1,11 +1,3 @@
-/**
- * T176 — `PUT /admin/users/{userId}/password` (`contracts/admin.openapi.yaml`,
- * FR-006, FR-017). Administrative reset: the new credential is flagged for
- * mandatory change on next sign-in and every session the user holds is
- * revoked (reason `PASSWORD_CHANGED`) in the same transaction. The
- * password value is never returned, logged or audited (FR-005, FR-035);
- * the reset action itself is audited (FR-032).
- */
 import { Inject, Injectable } from '@nestjs/common';
 import { AuditEntityType, AuditOutcome, SessionRevocationReason } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -69,9 +61,6 @@ export class ResetUserPasswordUseCase {
 
     const credential = await this.userDirectory.findLocalCredentialByUserId(command.userId);
     if (!credential) {
-      // LOCAL is the only authentication method this release provisions
-      // (data-model.md §1) — reachable only if a future federated identity
-      // exists with no local credential at all.
       throw new ValidationDomainError(USER_MESSAGES.admin.localCredentialNotFound);
     }
 
@@ -100,7 +89,6 @@ export class ResetUserPasswordUseCase {
         outcome: AuditOutcome.SUCCESS,
       });
 
-      // FR-017: every session for the user is revoked.
       await this.sessionService.revokeAllForUser(
         command.userId,
         SessionRevocationReason.PASSWORD_CHANGED,

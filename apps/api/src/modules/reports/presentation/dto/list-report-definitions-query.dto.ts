@@ -1,11 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T054) — matches `GET /reports`'s query
- * parameters (`contracts/reports.openapi.yaml`'s `listReportDefinitions`
- * operation) exactly: `page`, `pageSize` (default 20, per the contract's
- * own `PageSize` parameter), `isActive`. Mirrors
- * `ListIndicatorDefinitionsQueryDto` exactly — see that file's own header
- * for the `toBoolean` transform's reasoning, not repeated here.
- */
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
 

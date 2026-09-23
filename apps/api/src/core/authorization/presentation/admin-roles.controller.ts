@@ -1,14 +1,3 @@
-/**
- * T180 — `AdminRolesController`: `GET|POST /admin/roles`,
- * `GET /admin/roles/summary`, `GET|PATCH|DELETE /admin/roles/{roleId}`
- * (`contracts/admin.openapi.yaml`'s `Roles` tag). Every operation requires
- * `role:administer` (T172).
- *
- * `GET /admin/roles/summary` was added 2026-09-13 by
- * 015-roles-permissions-surface (T014, FR-039) — read-only, no new entity,
- * no new table. See `summary()` below for why its declaration ORDER is
- * load-bearing.
- */
 import {
   Body,
   Controller,
@@ -96,18 +85,6 @@ export class AdminRolesController {
     return toRoleResponse(role);
   }
 
-  /**
-   * 2026-09-13 (015-roles-permissions-surface, T014, FR-039).
-   *
-   * **Declared BEFORE `@Get(':roleId')` on purpose, and it must stay
-   * there.** Nest matches routes in the order their handlers are declared
-   * on the controller class, so with the reverse order `/admin/roles/summary`
-   * would be captured by `:roleId` and refused by `ParseUUIDPipe` with a
-   * `400` — the endpoint would be unreachable while every unit of code
-   * involved looked correct. `test/unit/admin-roles-route-order.spec.ts`
-   * fails if these two handlers are ever reordered, so this is a structural
-   * guard rather than a comment asking to be careful.
-   */
   @RequirePermission('role:administer')
   @Get('summary')
   async summary(): Promise<RolesSummaryResponse> {
@@ -154,18 +131,6 @@ export class AdminRolesController {
   }
 }
 
-/**
- * Named after `RiskController`'s identical-in-intent
- * `assertUpdateBodyNotEmpty`, but NOT copying its `Object.keys(body).length
- * === 0` check: under this project's `target: ES2023` (default
- * `useDefineForClassFields: true`), `class-transformer`'s `plainToInstance`
- * defines every declared class field on the instance — as `undefined` when
- * the client omitted it — so an actually-empty `{}` request body still
- * yields an instance whose `Object.keys(...)` lists every declared
- * property (verified directly against `UpdateUserRequestDto`, the sibling
- * DTO this pattern was first written for). Checking for at least one
- * DEFINED value is what `minProperties: 1` actually requires here.
- */
 function assertUpdateBodyNotEmpty(body: UpdateRoleRequestDto): void {
   const hasAnyField = Object.values(body).some((value) => value !== undefined);
   if (!hasAnyField) {

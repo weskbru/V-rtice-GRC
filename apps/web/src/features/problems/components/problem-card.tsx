@@ -1,21 +1,12 @@
 'use client';
 
-/**
- * PharosGRC — problem register card view, one problem (CLAUDE.md §18,
- * §18.12). Mirrors `AuditEngagementCard`'s shape — whole-card stretched
- * link to `/problems/{id}`, code repeated as its own independent link —
- * since this register offers no quick-view side panel either.
- *
- * Card anatomy follows the family: código → título → badges → three
- * metadata fields (Unidade, Responsável, Identificado em — the same three
- * `problem-register-columns.tsx` already shows, minus `updatedAt`, which
- * moves to the footer) → "Atualizado em". No description row:
- * `ProblemSummary` carries none (mirrors `problems.register.card`'s own
- * doc comment and the Audit Engagements catalog's identical precedent) —
- * never invented here.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { Building2, CalendarClock, User } from 'lucide-react';
+
+import { Link } from '@/components/navigation/link';
+import cardStyles from '@/components/register/register-card.module.css';
+import { problems } from '@/lib/messages/problems';
+import { cn } from '@/lib/utils';
 
 import { formatDateOnly, formatTimestampDate } from '../date';
 import {
@@ -26,11 +17,6 @@ import {
 } from '../status';
 
 import type { ProblemSummary } from '../types';
-
-import { Link } from '@/components/navigation/link';
-import cardStyles from '@/components/register/register-card.module.css';
-import { problems } from '@/lib/messages/problems';
-import { cn } from '@/lib/utils';
 
 export interface ProblemCardProps {
   problem: ProblemSummary;
@@ -106,7 +92,6 @@ export function ProblemCard({ problem }: ProblemCardProps): React.JSX.Element {
         </dl>
 
         <p className="text-xs text-muted-foreground">
-          {/* `updatedAt` is absent from `ProblemSummary`'s generated `required` array even though the server always sets it — see `problem-detail-view.tsx`'s identical comment. */}
           {card.updatedAt(formatTimestampDate(problem.updatedAt!))}
         </p>
       </div>

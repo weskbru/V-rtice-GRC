@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Finding edit dialog (T075, 002-shared-grc-foundation, US3).
- * `PATCH /findings/{id}` — `status` is never offered here: closing,
- * reopening and archiving each have their own dedicated action in the
- * panel (C5, the contract's own explicit rejection of `status` on this
- * operation).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -65,8 +58,6 @@ export function FindingEditDialog({
 }: FindingEditDialogProps): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  // S-10 — seeded from `finding.owner` itself (already carries `fullName`),
-  // never from a preloaded bounded list; `UserPicker` searches server-side.
   const [owner, setOwner] = useState<UserRef | undefined>(finding?.owner);
 
   const form = useForm<EditFindingFormValues>({
@@ -83,10 +74,6 @@ export function FindingEditDialog({
   });
 
   useEffect(() => {
-    // Nested and invoked, rather than a bare top-level `setOwner` in the
-    // effect body — `react-hooks/set-state-in-effect` (`form.reset` is a
-    // react-hook-form call, not a React `setState`, so it alone does not
-    // trigger this rule; the plain `UserPicker` label state next to it does).
     function apply(target: NonNullable<typeof finding>): void {
       form.reset({
         title: target.title,

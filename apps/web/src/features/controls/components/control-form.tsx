@@ -1,35 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control create/edit form (T046), mirroring `risk-form.tsx`'s
- * conflict-handling and owner-picker conventions exactly (CLAUDE.md
- * §18.12).
- *
- * ## Owner picker uses the ASSIGNMENT listing (T046's own explicit
- * requirement)
- *
- * `ownerUserId` MUST resolve against `controlsApi.listUsers({
- * assignableForOrgUnitId })` — never the browse listing — for the same
- * reason `RiskForm` was fixed to do this: a scoped analyst must not see an
- * empty owner picker just because the browse listing (restricted to the
- * CALLER's own scope) happens not to include anyone from the control's
- * (possibly different) organizational unit.
- *
- * ## Owner is optional here (FR-005) — unlike Risk's required owner
- *
- * A control may be created and remain in `DRAFT` with no owner at all; the
- * owner only becomes required when the record enters `ACTIVE`
- * (`ControlLifecycleActions` surfaces that precondition). The picker is
- * therefore never marked `required` and the schema never rejects an empty
- * value — this is the one structural difference from `RiskForm`'s owner
- * field.
- *
- * ## Conflict handling (ADR-013 equivalent)
- *
- * Identical to `RiskForm`: on a `409` nothing in the form is reset: a
- * banner explains the conflict and offers "ver versão atual",
- * "salvar mesmo assim" and "continuar editando" — never a silent reload.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -79,24 +49,8 @@ const OPTIONAL = common.formField.optionalIndicator;
 export interface ControlFormProps {
   mode: 'create' | 'edit';
   control?: ControlDetail;
-  /** The `ETag` last read for `control`. Required when `mode === 'edit'`. */
   etag?: string;
   onSaved: (result: { control: ControlDetail; etag: string }) => void;
-  /**
-   * Overrides the "Cancelar" button's default `navigate.back()` (real
-   * browser history navigation). Optional — omitted, this form behaves
-   * exactly as it always has (`/controls/new`, the register's own create
-   * flow). `ControlEditPanel` (021-control-detail-experience, Fase C/D)
-   * passes its own overlay-close here: `navigate.back()` is correct when
-   * this form IS the page (a real navigation got you here, so "cancel"
-   * means "leave"), but wrong inside an overlay `Sheet`, which is not a
-   * navigation at all — the coordinator measured this directly (F-79,
-   * `docs/deferred-findings.md`): "Cancelar" navigated the browser back to
-   * `/controls` instead of closing the panel, unlike the Sheet's own `X`
-   * and `Escape`, both of which correctly stay on `/controls/{id}`. Mirrors
-   * `ActionEditForm`'s own `onCancel: () => void` contract exactly — not
-   * invented here, aligning the one sibling that had not yet needed it.
-   */
   onCancel?: () => void;
 }
 
@@ -122,10 +76,6 @@ function defaultValuesFor(control: ControlDetail | undefined): ControlFormValues
   return {
     name: control.name,
     description: control.description,
-    // A control minted before this phase may carry no organizational unit
-    // at all (FR-003, US1 AS5) — falls back to unset rather than crashing
-    // or inventing one; `orgUnitId` is still required to SAVE the edit
-    // (schema validation), exactly as it is for a brand-new control.
     orgUnitId: control.orgUnit?.id ?? '',
     ownerUserId: control.owner?.id ?? NONE_SELECT_VALUE,
     nature: control.nature ?? NONE_SELECT_VALUE,
@@ -175,13 +125,6 @@ export function ControlForm({
   const [loadingReferenceData, setLoadingReferenceData] = useState(true);
   const [referenceDataReloadToken, setReferenceDataReloadToken] = useState(0);
 
-  // S-10 — the owner picker now searches the directory server-side
-  // (`UserPicker`) instead of holding the ASSIGNMENT listing's full,
-  // bounded page in `assignableUsers`. `owner` tracks the picker's own
-  // current value (label included); `assignableUsersEmpty` is still
-  // resolved eagerly per org unit (a single unsearched first page) purely
-  // to tell "nobody is assignable here" apart from "nobody has been typed
-  // yet" for the `assignablePickerState`/`ownerDescription` UX below.
   const [owner, setOwner] = useState<UserRef | undefined>(control?.owner ?? undefined);
   const [assignableUsersEmpty, setAssignableUsersEmpty] = useState(false);
   const [loadingAssignableUsers, setLoadingAssignableUsers] = useState(false);
@@ -225,7 +168,6 @@ export function ControlForm({
     };
   }, [referenceDataReloadToken]);
 
-  /** Mirrors `RiskForm`'s own assignment-listing effect — see that component's doc comment for the full reasoning. */
   useEffect(() => {
     let cancelled = false;
     const orgUnitId = selectedOrgUnitId || null;
@@ -249,14 +191,6 @@ export function ControlForm({
         if (cancelled) return;
         setAssignableUsersEmpty(firstPage.data.length === 0);
 
-        // Re-validate the CURRENTLY selected owner against the NEW unit's
-        // assignment line, only on an actual change (never on first mount,
-        // which already trusts `control.owner` as given). `owner` is
-        // usually already in `firstPage` (a small org has few assignable
-        // users); when it is not, one targeted search by their own exact
-        // name (not a full-list download) settles it before clearing —
-        // never a false "cleared" for someone merely ranked past the first
-        // page.
         if (isChange && owner) {
           const stillAssignable =
             firstPage.data.some((user) => user.id === owner.id) ||

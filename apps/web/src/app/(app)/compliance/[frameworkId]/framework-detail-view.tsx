@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework detail screen (US1, ADR-017), mirroring
- * `control-detail-view.tsx`'s structure exactly (CLAUDE.md §18.12):
- * `EntityHeader` + `EntityTabs`, a 404 rendered identically whether the
- * framework does not exist or the caller lacks `compliance:view`.
- */
 import {
   DetailLayout,
   EmptyState,
@@ -16,9 +10,6 @@ import {
 } from '@pharos/design-system/components';
 import { Eye, Layers, Pencil } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
-
-import type { Framework } from '@/features/compliance/types';
-import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
 
 import { useDetailSection } from '@/components/detail/use-detail-section';
 import { Link } from '@/components/navigation/link';
@@ -32,6 +23,9 @@ import { ApiError } from '@/lib/api-client';
 import { common } from '@/lib/messages/common';
 import { compliance } from '@/lib/messages/compliance';
 import { usePermissions } from '@/lib/permissions';
+
+import type { Framework } from '@/features/compliance/types';
+import type { EntityTab, ErrorStateProblem } from '@pharos/design-system/components';
 
 export interface FrameworkDetailViewProps {
   frameworkId: string;
@@ -111,11 +105,6 @@ function FrameworkDetailViewContent({ frameworkId }: FrameworkDetailViewProps): 
   }
 
   const canEdit = hasPermission('compliance:administer');
-  // `Eye` matches every other detail screen's own overview tab. `Layers`
-  // for Versões is the same "multiple, stacked records" icon this app
-  // already uses for register "total count" summary cards (`Layers` in
-  // `risk-register-summary.tsx`/`control-register-summary.tsx`/etc.) — a
-  // framework version list is exactly that shape (CLAUDE.md §18.12).
   const tabs: EntityTab[] = [
     {
       id: 'overview',

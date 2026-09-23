@@ -1,20 +1,3 @@
-/**
- * 008-incidents-problems — `ProblemParentRecordAccessor`: `modules/
- * problems`'s registration against the attachable/commentable entity-type
- * registry (`core/comments/domain/entity-registry.ts`). Mirrors
- * `IncidentParentRecordAccessor`/`RiskParentRecordAccessor` exactly — see
- * `RiskParentRecordAccessor`'s own header for the full reasoning this one
- * deliberately does not repeat: `problem:view`, checked first, PLUS
- * `GetProblemUseCase`'s own organizational-scope check, combined into the
- * single non-disclosing refusal FR-098/FR-030 require.
- *
- * `AttachableEntityType.PROBLEM`/`CommentableEntityType.PROBLEM` were
- * added to `schema.prisma` in this module's own foundation migration —
- * the registry's own worked-example comment even names `PROBLEM`
- * specifically — but no accessor was ever registered for either
- * (CLAUDE.md §19.10). This is that missing registration, exercised by
- * `test/integration/incident-problem-collaboration.spec.ts`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PermissionResolverService } from '../../../../core/authorization/application/permission-resolver.service';

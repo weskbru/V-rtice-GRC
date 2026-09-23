@@ -1,12 +1,3 @@
-/**
- * T043/004-compliance-management — matches
- * `contracts/compliance.openapi.yaml`'s `ExecuteMappingMigrationRequest`/
- * `MappingMigrationCorrespondence` exactly: `additionalProperties: false`
- * on both, `sourceRequirementIds` non-empty per entry (`minItems: 1`).
- * Nested-array validation follows `CreateMethodologyVersionRequestDto`'s
- * own established convention (`@ValidateNested({ each: true })` +
- * `@Type(() => X)`).
- */
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsUUID, ValidateNested } from 'class-validator';
 

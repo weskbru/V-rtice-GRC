@@ -1,15 +1,3 @@
-/**
- * T024/005-audit-findings, User Story 1 — `PrismaAuditEngagementRepository`,
- * the sole implementation of `AuditEngagementRepositoryPort`. Extends
- * `AuditEngagementScopedRepository` so every method below is compile-time
- * required to apply the caller's organizational `ScopeFilter` (FR-018) —
- * the same discipline `ControlRepository`/`RiskRepository` establish.
- *
- * `updateWithVersion`/`applyLifecycleTransition` — race-free by the same
- * single conditional `UPDATE ... WHERE id = ? AND version = ? AND <scope>`
- * mechanism `ControlRepository`/`FrameworkVersionRepository` already
- * document (research.md D-18).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -72,8 +60,6 @@ export class PrismaAuditEngagementRepository
     return row ? toAuditEngagementRecord(row) : undefined;
   }
 
-  /** F-38-style escape hatch — see `ControlRepository.findOrgUnitIdUnscoped`'s
-   * doc comment for the full non-disclosure reasoning this mirrors. */
   async findOrgUnitIdUnscoped(id: string): Promise<string | undefined> {
     return this.resolveOrganizationalUnitIgnoringScope(() =>
       this.prisma.client.auditEngagement.findUnique({ where: { id }, select: { orgUnitId: true } }),
@@ -150,9 +136,6 @@ export class PrismaAuditEngagementRepository
     return this.conditionalVersionUpdate(scope, id, expectedVersion, data);
   }
 
-  /** `list`'s own scope predicate, applied AFTER the caller's filters —
-   * exposed via the protected base rather than reimplemented, mirroring
-   * `ControlQueryService`'s own reliance on `applyScopeToWhere`. */
   private applyScopeForList(
     scope: ScopeFilter,
     where: Prisma.AuditEngagementWhereInput,
@@ -160,10 +143,6 @@ export class PrismaAuditEngagementRepository
     return this.applyScope(scope, where);
   }
 
-  /** Shared conditional `UPDATE ... WHERE id = ? AND version = ? AND
-   * <scope>` mechanism, factored out of `updateWithVersion`/
-   * `applyLifecycleTransition` exactly as `ControlRepository
-   * .conditionalVersionUpdate` factors out its own equivalents. */
   private async conditionalVersionUpdate(
     scope: ScopeFilter,
     id: string,
@@ -176,8 +155,6 @@ export class PrismaAuditEngagementRepository
 
     if (result.count > 0) {
       const updated = await this.findById(scope, id);
-      // Defensive only: a row this same transaction just updated cannot
-      // vanish from a `findById` scoped by the same filter a moment later.
       if (!updated) {
         return { outcome: 'NOT_FOUND' };
       }

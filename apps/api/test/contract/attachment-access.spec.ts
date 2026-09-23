@@ -1,22 +1,3 @@
-/**
- * T184 — an attachment is unreachable by direct id without access to its
- * PARENT record (FR-098, FR-030, ADR-010). Proves, against the real
- * `/api/v1/attachments/{id}` and `/api/v1/attachments/{id}/content`
- * endpoints:
- *
- *   1. A caller who cannot see the parent risk (wrong organizational
- *      scope) is refused with 404, indistinguishable from a random,
- *      nonexistent attachment id — byte-for-byte identical `status`,
- *      `title`, `type` and `detail`.
- *   2. A caller who holds NO `risk:view` permission at all (global
- *      organizational scope, but no view permission whatsoever) is
- *      refused the same way — proving the refusal is permission-aware,
- *      not merely scope-aware.
- *   3. A caller who genuinely can see the parent risk succeeds.
- *   4. The same non-disclosing 404 holds for `DELETE
- *      /attachments/{attachmentId}` (a caller who holds `attachment:delete`
- *      but cannot see the parent).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -99,9 +80,6 @@ describe('An attachment is unreachable by direct id without access to its parent
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('attachment-access-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner for the risk this file's attachment tests
-    // hang off — not the object of any assertion (that role belongs to
-    // insider/outOfScope/noPermission below, all untouched).
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnitInScope.id });
     const risk = await ctx.app.get(CreateRiskUseCase).execute({
       actorUserId: creator.user.id,
@@ -111,7 +89,6 @@ describe('An attachment is unreachable by direct id without access to its parent
       ownerUserId: owner.id,
     });
 
-    // Insider: risk:view + UNIT scope covering the risk's own unit.
     const insiderRole = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-attachment-access-insider-role-${randomUUID()}`,
     });
@@ -122,7 +99,6 @@ describe('An attachment is unreachable by direct id without access to its parent
     await assignRoleFixture(prisma, { user: insider.user, role: insiderRole });
     await grantUnitScopeFixture(prisma, { user: insider.user, orgUnitId: orgUnitInScope.id });
 
-    // Out-of-scope: HOLDS risk:view, but scoped only to a sibling unit.
     const outOfScopeRole = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-attachment-access-outscope-role-${randomUUID()}`,
     });
@@ -133,8 +109,6 @@ describe('An attachment is unreachable by direct id without access to its parent
     await assignRoleFixture(prisma, { user: outOfScope.user, role: outOfScopeRole });
     await grantUnitScopeFixture(prisma, { user: outOfScope.user, orgUnitId: orgUnitOutOfScope.id });
 
-    // No-permission: GLOBAL scope (would see every risk by scope alone)
-    // but holds NO risk:view permission at all.
     const noPermission = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('attachment-access-noperm')}@example.test`,
     });
@@ -202,18 +176,12 @@ describe('An attachment is unreachable by direct id without access to its parent
     expect(realBody.status).toBe(nonexistentBody.status);
     expect(realBody.title).toBe(nonexistentBody.title);
     expect(realBody.type).toBe(nonexistentBody.type);
-    // `detail` embeds the id the caller themselves supplied — comparing
-    // for equality would be wrong (they necessarily differ); what FR-030
-    // requires is that both follow the IDENTICAL template, keyed by the
-    // ATTACHMENT's own id, never the parent risk's — see
-    // `core/files/application/attachment-access.ts`'s header for why.
     expect(realBody.detail).toBe(`Anexo ${attachmentId} não foi encontrado(a).`);
     expect(nonexistentBody.detail).toBe(`Anexo ${nonexistentId} não foi encontrado(a).`);
 
     const raw = JSON.stringify(realButInaccessible.body);
     expect(raw).not.toMatch(/stack/i);
     expect(raw).not.toMatch(/prisma/i);
-    // The storage layout must never leak through the refusal either.
     expect(raw).not.toMatch(/sha256/i);
     expect(raw).not.toContain(riskOrgUnitId);
   });
@@ -240,8 +208,6 @@ describe('An attachment is unreachable by direct id without access to its parent
 
     expect(response.status).toBe(404);
 
-    // Proves the refusal did not partially apply — the attachment is
-    // still there for the insider afterward.
     const stillThere = await insiderAgent
       .get(`/api/v1/attachments/${attachmentId}/content`)
       .set('Origin', appOrigin);

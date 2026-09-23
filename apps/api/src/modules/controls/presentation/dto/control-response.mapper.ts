@@ -1,26 +1,3 @@
-/**
- * T023/003-controls-management — maps `ControlRecord`
- * (`domain/ports/control-repository.port.ts`) to the wire shape
- * `contracts/controls.openapi.yaml`'s `ControlDetail` describes. This is
- * the ONLY place a `Control` becomes a `ControlDetail` response body — no
- * Prisma model, and no `ControlRecord` either, is ever returned directly
- * from `ControlController` (ADR-009).
- *
- * ## `description`/`isActive` on `ControlSummaryResponse` — Task A superset
- *
- * Neither is part of `contracts/controls.openapi.yaml`'s own `ControlSummary`
- * schema (which has `descriptionExcerpt` and `status`/`effectiveness`
- * instead) — they are ADDITIVE fields, present so `ControlSummary` is a
- * genuine superset of the retired `RegistryItem` shape
- * (`contracts/platform.openapi.yaml`, pre-Task-A): `id`/`code`/`name`/
- * `description`/`isActive` survive under the SAME names, so
- * `apps/web/src/features/risks/api.ts`'s `listControlRegistry` keeps
- * working unchanged even though it only ever destructured `id`/`code`/
- * `name`. `ControlSummary` carries no `additionalProperties: false`, so an
- * extra field here is not a contract violation. `isActive` is derived via
- * `isActiveForControlStatus` (T019's single sync point) — never a second,
- * independent computation of the same fact.
- */
 import { isActiveForControlStatus } from '../../domain/control.entity';
 
 import type { ControlEffectiveness } from '../../domain/control-effectiveness.service';
@@ -46,9 +23,6 @@ export interface ControlSummaryResponse {
   readonly code: string;
   readonly name: string;
   readonly descriptionExcerpt: string | null;
-  /** Task A superset field — see this file's header. Full description,
-   * matching the retired `RegistryItem.description`'s own name and
-   * nullability. */
   readonly description: string | null;
   readonly orgUnit: ControlOrgUnitRefResponse | null;
   readonly owner: ControlUserRefResponse | null;
@@ -56,9 +30,6 @@ export interface ControlSummaryResponse {
   readonly type: ControlType | null;
   readonly frequency: ControlFrequency | null;
   readonly status: ControlStatus;
-  /** Task A superset field — see this file's header. Derived from `status`
-   * via `isActiveForControlStatus`, matching the retired
-   * `RegistryItem.isActive`'s own name. */
   readonly isActive: boolean;
   readonly effectiveness: ControlEffectiveness;
   readonly version: number;

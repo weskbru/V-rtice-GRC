@@ -1,8 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `IncidentAssetLinkRepositoryPort`. Sibling
- * of `incident-risk-link-repository.port.ts`, same reasoning, against
- * `Asset` instead of `Risk`.
- */
 import type { IncidentAssetLinkRecord } from '../incident-asset-link.entity';
 
 export abstract class IncidentAssetLinkRepositoryPort {

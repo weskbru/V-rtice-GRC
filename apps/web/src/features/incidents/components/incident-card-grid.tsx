@@ -1,14 +1,5 @@
 'use client';
 
-/**
- * The grid frame — list semantics, responsive columns and the
- * loading/error/empty contract — is the shared `CardGrid`; what stays
- * here is which card to render and a skeleton shaped like it.
- *
- * PharosGRC — incident register card view, the grid of `IncidentCard`s
- * (008-incidents-problems, US1, CLAUDE.md §18.12 — mirrors
- * `AssetCardGrid`/`AuditEngagementCardGrid`).
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
 
 import { Skeleton } from '@/components/ui/skeleton';

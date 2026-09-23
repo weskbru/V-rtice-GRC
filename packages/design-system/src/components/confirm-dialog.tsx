@@ -8,55 +8,21 @@ import { cn } from '../lib/utils';
 
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 
-/**
- * `ConfirmDialog`'s own chrome text. Required, never defaulted inside the
- * component — like `DataTableLabels`/`RiskLevelBadgeLabels`,
- * `packages/design-system` must not depend on `apps/web`'s pt-BR message
- * catalog, so every caller supplies this from its own source (D-10:
- * `ConfirmDialog` is brought onto the same labels-prop convention every
- * other component in this package already follows).
- */
 export interface ConfirmDialogLabels {
-  /** Text of the confirming action, e.g. "Confirmar" or "Desativar". */
   confirm: string;
-  /** Text of the cancelling action, e.g. "Cancelar". */
   cancel: string;
-  /** Accessible name for the dialog's close (X) icon button, e.g. "Fechar". */
   close: string;
 }
 
 export interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** What is about to happen — required, never a bare "Are you sure?" (FR-046). */
   title: string;
-  /** States plainly what will happen and, for destructive actions, that it cannot be undone. */
   description: ReactNode;
   labels: ConfirmDialogLabels;
-  /**
-   * Visual/severity tier of the action being confirmed (FR-046):
-   * - `'default'` — an ordinary, reversible action.
-   * - `'sensitive'` — a security- or access-relevant action that is not
-   *   itself destructive (no data is deleted) but has an immediate,
-   *   consequential effect the operator must weigh — e.g. deactivating a
-   *   user (ends every live session now), resetting a password, revoking
-   *   sessions, revoking a scope grant, or reparenting an organizational
-   *   unit (rewrites its whole subtree's visibility). Styled with the
-   *   platform's warning tone, never the same red as `'destructive'` —
-   *   approval-adjacent and data-destroying actions must stay visually
-   *   distinguishable from one another (CLAUDE.md §18.11).
-   * - `'destructive'` — irreversible loss of data (e.g. deleting a role).
-   */
   variant?: 'default' | 'sensitive' | 'destructive';
-  /**
-   * Optional icon shown beside the title, reinforcing the variant's severity
-   * through a second, non-color channel (CLAUDE.md §18.8: color is never the
-   * only signal). Omitted by default — every caller that predates this prop
-   * renders exactly as before.
-   */
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
   onConfirm: () => void;
-  /** Disables both actions and shows a spinner on confirm while an async confirmation is in flight. */
   isConfirming?: boolean;
 }
 
@@ -72,16 +38,6 @@ const TITLE_ICON_TONE: Record<'default' | 'sensitive' | 'destructive', string> =
   destructive: 'text-destructive',
 };
 
-/**
- * Platform-wide confirmation pattern for destructive or irreversible actions
- * (FR-046). Built directly on Radix Dialog rather than importing a shadcn
- * ui/dialog primitive — `packages/design-system` must not depend on
- * `apps/web` (dependency direction is the other way around), and a
- * confirmation dialog is itself a fully composed, opinionated component,
- * not a generic primitive. This still uses the platform's one interaction
- * library (Radix) exactly as shadcn/ui does internally — no second
- * component library is introduced.
- */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -98,14 +54,6 @@ export function ConfirmDialog({
     onOpenChange(nextOpen);
   };
 
-  // Built directly on Radix Dialog with no focus-restoration handlers of its
-  // own until this fix — 34 callers, every one silently losing focus to
-  // `<body>` on close (F-62), made worse by the `autoFocus` on the confirm
-  // button below racing the (missing) capture exactly like
-  // `apps/web/src/components/ui/dialog.tsx` (D-15) already had to solve.
-  // `useDialogFocusRestore` is the SAME mechanism that primitive uses —
-  // captured during React's render phase, ahead of any commit-phase
-  // `autoFocus` — so the two components cannot drift apart again.
   const { FocusRestoreAnchor, restoreTargetRef, handleCloseAutoFocus } = useDialogFocusRestore();
 
   return (

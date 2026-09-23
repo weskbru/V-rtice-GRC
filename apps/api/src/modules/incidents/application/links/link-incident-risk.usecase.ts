@@ -1,23 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `LinkIncidentRiskUseCase`/
- * `UnlinkIncidentRiskUseCase`/`ListIncidentRiskLinksUseCase`. Mirrors
- * `grc/finding/application/links/link-finding-risk.usecase.ts` exactly —
- * see that file's header for the full ADR-020 five-part account this one
- * does not repeat.
- *
- * The one structural difference: `modules/incidents` has no full
- * `IncidentRepositoryPort` yet (the incident lifecycle is a concurrent,
- * separate workstream — data-model.md §1). The SOURCE-side existence+scope
- * check below therefore goes through `IncidentDirectoryPort.findById`
- * instead of a scoped repository lookup, exactly the read
- * `IncidentActionOriginAccessor.resolveScopedLookup`
- * (`application/incident-action-origin-accessor.ts`) already performs for
- * the identical reason — `IncidentDirectoryPort.findById` is inherently
- * UNSCOPED (it returns the entry regardless of the caller's scope), so it
- * doubles as the "resolve actual org unit" callback
- * `OrgScopeEnforcerService.assertExistingRecordAccessible` (F-38) needs,
- * with no separate unscoped lookup method required.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -78,9 +58,6 @@ export class LinkIncidentRiskUseCase {
       input.incidentId,
     );
 
-    // ADR-020 parts 4+5 — checked BEFORE any write; a missing, archived,
-    // out-of-scope risk and a risk the actor lacks `risk:view` for all
-    // answer with the exact same refusal.
     const [risk, canViewRisk] = await Promise.all([
       this.riskDirectory.findById(input.riskId),
       this.permissionResolver.hasPermission(input.actorUserId, 'risk:view'),
@@ -124,8 +101,6 @@ export interface UnlinkIncidentRiskInput {
   readonly linkId: string;
 }
 
-/** ADR-020 part 5 deliberately NOT extended here — same exemption
- * `UnlinkFindingRiskUseCase` documents for its own unlink path. */
 @Injectable()
 export class UnlinkIncidentRiskUseCase {
   constructor(

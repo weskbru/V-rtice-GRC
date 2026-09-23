@@ -1,10 +1,3 @@
-/**
- * T021/006-assets-processes — `ReactivateAssetUseCase` (`POST
- * /assets/{assetId}/reactivate`, `reactivateAsset` operation, FR-005). The
- * mirror transition of `DeactivateAssetUseCase` — see that file's header
- * for the shared reasoning. Refused with `422` if the asset is already
- * active, and nothing changes.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

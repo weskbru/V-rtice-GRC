@@ -1,14 +1,3 @@
-/**
- * 008-incidents-problems, US1 — `UpdateIncidentUseCase` (`updateIncident`).
- * Field-by-field audit diff, mirroring
- * `grc/finding/application/update-finding.usecase.ts`'s own reasoning.
- *
- * `status` is NOT part of `UpdateIncidentInput` at all — matching
- * `contracts/incidents.openapi.yaml`'s `UpdateIncidentRequest`, which
- * simply does not declare it (nor `code`, nor any resolution/cancellation
- * field), and the global `ValidationPipe`'s `forbidNonWhitelisted` rejects
- * a caller who tries anyway.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -58,8 +47,6 @@ export class UpdateIncidentUseCase {
     }
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the incident actually exists outside `scope`.
     const current = await this.incidentRepository.findById(scope, input.incidentId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

@@ -1,13 +1,3 @@
-/**
- * 008-incidents-problems, US1 — `GetIncidentUseCase` (`getIncident`,
- * spec.md FR-014). Scoped read: an incident outside the caller's
- * organizational scope reads as `undefined` from the repository, turned
- * into an audited `NotFoundDomainError` here via
- * `OrgScopeEnforcerService.assertExistingRecordAccessible` (F-38) —
- * indistinguishable from a genuinely unknown id, keyed to the id the
- * caller actually supplied. Mirrors `grc/finding/application/
- * get-finding.usecase.ts` exactly.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -35,8 +25,6 @@ export class GetIncidentUseCase {
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
     const record = await this.incidentRepository.findById(scope, input.incidentId);
     if (!record) {
-      // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-      // whenever the incident actually exists outside `scope`.
       return this.scopeEnforcer.assertExistingRecordAccessible(
         {
           scope,

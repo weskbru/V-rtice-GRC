@@ -1,8 +1,3 @@
-/**
- * T022/004-compliance-management — `FrameworkVersionRepository`: the sole
- * Prisma-backed implementation of `FrameworkVersionRepositoryPort`. No
- * `ScopeFilter` anywhere (research.md D-2).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

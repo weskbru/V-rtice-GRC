@@ -1,37 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Finding close dialog (T075/T077, 002-shared-grc-foundation +
- * 005-audit-findings, US3, Invariant F1/F2, FR-010).
- *
- * Justification is optional at the shape level — it becomes required only
- * when no completed linked action exists, a business rule the SERVER
- * enforces authoritatively (`finding.entity.ts#assertFindingCloseRequirementMet`,
- * `422`). Segregation of duties (F2) is likewise a server-side rule (`403`)
- * — this dialog surfaces that `problem+json` detail verbatim rather than
- * guessing eligibility client-side, since the client has no reliable way to
- * know which linked actions are COMPLETED and who is responsible for them
- * without duplicating a query the panel does not otherwise need.
- *
- * 005-audit-findings adds an ADDITIVE requirement on top of F1: closing now
- * ALSO requires at least one currently-ACTIVE evidence link, of any
- * evidence status (an ARCHIVED evidence still sustains closure — only the
- * total absence of an active link refuses, quickstart.md §5). Unlike F1,
- * this one IS cheaply and reliably knowable client-side — a single read of
- * `GET /evidence?subjectType=FINDING&subjectId=` already answers "is there
- * at least one active link", the exact filter that endpoint's own
- * implementation applies (`prisma-evidence.repository.ts`'s own
- * `links: { some: { subjectType, subjectId, unlinkedAt: null } }` — it does
- * NOT filter by the evidence's own `status`, so an archived evidence still
- * counts here, matching the server rule exactly). So this dialog checks it
- * on open and communicates the requirement BEFORE any attempt
- * (`closureEvidenceRequirement`, CLAUDE.md §18.11) — not only as a `422`
- * string after a refusal — and disables the confirm action while the
- * requirement is known to be unmet, the same "unmet precondition disables
- * the action" pattern `control-lifecycle-actions.tsx` already establishes.
- * A failed check (network/permission) never blocks the attempt — the
- * server remains the authority either way.
- */
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -72,12 +40,6 @@ export function FindingCloseDialog({
   const [justification, setJustification] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Mirrors `EvidenceAttachmentsSection`'s/`FindingsPanel`'s own
-  // "derive loading from a resolved-key comparison" convention rather than
-  // an unconditional `setState('checking')` at the top of the effect body
-  // (react-hooks/set-state-in-effect) — `evidenceCheck` below is CHECKING
-  // whenever `findingId` has changed since the last id this effect
-  // actually resolved.
   const [evidenceResult, setEvidenceResult] = useState<EvidenceResult>('present');
   const [resolvedFindingId, setResolvedFindingId] = useState<string | null>(null);
 
@@ -125,14 +87,8 @@ export function FindingCloseDialog({
       onClosed(closed);
     } catch (submitError) {
       if (submitError instanceof ApiError && submitError.problem.status === 403) {
-        // Segregation of duties (Invariant F2) — a DIFFERENT problem from
-        // the evidence requirement below: this one is about WHO is
-        // closing, never about what is or is not linked.
         setError(findingsMessages.close.segregationOfDutiesError);
       } else if (submitError instanceof ApiError && submitError.problem.status === 422) {
-        // The evidence requirement (FR-010) is the one 422 cause this
-        // dialog already knows how to name specifically — everything else
-        // 422 falls back to the server's own `detail` below.
         setError(
           evidenceCheck === 'missing'
             ? closureEvidenceRequirement.noEvidenceError

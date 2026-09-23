@@ -1,7 +1,3 @@
-/**
- * T180 — maps `OrgUnitAdminRecord` to `contracts/admin.openapi.yaml`'s
- * `OrgUnitNode` response schema.
- */
 import type { OrgUnitAdminRecord } from '../../domain/ports/org-unit-admin-repository.port';
 
 export interface OrgUnitNodeResponse {

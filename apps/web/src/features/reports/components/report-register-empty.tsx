@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report catalog empty states (009-indicators-reports, T061), mirroring
- * `features/incidents/components/incident-register-empty.tsx` exactly (CLAUDE.md §18.12) — two
- * genuinely different situations ("nothing has ever been registered" vs. "the current filter
- * matches nothing"), never collapsed into one generic message.
- */
 import { EmptyState } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

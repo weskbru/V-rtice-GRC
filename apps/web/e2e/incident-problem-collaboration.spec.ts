@@ -5,32 +5,6 @@ import { openIncidentDetailSection } from './support/incident-detail-sections';
 import { selectSeededRootOrgUnit } from './support/org-units';
 import { openProblemDetailSection } from './support/problem-detail-sections';
 
-/**
- * CLAUDE.md §19.10 remediation — E2E: comment on, attach a file to, and
- * link evidence to an Incident and a Problem, through the real rendered
- * UI, with a page reload proving persistence.
- *
- * `CommentableEntityType.INCIDENT`/`PROBLEM` and
- * `AttachableEntityType.INCIDENT`/`PROBLEM` existed in the schema with
- * accessors registered nowhere — a real attempt threw
- * `EntityTypeNotRegisteredError` at the use-case boundary (see
- * `IncidentParentRecordAccessor`/`ProblemParentRecordAccessor`, and
- * `apps/api/test/integration/incident-problem-collaboration.spec.ts` for
- * the backend-level proof). Neither detail screen had a Comments,
- * Attachments or Evidence tab at all — `EvidenceSubjectType.INCIDENT`/
- * `PROBLEM` were registered on the backend with no reachable interface
- * either. This spec is the rendered proof both gaps are closed.
- *
- * Mirrors `risk-collaboration.spec.ts`/`grc-foundation.spec.ts`'s exact
- * flows for comments, attachments and evidence — see those files for the
- * full reasoning (magic-byte sniffing, withdrawal-is-audited, in-memory
- * file buffers) this file does not repeat.
- *
- * The Problem test's own Evidência/Anexos/Comentários navigation now goes
- * through `openProblemDetailSection` (019-problem-detail-experience, Fase A
- * regrouped those three leaves under a "Registro" group — a flat
- * `role="tab"` click no longer reaches them).
- */
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Comment on, attach a file to, and link evidence to an Incident and a Problem (§19.10)', () => {
@@ -62,10 +36,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     await page.waitForURL(/\/incidents\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
 
-    // --- Evidence (EvidenceSubjectType.INCIDENT, previously unreachable) ---
-    // 018-incident-detail-experience Fase 2+3 regrouped Evidência/Anexos/
-    // Comentários under the "Registro" group (two-level navigation) —
-    // `openIncidentDetailSection` clicks the group tab first, then the leaf.
     const evidenceTitle = `Evidência do incidente E2E ${uniqueSuffix}`;
     await openIncidentDetailSection(page, 'evidence');
     await expect(page.getByText('Nenhuma evidência vinculada ainda.')).toBeVisible();
@@ -83,7 +53,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     await expect(page.getByRole('dialog')).toBeHidden();
     await expect(page.getByText(evidenceTitle)).toBeVisible();
 
-    // --- Attachment (AttachableEntityType.INCIDENT, previously unregistered) ---
     await openIncidentDetailSection(page, 'attachments');
     const attachmentsPanel = page.getByRole('tabpanel', { name: 'Anexos' });
     await expect(attachmentsPanel.getByText('Nenhum anexo enviado ainda.')).toBeVisible();
@@ -96,7 +65,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     const attachmentLink = attachmentsPanel.getByRole('link', { name: /evidencia-incidente\.pdf/ });
     await expect(attachmentLink).toBeVisible();
 
-    // --- Comment (CommentableEntityType.INCIDENT, previously unregistered) ---
     await openIncidentDetailSection(page, 'comments');
     await expect(page.getByText('Nenhum comentário registrado ainda.')).toBeVisible();
     const commentBody = `Investigação registrada via E2E (${uniqueSuffix}, incidente).`;
@@ -104,7 +72,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     await page.getByRole('button', { name: 'Comentar' }).click();
     await expect(page.getByText(commentBody)).toBeVisible();
 
-    // --- Reload: all three must persist server-side, not merely in local state ---
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
 
@@ -146,10 +113,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     await page.waitForURL(/\/problems\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
 
-    // --- Evidence (EvidenceSubjectType.PROBLEM, previously unreachable) ---
-    // 019-problem-detail-experience Fase A regrouped Evidência/Anexos/
-    // Comentários under the "Registro" group (two-level navigation) —
-    // `openProblemDetailSection` clicks the group tab first, then the leaf.
     const evidenceTitle = `Evidência do problema E2E ${uniqueSuffix}`;
     await openProblemDetailSection(page, 'evidence');
     await expect(page.getByText('Nenhuma evidência vinculada ainda.')).toBeVisible();
@@ -167,7 +130,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     await expect(page.getByRole('dialog')).toBeHidden();
     await expect(page.getByText(evidenceTitle)).toBeVisible();
 
-    // --- Attachment (AttachableEntityType.PROBLEM, previously unregistered) ---
     await openProblemDetailSection(page, 'attachments');
     const attachmentsPanel = page.getByRole('tabpanel', { name: 'Anexos' });
     await expect(attachmentsPanel.getByText('Nenhum anexo enviado ainda.')).toBeVisible();
@@ -180,7 +142,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     const attachmentLink = attachmentsPanel.getByRole('link', { name: /analise-problema\.pdf/ });
     await expect(attachmentLink).toBeVisible();
 
-    // --- Comment (CommentableEntityType.PROBLEM, previously unregistered) ---
     await openProblemDetailSection(page, 'comments');
     await expect(page.getByText('Nenhum comentário registrado ainda.')).toBeVisible();
     const commentBody = `Causa raiz em análise via E2E (${uniqueSuffix}, problema).`;
@@ -188,7 +149,6 @@ test.describe('Comment on, attach a file to, and link evidence to an Incident an
     await page.getByRole('button', { name: 'Comentar' }).click();
     await expect(page.getByText(commentBody)).toBeVisible();
 
-    // --- Reload: all three must persist server-side, not merely in local state ---
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
 

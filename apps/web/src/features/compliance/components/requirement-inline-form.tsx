@@ -1,14 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — requirement (clause) create/edit form (US1, FR-003, FR-004,
- * FR-007). Permitted only while the parent version is `DRAFT`; the caller
- * (`RequirementListSection` for create, the requirement detail screen for
- * edit) is responsible for never rendering this once the version publishes
- * — the server also refuses with `422` regardless (a database trigger,
- * `requirements_immutable_after_publish`), so this is a courtesy, not the
- * enforcement (ADR-003).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -38,7 +29,6 @@ export interface RequirementInlineFormProps {
   frameworkId: string;
   versionId: string;
   requirement?: Requirement;
-  /** The `ETag` last read for `requirement`. Required when `mode === 'edit'`. */
   etag?: string;
   onSaved: (result: RequirementInlineFormSavedResult) => void;
   onCancel?: () => void;

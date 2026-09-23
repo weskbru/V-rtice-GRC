@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, the roles list and its states
- * (015-roles-permissions-surface T033).
- *
- * Four states, and the two empty ones are deliberately distinct: "nothing
- * matched the current search and filters" and "no role exists at all" are
- * different problems with different exits — clear the filters, or create the
- * first role. Collapsing them into one message is how a user ends up
- * clearing filters that were never applied (`EmptyState`'s own
- * `variant` prop exists for exactly this distinction).
- *
- * The loading skeleton has the SHAPE of the real card — icon chip, two text
- * lines, a chip row — rather than a generic bar, so the list does not jump
- * when the data arrives.
- */
 import { EmptyState, ErrorState } from '@pharos/design-system/components';
 import { KeyRound, SearchX } from 'lucide-react';
 
@@ -28,7 +13,6 @@ import type { ErrorStateProblem } from '@pharos/design-system/components';
 
 export interface RoleCardListProps {
   roles: readonly Role[];
-  /** How many roles exist before search and filters — what tells the two empty states apart. */
   totalRoles: number;
   selectedRoleId: string | null;
   onSelect: (role: Role) => void;
@@ -36,7 +20,6 @@ export interface RoleCardListProps {
   error: ErrorStateProblem | undefined;
   onRetry: () => void;
   onClearFilters: () => void;
-  /** The "create the first role" action, already gated on `role:administer` by the caller; omitted when the caller may not create. */
   createAction?: React.ReactNode;
 }
 
@@ -95,8 +78,6 @@ export function RoleCardList({
   }
 
   if (roles.length === 0) {
-    // `totalRoles` is the unfiltered count, so the distinction is a fact,
-    // not a guess about why the list came back empty.
     return totalRoles === 0 ? (
       <EmptyState
         variant="empty"

@@ -1,25 +1,8 @@
-/**
- * T015/002-shared-grc-foundation — unit coverage for the pure domain
- * predicate in `grc/shared/domain/overdue.service.ts`: `isActionOverdue`
- * (R-006, FR-014, SC-007). No I/O, no framework — mirrors
- * `test/unit/risk-overdue.spec.ts`'s structure for its
- * `isOverdueTreatmentAction` cousin, minus the "defaults when omitted"
- * case: `isActionOverdue` takes `referenceDate` as a REQUIRED parameter
- * with no default (see that function's own header for why), so there is no
- * "omitted" call shape to cover — every call site names its reference date
- * explicitly, which is exactly what the other cases below exercise.
- *
- * Covers, per this task's explicit checklist: a future due date, due
- * today, a past due date, and each of `Action`'s two terminal statuses
- * (`COMPLETED`, `CANCELLED`) — plus both eligible statuses (`OPEN`,
- * `IN_PROGRESS`) with a past due date, so every `ActionStatus` member is
- * exercised at least once.
- */
 import { describe, expect, it } from 'vitest';
 
 import { isActionOverdue, todayDateOnlyUtc } from '../../src/grc/shared/domain/overdue.service';
 
-const TODAY = new Date(Date.UTC(2026, 5, 15)); // 2026-06-15
+const TODAY = new Date(Date.UTC(2026, 5, 15));
 const PAST = new Date(Date.UTC(2026, 5, 14));
 const FUTURE = new Date(Date.UTC(2026, 5, 16));
 

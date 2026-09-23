@@ -8,40 +8,18 @@ import { cn } from '../../lib/utils';
 import { useDisclosureClose } from './use-disclosure-close';
 
 export interface ColumnVisibilityOption {
-  /** The `ColumnDef.id`/`accessorKey` this checkbox controls. */
   id: string;
   label: string;
 }
 
 export interface ColumnVisibilityMenuProps {
-  /** Visible trigger text, e.g. "Colunas". */
   label: string;
-  /** Every hideable column, in display order. Never include a column the table forces always-visible (e.g. the row's title/link cell). */
   columns: readonly ColumnVisibilityOption[];
-  /** Column id → visible. A missing entry is treated as visible. */
   visibility: Readonly<Record<string, boolean>>;
   onChange: (next: Record<string, boolean>) => void;
   className?: string;
 }
 
-/**
- * Generic column-visibility control for a `DataTable` (T109). Deliberately
- * decoupled from the TanStack `Table` instance — it only ever reads/writes
- * a plain `{ [columnId]: boolean }` record, the same `VisibilityState`
- * shape `DataTable` accepts as its own `columnVisibility` prop — so a
- * feature can place this menu anywhere in its toolbar without threading the
- * table instance through it.
- *
- * The panel is hidden rather than unmounted while closed, for the reason and
- * by the mechanism `MultiSelectFilter`'s doc comment sets out in full
- * (F-71): this menu has the identical trigger shape, it rides into the
- * server HTML through `FilterBar`'s `trailing` slot on the same collapsible
- * registers, and `aria-haspopup` means axe would downgrade a dangling
- * `aria-controls` here to "needs review" rather than report it. Fixed at the
- * source instead of relied on to stay lucky. As there, it is the panel
- * ELEMENT that survives both render passes; the checkboxes still mount on
- * open.
- */
 export function ColumnVisibilityMenu({
   label,
   columns,
@@ -78,7 +56,6 @@ export function ColumnVisibilityMenu({
         id={panelId}
         role="group"
         aria-label={label}
-        // Present in every render pass, hidden while closed (F-71).
         hidden={!open}
         className={cn(
           'absolute right-0 z-20 mt-1 w-56 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-md',

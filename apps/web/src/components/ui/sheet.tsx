@@ -57,23 +57,6 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
-  // D-15: `Sheet` is built on the very same `@radix-ui/react-dialog`
-  // primitive as `dialog.tsx`, so it inherits the identical defect recorded
-  // there: modal content hard-codes `onCloseAutoFocus` to
-  // `event.preventDefault(); context.triggerRef.current?.focus()`, and
-  // `preventDefault()` also discards `FocusScope`'s own generic "restore
-  // whatever had focus before" fallback. No caller in this platform renders
-  // a Radix `Sheet.Trigger` — the sheet is opened from ordinary application
-  // state — so NOTHING was registered and focus fell silently to `<body>`
-  // on every close (Escape, the X button, or a Cancel button): SC 2.4.3.
-  // This was the measured reason 012 §2.4 chose `Dialog` over `Sheet`; the
-  // fix removes the cause instead of routing around it.
-  //
-  // Same shared hook, same ordering, as `dialog.tsx`: `FocusRestoreAnchor`
-  // is the content's FIRST child so the capture happens during React's
-  // render phase — strictly before any commit-phase `autoFocus` inside the
-  // sheet — and the composed `onCloseAutoFocus` runs ours first, so its
-  // `preventDefault()` stops Radix's own handler.
   const { FocusRestoreAnchor, restoreTargetRef, handleCloseAutoFocus } = useDialogFocusRestore()
 
   return (

@@ -1,13 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `ReportRunDialog` (009-indicators-reports, T061) — the FR-026/
- * SC-006 acceptance rule this task exists to verify in a rendered surface: an `available: false`
- * item renders through `MetricCard`'s distinct unavailable treatment, never a zero, and the rest
- * of the run still renders normally alongside it. Also covers the CSV export link building on
- * `reportsApi.buildRunCsvUrl` rather than a fetched blob (`ReportRunDialog`'s own header).
- */
 const { runMock, buildRunCsvUrlMock } = vi.hoisted(() => ({
   runMock: vi.fn(),
   buildRunCsvUrlMock: vi.fn(() => '/api/v1/reports/report-1/run?format=csv'),
@@ -75,15 +68,10 @@ describe('ReportRunDialog', () => {
 
     expect(await screen.findByText('4')).toBeInTheDocument();
     expect(screen.getByText('Sem permissão para ver este item')).toBeInTheDocument();
-    // The unavailable item must never render as a bare zero alongside the real value.
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
   it("labels each item's scope by its OWN scopeApplicability, not one label for the whole run (S-07, A4-F01)", async () => {
-    // A run mixes metrics of different scope applicability — an ORGANIZATIONAL_UNIT metric and an
-    // ORGANIZATION_WIDE one (COMPLIANCE_PERCENTAGE) side by side — for a caller whose OWN scope is
-    // NOT global. Before the fix, a single `reports.run.scopeLabel(scope.global)` line above the
-    // grid would show "Sua unidade organizacional" once, misdescribing the ORGANIZATION_WIDE item.
     runMock.mockResolvedValue({
       reportId: 'report-1',
       computedAt: '2026-09-12T14:32:00.000Z',

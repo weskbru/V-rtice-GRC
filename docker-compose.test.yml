@@ -1,32 +1,4 @@
-# docker-compose.test.yml
-#
-# Isolated PostgreSQL 17 + Redis 7 pair for integration, contract and e2e test
-# runs (T010). Deliberately separate from docker-compose.yml so a test run
-# never touches development data — PostgreSQL's data directory is `tmpfs`
-# (in-memory, fast, and wiped whenever the container is removed), and this
-# stack uses its own host ports so it can run at the same time as
-# docker-compose.yml AND the machine's native PostgreSQL on 5432. No api/web
-# services here — tests run the applications directly on the host against
-# this stack. No `version:` key — obsolete in Compose v2.
-#
-# HOST PORT COLLISION NOTE (mirrors docker-compose.yml):
-#   - postgres -> 5434 (5432 is native Postgres, 5433 is docker-compose.yml)
-#   - redis    -> 6380 (6379 is docker-compose.yml's redis)
-#
-# PROJECT NAME: without an explicit `name`, Compose derives the project name
-# from the current directory, which is `pharos-grc` for BOTH this file and
-# docker-compose.yml when run from the repo root. Because the two files also
-# declare services with the same names (postgres, redis), that shared default
-# project name made `docker compose -f docker-compose.test.yml up` recreate
-# and replace docker-compose.yml's running containers instead of running
-# alongside them — the opposite of this file's stated purpose. An explicit,
-# distinct name keeps the two stacks genuinely independent.
 name: pharos-grc-test
-#
-# Usage (see quickstart.md section 5):
-#   docker compose -f docker-compose.test.yml up -d
-#   ... run pnpm test:integration / test:contract / test:e2e ...
-#   docker compose -f docker-compose.test.yml down -v
 
 services:
   postgres:
@@ -35,8 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-postgres_dev_only}
       POSTGRES_DB: ${TEST_POSTGRES_DB:-pharos_grc_test}
-      # Consumed by docker/postgres/init/01-roles.sql (shared with
-      # docker-compose.yml) via psql's `\getenv`.
       POSTGRES_OWNER_USER: ${POSTGRES_OWNER_USER:-pharos_owner}
       POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:-pharos_owner_dev}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-pharos_app}
@@ -44,12 +14,8 @@ services:
     ports:
       - "${TEST_POSTGRES_HOST_PORT:-5434}:5432"
     volumes:
-      # Reuses the same two-role bootstrap script as docker-compose.yml — a
-      # single source of truth for ADR-005's role split.
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     tmpfs:
-      # Disposable, fast: every `up` starts from an empty cluster, and the
-      # init script above re-provisions the two roles and extensions.
       - /var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]

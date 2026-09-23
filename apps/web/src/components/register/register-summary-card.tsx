@@ -1,12 +1,12 @@
 import { SummaryStatCard } from '@pharos/design-system/components';
 
+import { Link } from '@/components/navigation/link';
+import { cn } from '@/lib/utils';
+
 import styles from './register-summary-card.module.css';
 
 import type { SummaryStatCardTone } from '@pharos/design-system/components';
 import type { ComponentType, SVGProps } from 'react';
-
-import { Link } from '@/components/navigation/link';
-import { cn } from '@/lib/utils';
 
 export interface RegisterSummaryCardProps {
   href: string;
@@ -20,11 +20,6 @@ export interface RegisterSummaryCardProps {
   className?: string;
 }
 
-/**
- * Register-specific composition of the Design System's neutral
- * `SummaryStatCard`: one consistent focus target, density and semantic tint
- * for the compact indicator strips shared by GRC catalogs.
- */
 export function RegisterSummaryCard({
   href,
   linkLabel,

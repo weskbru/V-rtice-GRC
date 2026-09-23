@@ -1,9 +1,3 @@
-/**
- * T037/003-controls-management, User Story 3 — the sole implementation of
- * `ControlAssetLinkRepositoryPort`. Same shape and rationale as
- * `control-process-link.repository.ts` above, against `Asset` instead of
- * `Process`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

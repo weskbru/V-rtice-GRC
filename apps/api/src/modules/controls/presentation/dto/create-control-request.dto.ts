@@ -1,12 +1,3 @@
-/**
- * T023/003-controls-management — matches `contracts/controls.openapi.yaml`'s
- * `CreateControlRequest` exactly: `additionalProperties: false` (global
- * `ValidationPipe`'s `forbidNonWhitelisted`) means this class is also,
- * by construction, where "code/status/version/effectiveness are
- * server-owned and rejected as unknown properties" is enforced — not
- * declaring the property IS the rejection, the same discipline
- * `CreateRiskRequestDto`'s own header documents.
- */
 import { IsIn, IsOptional, IsString, IsUUID, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';
@@ -37,8 +28,6 @@ export class CreateControlRequestDto {
   @IsUUID(undefined, { message: USER_MESSAGES.dto.control.orgUnitId.isUuid })
   orgUnitId!: string;
 
-  /** Optional at creation (FR-005, edge case "controle sem dono"); required
-   * before the control may enter `ACTIVE`. */
   @IsOptional()
   @IsUUID(undefined, { message: USER_MESSAGES.dto.control.ownerUserId.isUuid })
   ownerUserId?: string | null;

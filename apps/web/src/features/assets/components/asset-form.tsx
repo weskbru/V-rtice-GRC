@@ -1,26 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — asset create/edit form (T048), mirroring
- * `AuditEngagementForm`'s/`ControlForm`'s overall shape (CLAUDE.md §18.12) —
- * simpler than either in two ways that both trace back to `assets.
- * openapi.yaml`, not to a smaller ambition for this screen:
- *
- *   - **No conflict handling.** `assets` carries no `version` column
- *     (`features/assets/types.ts`'s own header comment) — `PATCH
- *     /assets/{assetId}` applies last-write-wins directly, so this form
- *     never reads or writes an `ETag` and never renders a 409 banner.
- *   - **No org-unit-scoped assignment picker.** There is no owner field on
- *     this contract at all — only `name`/`description`/`orgUnitId` — so
- *     there is nothing here resembling `ControlForm`'s cascading
- *     assignable-users effect.
- *
- * Organizational unit is required (invariant A1, FR-004) — the field's own
- * `FormField` renders both the required `*` and an explanatory helper
- * (`assets.form.fields.orgUnit.helper`), so the invariant is unmistakable
- * on the screen itself, not only as a validation message after the fact
- * (CLAUDE.md §18.11).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -53,20 +32,6 @@ export interface AssetFormProps {
   mode: 'create' | 'edit';
   asset?: AssetDetail;
   onSaved: (asset: AssetDetail) => void;
-  /**
-   * Overrides the "Cancelar" button's default `navigate.back()` (real
-   * browser history navigation). Optional — omitted, this form behaves
-   * exactly as it always has (`/assets/new`, the register's own create
-   * flow). `AssetEditPanel` (022-asset-detail-experience Fase C) passes its
-   * own overlay-close here: `navigate.back()` is correct when this form IS
-   * the page (a real navigation got you here, so "cancel" means "leave"),
-   * but wrong inside an overlay `Sheet`, which is not a navigation at all —
-   * exactly the defect the coordinator measured in `ControlForm` (F-79,
-   * `docs/deferred-findings.md`) before this same fix was applied here
-   * preemptively, rather than shipping the overlay first and finding the
-   * same bug a second time. Mirrors `ControlForm`'s/`ActionEditForm`'s own
-   * `onCancel?: () => void` contract exactly.
-   */
   onCancel?: () => void;
 }
 
@@ -77,15 +42,10 @@ function defaultValuesFor(asset: AssetDetail | undefined): AssetFormValues {
   return {
     name: asset.name,
     description: asset.description ?? '',
-    // An asset minted before this module existed may carry no
-    // organizational unit at all (data-model.md §1/§6) — falls back to
-    // unset rather than crashing; `orgUnitId` is still required to SAVE
-    // the edit (schema validation), exactly as for a brand-new asset.
     orgUnitId: asset.orgUnit?.id ?? '',
   };
 }
 
-/** The server refuses `description: ''` outright (`MinLength(1)` whenever the property is present) — see `lib/validation/asset.ts`'s own header comment. */
 function normalizedDescription(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;

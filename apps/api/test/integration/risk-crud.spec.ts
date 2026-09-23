@@ -1,13 +1,3 @@
-/**
- * T080 — proves, against the real test database, that:
- *
- *   1. Creation assigns a unique, human-readable, per-year code
- *      (FR-054) — two risks created back-to-back never collide.
- *   2. Creation is audited with the new field values (FR-032, ADR-005).
- *   3. Update records each CHANGED field's previous and new value
- *      (FR-033, FR-058) — a field re-submitted unchanged does not appear
- *      in the audit payload, and version increments (ADR-013).
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -30,15 +20,6 @@ import { uniqueTestMarker } from './support/env';
 import { createOrgUnitFixture, createUserFixture } from './support/fixtures';
 import { buildIntegrationTestingModule, type IntegrationTestContext } from './support/test-app';
 
-/**
- * `AuditRecorder` reads `actorUserId`/`ipAddress`/`userAgent`/`correlationId`
- * from the AMBIENT `RequestContextStore` (ADR-005/ADR-012) — populated by
- * `RequestContextMiddleware` for a real HTTP request, but this suite calls
- * the use case directly with no HTTP request in the loop, exactly like
- * `test/integration/audit-transactional.spec.ts` does. Without this, every
- * audit row's `actorUserId` would be `null` even though `actorLabel` was
- * supplied explicitly.
- */
 function withActorContext<T>(actorUserId: string, fn: () => Promise<T>): Promise<T> {
   return RequestContextStore.run(
     {
@@ -83,15 +64,6 @@ describe('Risk creation and update (T080, FR-054, FR-032, FR-033, FR-058, ADR-00
     return actor;
   }
 
-  /**
-   * F-CV-2 (`risks-lifecycle-audit`): being assignable as owner/responsible
-   * now also requires being able to SEE the risk once assigned —
-   * `risk:view` plus scope reaching `orgUnitId`, on top of the pre-existing
-   * assignment-line check this file never exercised in the first place
-   * (every owner/responsible here has no `primaryOrgUnitId`, trivially in
-   * line). Every bare `createUserFixture` owner/responsible in this file
-   * needs this to keep passing.
-   */
   async function makeEligibleAssignee(orgUnitId: string, email: string) {
     const user = await createUserFixture(ctx.prisma, { email });
     const role = await createRoleWithPermissionsFixture(ctx.prisma, ['risk:view'], {
@@ -174,7 +146,6 @@ describe('Risk creation and update (T080, FR-054, FR-032, FR-033, FR-058, ADR-00
     expect(newValues.orgUnitId).toBe(orgUnit.id);
     expect(newValues.ownerUserId).toBe(owner.id);
 
-    // No secret/internal field ever reaches the payload (allow-list, FR-035).
     const raw = JSON.stringify(event);
     expect(raw).not.toMatch(/passwordHash/i);
     expect(raw).not.toMatch(/tokenHash/i);
@@ -210,8 +181,6 @@ describe('Risk creation and update (T080, FR-054, FR-032, FR-033, FR-058, ADR-00
         riskId: risk.id,
         expectedVersion: risk.version,
         title: 'Título atualizado',
-        // Re-submitting the SAME description on purpose: must not appear in
-        // the audit diff (only genuinely changed fields do).
         description: 'Descrição original.',
         responsibleUserId: newResponsible.id,
       }),
@@ -235,7 +204,6 @@ describe('Risk creation and update (T080, FR-054, FR-032, FR-033, FR-058, ADR-00
     expect(previousValues.responsibleUserId).toBeNull();
     expect(newValues.responsibleUserId).toBe(newResponsible.id);
 
-    // The unchanged field must not appear in either side of the diff.
     expect(previousValues).not.toHaveProperty('description');
     expect(newValues).not.toHaveProperty('description');
   });

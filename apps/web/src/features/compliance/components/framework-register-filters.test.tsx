@@ -3,14 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { FrameworkRegisterFilters } from './framework-register-filters';
 
-/**
- * Component-mount evidence for `FrameworkRegisterFilters`'s active-filter
- * chip row (CLAUDE.md §18.11 "Filtros ativos são visíveis?") — pins that the
- * chip row reflects exactly the filters the caller reports as applied, and
- * that removing one chip calls back with that field cleared, never another.
- * No reference-data fetch here (unlike `IncidentRegisterFilters`): `origin`
- * is a closed, two-value enum with no server-side option list.
- */
 function baseProps() {
   return {
     origin: [] as const,

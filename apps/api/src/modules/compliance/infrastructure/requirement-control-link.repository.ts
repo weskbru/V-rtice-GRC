@@ -1,14 +1,3 @@
-/**
- * T032/004-compliance-management, User Story 2 — `RequirementControlLinkRepository`:
- * the sole Prisma-backed implementation of `RequirementControlLinkRepositoryPort`.
- * `include: { control: ... }` reads `controls` directly, the same accepted
- * convention `PrismaRiskControlLinkRepository`
- * (`modules/risk/infrastructure/prisma-risk-relationship.repository.ts`)
- * already establishes for the identical shape: a real FK-backed Prisma
- * relation on a table THIS module owns is a data-layer join, not a
- * cross-module CODE import (ADR-020 part 3 governs code dependencies; this
- * file imports nothing from `modules/controls`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

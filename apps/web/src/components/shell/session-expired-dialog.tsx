@@ -1,24 +1,5 @@
 'use client';
 
-/**
- * PharosGRC application shell — in-place re-authentication (T077, FR-016).
- *
- * Registers itself as the `api-client.ts` session-expiry seam
- * (`setUnauthorizedHandler`) for the lifetime of the authenticated shell. On
- * an unexpected 401 (the session expired or was revoked mid-use) it opens a
- * modal *over* whatever the user was doing — it does not navigate anywhere,
- * so the page underneath, and every value in every field on it, is left
- * completely untouched. Re-entering the password re-establishes a session in
- * place; the user resumes exactly where they left off (FR-016: no data the
- * user has entered is lost).
- *
- * The dialog cannot be dismissed by pressing Escape or clicking outside — a
- * genuinely expired session is not something closing the dialog fixes — but
- * it does offer an explicit "Sign in as someone else" escape hatch for the
- * (rare) case the current user is not who should continue; choosing that is
- * a deliberate, informed decision by the user to leave the page, not
- * something this component decides silently on a 401.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -63,10 +44,6 @@ export function SessionExpiredDialog(): React.JSX.Element {
   });
 
   useEffect(() => {
-    // Seeding the form and clearing any stale error happens here, at the
-    // moment the seam actually fires — not in a second effect keyed on
-    // `open` (which would call setState synchronously inside an effect body
-    // purely to react to a state change this component itself just made).
     setUnauthorizedHandler(() => {
       form.reset({ email: user.email, password: '' });
       setFormError(null);

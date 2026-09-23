@@ -1,18 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-/**
- * Evidence for the roles surface's search, filtering and ordering
- * (015-roles-permissions-surface FR-005, FR-005a, FR-005b, FR-007).
- *
- * The first block is a MIGRATED guard, not a new one. The rule "modules are
- * ordered by how many permissions the role concentrates in each, never by
- * product order" was measured and decided in
- * `specs/012-admin-roles-screen/STATE.md` §2.3 and is kept by FR-007; it was
- * guarded by `role-admin-columns.test.tsx`, which covers a component this
- * phase stops using. The rule now lives in `roleModuleReach`, so its guard
- * lives here — a behaviour must never lose its test because the component
- * that carried it was replaced (D-07).
- */
 import {
   applyRoleCriteria,
   roleMatchesCriteria,
@@ -40,10 +27,6 @@ function role(overrides: Partial<Role> = {}): Role {
 
 describe('roleModuleReach', () => {
   it('orders modules by how many permissions the role concentrates in each, not by product order', () => {
-    // In product order alone "Riscos" comes first (it is the first area of
-    // the sidebar) — the very effect 012 §2.3 measured and rejected, which
-    // made the Audit Lead read as a risk role. Here the role grants one
-    // risk permission and three audit ones.
     const reach = roleModuleReach(
       role({
         permissions: [
@@ -66,8 +49,6 @@ describe('roleModuleReach', () => {
         permissions: [permission('control:view', 'control'), permission('risk:view', 'risk')],
       }),
     );
-    // Both modules hold one permission; `risk` precedes `control` in the
-    // platform's own area order.
     expect(reach.map((module) => module.area)).toEqual(['risk', 'control']);
   });
 
@@ -106,8 +87,6 @@ describe('roleMatchesCriteria', () => {
   });
 
   it('never matches a module when the role grants no permission at all', () => {
-    // Vacuous truth would make a permissionless role match every module —
-    // the opposite of what "reaches this module" means.
     const empty = role({ permissions: [] });
     expect(roleMatchesCriteria(empty, { q: '', type: 'all', module: 'risk' })).toBe(false);
     expect(roleMatchesCriteria(empty, { q: '', type: 'all', module: undefined })).toBe(true);
@@ -121,11 +100,8 @@ describe('roleMatchesCriteria', () => {
     });
     const criteria = { type: 'all', module: undefined } as const;
 
-    // Typed by someone reading this screen.
     expect(roleMatchesCriteria(seeded, { ...criteria, q: 'Administrador' })).toBe(true);
     expect(roleMatchesCriteria(seeded, { ...criteria, q: 'plataforma' })).toBe(true);
-    // Typed by someone who met the role in an API response, an audit entry or
-    // a runbook. Both readers must reach the same role.
     expect(roleMatchesCriteria(seeded, { ...criteria, q: 'Platform' })).toBe(true);
     expect(roleMatchesCriteria(seeded, { ...criteria, q: 'administrator' })).toBe(true);
 
@@ -133,8 +109,6 @@ describe('roleMatchesCriteria', () => {
   });
 
   it('does not let the pt-BR map leak into a custom role name', () => {
-    // "Risk Analyst" is a seeded name, but not THIS role's: a custom role
-    // must never become findable by a label it does not carry.
     const custom = role({ id: 'c', name: 'Equipe Alfa', description: 'Sem relação.' });
     expect(roleMatchesCriteria(custom, { q: 'Analista', type: 'all', module: undefined })).toBe(
       false,
@@ -178,11 +152,6 @@ describe('sortRoles', () => {
   });
 
   it('orders A–Z by the name the list PRINTS, not by the one it stores (ADR-022)', () => {
-    // Sorted by the stored names this is already alphabetical — A(udit Lead),
-    // P(latform Administrator), R(ead Only) — and the screen would read
-    // "Líder de Auditoria, Administrador da Plataforma, Somente Leitura"
-    // under a control that says "Nome (A–Z)". The displayed order is the one
-    // that has to be alphabetical.
     const seeded = [
       role({ id: '1', name: 'Audit Lead' }),
       role({ id: '2', name: 'Platform Administrator' }),
@@ -190,9 +159,9 @@ describe('sortRoles', () => {
     ];
 
     expect(sortRoles(seeded, 'name:asc').map((r) => r.name)).toEqual([
-      'Platform Administrator', // Administrador da Plataforma
-      'Audit Lead', // Líder de Auditoria
-      'Read Only', // Somente Leitura
+      'Platform Administrator',
+      'Audit Lead',
+      'Read Only',
     ]);
     expect(sortRoles(seeded, 'name:desc').map((r) => r.name)).toEqual([
       'Read Only',

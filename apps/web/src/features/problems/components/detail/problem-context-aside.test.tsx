@@ -5,26 +5,6 @@ import { ProblemContextAside } from './problem-context-aside';
 
 import type { ProblemDetail } from '../../types';
 
-/**
- * Component-mount evidence for the contextual aside
- * (019-problem-detail-experience, Fase C). Rendered at the default (wide,
- * jsdom `matchMedia` stub) viewport, so every block is the plain,
- * always-expanded `<section>` — mirrors
- * `incident-context-aside.test.tsx`'s own convention for not duplicating
- * narrow-mode coverage here.
- *
- * Central assertions this suite exists to prove:
- *
- *   - every quick action is a real LINK (`role="link"`), never a button —
- *     the exact defect class `RiskRelationshipsAside`/`IncidentContextAside`
- *     had to correct (`getByRole('button', …)` colliding with a section's
- *     own real button);
- *   - no relationship row ever shows a count — `ProblemDetail` carries
- *     none, and the aside must never fabricate one;
- *   - "Última atualização" renders only when `problem.updatedAt` is
- *     present, never "Invalid Date" for the optional field.
- */
-
 const baseProblem: ProblemDetail = {
   id: 'problem-1',
   code: 'PRB-2026-0001',
@@ -69,7 +49,6 @@ describe('ProblemContextAside', () => {
       '/problems/problem-1?section=comments',
     );
 
-    // None of these render as buttons.
     for (const name of [
       'Vincular risco',
       'Vincular incidente',
@@ -110,12 +89,8 @@ describe('ProblemContextAside', () => {
     );
 
     for (const label of ['Riscos', 'Incidentes']) {
-      // Accessible name concatenates label + hint with an explicit space —
-      // see this component's own doc comment and `IncidentContextAside`'s
-      // identical fix ("Riscos8").
       const link = screen.getByRole('link', { name: `${label} Ver` });
       expect(link).toHaveAttribute('href', expect.stringContaining('/problems/problem-1?section='));
-      // Never a digit anywhere in the visible row text.
       expect(link.textContent).not.toMatch(/\d/);
     }
 

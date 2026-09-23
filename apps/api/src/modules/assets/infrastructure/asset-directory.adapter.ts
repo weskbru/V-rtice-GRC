@@ -1,11 +1,3 @@
-/**
- * T013/006-assets-processes — the sole implementation of
- * `AssetDirectoryPort` (`shared/grc-ports/asset-directory.port.ts`,
- * ADR-020 part 3). `modules/assets` OWNS the `assets` table, so this
- * adapter is the one place in the platform allowed to query it on behalf
- * of another module. Follows
- * `modules/controls/infrastructure/control-directory.adapter.ts` exactly.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

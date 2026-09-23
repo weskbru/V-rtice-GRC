@@ -1,23 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident register URL state (008-incidents-problems, US1),
- * mirroring `features/assets/hooks/use-asset-catalog-state.ts` exactly
- * (CLAUDE.md §18.12 — a register joining the shared exploration frame
- * extends the established pattern, it does not keep its own copy of the
- * commit/debounce mechanism `@/lib/register/url-state` already owns).
- *
- * Trimmed/extended to the axes `incidents.openapi.yaml`'s own
- * `listIncidents` operation actually accepts (`search`, `status[]`,
- * `severity[]`, `orgUnitId`, `sort`, `direction`) plus the presentation-only
- * `view` (cards/table — CLAUDE.md §18, cards is the primary view). No
- * quick-view selection: this register has no side panel, matching
- * `IncidentCard`'s own doc comment.
- */
-
-// Reads the current screen's own query string. The WRITE side — and the
-// `useRouter` import the loader policy restricts — lives in the shared
-// `@/lib/register/url-state` (specs/014-institutional-loader §2.3).
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -93,11 +75,9 @@ function parseSingleValue(value: string | null): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
-/** Which presentation the results area is currently rendering — cards is the primary view (CLAUDE.md §18), matching every other register in this codebase. */
 export type IncidentRegisterView = 'cards' | 'table';
 
 export interface IncidentRegisterUrlState {
-  /** Committed (URL) search term — for display use `searchInputValue` instead. */
   search: string;
   page: number;
   pageSize: number;
@@ -122,16 +102,11 @@ export interface UseIncidentRegisterStateResult {
   setView: (view: IncidentRegisterView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter fields are currently applied — shown on the collapsed "Filtros" button. */
   activeFilterCount: number;
 }
 
 export function useIncidentRegisterState(): UseIncidentRegisterStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism — one change applied to the CURRENT query string,
-  // `replace` not `push`, page reset by default — is shared with every other
-  // register (`@/lib/register/url-state`). What stays here is what only this
-  // register knows: its enums, sortable fields and defaults.
   const commit = useUrlQueryCommit();
 
   const urlSearch = searchParams.get('search') ?? '';
@@ -158,10 +133,6 @@ export function useIncidentRegisterState(): UseIncidentRegisterStateResult {
     });
   }
 
-  // Both directions (typing → URL after a pause, and URL → input on
-  // Back/Forward, a pasted link or "clear filters") are the shared
-  // mechanism's job, including cancelling a pending commit so it can never
-  // overwrite a change that came from elsewhere mid-debounce.
   const {
     inputValue: searchInputValue,
     setValue: setSearch,
@@ -248,7 +219,6 @@ export function useIncidentRegisterState(): UseIncidentRegisterStateResult {
     });
   }, [commit, clearSearchInput]);
 
-  /** Which filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows, from the same conditions the chip row is built on. */
   const activeFilterCount =
     (state.search !== '' ? 1 : 0) +
     (state.status.length > 0 ? 1 : 0) +

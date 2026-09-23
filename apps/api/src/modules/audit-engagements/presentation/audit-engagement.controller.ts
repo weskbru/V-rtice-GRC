@@ -1,17 +1,3 @@
-/**
- * T040/005-audit-findings, User Story 1 — `AuditEngagementController`: the
- * record operations of `contracts/audit.openapi.yaml` (`listAuditEngagements`,
- * `createAuditEngagement`, `getAuditEngagement`, `updateAuditEngagement` —
- * operations 1-4 of 11). Mirrors `modules/controls/presentation/control.controller.ts`'s
- * structure exactly — see that file's header for the `formatETag`/
- * `parseIfMatchHeader`/`assertUpdateBodyNotEmpty` reasoning this one does
- * not repeat. Re-declared locally rather than imported from
- * `modules/controls` (ADR-011/SC-008: no business module imports another).
- *
- * Every route is gated by an `audit-engagement:*` permission — never
- * `audit:*`, which already means something else (FR-019, this module's own
- * `audit-engagement-permissions.ts` header).
- */
 import {
   BadRequestException,
   Body,
@@ -68,17 +54,6 @@ export class AuditEngagementController {
     private readonly updateAuditEngagementUseCase: UpdateAuditEngagementUseCase,
   ) {}
 
-  /**
-   * `listAuditEngagements`. Declared BEFORE `findById`'s `:auditId` route
-   * in this file for the same reason `ControlController.list` documents:
-   * Nest dispatches `/audits` and `/audits/:auditId` unambiguously
-   * regardless of declaration order.
-   *
-   * `status`/`orgUnitId`/`leadAuditorUserId` are each a single query value
-   * in the contract (`ListAuditEngagementsQueryDto`'s own header) — wrapped
-   * into a one-element array here for `ListAuditEngagementUseCase`, whose
-   * own filter shape accepts an array.
-   */
   @RequirePermission('audit-engagement:view')
   @Get()
   async list(
@@ -181,18 +156,10 @@ export class AuditEngagementController {
   }
 }
 
-/** Exported for reuse by `audit-engagement-scope.controller.ts`/
- * `audit-engagement-lifecycle.controller.ts` — every engagement-mutating
- * endpoint formats/parses `ETag`/`If-Match` identically (ADR-013), so this
- * is the one place either does it, mirroring `control.controller.ts`'s own
- * `formatETag`. */
 export function formatETag(version: number): string {
   return `"${String(version)}"`;
 }
 
-/** Exported for reuse — see `formatETag`'s doc comment above, and
- * `control.controller.ts`'s own `parseIfMatchHeader` for the full
- * `400`/`409` split this mirrors. */
 export function parseIfMatchHeader(headerValue: string | undefined): number {
   if (headerValue === undefined || headerValue.trim().length === 0) {
     throw new BadRequestException({
@@ -214,11 +181,6 @@ export function parseIfMatchHeader(headerValue: string | undefined): number {
   return version;
 }
 
-/** `UpdateAuditEngagementRequest`'s `minProperties: 1` — see
- * `UpdateAuditEngagementRequestDto`'s header and
- * `ControlController.assertUpdateBodyNotEmpty`'s own doc comment for why
- * this is a controller-level check (the `plainToInstance` own-property
- * caveat) with no dedicated validator class. */
 function assertUpdateBodyNotEmpty(body: UpdateAuditEngagementRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

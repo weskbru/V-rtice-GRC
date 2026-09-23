@@ -6,14 +6,6 @@ import { IncidentCorrectiveActions } from './incident-corrective-actions';
 import type { UserRef } from '../types';
 import type { Action } from '@/features/actions/types';
 
-/**
- * Component-mount evidence for the incident side of the missing corrective-
- * action affordance (008-incidents-problems follow-up, 2026-09-11) — mirrors
- * `problem-corrective-actions.test.tsx` exactly, `originType: 'INCIDENT'` in
- * place of `'PROBLEM'`. `@/features/actions/api` and `../api` are mocked at
- * the network boundary.
- */
-
 const { listActionsMock, createActionMock, transitionActionMock } = vi.hoisted(() => ({
   listActionsMock: vi.fn(),
   createActionMock: vi.fn(),

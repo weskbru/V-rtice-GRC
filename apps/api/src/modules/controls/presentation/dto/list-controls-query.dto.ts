@@ -1,12 +1,3 @@
-/**
- * T023/003-controls-management — matches `GET /controls`'s query
- * parameters exactly (`contracts/controls.openapi.yaml`'s
- * `listControlCatalog` operation). Comma-separated array parameters use
- * `style: form, explode: false` per the OpenAPI document — mirrors
- * `ListRisksQueryDto`'s own `splitCsv`/`toBoolean` convention exactly (see
- * that file's header for why `enableImplicitConversion` alone is not
- * relied on for numbers).
- */
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,

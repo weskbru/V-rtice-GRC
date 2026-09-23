@@ -1,9 +1,3 @@
-/**
- * T013/006-assets-processes — the `Process` counterpart of
- * `modules/assets/asset-directory.module.ts`. Identical in shape and
- * reasoning (FR-020) — see that file's header for the full account this
- * one does not repeat.
- */
 import { Global, Module } from '@nestjs/common';
 
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';

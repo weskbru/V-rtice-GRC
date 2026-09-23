@@ -5,13 +5,6 @@ import { RiskStatusChart } from './risk-status-chart';
 
 import type { RiskStatus } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for T198 (FR-049, FR-091, SC-012). Unlike
- * `RiskLevelChart`/`TreatmentActionsChart`, this component renders a real,
- * visible `<table>` (wave 3 — a horizontal bar list, not a Recharts chart
- * with rotated labels), so `getByRole('table')` here exercises the actual
- * rendered markup, not a jsdom-unmeasurable SVG's hidden text mirror.
- */
 describe('RiskStatusChart', () => {
   const byStatus: Record<RiskStatus, number> = {
     DRAFT: 1,
@@ -47,7 +40,6 @@ describe('RiskStatusChart', () => {
     const table = screen.getByRole('table', { name: 'Tabela: quantidade de riscos por status' });
     const rows = within(table).getAllByRole('row').slice(1);
 
-    // Eight lifecycle rows always render, regardless of which are zero.
     expect(rows).toHaveLength(8);
     const zeroRow = within(table).getByRole('rowheader', { name: 'Em revisão' }).closest('tr');
     expect(zeroRow).not.toBeNull();

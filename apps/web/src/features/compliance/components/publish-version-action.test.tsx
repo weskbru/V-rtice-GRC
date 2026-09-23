@@ -7,10 +7,6 @@ import { PublishVersionAction } from './publish-version-action';
 
 import type { FrameworkVersion } from '../types';
 
-/**
- * Component-mount evidence for `PublishVersionAction` (US1, FR-005,
- * research.md D-3). `../api` is mocked at the network boundary.
- */
 const { publishFrameworkVersionMock } = vi.hoisted(() => ({
   publishFrameworkVersionMock: vi.fn(),
 }));

@@ -1,46 +1,21 @@
-# docker-compose.yml
-#
-# From-scratch development environment for PharosGRC: PostgreSQL 17, Redis 7,
-# the NestJS API and the Next.js web frontend. See specs/001-grc-platform-foundation
-# (plan.md, research.md ADR-002/ADR-005/ADR-014, quickstart.md) for the design
-# this file implements. No `version:` key — obsolete in Compose v2.
-#
-# HOST PORT COLLISION NOTE: this machine already runs a native PostgreSQL 18
-# instance on localhost:5432 (used for local `pnpm dev`, see .env.example).
-# Binding this stack's postgres container to 5432 as well would fail to start
-# or silently talk to the wrong database. Every host port below therefore
-# defaults to a value that does NOT collide with anything native:
-#   - postgres  -> 5433 (native Postgres already owns 5432)
-#   - redis     -> 6379 (nothing native listens there on this machine)
-# All are overridable via .env so a machine with different native services
-# can shift them without editing this file.
-
 services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      # Bootstrap superuser used only during container initialization and by
-      # `pg_isready`; application code never connects with this role.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-postgres_dev_only}
       POSTGRES_DB: ${POSTGRES_DB:-pharos_grc}
-      # Consumed by docker/postgres/init/01-roles.sql via psql's `\getenv` —
-      # see that file for why a .sql script can read these safely.
       POSTGRES_OWNER_USER: ${POSTGRES_OWNER_USER:-pharos_owner}
       POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:-pharos_owner_dev}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-pharos_app}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-pharos_app_dev}
     ports:
-      # ${POSTGRES_HOST_PORT:-5433} avoids the native PostgreSQL on 5432 — see
-      # the file header comment.
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # $$ escapes compose's own ${...} interpolation so the shell inside the
-      # container expands $POSTGRES_USER / $POSTGRES_DB at healthcheck time.
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
@@ -70,48 +45,12 @@ services:
     env_file:
       - .env
     environment:
-      # Overrides that make sense only inside the Compose network (service
-      # names resolve via Docker DNS; the app/owner roles and DB name mirror
-      # the postgres service above so the two never drift apart).
       NODE_ENV: production
-      # F-13: `.env.example`'s SESSION_COOKIE_SECURE default is `false`
-      # ("ONLY for local HTTP development" — see its own comment), because
-      # that file is also the source of truth for native `pnpm dev` on plain
-      # http://localhost. This service hardcodes NODE_ENV=production above,
-      # and env.schema.ts correctly refuses to boot a production
-      # configuration with an insecure session cookie (that check is doing
-      # its job and must not be weakened). So — exactly like DATABASE_URL /
-      # DATABASE_MIGRATION_URL / REDIS_URL below, which also override
-      # `.env`'s host-native defaults with values that make sense only for
-      # this Compose network — this stack's NODE_ENV=production forces the
-      # matching SESSION_COOKIE_SECURE=true here, regardless of what a
-      # `.env` copied verbatim from `.env.example` contains.
-      #
-      # This does NOT make the cookie usable from a real browser: nothing in
-      # this compose stack terminates TLS, so a browser at http://localhost
-      # would still refuse to store a `Secure` cookie (curl ignores the
-      # attribute and cannot reveal this). Fixing that requires a
-      # TLS-terminating reverse proxy in front of this stack, which is
-      # outside this fix's scope — see F-13 in docs/deferred-findings.md.
       SESSION_COOKIE_SECURE: "true"
       DATABASE_URL: postgresql://${POSTGRES_APP_USER:-pharos_app}:${POSTGRES_APP_PASSWORD:-pharos_app_dev}@postgres:5432/${POSTGRES_DB:-pharos_grc}?schema=public
       DATABASE_MIGRATION_URL: postgresql://${POSTGRES_OWNER_USER:-pharos_owner}:${POSTGRES_OWNER_PASSWORD:-pharos_owner_dev}@postgres:5432/${POSTGRES_DB:-pharos_grc}?schema=public
-      # Redis is mandatory inside this full stack (the container always
-      # exists here); REDIS_URL stays optional only for native local dev
-      # without Compose — see .env.example.
       REDIS_URL: redis://redis:6379
       ATTACHMENT_STORAGE_PATH: /app/storage/attachments
-      # `API_PORT` is also the app's own "which port do I listen on" setting
-      # (env.schema.ts / AppConfigService — the same variable name native
-      # `pnpm dev` reads). `.env` supplies it to this container too via
-      # `env_file` above, which — left alone — would make the app inside the
-      # container bind to whatever host port an operator chose below,
-      # while the container side of the mapping stays fixed at 3001
-      # (matching the image's `EXPOSE 3001`), silently breaking the
-      # container's own listen socket. Pinning it here decouples the two:
-      # the host-published port is still freely overridable via `.env`
-      # (left side of `ports:` below), while the process inside the
-      # container always binds where the mapping's right side expects it.
       API_PORT: "3001"
     ports:
       - "${API_PORT:-3001}:3001"
@@ -128,16 +67,6 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
       args:
-        # F-6 verification: apps/web/next.config.ts resolves the `/api/*`
-        # rewrite destination (ADR-014) once, at `next build` time — Next.js
-        # serializes rewrites() into the build output and never re-reads it
-        # when server.js starts, so the `API_INTERNAL_URL` runtime override
-        # below (under `environment:`) does NOT reach that rewrite; only a
-        # build-time value does. Must match the runtime values below (the
-        # api service's Compose DNS name/port, and this service's own
-        # published host port) or the browser-facing proxy silently targets
-        # the wrong origin. See docker/web.Dockerfile's build stage for the
-        # full reasoning.
         API_INTERNAL_URL: http://api:3001
         APP_ORIGIN: http://localhost:${WEB_PORT:-3000}
     restart: unless-stopped
@@ -145,11 +74,6 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      # Read at request time by apps/web/src/lib/server-session.ts (the
-      # server-side session check), which calls the API directly rather than
-      # through the /api/* rewrite — that one path really does re-read this
-      # at runtime. It does NOT reach next.config.ts's rewrite destination;
-      # see build.args above for that.
       API_INTERNAL_URL: http://api:3001
     ports:
       - "${WEB_PORT:-3000}:3000"
@@ -159,7 +83,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  # Local-disk attachment storage for the FileStorageProvider local adapter
-  # (ADR-010). Named volume rather than a bind mount so the container's
-  # non-root user always owns it regardless of host filesystem permissions.
   attachments_storage:

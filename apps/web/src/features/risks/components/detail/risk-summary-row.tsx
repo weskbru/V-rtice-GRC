@@ -1,13 +1,12 @@
-/** Three presentation groups over the same five server-provided summary facts. */
 import { ArrowRight, CalendarClock, ShieldCheck, Wrench } from 'lucide-react';
+
+import { risks } from '@/lib/messages/risks';
 
 import { formatDateOnly } from '../../date';
 
 import styles from './risk-detail-visual.module.css';
 
 import type { RiskDetail, RiskLevel } from '../../types';
-
-import { risks } from '@/lib/messages/risks';
 
 function levelTone(level: RiskLevel | null): string {
   if (level === null) return 'neutral';

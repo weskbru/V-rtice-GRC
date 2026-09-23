@@ -1,10 +1,3 @@
-/**
- * T033/002-shared-grc-foundation, US1 — `ListEvidenceLinksUseCase`
- * (`listEvidenceLinks`, R-010). Requires `evidence:view` and evidence-side
- * scope; subject-side visibility filtering is delegated to
- * `EvidenceLinkVisibilityService` — see that file's own header for the
- * full R-010 reasoning this use case does not repeat.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

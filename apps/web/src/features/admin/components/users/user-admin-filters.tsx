@@ -1,24 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, users register filter toolbar, brought into
- * the shared register family (CLAUDE.md §18.12): the same collapsible
- * `FilterBar` disposition `RiskRegisterFilters`/`RoleFilterBar` use —
- * search-row + "Filtros N" disclosure + an active-filters chip row that
- * stays visible while the panel is collapsed.
- *
- * `GET /admin/users` accepts exactly one value per filter field (no CSV
- * array — `ListUsersQuery` in `../../api`), so — like
- * `AuditEngagementRegisterFilters` — Status/Unidade/Papel stay single-value
- * `Select`s, never `MultiSelectFilter`.
- *
- * Organizational units are the caller's own responsibility to pass in
- * (`UserAdminView` already fetches them once for the create/edit dialogs);
- * roles are fetched HERE, mirroring `AuditEngagementRegisterFilters`'s own
- * local reference-data pattern — this filter is the only consumer of the
- * full role list, so there is no reason to lift that fetch into the parent
- * screen.
- */
 import { FilterBar, type ActiveFilterChip } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 

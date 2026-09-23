@@ -5,12 +5,6 @@ import { AssessmentHistory } from './assessment-history';
 
 import type { RiskAssessment } from '../types';
 
-/**
- * Component-mount evidence for T131 (`AssessmentHistory`, FR-066,
- * Constitution VI — audit defensibility). `../api` is mocked at the network
- * boundary.
- */
-
 const { listAssessmentsMock } = vi.hoisted(() => ({ listAssessmentsMock: vi.fn() }));
 
 vi.mock('../api', () => ({
@@ -74,7 +68,6 @@ describe('AssessmentHistory', () => {
 
     const table = await screen.findByRole('table');
     const rows = within(table).getAllByRole('row');
-    // Header row + two data rows, newest first.
     expect(rows).toHaveLength(3);
 
     expect(within(rows[1]!).getByText('Carlos Lima')).toBeInTheDocument();

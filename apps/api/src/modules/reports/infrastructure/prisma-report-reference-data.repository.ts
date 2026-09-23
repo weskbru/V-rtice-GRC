@@ -1,9 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T051) — the sole implementation of
- * `ReportReferenceDataPort`. Mirrors
- * `modules/indicators/infrastructure/prisma-indicator-reference-data.repository.ts`
- * exactly (minus the org-unit lookup neither module needs, research.md D-8).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

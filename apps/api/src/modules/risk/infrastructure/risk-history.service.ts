@@ -1,101 +1,3 @@
-/**
- * T166/US7 — `RiskHistoryQueryService`, the sole implementation of
- * `RiskHistoryQueryPort` (`domain/ports/risk-history-query.port.ts`).
- * Backs `GET /risks/{riskId}/history`
- * (`contracts/risks.openapi.yaml`'s `getRiskHistory` operation, ADR-006):
- * "a query over the append-only domain records and the relevant audit
- * entries ... not a stored table".
- *
- * ## F-9 — which timestamp orders the merged timeline, and why
- * (`docs/deferred-findings.md`)
- *
- * Every source this service merges carries a timestamp, but they are not
- * the same KIND of fact:
- *
- * - `RiskAssessment.assessedOn` is a `@db.Date` the ASSESSOR asserts and
- *   can backdate (F-9) — business data, not a record of when the platform
- *   did anything.
- * - `RiskTreatmentDecision.decidedAt`, `RiskLifecycleTransition
- *   .performedAt` and `Approval.requestedAt`/`decidedAt` are all written by
- *   the REPOSITORY as `new Date()` at write time (confirmed by reading
- *   `risk-treatment-decision.repository.ts`, `risk-lifecycle-transition
- *   .repository.ts`, `approval.repository.ts`) — genuine recorded
- *   instants, never user-supplied.
- * - Ownership changes have no dedicated table at all; they are read
- *   straight from `audit_event.occurredAt` (ADR-005's system of record for
- *   "when did this actually happen").
- *
- * **Decision: the merged timeline is ordered by the RECORDED instant,
- * never the asserted one.** For every source except assessments this is
- * already the only timestamp available, so there is nothing to decide. For
- * assessments specifically, this service does NOT sort by `assessedOn` —
- * it joins to the `audit_event` row `CreateAssessmentUseCase` writes in the
- * SAME transaction as the assessment (`action: 'risk.assessed'`,
- * `entityType: RISK_ASSESSMENT`, `entityId: assessment.id`) and orders by
- * THAT row's `occurredAt`. Sorting by an assertable, backdateable date
- * would let an assessor entered today with `assessedOn` set to last month
- * silently jump ahead of everything that happened in between — exactly the
- * "quiet dishonesty" the task brief warns a GRC audit trail cannot afford.
- *
- * **Visibility, not flattening (the task's explicit requirement)**: the
- * asserted date is never discarded — every `ASSESSMENT` entry carries BOTH
- * `occurredAt` (the recorded instant, used for ordering AND rendered as the
- * entry's timeline position) and a separate `assessedOn` field (the
- * asserted business date, `null` for every other entry type). A reader can
- * therefore always tell, for an assessment, "when the platform recorded
- * this" from "the date its author claims it reflects" — the two are never
- * merged into one ambiguous value. This extra field is additive to
- * `contracts/risks.openapi.yaml`'s `RiskHistoryEntry` schema (which sets no
- * `additionalProperties: false`), not a contract change.
- *
- * ## Stable ordering across pages
- *
- * Sort key: `(occurredAt DESC, id DESC)`. `id` is `uuid(7)` on every source
- * table (`schema.prisma`: `@default(uuid(7))`), which is time-ordered and,
- * being a fixed-width, fixed-format string, compares correctly with plain
- * lexicographic `<`/`>` — no parsing needed. Using it as the tiebreaker
- * means two entries that land on the exact same instant (measured
- * `Date.getTime()` millisecond resolution — realistic for, e.g., an
- * approval decision and the lifecycle transition it triggers, written by
- * the SAME request a few statements apart) still sort deterministically
- * and identically on every call, which is what makes offset pagination
- * safe: without a tiebreaker, two rows with an equal `occurredAt` could
- * swap order between the query serving page N and the query serving page
- * N+1, which either drops or duplicates a row at the boundary depending on
- * which way they swap. `test/integration/risk-history.spec.ts` proves this
- * directly with a synthetic tie.
- *
- * ## Why this is five small, indexed, per-risk queries merged in
- * TypeScript, not one big raw-SQL UNION (unlike `risk-query.service.ts`)
- *
- * `risk-query.service.ts`'s raw-SQL approach exists because THAT query
- * scans up to 50,000 register rows and needs the trigram index / a single
- * query plan. This service's five sources are each bounded by ONE risk's
- * own lifetime activity (assessments, decisions, transitions and approvals
- * a single risk accumulates — realistically dozens, not tens of
- * thousands), each already served by an existing, indexed, per-risk
- * repository method (`RiskAssessmentRepositoryPort.listByRisk`,
- * `RiskTreatmentDecisionRepositoryPort.listByRisk`,
- * `RiskLifecycleTransitionRepositoryPort.listByRisk` (added by this task —
- * no such method existed), `ApprovalRepositoryPort.listByEntity`) plus two
- * small `audit_event` reads keyed on its own `(entityType, entityId,
- * occurredAt DESC)` index. Merging small, already-correct, already-tested
- * sources in memory is less code and less risk than re-deriving every
- * join/actor-resolution these repositories already do, for a volume where
- * raw SQL buys no measurable performance (see the implementation report's
- * `EXPLAIN (ANALYZE, BUFFERS)` transcript). If a risk's history ever grows
- * large enough for this to matter, that is a `LIMIT`/pushdown optimization
- * to make then, not a reason to duplicate five repositories' logic now
- * (CLAUDE.md: "não criar abstrações prematuras").
- *
- * ## Scope
- *
- * No `ScopeFilter` parameter here (see `RiskHistoryQueryPort`'s own doc
- * comment) — `GetRiskHistoryUseCase` has already resolved and
- * scope-checked the parent risk via `RiskRepositoryPort.findById` before
- * this service is ever called, exactly like every other risk-child
- * repository in this module.
- */
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
@@ -119,10 +21,6 @@ import type { LifecycleTransitionRecord } from '../domain/ports/risk-lifecycle-t
 import type { TreatmentDecisionRecord } from '../domain/ports/risk-treatment-decision-repository.port';
 import type { RiskStatus } from '@prisma/client';
 
-/** Comfortably exceeds any plausible single risk's lifetime total of
- * assessments/decisions (a human-cadenced review activity, not a
- * per-request one) while still bounding the query — see this file's header
- * for why an unpaginated-in-practice read of these two sources is safe. */
 const ALL_ROWS_PAGE_SIZE = 10_000;
 
 const LEVEL_LABELS = USER_MESSAGES.risk.history.levelLabels;
@@ -209,10 +107,6 @@ export class RiskHistoryQueryService implements RiskHistoryQueryPort {
       const previous = assessment.previousAssessmentId
         ? byId.get(assessment.previousAssessmentId)
         : undefined;
-      // Fallback to `assessedOn` only in the theoretical case the
-      // transactionally-coupled `risk.assessed` audit row is somehow
-      // missing (ADR-005 guarantees it never is) — never silently drop the
-      // entry from the timeline.
       const recordedAt = recordedAtByAssessmentId.get(assessment.id) ?? assessment.assessedOn;
 
       return {
@@ -283,9 +177,6 @@ export class RiskHistoryQueryService implements RiskHistoryQueryPort {
   private buildApprovalDecidedEntry(approval: ApprovalRecord): RiskHistoryEntryRecord {
     const toStatus = parseRequestedTransitionTarget(approval.requestedTransition);
     const approved = approval.status === 'APPROVED';
-    // `decidedBy`/`decidedAt` are non-null here — this is only ever called
-    // for an approval whose `status !== 'PENDING'` (`getHistory` above),
-    // and `ApprovalRepositoryPort.decide` always sets both together.
     return {
       id: approval.id,
       type: 'APPROVAL',
@@ -319,14 +210,6 @@ export class RiskHistoryQueryService implements RiskHistoryQueryPort {
     return new Map(rows.map((row) => [row.entity_id, row.occurred_at]));
   }
 
-  /** FR-105/ADR-006 — ownership changes have no dedicated table; read
-   * straight from the allow-listed `ownerUserId` diff `UpdateRiskUseCase`
-   * writes into `audit_event` (`risk-audit-allowlist.ts` allow-lists
-   * `ownerUserId` for `AuditEntityType.RISK`). `new_values ? 'ownerUserId'`
-   * (the JSONB "has key" operator) is exactly the predicate
-   * `UpdateRiskUseCase` guarantees true iff the owner genuinely changed —
-   * that use case only ever writes the key when
-   * `input.ownerUserId !== current.owner.id`. */
   private async loadOwnershipChanges(riskId: string): Promise<readonly RiskHistoryEntryRecord[]> {
     const rows = await this.prisma.client.$queryRaw<OwnershipChangeAuditRow[]>(Prisma.sql`
       SELECT id, occurred_at, actor_user_id, actor_label,
@@ -355,11 +238,6 @@ export class RiskHistoryQueryService implements RiskHistoryQueryPort {
     return rows.map((row) => {
       const previousName = row.previous_owner_id ? namesById.get(row.previous_owner_id) : undefined;
       const newName = namesById.get(row.new_owner_id) ?? row.new_owner_id;
-      // `actor_user_id` is nullable in `audit_event` only for
-      // pre-authentication events (data-model.md §5's own note); a
-      // `risk.updated` action is always written by an authenticated actor
-      // inside `UpdateRiskUseCase` — a null here would be a genuine data
-      // anomaly worth surfacing loudly rather than papering over.
       if (!row.actor_user_id) {
         throw new Error(
           `audit_event ${row.id} (action risk.updated) has no actorUserId — invariant violated.`,
@@ -397,12 +275,6 @@ function levelLabel(level: RiskLevelValue): string {
   return LEVEL_LABELS[level];
 }
 
-/** `Approval.requestedTransition` is always written by
- * `RequestApprovalUseCase` as `${fromStatus}->${toStatus}` — the same
- * parsing `DecideApprovalUseCase` performs (see that file's own
- * `parseRequestedTransitionTarget`); duplicated here rather than imported
- * because that one is a private, unexported function of a different
- * use case, not a shared utility. */
 function parseRequestedTransitionTarget(requestedTransition: string): RiskStatus {
   const [, toStatus] = requestedTransition.split('->');
   return toStatus as RiskStatus;
@@ -413,9 +285,6 @@ function compareEntriesNewestFirst(a: RiskHistoryEntryRecord, b: RiskHistoryEntr
   if (byTime !== 0) {
     return byTime;
   }
-  // Stable tiebreak (this file's header, "Stable ordering across pages"):
-  // `id` is `uuid(7)` on every source table, so plain string comparison is
-  // both deterministic and (approximately) time-ordered.
   if (a.id === b.id) {
     return 0;
   }

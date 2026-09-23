@@ -1,39 +1,3 @@
-/**
- * T197 — maps `DashboardOutput` (`application/get-dashboard.usecase.ts`) to
- * `contracts/platform.openapi.yaml`'s `Dashboard` wire shape (~1002). The
- * ONE place a dashboard aggregate becomes a response body (ADR-009).
- *
- * ## `link` — the register query that reproduces the tile (FR-052)
- *
- * Only set where a REAL, functioning register filter reproduces the tile's
- * exact contents:
- *
- * - `risks` -> `/risks` (the whole scoped register, no filter).
- * - `itemsRequiringReview` -> `/risks?overdueReview=true`
- *   (`contracts/risks.openapi.yaml`'s own filter, identical predicate).
- * - `overdueActions` -> `/risks?overdueTreatment=true` — the closest real
- *   filter: it surfaces the RISKS carrying an overdue action, one level
- *   coarser than the individual actions this tile lists, but it is a real,
- *   working query, not a fabricated one.
- *
- * `pendingApprovals` and `treatmentActions` deliberately carry NO `link`:
- * `link` is optional per area (`Dashboard` schema's `required` list omits
- * it), and there is no register filter for "approvals awaiting me" (the
- * approvals endpoints are per-risk only,
- * `/risks/{riskId}/approvals[/…]`, contracts/risks.openapi.yaml ~1063) or
- * for "has any treatment action regardless of status" (only
- * `overdueTreatment` exists, already the `overdueActions` tile's own link —
- * repeating it here would misleadingly imply this tile's `open` count is
- * also reachable through that same filter, which it is not). Inventing a
- * path neither the register nor any other endpoint actually accepts would
- * be a broken link presented as a working one.
- *
- * `plannedAreas` (F-22 defect 2): `key`/`label`/`status` are copied
- * straight through from `DashboardOutput.plannedAreas` — the label lookup
- * against `shared/messages/user-messages.ts` now happens once, at
- * registration time, inside `core/dashboard/domain/default-planned-areas.ts`,
- * not here on every request keyed by a closed union this file used to own.
- */
 import type { DashboardOutput } from '../../application/get-dashboard.usecase';
 import type {
   DashboardActionItemRecord,

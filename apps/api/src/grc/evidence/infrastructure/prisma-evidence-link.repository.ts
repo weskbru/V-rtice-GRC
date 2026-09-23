@@ -1,13 +1,3 @@
-/**
- * T031/002-shared-grc-foundation, US1 — `PrismaEvidenceLinkRepository`, the
- * sole implementation of `EvidenceLinkRepositoryPort`. No `ScopedRepository`
- * base here — like `PrismaRiskControlLinkRepository`, the caller
- * (`LinkEvidenceUseCase`/`UnlinkEvidenceUseCase`) has already resolved and
- * scope-checked the parent `Evidence` (via `EvidenceRepositoryPort`, scope
- * applied) AND the subject (via `EvidenceSubjectResolverPort`) before any
- * method here runs — this repository operates purely on `evidence_links`'
- * own columns and never re-derives either scope check.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -108,9 +98,6 @@ export class PrismaEvidenceLinkRepository implements EvidenceLinkRepositoryPort 
     return rows.map(toEvidenceLinkRecord);
   }
 
-  /** T017/005-audit-findings — see the port's own doc comment. A single
-   * indexed existence check (`findFirst` + `select: { id: true }`), never a
-   * full row fetch — the caller only needs a boolean. */
   async hasActiveLinkForSubject(
     subjectType: EvidenceSubjectType,
     subjectId: string,

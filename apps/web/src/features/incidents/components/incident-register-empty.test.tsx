@@ -6,11 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { IncidentRegisterEmpty } from './incident-register-empty';
 
-/**
- * Component-mount evidence mirroring `asset-register-empty.test.tsx`
- * (008-incidents-problems, US1) — the two empty states must be textually
- * distinct and each drive its own next action (CLAUDE.md §18.11).
- */
 describe('IncidentRegisterEmpty', () => {
   it('shows "no incident registered yet" (never "no results") when no filters are applied', () => {
     render(

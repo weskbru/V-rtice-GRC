@@ -5,10 +5,6 @@ import { RequirementControlsSection } from './requirement-controls-section';
 
 import type { RequirementControlLink } from '../types';
 
-/**
- * Component-mount evidence for `RequirementControlsSection` (US2, ADR-020).
- * `../api` is mocked at the network boundary.
- */
 const {
   listRequirementControlLinksMock,
   listControlsMock,
@@ -77,10 +73,6 @@ describe('RequirementControlsSection', () => {
 
     await screen.findByText('Controle de acesso');
     expect(screen.queryByRole('button', { name: 'Desvincular' })).not.toBeInTheDocument();
-    // The picker's own trigger accessible name is `pickerAriaLabel`
-    // ("Selecionar controle"), deliberately DIFFERENT from the adjacent
-    // button's "Vincular controle" — see the identical fix in the e2e
-    // specs (Front H).
     expect(screen.queryByRole('combobox', { name: 'Selecionar controle' })).not.toBeInTheDocument();
   });
 
@@ -100,8 +92,6 @@ describe('RequirementControlsSection', () => {
     render(<RequirementControlsSection requirementId="req-1" canLink />);
 
     await screen.findByText('Nenhum controle vinculado a esta cláusula.');
-    // The picker searches server-side as the user types (Front H) — see
-    // the identical fix in `risk-controls-section.test.tsx`.
     fireEvent.click(screen.getByRole('combobox', { name: 'Selecionar controle' }));
     fireEvent.change(screen.getByPlaceholderText('Buscar controle por nome ou código'), {
       target: { value: 'backup' },

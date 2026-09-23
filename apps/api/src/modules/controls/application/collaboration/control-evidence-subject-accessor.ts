@@ -1,16 +1,3 @@
-/**
- * T039/003-controls-management, Task C — `modules/controls`'s own
- * registration against `EvidenceSubjectResolverPort`'s registry
- * (`grc/shared/domain/ports/evidence-subject-resolver.port.ts`) for
- * `EvidenceSubjectType.CONTROL` (FR-026: "uma evidência sustenta um
- * controle pelo mesmo mecanismo de tipo fechado já usado pelos demais
- * sujeitos"). Mirrors
- * `grc/finding/application/collaboration/finding-evidence-subject-accessor.ts`'s
- * shape exactly — `control:view` permission PLUS `ControlAccessResolver`'s
- * own scope-checked read, neither substituting for the other.
- *
- * `EvidenceLink.subjectId` for `CONTROL` is the `Control`'s own id.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PermissionResolverService } from '../../../../core/authorization/application/permission-resolver.service';

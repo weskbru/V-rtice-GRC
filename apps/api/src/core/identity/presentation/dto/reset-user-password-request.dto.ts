@@ -1,7 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s
- * `ResetUserPasswordRequest` (`additionalProperties: false`).
- */
 import { IsString, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

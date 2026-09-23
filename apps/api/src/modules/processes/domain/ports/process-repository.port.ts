@@ -1,8 +1,3 @@
-/**
- * T017-T021/006-assets-processes — `ProcessRepositoryPort`. Identical in
- * shape to `modules/assets/domain/ports/asset-repository.port.ts` (FR-020)
- * — see that file's header for the full account this one does not repeat.
- */
 import type { ScopeFilter } from '../../../../shared/persistence/scope-filter';
 
 export interface ProcessOrgUnitRefRecord {

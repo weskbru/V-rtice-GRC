@@ -1,11 +1,3 @@
-/**
- * 008-incidents-problems, US3 — maps `ProblemRiskLinkRecord`/
- * `ProblemIncidentLinkRecord` to the wire shapes
- * `contracts/problems.openapi.yaml`'s `ProblemRiskLinkResponse`/
- * `ProblemIncidentLinkResponse` describe. ONE mapper per resource is the
- * only place a domain object becomes this DTO (ADR-009). Deliberately does
- * NOT expose `unlinkedBy` — neither schema declares it.
- */
 import type { ProblemIncidentLinkRecord } from '../../domain/problem-incident-link.entity';
 import type { ProblemRiskLinkRecord } from '../../domain/problem-risk-link.entity';
 

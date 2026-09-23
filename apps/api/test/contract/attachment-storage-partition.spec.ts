@@ -1,28 +1,3 @@
-/**
- * F-26 fix (research.md D-12/D-R12, D-13/D-R20 measurement) — the storage
- * key partition. `LocalDiskStorageProvider` keyed blobs purely by
- * `sha256(content)`, globally, so two organizational units uploading
- * byte-identical content shared ONE stored object — the cross-scope
- * existence oracle the measurement confirmed observable near the 25 MiB
- * size ceiling. The fix partitions the key by the organizational unit
- * `UploadService.execute` already resolves server-side
- * (`parentAccess.organizationalUnitId`, `upload.service.ts:94`) — no new
- * resolution, no new trust boundary.
- *
- * This test is the proof the fix exists to satisfy, not a re-run of the
- * timing measurement (already done, and not repeated here per the
- * coordinator's own instruction): two uploads of IDENTICAL content under
- * TWO DIFFERENT organizational units must produce two DISTINCT stored
- * objects. Run against pre-fix code, this fails — both rows point at the
- * one globally-deduplicated `sha256/...` key. It is not a proxy for the
- * fix; it is the fix's own stated acceptance criterion (research.md D-12:
- * "duas uploads de conteúdo idêntico sob unidades organizacionais
- * diferentes devem produzir dois objetos armazenados distintos").
- *
- * `checksumSha256` is asserted UNCHANGED (identical for both rows) in the
- * same test — it is the content's checksum, never the storage key, and
- * partitioning must not touch it.
- */
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -89,9 +64,6 @@ describe('Attachment storage key partition by organizational unit (F-26 fix)', (
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('sp-owner')}@example.test`,
     });
-    // F-CV-2: the owner here is a pure precondition for the risk to exist —
-    // not the object of this test's own assertion (storage key partition) —
-    // so it gets the minimum eligibility, never elevated scope.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const risk = await ctx.app.get(CreateRiskUseCase).execute({
       actorUserId: setupUser.id,
@@ -139,11 +111,6 @@ describe('Attachment storage key partition by organizational unit (F-26 fix)', (
   });
 
   it('two uploads of IDENTICAL content under different organizational units produce two distinct stored objects', async () => {
-    // Unique PER TEST RUN (embeds a fresh UUID) — the real storage
-    // directory is never cleaned between separate runs on this machine
-    // (see attachments.spec.ts's own note on this), so a fixed byte
-    // string would make "the two keys differ" pass or fail depending on
-    // an earlier run's leftover state, unrelated to this test.
     const identicalContent = Buffer.from(
       `%PDF-1.7\nfront-f storage partition proof ${randomUUID()}`,
       'utf-8',
@@ -174,19 +141,10 @@ describe('Attachment storage key partition by organizational unit (F-26 fix)', (
       select: { storageKey: true, checksumSha256: true },
     });
 
-    // The content checksum is a fact about the BYTES, never the storage
-    // key — identical content means identical checksum regardless of
-    // which organizational unit uploaded it. Partitioning must not change
-    // this.
     expect(attachmentA.checksumSha256).toBe(attachmentB.checksumSha256);
 
-    // THE PROOF: identical content, different organizational units ->
-    // different storage keys. Fails against pre-partition code (both rows
-    // share the one globally-deduplicated `sha256/...` key).
     expect(attachmentA.storageKey).not.toBe(attachmentB.storageKey);
 
-    // Both keys resolve to real, independently-existing files on disk —
-    // two distinct stored objects, not one object referenced twice.
     expect(existsSync(path.join(storageRoot, attachmentA.storageKey))).toBe(true);
     expect(existsSync(path.join(storageRoot, attachmentB.storageKey))).toBe(true);
   });

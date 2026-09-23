@@ -1,14 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — "abrir ação de remediação" dialog (T049, US3 AS7, FR-027).
- *
- * Opens an `Action` (the shared GRC core capability, §17) from an
- * assessment whose result indicates failure — never a second, control-
- * specific task system. The created action appears in the platform's one
- * work list (`/actions`, "Minhas ações"), identified by its origin
- * (`ActionOriginType.CONTROL_ASSESSMENT`).
- */
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -49,9 +40,6 @@ export function ControlRemediationDialog({
 }: ControlRemediationDialogProps): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // S-10 — searched server-side now (`UserPicker`), never a preloaded
-  // bounded list; this create dialog has no existing action to seed a
-  // label from, so it starts unselected, exactly like the old `<Select>` did.
   const [responsible, setResponsible] = useState<UserRef | undefined>(undefined);
   const [dueOn, setDueOn] = useState('');
   const [submitting, setSubmitting] = useState(false);

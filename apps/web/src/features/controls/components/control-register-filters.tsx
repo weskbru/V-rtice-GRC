@@ -1,25 +1,17 @@
 'use client';
 
-/**
- * PharosGRC — control catalog filter toolbar (CLAUDE.md §18.12).
- *
- * Composes the same shared exploration chrome the risk register does —
- * `FilterBar` in its collapsible disposition, `MultiSelectFilter`, the
- * platform chip builders and the reference-data error banner — with the
- * control-specific filters: status, effectiveness, nature, type and
- * frequency are closed enums with static option lists; organizational unit
- * and owner are reference data fetched once on mount.
- *
- * The column menu is no longer here: it governs table columns, which is a
- * presentation decision, and it now sits in the results toolbar beside the
- * view toggle.
- */
 import {
   FilterBar,
   MultiSelectFilter,
   type MultiSelectFilterOption,
 } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
+
+import { UserMultiSelectFilter } from '@/components/directory/user-multi-select-filter';
+import { ReferenceDataError } from '@/components/register/reference-data-error';
+import { common } from '@/lib/messages/common';
+import { controls } from '@/lib/messages/controls';
+import { multiSelectChip, searchChip } from '@/lib/register/filter-chips';
 
 import { controlsApi } from '../api';
 
@@ -34,12 +26,6 @@ import type {
 } from '../types';
 import type { ActiveFilterChip } from '@pharos/design-system/components';
 import type { ReactNode } from 'react';
-
-import { UserMultiSelectFilter } from '@/components/directory/user-multi-select-filter';
-import { ReferenceDataError } from '@/components/register/reference-data-error';
-import { common } from '@/lib/messages/common';
-import { controls } from '@/lib/messages/controls';
-import { multiSelectChip, searchChip } from '@/lib/register/filter-chips';
 
 const STATUS_OPTIONS: readonly MultiSelectFilterOption[] = (
   Object.keys(controls.statusLabels) as ControlStatus[]
@@ -81,16 +67,10 @@ export interface ControlRegisterFiltersProps {
   onOrgUnitIdChange: (values: readonly string[]) => void;
   ownerUserId: readonly string[];
   onOwnerUserIdChange: (values: readonly string[]) => void;
-  /** S-10 — labels for already-selected owner ids the caller already knows
-   * about (e.g. from the currently loaded page of controls), so a filter
-   * value persisted in the URL still shows a name even when this
-   * component's own search has not (yet) returned that user. See
-   * `UserMultiSelectFilter`'s own header comment for the full reasoning. */
   knownOwners?: ReadonlyMap<string, UserRef>;
   searchValue: string;
   onSearchChange: (value: string) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }
@@ -159,8 +139,6 @@ export function ControlRegisterFilters({
 
   const orgUnitOptions: readonly MultiSelectFilterOption[] =
     referenceData?.orgUnits.map((unit) => ({ value: unit.id, label: unit.name })) ?? [];
-  // S-10 — owner chip labels resolve from `knownOwners` now (no bounded,
-  // unsearched full list) — see this prop's own doc comment.
   const ownerOptions: readonly MultiSelectFilterOption[] = ownerUserId.map((id) => ({
     value: id,
     label: knownOwners?.get(id)?.fullName ?? id,

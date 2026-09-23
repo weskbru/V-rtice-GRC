@@ -1,16 +1,3 @@
-/**
- * 008-incidents-problems, US3 (research.md D-14) — READ-ONLY implementation
- * of `IncidentProblemLinkReadPort`. Backs `GET /incidents/{incidentId}/problems`.
- *
- * This reads the `problemIncidentLink` Prisma model directly via a `select`
- * projection of the `problem` relation's own columns — it is a Prisma query
- * against the platform's one shared database, not a TypeScript import of
- * `modules/problems`. Same precedent as `grc/finding`'s cross-link reads:
- * the eslint-boundaries rule (ADR-011) constrains module-to-module code
- * imports, not shared-schema Prisma relations. `modules/problems` remains
- * the sole WRITE owner of this table (see the port's own header) — nothing
- * here creates or unlinks rows.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

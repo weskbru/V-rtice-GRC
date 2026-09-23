@@ -7,12 +7,6 @@ import { AssessmentForm } from './assessment-form';
 
 import type { RiskMethodologyVersion } from '../types';
 
-/**
- * Component-mount evidence for T129 (`AssessmentForm`, FR-061 to FR-068,
- * ADR-006). `../api` (`risksApi`) is mocked at the network boundary, per
- * this project's "program against the contract" testing convention.
- */
-
 const { getActiveMethodologyMock, createAssessmentMock } = vi.hoisted(() => ({
   getActiveMethodologyMock: vi.fn(),
   createAssessmentMock: vi.fn(),
@@ -25,11 +19,6 @@ vi.mock('../api', () => ({
   },
 }));
 
-/**
- * Deliberately NOT 5×5 (2 probability rows × 3 impact columns) — FR-061:
- * the form must build itself from whatever the active methodology actually
- * configures, never assume a fixed shape.
- */
 const methodology: RiskMethodologyVersion = {
   id: 'methodology-v1',
   methodologyName: 'Padrão',
@@ -85,7 +74,6 @@ describe('AssessmentForm', () => {
     for (const probability of methodology.probabilityScale) {
       expect(within(table).getByRole('rowheader', { name: probability.label })).toBeInTheDocument();
     }
-    // Not a hardcoded 5×5: exactly this methodology's own 2×3 shape.
     expect(within(table).queryByRole('columnheader', { name: 'Crítico' })).not.toBeInTheDocument();
   });
 
@@ -99,7 +87,6 @@ describe('AssessmentForm', () => {
     render(<AssessmentForm riskId="risk-1" etag='"3"' onAssessed={onAssessed} />);
     await screen.findByRole('table');
 
-    // Inherent is selected by default (the toggle starts on "Risco inerente").
     await selectCell(
       'Risco inerente',
       'Probabilidade Baixa, Impacto Baixo: pontuação 1, nível Baixo',
@@ -130,8 +117,6 @@ describe('AssessmentForm', () => {
       rationale: 'Controles reduziram a exposição residual.',
       methodologyVersionId: 'methodology-v1',
     });
-    // The four derived fields are never even keys on the submitted body —
-    // the API rejects them as unknown properties (FR-062, FR-063).
     expect(submittedBody).not.toHaveProperty('inherentScore');
     expect(submittedBody).not.toHaveProperty('inherentLevel');
     expect(submittedBody).not.toHaveProperty('residualScore');
@@ -182,12 +167,10 @@ describe('AssessmentForm', () => {
     expect(
       await screen.findByText('A metodologia de avaliação foi atualizada'),
     ).toBeInTheDocument();
-    // Never the generic fallback for this specific, actionable case.
     expect(
       screen.queryByText('Não foi possível registrar a avaliação. Tente novamente.'),
     ).not.toBeInTheDocument();
 
-    // Reloading re-fetches the methodology and clears the stale selections.
     getActiveMethodologyMock.mockResolvedValueOnce(methodology);
     fireEvent.click(screen.getByRole('button', { name: 'Recarregar metodologia vigente' }));
 

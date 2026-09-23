@@ -1,10 +1,3 @@
-/**
- * T016/005-audit-findings — the sole implementation of
- * `RequirementDirectoryPort` (`shared/grc-ports/requirement-directory.port.ts`,
- * ADR-020 part 3). `modules/compliance` OWNS the `requirements` table, so
- * this adapter is the one place in the platform allowed to query it on
- * behalf of another module (`modules/audit-engagements`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

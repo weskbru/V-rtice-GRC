@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC application shell — theme toggle (F-21, docs/deferred-findings.md).
- *
- * Mounted in `Header`. Both icons always render; which one is visible is
- * decided purely by CSS reacting to the `.dark` ancestor class (the same
- * mechanism `packages/design-system` themes everything else through) rather
- * than by branching on `useTheme()`'s `resolvedTheme` — `resolvedTheme` is
- * `undefined` on the very first client render (next-themes cannot know the
- * theme before mount), so branching render output on it would either flash
- * the wrong icon or need a `mounted` guard. Reading it only inside the click
- * handler (a user gesture, always post-hydration) needs no such guard.
- */
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 

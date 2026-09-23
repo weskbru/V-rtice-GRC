@@ -1,81 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — finding detail row, remediation actions section (audit-
- * findings follow-up, 2026-09-12).
- *
- * Before this component existed, `FindingsPanel` rendered a real, server-
- * computed `openActionCount` next to every finding ("3 ações em aberto")
- * with no way to see, create, or transition any of them — a dead number.
- * `Action` origin `FINDING` was already fully wired server-side
- * (`FindingActionOriginAccessor`, registered against `ActionOriginType
- * .FINDING`) with nothing in the frontend ever calling it.
- *
- * ## Shared `Action`, not a bespoke task table (CLAUDE.md §19.6)
- *
- * Mirrors `features/incidents/components/incident-corrective-actions.tsx`
- * and `features/problems/components/problem-corrective-actions.tsx` almost
- * verbatim — same `actionsApi` calls (`listActions`/`createAction`
- * /`transitionAction`), the same `features/actions/status.ts`
- * `availableTransitions` table, the same `ReopenActionDialog`. This would be
- * a THIRD near-identical copy; see this task's own final report for the
- * extraction recommendation (deliberately not done here — three concurrent
- * work fronts are touching `features/actions/**`, `features/incidents/**`
- * and `features/problems/**` at once, and a shared extraction would touch
- * files outside this task's boundary while they are still moving).
- *
- * Two deliberate differences from those two precedents:
- *
- *   1. **No `<Card>` wrapper.** `IncidentCorrectiveActions`/
- *      `ProblemCorrectiveActions` are a whole detail-page section, so full
- *      `Card` chrome makes sense there. This component is embedded inside
- *      `FindingsPanel`'s own already-bordered per-finding `<li>` — a `Card`
- *      in here would be exactly the "cartão dentro de cartão" CLAUDE.md
- *      §18.5 rules out. Same choice `FindingLinksSection` (the sibling
- *      collaboration section in the very same `<li>`) already makes and
- *      explains in its own header comment — this mirrors it, including the
- *      `<h2>` heading level (nothing above it in this `<li>` renders a
- *      heading of its own either).
- *   2. **Gates its own permissions via `usePermissions()` directly**,
- *      instead of receiving `canCreate`/`canTransition` as props the way the
- *      two precedents do. Those two receive them from their own page-level
- *      detail view (`incident-detail-view.tsx`/`problem-detail-view.tsx`),
- *      which call `hasPermission` once and thread the result down.
- *      `FindingsPanel`'s own host page is `risks/[id]/risk-detail-view.tsx`
- *      — out of this task's edit boundary — so this component reads the
- *      advisory permission set itself, the same way `ActionDetailView`
- *      (`features/actions/components/action-detail-view.tsx`) already does
- *      at a leaf-component level rather than only at a page level.
- *
- * ## Permissions (advisory only, FR-042 — `usePermissions.ts`'s own warning)
- *
- * Creation requires BOTH `finding:edit` AND `action:create` — the exact two
- * checks the server actually applies: `POST /actions`'s own
- * `@RequirePermission('action:create')` (`action.controller.ts`) and
- * `FindingActionOriginAccessor#resolveEditableOrigin`'s own
- * `finding:edit` gate (`finding-action-origin-accessor.ts`) for
- * `ActionOriginType.FINDING`. Transitioning requires `action:edit` — the
- * same permission `action.controller.ts` requires for
- * `PATCH /actions/{id}` and `POST /actions/{id}/transitions` alike, and the
- * same one `IncidentCorrectiveActions`/`ProblemCorrectiveActions` use for
- * their own row-actions menu.
- *
- * ## Mounted on demand, never once per finding on panel load
- *
- * `FindingsPanel` renders this component only after the caller expands a
- * given finding's own "N ações em aberto" disclosure — never unconditionally
- * for every row the way `FindingLinksSection` already does today (that
- * existing panel already fires two requests per finding on mount; this
- * component deliberately does not add a third). See `findings-panel.tsx`'s
- * own `expandedActionsFindingIds` state.
- *
- * ## `/actions/{id}` link
- *
- * Unlike the two precedents (whose own detail pages have no reason to link
- * back to the same action they are already showing inline), this table adds
- * a "Código" column linking to `/actions/{id}` — `my-actions-columns.tsx`'s
- * own established convention for the platform's one action detail route.
- */
 import { FormField, StatusBadge } from '@pharos/design-system/components';
 import { Loader2, MoreHorizontal, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -125,13 +49,6 @@ const PAGE_SIZE = 20;
 export interface FindingCorrectiveActionsProps {
   findingId: string;
   regionLabel: string;
-  /**
-   * Called after any write that can change the finding's own
-   * `openActionCount` — creating an action, or transitioning one into or
-   * out of a finished status. The host re-reads the finding, because that
-   * count is derived on the SERVER from the `actions` table and must never
-   * be recomputed here (CLAUDE.md §19.7).
-   */
   onActionsChanged?: () => void;
 }
 
@@ -142,8 +59,6 @@ export function FindingCorrectiveActions({
 }: FindingCorrectiveActionsProps): React.JSX.Element {
   const copy = auditEngagements.correctiveActions;
 
-  // `finding:edit` AND `action:create` — see this file's own header. Both
-  // are advisory-only client-side; the server independently re-checks each.
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finding:edit') && hasPermission('action:create');
   const canTransition = hasPermission('action:edit');
@@ -162,9 +77,6 @@ export function FindingCorrectiveActions({
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // S-10 — searched server-side now (`UserPicker`), never a preloaded
-  // bounded list; this create form has no existing action to seed a label
-  // from, so it starts unselected, exactly like the old `<Select>` did.
   const [responsible, setResponsible] = useState<UserRef | undefined>(undefined);
   const [dueOn, setDueOn] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -252,9 +164,6 @@ export function FindingCorrectiveActions({
     void submitCreate();
   }
 
-  /** Re-reads this section's own list AND tells the host its derived count
-   * moved. Both, always — a create that refreshed only the table left the
-   * row above it still claiming the old number. */
   function refreshAfterMutation(): void {
     setReloadToken((token) => token + 1);
     onActionsChanged?.();
@@ -299,9 +208,6 @@ export function FindingCorrectiveActions({
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-3">
       <div>
-        {/* `<h2>`, matching `FindingLinksSection`'s own choice in this same
-            `<li>` — see that component's header comment for why (nothing
-            above either section renders a heading of its own here). */}
         <h2 className="text-sm font-semibold text-foreground">{copy.sectionTitle}</h2>
         <p className="text-xs text-muted-foreground">{copy.sectionDescription}</p>
       </div>

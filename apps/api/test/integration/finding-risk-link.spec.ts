@@ -1,9 +1,3 @@
-/**
- * T061-T071/005-audit-findings, US3 — `Finding ↔ Risk` (`FindingRiskLink`,
- * FR-013-FR-016, ADR-020, research.md D-4/D-11). Sibling of
- * `finding-control-link.spec.ts`, same structure, against the NEW
- * `RiskDirectoryPort` instead of the pre-existing `ControlDirectoryPort`.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';

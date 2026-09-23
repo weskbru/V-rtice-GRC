@@ -1,24 +1,17 @@
 'use client';
 
-/**
- * PharosGRC — asset catalog card view, one asset (T046, CLAUDE.md §18,
- * §18.12). Mirrors `AuditEngagementCard`: no quick-view side panel for this
- * register, so the whole card is one stretched link to `/assets/{id}`, with
- * the code repeated as its own smaller link purely so it can be opened in a
- * new tab independently.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { Box, Building2 } from 'lucide-react';
-
-import { formatTimestampDate } from '../date';
-import { assetSituationLabel, assetSituationVariant } from '../situation';
-
-import type { AssetSummary } from '../types';
 
 import { Link } from '@/components/navigation/link';
 import registerCardStyles from '@/components/register/register-card.module.css';
 import { assets } from '@/lib/messages/assets';
 import { cn } from '@/lib/utils';
+
+import { formatTimestampDate } from '../date';
+import { assetSituationLabel, assetSituationVariant } from '../situation';
+
+import type { AssetSummary } from '../types';
 
 export interface AssetCardProps {
   asset: AssetSummary;

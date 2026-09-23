@@ -5,21 +5,6 @@ import { ControlLifecycleTrackView } from './control-lifecycle-track-view';
 
 import type { ControlLifecycleTrackModel } from './control-lifecycle-track';
 
-/**
- * Component-mount evidence for the "Ciclo de vida" track view
- * (021-control-detail-experience, Fase B). Mirrors `action-lifecycle-track
- * -view.test.tsx`'s/`problem-lifecycle-track-view.test.tsx`'s own coverage
- * exactly.
- *
- * `Control` does not record which of the three possible origins
- * (`DRAFT`/`ACTIVE`/`SUSPENDED`) a retirement came from
- * (`control-lifecycle-track.ts`'s own header comment) — so the rendered
- * `RETIRED` node must never visually assert one. This suite proves the
- * retired block is NOT a descendant of the main track's own `<ol>` (which
- * is what would tie it to a specific column), and always carries the honest
- * context sentence instead of a connector.
- */
-
 function buildModel(withRetired: boolean): ControlLifecycleTrackModel {
   return {
     main: [
@@ -45,10 +30,6 @@ describe('ControlLifecycleTrackView', () => {
     expect(retiredBlocks.length).toBeGreaterThan(0);
 
     for (const block of retiredBlocks) {
-      // The main track's nodes live inside an <ol aria-label="Posições…">;
-      // the retired block must not be a descendant of that list, which is
-      // the structural guarantee that it cannot inherit a specific column's
-      // position.
       const enclosingList = block.closest('ol');
       expect(enclosingList).toBeNull();
     }

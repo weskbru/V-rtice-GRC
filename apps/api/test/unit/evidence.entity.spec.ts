@@ -1,13 +1,3 @@
-/**
- * T019/002-shared-grc-foundation, US1 — unit coverage for `Evidence`'s pure
- * domain invariants (`grc/evidence/domain/evidence.entity.ts`). No I/O, no
- * framework — mirrors `test/unit/grc-overdue.spec.ts`'s structure.
- *
- * Invariant E1 (FR-002, revised — see `evidence.entity.ts`'s own header):
- * evidence with no `externalUrl`/`observation` is rejected regardless of
- * whatever a file attachment may separately provide; evidence with either
- * form is accepted.
- */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -51,7 +41,7 @@ describe('assertEvidenceHasSubstance (Invariant E1, FR-002)', () => {
 });
 
 describe('assertValidUntilNotBeforeCollectedOn (Invariant E2)', () => {
-  const collectedOn = new Date(Date.UTC(2026, 2, 15)); // 2026-03-15
+  const collectedOn = new Date(Date.UTC(2026, 2, 15));
 
   it('accepts a missing validUntil', () => {
     expect(() => assertValidUntilNotBeforeCollectedOn(collectedOn, undefined)).not.toThrow();

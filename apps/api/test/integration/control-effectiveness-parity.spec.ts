@@ -1,17 +1,3 @@
-/**
- * T016/003-controls-management — confronts `calculateControlEffectiveness`
- * (`modules/controls/domain/control-effectiveness.service.ts`, T013)
- * against `controlEffectivenessExpression`
- * (`modules/controls/infrastructure/control-effectiveness-query.ts`, T015)
- * over the SAME real, seeded data. Without this test the two are "two
- * rules that merely start out equal" (data-model.md §3's own words) — a
- * future edit to one could drift from the other silently, since nothing
- * else in the codebase would notice.
- *
- * Real PostgreSQL, no NestJS application context beyond the shared
- * `PrismaService` the integration harness already provides — this is a
- * pure data/SQL confrontation, not a use-case test.
- */
 import { Prisma, type ControlAssessmentResult, type ControlFrequency } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -22,7 +8,7 @@ import { uniqueTestMarker } from './support/env';
 import { createUserFixture } from './support/fixtures';
 import { buildIntegrationTestingModule, type IntegrationTestContext } from './support/test-app';
 
-const REFERENCE_DATE = new Date(Date.UTC(2026, 8, 7)); // 2026-09-07
+const REFERENCE_DATE = new Date(Date.UTC(2026, 8, 7));
 const REFERENCE_DATE_PARAM = '2026-09-07';
 
 function daysBefore(reference: Date, days: number): Date {
@@ -178,7 +164,6 @@ describe('Control effectiveness: domain calculator vs SQL expression agree over 
         });
       }
 
-      // --- SQL side ------------------------------------------------------
       const sqlRows = await ctx.prisma.client.$queryRaw<{ effectiveness: string }[]>(Prisma.sql`
         SELECT ${controlEffectivenessExpression(
           Prisma.sql`c.id`,
@@ -190,7 +175,6 @@ describe('Control effectiveness: domain calculator vs SQL expression agree over 
       `);
       const sqlEffectiveness = sqlRows[0]?.effectiveness;
 
-      // --- Domain side -----------------------------------------------------
       const rows = await ctx.prisma.client.controlAssessment.findMany({
         where: { controlId: control.id },
         select: { assessedOn: true, createdAt: true, result: true, attestedAt: true },

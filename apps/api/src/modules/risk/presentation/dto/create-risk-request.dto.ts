@@ -1,13 +1,3 @@
-/**
- * T091 — matches `contracts/risks.openapi.yaml`'s `CreateRiskRequest`
- * exactly: `additionalProperties: false` (global `ValidationPipe`'s
- * `forbidNonWhitelisted`, T022) means this class is also, by construction,
- * where FR-062 is enforced — `inherentScore`, `inherentLevel`,
- * `residualScore`, `residualLevel`, `code`, `status` and `version` are never
- * declared here, so any request that supplies one is rejected with `400`
- * before this DTO's own validators even run. No special-case code is
- * needed for that rejection; not declaring the property IS the rejection.
- */
 import {
   IsArray,
   IsDateString,

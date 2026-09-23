@@ -1,9 +1,3 @@
-/**
- * T051 — `POST /api/v1/auth/login`: success shape/cookie per
- * `auth.openapi.yaml`, and a generic, non-disclosing failure message
- * (FR-007) that is IDENTICAL whether the account does not exist, exists
- * with the wrong password, or exists but is deactivated.
- */
 import { UserStatus } from '@prisma/client';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -67,8 +61,6 @@ describe('POST /api/v1/auth/login (T051, FR-003, FR-007, FR-012, FR-019)', () =>
     expect(cookieHeader).toMatch(/HttpOnly/i);
     expect(cookieHeader).toMatch(/SameSite=Lax/i);
     expect(cookieHeader).toMatch(/Path=\//i);
-    // The raw token must be a non-trivial opaque value — never a JWT (no
-    // dots), never the account email or a guessable value.
     const rawToken = /=([^;]+)/.exec(cookieHeader ?? '')?.[1] ?? '';
     expect(rawToken.length).toBeGreaterThan(20);
     expect(rawToken).not.toContain('.');
@@ -81,11 +73,6 @@ describe('POST /api/v1/auth/login (T051, FR-003, FR-007, FR-012, FR-019)', () =>
     expect(body.scope).toHaveProperty('orgUnitIds');
     expect(body.session).toHaveProperty('authenticationMethod', 'LOCAL');
     expect(body).toHaveProperty('mustChangePassword', false);
-    // The internal Session.id is never exposed (FR-107) — `session` in the
-    // response carries only metadata (createdAt/expiresAt/lastActivityAt/
-    // authenticationMethod/ipAddress/userAgent), never an "id" field. This
-    // is distinct from `user.id`, which the contract explicitly requires
-    // (`OwnProfile.id`) and is asserted separately above.
     expect(body.session).not.toHaveProperty('id');
     expect(JSON.stringify(body.session)).not.toMatch(/"id"/i);
   });
@@ -99,12 +86,6 @@ describe('POST /api/v1/auth/login (T051, FR-003, FR-007, FR-012, FR-019)', () =>
       .send({ email: fixture.user.email, password: fixture.rawPassword });
     expect(loginResponse.status).toBe(200);
 
-    // Regression coverage: GET /auth/me and GET /auth/session require ONLY
-    // an authenticated session, no specific permission
-    // (`@NoPermissionRequired()`, T067) — PermissionGuard's fail-closed
-    // default would otherwise refuse them with 403 for having no
-    // `@RequirePermission`, which is exactly the bug the manual curl
-    // verification in this task's report caught.
     const meResponse = await agent.get('/api/v1/auth/me');
     expect(meResponse.status).toBe(200);
     expect((meResponse.body as { email: string }).email.toLowerCase()).toBe(
@@ -117,7 +98,6 @@ describe('POST /api/v1/auth/login (T051, FR-003, FR-007, FR-012, FR-019)', () =>
     const logoutResponse = await agent.post('/api/v1/auth/logout').set('Origin', appOrigin);
     expect(logoutResponse.status).toBe(204);
 
-    // The same cookie is refused on the very next request (FR-015).
     const afterLogoutResponse = await agent.get('/api/v1/auth/me');
     expect(afterLogoutResponse.status).toBe(401);
   });

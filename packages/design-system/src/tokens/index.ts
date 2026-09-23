@@ -1,15 +1,3 @@
-/**
- * PharosGRC Design System — design tokens barrel.
- *
- * Re-exports every token module and assembles a single typed `tokens` object
- * so components, tests and future chart code (Recharts series colors) can
- * import one stable value instead of wiring up each module individually.
- * The canonical, styling-facing form of these same values is the Tailwind 4
- * `@theme` layer in `../styles/globals.css` — this module exists so
- * non-Tailwind consumers see identical values (Constitution X: one design
- * system, consumed identically everywhere).
- */
-
 export * from './colors';
 export * from './typography';
 export * from './spacing';

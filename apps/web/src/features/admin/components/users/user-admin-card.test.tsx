@@ -5,13 +5,6 @@ import { UserAdminCard } from './user-admin-card';
 
 import type { AdminUser } from '../../types';
 
-/**
- * Component-mount evidence for `UserAdminCard` (CLAUDE.md §18.12) — the
- * card anatomy this register's family requires: initials + name + e-mail,
- * status badge, the shared row-actions menu, then Unidade / Papéis /
- * Último acesso — the same real fields the table's own columns show, so
- * the two views can never disagree about what a user "is".
- */
 const baseUser: AdminUser = {
   id: 'user-1',
   email: 'ana.souza@pharosgrc.local',
@@ -49,9 +42,6 @@ describe('UserAdminCard', () => {
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Tecnologia da Informação')).toBeInTheDocument();
     expect(screen.getByText('Analista de Riscos')).toBeInTheDocument();
-    // Computed the same way the component itself formats it, rather than a
-    // hard-coded string — `toLocaleString` resolves against the runner's own
-    // timezone, which this test does not control.
     expect(
       screen.getByText(new Date(baseUser.lastLoginAt!).toLocaleString('pt-BR')),
     ).toBeInTheDocument();

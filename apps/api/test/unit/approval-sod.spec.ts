@@ -1,12 +1,3 @@
-/**
- * T148 — proves `domain/approval.ts`'s segregation-of-duties rule
- * (FR-029a, ADR-006) in isolation: pure domain, no I/O, no NestJS module,
- * no database. `test/integration/risk-approval.spec.ts` (T150) and
- * `test/contract/risk-lifecycle.spec.ts` prove the SAME rule holds end to
- * end through the real use case and the database check constraint — this
- * file is the narrowest possible proof that the rule itself, in isolation,
- * is correct.
- */
 import { randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';

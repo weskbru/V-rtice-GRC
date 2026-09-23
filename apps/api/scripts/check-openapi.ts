@@ -1,14 +1,3 @@
-/**
- * CI staleness check (T025 / ADR-009): rebuilds the OpenAPI document
- * in-process and compares it byte-for-byte against the committed
- * `apps/api/openapi.json`. Exits non-zero (failing CI) if they differ or if
- * the committed file is missing — the API's contract can never silently
- * drift from what `@nestjs/swagger` actually generates from the decorators.
- *
- * Run via `ts-node`, not `tsx` — see generate-openapi.ts's header comment.
- *
- * Run: `pnpm --filter @pharos/api run openapi:check`.
- */
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 

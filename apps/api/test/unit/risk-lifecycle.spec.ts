@@ -1,16 +1,3 @@
-/**
- * T147 — exhaustive proof of `domain/risk-lifecycle.ts`'s declarative
- * transition table (ADR-006, FR-079 to FR-081). Enumerates the FULL
- * cartesian product of `RiskStatus` (8 x 8 = 64 ordered pairs, including
- * every self-pair) rather than sampling — "that is the point of a
- * declarative table" (this task's own framing): a table is only worth
- * having if every cell, not a sample of cells, is verifiably correct.
- *
- * The 13 legal pairs below are transcribed independently from ADR-006's own
- * table (`research.md`), not re-derived from
- * `RISK_LIFECYCLE_TRANSITIONS` itself — this test would catch a transcription
- * error in `risk-lifecycle.ts`, not merely confirm it agrees with itself.
- */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -33,8 +20,6 @@ const ALL_STATUSES: readonly RiskStatus[] = [
   'ARCHIVED',
 ];
 
-/** ADR-006's transition table, transcribed independently — see this file's
- * header. Exactly 13 legal (from, to) pairs. */
 const EXPECTED_LEGAL: readonly Omit<LifecycleTransitionRule, 'preconditions'>[] = [
   { from: 'DRAFT', to: 'IDENTIFIED', requiredPermission: 'risk:edit', requiresApproval: false },
   {
@@ -117,7 +102,6 @@ describe('Risk lifecycle transition table (T147, ADR-006, FR-079 to FR-081)', ()
     expect(EXPECTED_LEGAL).toHaveLength(13);
   });
 
-  // The full 8x8 = 64-cell cartesian product, including every self-pair.
   for (const from of ALL_STATUSES) {
     for (const to of ALL_STATUSES) {
       const expected = EXPECTED_BY_KEY.get(legalKey(from, to));
@@ -141,11 +125,6 @@ describe('Risk lifecycle transition table (T147, ADR-006, FR-079 to FR-081)', ()
     const gatedRules = EXPECTED_LEGAL.filter((rule) => rule.requiresApproval);
     expect(gatedRules.length).toBeGreaterThan(0);
     for (const rule of gatedRules) {
-      // Every gated row's REQUEST permission is risk:transition — deciding
-      // it always requires risk:approve instead, which this table does not
-      // (and must not) name as a `requiredPermission` for any row: the
-      // decision endpoint enforces `risk:approve` statically in
-      // `lifecycle.controller.ts`, independent of this table.
       const requestPermission: PermissionIdentifier = rule.requiredPermission;
       expect(requestPermission).toBe('risk:transition');
       expect(requestPermission).not.toBe('risk:approve');

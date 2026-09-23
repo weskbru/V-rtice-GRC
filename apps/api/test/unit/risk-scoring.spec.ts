@@ -1,20 +1,3 @@
-/**
- * T114 — `RiskScoringService.score()` (ADR-006, T122). Exhaustive by
- * construction, not a sample:
- *
- *  1. Every one of the 25 cells of the default 5×5 matrix (product-based
- *     scoring, matching `prisma/seed/methodology.seed.ts`'s default
- *     configuration) is asserted individually.
- *  2. Every score from 1 to 25 — the full attainable range — is asserted
- *     against a second, purpose-built single-impact-value configuration,
- *     so BOTH sides of every band boundary (4/5, 9/10, 15/16) are covered,
- *     including scores the 5×5 product grid never happens to produce on
- *     its own (e.g. 7, 11, 13, 14, 17-19, 21-24).
- *
- * ADR-006's own rationale: "Putting scoring in a pure function makes
- * exhaustive matrix-cell and band-boundary testing trivial" — this file is
- * that proof, run with no database, no NestJS module and no mocks.
- */
 import { describe, expect, it } from 'vitest';
 
 import { RiskScoringService } from '../../src/modules/risk/domain/risk-scoring.service';
@@ -40,8 +23,6 @@ function levelForScore(score: number): RiskLevelValue {
   return band.level;
 }
 
-// --- Fixture 1: the default 5×5 product-based matrix -----------------------
-
 const SCALE_1_TO_5 = [1, 2, 3, 4, 5].map((value) => ({ value, label: `P${String(value)}` }));
 
 const PRODUCT_MATRIX_VERSION: MethodologyConfiguration = {
@@ -57,10 +38,6 @@ const PRODUCT_MATRIX_VERSION: MethodologyConfiguration = {
   ),
   levelBands: LEVEL_BANDS,
 };
-
-// --- Fixture 2: single impact value, probability 1..25 — every attainable
-// score in the full 1-25 range, so every band boundary is exercised on both
-// sides regardless of which scores the 5x5 product grid happens to hit. ---
 
 const SCALE_1_TO_25 = Array.from({ length: 25 }, (_, index) => ({
   value: index + 1,
@@ -116,9 +93,6 @@ describe('RiskScoringService.score (T122/T114) — every score 1-25, both sides 
     },
   );
 
-  // Explicit, named boundary assertions (redundant with the sweep above by
-  // construction, but make the intent — "both sides of every boundary" —
-  // impossible to miss on review).
   it.each([
     [4, 'LOW'],
     [5, 'MEDIUM'],

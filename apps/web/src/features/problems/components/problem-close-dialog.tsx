@@ -1,37 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem close dialog (008-incidents-problems, US2, D-7,
- * Invariants P2/P3). The screen the coordinator asked for particular care
- * on (2026-09-11): closing a problem is gated by THREE server-side
- * conditions —
- *
- *   1. `rootCause` already populated (structurally guaranteed here: the
- *      lifecycle table only ever offers `CLOSED` from `RESOLVED`, and
- *      `RESOLVED` cannot be entered without providing `rootCause` at that
- *      same transition — `ProblemOverview` already shows it once set);
- *   2. at least one `COMPLETED` `Action` of `originType: PROBLEM` for this
- *      problem;
- *   3. the caller closing it is not the same user who completed that
- *      action (segregation of duties).
- *
- * All three are enforced authoritatively server-side — this dialog's job
- * is to make (2) legible BEFORE any attempt (CLAUDE.md §18.11: "a refusal
- * that could have been prevented by showing the requirement is a design
- * failure even when the server behaves correctly"). (2) is the one
- * precondition cheaply and reliably knowable client-side, via a single
- * `GET /actions?originType=PROBLEM&originId=&status=COMPLETED` read —
- * `problemsApi.hasCompletedCorrectiveAction`'s own header explains why (3)
- * is deliberately NOT pre-checked here (no reliable client-side signal for
- * "who completed it", the same limitation `FindingCloseDialog` documents
- * for Invariant F2) and instead surfaced honestly from the server's `403`
- * when it happens.
- *
- * Mirrors `FindingCloseDialog`'s exact "checking/present/missing/unknown"
- * state shape and its "disable confirm while known-missing, never while
- * merely unknown" rule: a failed check (network/permission) must never
- * block the attempt — the server remains the authority either way.
- */
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -65,10 +33,6 @@ export function ProblemCloseDialog({
 }: ProblemCloseDialogProps): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Mirrors `FindingCloseDialog`'s own "derive loading from a resolved-key
-  // comparison" convention (react-hooks/set-state-in-effect) — `checkState`
-  // below is CHECKING whenever `problemId` has changed since the last id
-  // this effect actually resolved.
   const [actionResult, setActionResult] = useState<CorrectiveActionResult>('present');
   const [resolvedProblemId, setResolvedProblemId] = useState<string | null>(null);
 
@@ -111,8 +75,6 @@ export function ProblemCloseDialog({
       onClosed(closed);
     } catch (submitError) {
       if (submitError instanceof ApiError && submitError.problem.status === 403) {
-        // Segregation of duties (Invariant P3) — never pre-checked above,
-        // only ever surfaced here.
         setError(problems.lifecycle.closeSameUserError);
       } else if (submitError instanceof ApiError && submitError.problem.status === 422) {
         setError(

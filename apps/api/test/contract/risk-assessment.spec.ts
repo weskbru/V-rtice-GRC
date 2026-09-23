@@ -1,13 +1,3 @@
-/**
- * T118 — FR-062: the API rejects a request supplying `inherentScore`,
- * `inherentLevel`, `residualScore` or `residualLevel` on
- * `POST /risks/{riskId}/assessments`. These fields are never declared on
- * `CreateAssessmentRequestDto` (T125), so the global `ValidationPipe`'s
- * `whitelist`/`forbidNonWhitelisted` (T022) rejects the request with `400`
- * before the handler — and therefore `CreateAssessmentUseCase` — ever runs,
- * exactly the same mechanism `CreateRiskRequestDto`'s own header documents
- * for `Risk` itself.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -124,9 +114,6 @@ describe('Risk assessment rejects client-supplied derived fields (T118, FR-062)'
     await ctx.close();
   });
 
-  /** Body validation runs before the handler (and therefore before any
-   * existence check on `riskId`), so a random, nonexistent risk id is
-   * sufficient to prove the rejection happens at the DTO boundary. */
   function post(body: Record<string, unknown>) {
     return agent
       .post(`/api/v1/risks/${randomUUID()}/assessments`)
@@ -177,14 +164,6 @@ describe('Risk assessment rejects client-supplied derived fields (T118, FR-062)'
   });
 });
 
-/**
- * T126 — `GET /risks/{riskId}`'s `currentAssessment`
- * (`contracts/risks.openapi.yaml`'s `RiskDetail.currentAssessment`, FR-093):
- * `null` for a risk that has never been assessed, and the risk's real
- * current assessment — shaped exactly as `RiskAssessment`, via the SAME
- * `assessment-response.mapper.ts` `POST /risks/{riskId}/assessments` uses
- * (ADR-009) — for one that has.
- */
 describe('GET /risks/{riskId} surfaces the current assessment (T126, FR-093, ADR-009)', () => {
   let ctx: ContractTestContext;
   let appOrigin: string;
@@ -210,9 +189,6 @@ describe('GET /risks/{riskId} surfaces the current assessment (T126, FR-093, ADR
     );
     await assignRoleFixture(prisma, { user: fixture.user, role });
     await grantUnitScopeFixture(prisma, { user: fixture.user, orgUnitId: orgUnit.id });
-    // FR-068: an assessment can only be created against an ACTIVE
-    // methodology version — same fixture the US4 integration suite
-    // (risk-assessment-history.spec.ts) uses.
     await createMethodologyVersionFixture(prisma, fixture.user.id);
 
     agent = request.agent(ctx.app.getHttpServer());
@@ -229,16 +205,11 @@ describe('GET /risks/{riskId} surfaces the current assessment (T126, FR-093, ADR
     await ctx.close();
   });
 
-  /** Creates a fresh `DRAFT` risk over HTTP, returning its id and the
-   * `version` carried in the `ETag` `POST /risks` returns (ADR-013) — so the
-   * caller can immediately issue `If-Match` on a follow-up mutation without
-   * a separate `GET`. */
   async function createRisk(): Promise<{ id: string; version: string }> {
     const prisma = ctx.app.get(PrismaService);
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('risk-detail-assessment-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId });
 
     const response = await agent.post('/api/v1/risks').set('Origin', appOrigin).send({
@@ -287,9 +258,6 @@ describe('GET /risks/{riskId} surfaces the current assessment (T126, FR-093, ADR
     expect(body.currentAssessment).not.toBeNull();
     const assessment = body.currentAssessment!;
 
-    // Byte-for-byte the same assessment `POST` just returned — one business
-    // concept (the current assessment), one representation, whether read
-    // right after creation or via the risk detail endpoint (ADR-009).
     expect(assessment).toEqual(created);
 
     expect(assessment.id).toBe(created.id);
@@ -301,7 +269,6 @@ describe('GET /risks/{riskId} surfaces the current assessment (T126, FR-093, ADR
     expect(assessment.rationale).toBe('Justificativa da avaliação.');
     expect(assessment.methodologyVersion.id).toBeTruthy();
     expect(assessment.controlsConsidered).toEqual([]);
-    // First assessment on this risk — no predecessor (FR-066).
     expect(assessment.previousAssessmentId).toBeNull();
     expect(assessment.levelChange).toEqual({
       previousInherentLevel: null,
@@ -325,16 +292,6 @@ describe('GET /risks/{riskId} surfaces the current assessment (T126, FR-093, ADR
   });
 });
 
-/**
- * Gap-coverage — `GET /risks/{riskId}/assessments` (`AssessmentController.
- * list`, `contracts/risks.openapi.yaml` line ~406) had NO test anywhere in
- * the repository before this dispatch: every existing assessment test
- * exercised only `POST`, either over HTTP (above) or by calling
- * `CreateAssessmentUseCase` directly (integration suite). Requires
- * `risk:view` and scope (same check `GetRiskUseCase` applies to
- * `GET /risks/{riskId}` — see the controller's own doc comment), and
- * returns the `{data, meta}` envelope, newest first.
- */
 describe('GET /risks/{riskId}/assessments — assessment history (FR-066)', () => {
   let ctx: ContractTestContext;
   let appOrigin: string;
@@ -376,7 +333,6 @@ describe('GET /risks/{riskId}/assessments — assessment history (FR-066)', () =
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('risk-assessment-list-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId });
     const createResponse = await viewerAgent.post('/api/v1/risks').set('Origin', appOrigin).send({
       title: 'Risco para histórico de avaliações',
@@ -389,9 +345,6 @@ describe('GET /risks/{riskId}/assessments — assessment history (FR-066)', () =
     riskId = created.id;
     riskVersion = createResponse.headers.etag!;
 
-    // Two assessments — the second review supersedes the first, so the
-    // list's newest-first ordering and `previousAssessmentId` linkage are
-    // both meaningfully exercised.
     const firstAssessment = await viewerAgent
       .post(`/api/v1/risks/${riskId}/assessments`)
       .set('Origin', appOrigin)
@@ -426,8 +379,6 @@ describe('GET /risks/{riskId}/assessments — assessment history (FR-066)', () =
     expect(body.data).toHaveLength(2);
     expect(body.meta).toEqual({ page: 1, pageSize: 25, total: 2, totalPages: 1 });
 
-    // Newest first: the reassessment (with a predecessor) precedes the
-    // original (with none).
     expect(body.data[0]!.rationale).toBe('Reavaliação.');
     expect(body.data[0]!.previousAssessmentId).toBe(body.data[1]!.id);
     expect(body.data[1]!.rationale).toBe('Primeira avaliação.');

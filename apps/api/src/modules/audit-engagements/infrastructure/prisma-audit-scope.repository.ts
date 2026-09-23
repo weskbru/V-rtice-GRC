@@ -1,18 +1,3 @@
-/**
- * T024/005-audit-findings, User Story 1 — `PrismaAuditScopeRepository`, the
- * sole implementation of `AuditScopeRepositoryPort`. No `ScopedRepository`
- * base here — like `PrismaRiskControlLinkRepository`, the caller
- * (`LinkAuditScopeTo*UseCase`) has already resolved and scope-checked the
- * parent `AuditEngagement` (via `AuditEngagementRepositoryPort`, scope
- * applied) before any method here runs — this repository operates purely
- * on the three scope-link tables' own columns.
- *
- * `target.label` (`AuditScopeTargetRefRecord`) is precomputed HERE, at read
- * time, from the joined `FrameworkVersion.label` /
- * `"{externalRef} — {title}"` / `"{code} — {name}"` — the exact shapes
- * `contracts/audit.openapi.yaml`'s `AuditScopeTargetRef` schema documents
- * (ADR-020 part 4: never the referenced entity's own full domain shape).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

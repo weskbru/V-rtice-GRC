@@ -1,16 +1,3 @@
-/**
- * T163/US7 — proves `RiskHistoryQueryService`/`GetRiskHistoryUseCase`
- * merge assessments, treatment decisions, lifecycle transitions, approvals
- * and ownership changes into ONE chronological, attributed timeline, with
- * the EXACT ordering a real interleaved sequence of all five produces —
- * not merely that all five appear somewhere in the result.
- *
- * Also proves stable pagination across a page boundary with a genuine
- * timestamp tie (this task's explicit pagination-stability requirement):
- * two entries sharing the exact same `occurredAt` must never be dropped or
- * duplicated across pages, because the `(occurredAt DESC, id DESC)` sort
- * key is deterministic.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -74,13 +61,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
     await ctx.close();
   });
 
-  /** `AuditRecorder` reads `actorUserId` from `RequestContextStore`
-   * (populated in production by `RequestContextMiddleware` before any
-   * guard/controller runs) — calling a use case directly, as this
-   * integration suite does, bypasses that middleware, so `audit_event
-   * .actorUserId` would otherwise be `null` for every recorded action.
-   * Mirrors `audit-transactional.spec.ts`'s own established pattern for
-   * exactly this reason. */
   function runAs<T>(actorUserId: string, callback: () => Promise<T>): Promise<T> {
     return RequestContextStore.run(
       {
@@ -126,8 +106,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
 
     const ownerA = await createUserFixture(ctx.prisma, { email: `${marker}-ownerA@example.test` });
     const ownerB = await createUserFixture(ctx.prisma, { email: `${marker}-ownerB@example.test` });
-    // F-CV-2: both are pure preconditions (this test's subject is the
-    // history MERGE ORDER, never ownerA/ownerB's own permissions).
     await makeRiskAssignmentVisible(ctx.prisma, { user: ownerA, orgUnitId: orgUnit.id });
     await makeRiskAssignmentVisible(ctx.prisma, { user: ownerB, orgUnitId: orgUnit.id });
     const category = await ctx.prisma.client.riskCategory.create({
@@ -142,12 +120,7 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
     });
     await createMethodologyVersionFixture(ctx.prisma, actor.id);
 
-    // Steps 1-11 all performed by `actor` — one `RequestContextStore`
-    // scope so every `AuditRecorder.record(...)` call along the way sees
-    // `actorUserId: actor.id` (see `runAs`'s own doc comment).
     const { created, requested, afterRequested } = await runAs(actor.id, async () => {
-      // 1. Create the risk (DRAFT) — owned by ownerA. Risk creation itself
-      // is NOT one of the five merged categories, so it produces no entry.
       const created = await createRiskUseCase.execute({
         actorUserId: actor.id,
         title: 'Risco para teste de histórico',
@@ -157,7 +130,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         ownerUserId: ownerA.id,
       });
 
-      // 2. ASSESSMENT #1.
       const { risk: afterAssessment1 } = await createAssessmentUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -169,7 +141,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         rationale: 'Primeira avaliação.',
       });
 
-      // 3. TRANSITION DRAFT -> IDENTIFIED.
       const { risk: afterIdentified } = await performTransitionUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -177,7 +148,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         toStatus: 'IDENTIFIED',
       });
 
-      // 4. TRANSITION IDENTIFIED -> ASSESSED.
       const { risk: afterAssessed1 } = await performTransitionUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -185,7 +155,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         toStatus: 'ASSESSED',
       });
 
-      // 5. TREATMENT_DECISION.
       const { risk: afterTreatmentDecision } = await recordTreatmentUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -194,7 +163,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         description: 'Mitigar por meio de controles adicionais.',
       });
 
-      // 6. TRANSITION ASSESSED -> UNDER_TREATMENT.
       const { risk: afterUnderTreatment } = await performTransitionUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -202,7 +170,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         toStatus: 'UNDER_TREATMENT',
       });
 
-      // 7. OWNERSHIP_CHANGE (ownerA -> ownerB).
       const afterOwnershipChange = await updateRiskUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -210,7 +177,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         ownerUserId: ownerB.id,
       });
 
-      // 8. TRANSITION UNDER_TREATMENT -> UNDER_REVIEW.
       const { risk: afterUnderReview } = await performTransitionUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -218,7 +184,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         toStatus: 'UNDER_REVIEW',
       });
 
-      // 9. ASSESSMENT #2 (reassessed during review).
       const { risk: afterAssessment2 } = await createAssessmentUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -230,7 +195,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         rationale: 'Reavaliação durante a revisão.',
       });
 
-      // 10. TRANSITION UNDER_REVIEW -> ASSESSED (REASSESSED_DURING_REVIEW met).
       const { risk: afterAssessed2 } = await performTransitionUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -238,7 +202,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
         toStatus: 'ASSESSED',
       });
 
-      // 11. APPROVAL requested (ASSESSED -> ACCEPTED, gated).
       const { approval: requested, risk: afterRequested } = await requestApprovalUseCase.execute({
         actorUserId: actor.id,
         riskId: created.id,
@@ -249,9 +212,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
       return { created, requested, afterRequested };
     });
 
-    // 12. APPROVAL decided (APPROVED), by `approver` — writes BOTH an
-    // APPROVAL decision entry and a TRANSITION entry (ASSESSED -> ACCEPTED,
-    // approval-linked). Own `RequestContextStore` scope: a DIFFERENT actor.
     const { decided } = await runAs(approver.id, async () => {
       const { approval: decided } = await decideApprovalUseCase.execute({
         actorUserId: approver.id,
@@ -273,25 +233,22 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
     expect(page.total).toBe(12);
     expect(page.items).toHaveLength(12);
 
-    // The EXACT type sequence, newest first — proving real chronological
-    // merge order across all five categories, not just that each appears.
     const expectedTypeSequence: readonly RiskHistoryEntryType[] = [
-      'LIFECYCLE_TRANSITION', // 12b: ASSESSED -> ACCEPTED (approval-triggered)
-      'APPROVAL', // 12a: decided (APPROVED)
-      'APPROVAL', // 11: requested
-      'LIFECYCLE_TRANSITION', // 10: UNDER_REVIEW -> ASSESSED
-      'ASSESSMENT', // 9: assessment #2
-      'LIFECYCLE_TRANSITION', // 8: UNDER_TREATMENT -> UNDER_REVIEW
-      'OWNERSHIP_CHANGE', // 7: ownerA -> ownerB
-      'LIFECYCLE_TRANSITION', // 6: ASSESSED -> UNDER_TREATMENT
-      'TREATMENT_DECISION', // 5: MITIGATE
-      'LIFECYCLE_TRANSITION', // 4: IDENTIFIED -> ASSESSED
-      'LIFECYCLE_TRANSITION', // 3: DRAFT -> IDENTIFIED
-      'ASSESSMENT', // 2: assessment #1
+      'LIFECYCLE_TRANSITION',
+      'APPROVAL',
+      'APPROVAL',
+      'LIFECYCLE_TRANSITION',
+      'ASSESSMENT',
+      'LIFECYCLE_TRANSITION',
+      'OWNERSHIP_CHANGE',
+      'LIFECYCLE_TRANSITION',
+      'TREATMENT_DECISION',
+      'LIFECYCLE_TRANSITION',
+      'LIFECYCLE_TRANSITION',
+      'ASSESSMENT',
     ];
     expect(page.items.map((item) => item.type)).toEqual(expectedTypeSequence);
 
-    // Spot-check attribution and content on a few entries, not just type.
     const ownershipEntry = page.items[6]!;
     expect(ownershipEntry.type).toBe('OWNERSHIP_CHANGE');
     expect(ownershipEntry.previousValue).toBe(ownerA.fullName);
@@ -309,16 +266,12 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
     expect(approvalDecidedEntry.actor.id).toBe(approver.id);
     expect(approvalDecidedEntry.newValue).toBe('Aprovada');
 
-    // F-9: the two ASSESSMENT entries carry the ASSERTED `assessedOn`
-    // separately from the RECORDED `occurredAt` — never flattened into one.
     const assessmentEntries = page.items.filter((item) => item.type === 'ASSESSMENT');
     expect(assessmentEntries).toHaveLength(2);
     for (const entry of assessmentEntries) {
       expect(entry.assessedOn).not.toBeNull();
       expect(entry.occurredAt.getTime()).toBeGreaterThan(0);
     }
-    // Every non-assessment entry leaves `assessedOn` null — the visibility
-    // is exclusive to assessments, never ambiguous for other kinds.
     for (const entry of page.items) {
       if (entry.type !== 'ASSESSMENT') {
         expect(entry.assessedOn).toBeNull();
@@ -350,11 +303,6 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
       ownerUserId: actor.id,
     });
 
-    // Three `RiskLifecycleTransition` rows inserted directly (bypassing the
-    // use case — this test is about the QUERY layer's tiebreak, not the
-    // lifecycle state machine) sharing the EXACT SAME `performedAt`, with
-    // deliberately chosen ids so their lexicographic order is known: id
-    // "...003" > "...002" > "...001".
     const tiedAt = new Date('2026-01-01T00:00:00.000Z');
     const ids = [
       '00000000-0000-7000-8000-000000000001',
@@ -391,13 +339,9 @@ describe('Risk History (T163, US7, FR-105, ADR-006)', () => {
     expect(firstPage.total).toBe(3);
     expect(secondPage.total).toBe(3);
 
-    // Deterministic tiebreak: `id DESC` alongside `occurredAt DESC` — the
-    // three tied rows come back in strict id-descending order, split
-    // exactly at the page boundary.
     expect(firstPage.items.map((item) => item.referenceId)).toEqual([ids[2], ids[1]]);
     expect(secondPage.items.map((item) => item.referenceId)).toEqual([ids[0]]);
 
-    // No duplicate, no dropped row across the two pages.
     const allIds = [...firstPage.items, ...secondPage.items].map((item) => item.referenceId);
     expect(new Set(allIds).size).toBe(3);
     expect(allIds.sort()).toEqual([...ids].sort());

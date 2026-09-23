@@ -1,12 +1,3 @@
-/**
- * T037-T041/004-compliance-management, User Story 2 (research.md D-6) —
- * end-to-end coverage of `ExecuteMappingMigrationUseCase`: never inferred
- * (only human-supplied correspondences ever produce `COPIED`), never
- * overwrites an existing mapping (`SKIPPED_ALREADY_MAPPED`, including the
- * deliberate attempt to force it), `PENDING_DECISION` for anything absent
- * and unmapped, re-runnable across two executions, and exactly ONE audit
- * event per execution (SC-004).
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -60,8 +51,6 @@ describe('ExecuteMappingMigrationUseCase (T036-T042, research.md D-6, SC-004)', 
       email: `${uniqueTestMarker('migration-actor')}@example.test`,
       primaryOrgUnitId: orgUnitId,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `compliance:map`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['compliance:map', 'compliance:administer', 'compliance:view', 'control:view'],
@@ -114,8 +103,6 @@ describe('ExecuteMappingMigrationUseCase (T036-T042, research.md D-6, SC-004)', 
       title: 'Cláusula de origem',
       description: 'Descrição da cláusula de origem.',
     });
-    // Same externalRef as the source, deliberately — coincidence must not
-    // be treated as correspondence.
     const targetRequirementSameCode = await createRequirement.execute({
       actorUserId: actor.id,
       frameworkId: framework.id,
@@ -212,7 +199,6 @@ describe('ExecuteMappingMigrationUseCase (T036-T042, research.md D-6, SC-004)', 
       requirementId: sourceRequirement.id,
       controlId: sourceControl.id,
     });
-    // The manual decision this migration must never overwrite.
     await linkUseCase.execute({
       actorUserId: actor.id,
       requirementId: targetRequirement.id,
@@ -224,7 +210,6 @@ describe('ExecuteMappingMigrationUseCase (T036-T042, research.md D-6, SC-004)', 
       frameworkId: framework.id,
       targetVersionId: targetVersion.id,
       sourceFrameworkVersionId: sourceVersion.id,
-      // Deliberate attempt to force an overwrite.
       correspondences: [
         { targetRequirementId: targetRequirement.id, sourceRequirementIds: [sourceRequirement.id] },
       ],
@@ -313,8 +298,6 @@ describe('ExecuteMappingMigrationUseCase (T036-T042, research.md D-6, SC-004)', 
     expect(firstTargetOneItem?.outcome).toBe('COPIED');
     expect(firstTargetTwoItem?.outcome).toBe('PENDING_DECISION');
 
-    // Second run: attempts to re-decide targetOne (must stay untouched,
-    // SKIPPED_ALREADY_MAPPED) and resolves targetTwo (COPIED).
     const secondRun = await executeMigration.execute({
       actorUserId: actor.id,
       frameworkId: framework.id,
@@ -434,7 +417,6 @@ describe('ExecuteMappingMigrationUseCase (T036-T042, research.md D-6, SC-004)', 
       skippedAlreadyMappedCount: 0,
     });
 
-    // No per-link audit event was written for the copied link.
     const linkEvents = await ctx.prisma.client.auditEvent.findMany({
       where: { entityType: AuditEntityType.REQUIREMENT_CONTROL_LINK },
     });

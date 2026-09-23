@@ -7,11 +7,6 @@ import { RiskAttachmentsSection } from './risk-attachments-section';
 
 import type { Attachment } from '../types';
 
-/**
- * Component-mount evidence for T195 (`RiskAttachmentsSection`, US9, FR-096
- * to FR-100, FR-102). `../api` is mocked at the network boundary.
- */
-
 const { listAttachmentsMock, uploadAttachmentMock, withdrawAttachmentMock } = vi.hoisted(() => ({
   listAttachmentsMock: vi.fn(),
   uploadAttachmentMock: vi.fn(),
@@ -33,7 +28,7 @@ function attachmentFixture(overrides: Partial<Attachment>): Attachment {
     entityId: 'risk-1',
     fileName: 'evidencia.pdf',
     contentType: 'application/pdf',
-    sizeBytes: 1_258_291, // ~1.2 MB
+    sizeBytes: 1_258_291,
     uploadedBy: { id: 'user-1', fullName: 'Ana Souza' },
     createdAt: '2026-09-05T14:32:00.000Z',
     contentUrl: '/api/v1/attachments/attachment-1/content',
@@ -99,8 +94,6 @@ describe('RiskAttachmentsSection', () => {
     render(<RiskAttachmentsSection riskId="risk-1" canUpload canWithdraw={false} />);
     await waitFor(() => expect(listAttachmentsMock).toHaveBeenCalledTimes(1));
 
-    // A .pdf-named file whose bytes are plain text — exactly the mismatch
-    // the server's magic-byte sniffing refuses (FR-097).
     const file = new File(['isto não é um PDF de verdade'], 'evidencia.pdf', {
       type: 'application/pdf',
     });

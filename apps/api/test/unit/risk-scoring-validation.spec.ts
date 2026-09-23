@@ -1,9 +1,3 @@
-/**
- * T115 — FR-067: `RiskScoringService.score()` rejects a factor value that is
- * not a member of the configured scale, with a field-level
- * `ValidationDomainError` (422 territory), and never falls through to a
- * silent/incorrect score.
- */
 import { describe, expect, it } from 'vitest';
 
 import { RiskScoringService } from '../../src/modules/risk/domain/risk-scoring.service';

@@ -1,21 +1,3 @@
-/**
- * 008-incidents-problems — `modules/problems`'s own registration against
- * `ActionOriginResolverPort`'s registry for `ActionOriginType.PROBLEM`
- * (spec.md FR-016, research.md D-2). Mirrors
- * `IncidentActionOriginAccessor` exactly — see that file's header for the
- * live-scope reasoning this one deliberately does not repeat.
- *
- * `Action.originId` for `PROBLEM` is the `Problem`'s own id.
- * `resolveEditableOrigin` is checked against `problem:edit` — stricter
- * than `resolveViewableOrigin` (`problem:view`).
- *
- * This accessor is more than plumbing for `Problem`: `Problem`'s own
- * `CLOSED` transition (data-model.md invariant P2) requires a
- * `COMPLETED` `Action` with `originType: PROBLEM` to exist for it — until
- * this file existed and was registered, no such `Action` could ever be
- * created, and US2's own closure requirement was unreachable (spec.md
- * FR-016's own dated note).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PermissionResolverService } from '../../../core/authorization/application/permission-resolver.service';
@@ -38,29 +20,18 @@ export class ProblemActionOriginAccessor implements ActionOriginAccessor {
     private readonly scopeResolver: ScopeResolverService,
   ) {}
 
-  /** Registered for `ActionOriginType.PROBLEM` — `createAction`'s own
-   * gate (FR-031). */
   async resolveEditableOrigin(actorUserId: string, originId: string): Promise<ActionOriginAccess> {
     return this.resolve(actorUserId, originId, 'problem:edit');
   }
 
-  /** Registered for `ActionOriginType.PROBLEM` — the read-side
-   * counterpart used only to populate `Action.originLabel`. */
   async resolveViewableOrigin(actorUserId: string, originId: string): Promise<ActionOriginAccess> {
     return this.resolve(actorUserId, originId, 'problem:view');
   }
 
-  /** Registered for `ActionOriginType.PROBLEM` — the assurance-fix
-   * SCOPE-ONLY re-check (no permission gate). Re-derives the problem's
-   * LIVE unit on every call via `ProblemLookupPort.findScoped`, never a
-   * value stamped on the `Action` at creation time. */
   async resolveOriginScope(actorUserId: string, originId: string): Promise<ActionOriginAccess> {
     return this.resolveScopedLookup(actorUserId, originId);
   }
 
-  /** Registered for `ActionOriginType.PROBLEM` — the bulk, SCOPE-ONLY
-   * listing `ListActionUseCase` uses to filter a page of actions by their
-   * origin problem's CURRENT unit, in one query. */
   async listOriginIdsInScope(scope: UnitScopeFilter): Promise<readonly string[]> {
     return this.problemLookup.listIdsInScope(scope);
   }

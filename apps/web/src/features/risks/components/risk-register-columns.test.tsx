@@ -5,12 +5,6 @@ import { buildRiskRegisterColumns, RISK_REGISTER_COLUMN_IDS } from './risk-regis
 
 import type { RiskSummary } from '../types';
 
-/**
- * Pure-function evidence for T111 (FR-087, FR-091) — no `DataTable`/TanStack
- * table instance needed: `ColumnDef.cell` is a plain function of
- * `{ row: { original } }`, so it is exercised directly.
- */
-
 const baseRisk: RiskSummary = {
   id: 'risk-1',
   code: 'RSK-2026-0001',

@@ -1,26 +1,3 @@
-/**
- * T041/006-assets-processes, User Story 3 (SC-005, FR-021) — a structural,
- * automated proof that no module OTHER than `modules/assets`/
- * `modules/processes` reads the `assets`/`processes` tables directly.
- *
- * Before this fase, TWO call sites violated this: `modules/controls/
- * infrastructure/reference-registry-lookup.repository.ts` and `modules/
- * risk/infrastructure/prisma-registry.repository.ts` (`findById`, for
- * both tables, plus `list` for both). T036 replaced every one of them with
- * `AssetDirectoryPort`/`ProcessDirectoryPort` (`shared/grc-ports/`) —
- * Constitution Principle I: "acesso entre domínios DEVE ocorrer através de
- * interfaces explícitas e declaradas; alcançar diretamente o modelo
- * interno ou as tabelas de outro domínio é proibido."
- *
- * Modeled on `controls-risk-module-boundary.spec.ts`'s scan approach (see
- * that file's own header for the general shape this one does not repeat):
- * a plain-text scan, not a NestJS container or a database — fast and
- * exhaustive over every `.ts` file in `src/`. Comment-only mentions (this
- * file's own header included, and several already-shipped doc comments
- * explaining WHY a file no longer does this) are stripped before matching,
- * so documenting the boundary in prose can never trip this guard — only an
- * actual `prisma.client.asset`/`prisma.client.process` property access can.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -61,15 +38,6 @@ function isUnderAnyAllowedRoot(file: string): boolean {
   });
 }
 
-/** Strips `//` line comments and block/doc comments (`/star ... star/`)
- * before scanning — a file that only ever MENTIONS
- * `prisma.client.asset`/`prisma.client.process` in prose (explaining why
- * it no longer reads them, e.g. this file's own header) must never trip
- * this guard; only a real property access in executable code can. Good
- * enough for this codebase's own style (no such literal ever appears
- * inside a string literal or template literal in `src/**`), the same
- * "precise about the one thing this test needs" trade-off
- * `contract-coverage.spec.ts`'s own line-scanner header describes. */
 function stripComments(contents: string): string {
   return contents
     .replace(/\/\*[\s\S]*?\*\//g, '')

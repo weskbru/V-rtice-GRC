@@ -1,11 +1,3 @@
-/**
- * 008-incidents-problems, US1 — `ListIncidentsUseCase` (`listIncidents`,
- * contracts/incidents.openapi.yaml). Scoped register listing, mirroring
- * `grc/finding/application/list-finding.usecase.ts`'s shape, plus the
- * `sort`/`direction` pair `IncidentRepositoryPort.list` declares (the
- * contract's own `sort`/`direction` query parameters) that Finding's own
- * list operation does not have.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

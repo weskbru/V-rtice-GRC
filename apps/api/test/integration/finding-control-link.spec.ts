@@ -1,12 +1,3 @@
-/**
- * T060-T071/005-audit-findings, US3 — `Finding ↔ Control`
- * (`FindingControlLink`, FR-013-FR-016, ADR-020, research.md D-4/D-11).
- * Mirrors `test/integration/risk-control-link.spec.ts` exactly in
- * structure — history/audit on link+unlink, the refusal shape for a
- * missing/inactive control, the `control:view` half of ADR-020 part 5,
- * and the organizational-scope half (ADR-020 part 4), each with the
- * row-count-unchanged proof T066 requires.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -142,7 +133,6 @@ describe('Finding control link/unlink — history, audit, ADR-020 (T060-T071, FR
       await ctx.prisma.client.findingControlLink.findUniqueOrThrow({ where: { id: link.id } });
     expect(linkRow.unlinkedAt).not.toBeNull();
     expect(linkRow.unlinkedByUserId).toBe(actor.id);
-    // The original link facts are untouched by withdrawal.
     expect(linkRow.linkedByUserId).toBe(actor.id);
     expect(linkRow.controlId).toBe(control.id);
 
@@ -245,9 +235,6 @@ describe('Finding control link/unlink — history, audit, ADR-020 (T060-T071, FR
       },
     });
     const finding = await createFindingFixture(createFinding, actor.id, orgUnit.id, owner.id);
-    // Close with justification then archive directly at the DB layer —
-    // this test isolates the ARCHIVED-finding refusal from Invariant F5's
-    // evidence requirement, which is exercised elsewhere.
     await ctx.prisma.client.finding.update({
       where: { id: finding.id },
       data: {
@@ -270,11 +257,6 @@ describe('Finding control link/unlink — history, audit, ADR-020 (T060-T071, FR
   });
 });
 
-/**
- * ADR-020 part 5, both halves — `finding:link` (registering side) AND
- * `control:view` (referenced side). Mirrors
- * `risk-control-link.spec.ts`'s own "control:view is required" describe.
- */
 describe('Finding control link — control:view is required on the referenced control (ADR-020 part 5)', () => {
   let ctx: IntegrationTestContext;
   let createFinding: CreateFindingUseCase;
@@ -362,11 +344,6 @@ describe('Finding control link — control:view is required on the referenced co
   });
 });
 
-/**
- * T066/ADR-020 part 4 — organizational scope checked BEFORE any write. An
- * out-of-scope control and a nonexistent one answer identically, and the
- * row count is unchanged before/after the refused attempt.
- */
 describe('Finding control link — organizational scope enforced on the referenced control (ADR-020 part 4, T066)', () => {
   let ctx: IntegrationTestContext;
   let createFinding: CreateFindingUseCase;

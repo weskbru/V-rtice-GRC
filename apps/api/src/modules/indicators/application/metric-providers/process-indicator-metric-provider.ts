@@ -1,9 +1,3 @@
-/**
- * 009-indicators-reports, T025 — `PROCESS_INACTIVE_COUNT`. Delegates to
- * `ProcessMetricsPort` (`shared/grc-ports/process-metrics.port.ts`), which
- * itself reuses `PrismaProcessRepository.list` — no query of this file's
- * own.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ProcessMetricsPort } from '../../../../shared/grc-ports/process-metrics.port';

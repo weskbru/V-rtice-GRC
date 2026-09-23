@@ -1,28 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk register card view, one risk (US3, CLAUDE.md §18).
- *
- * Compact operational card: code -> title -> short description -> status /
- * risk level -> quiet category/unit/owner metadata -> last update. Mirrors
- * the same source of truth `risk-register-columns.tsx` uses for status and
- * risk-level rendering (`StatusBadge`/`RiskLevelBadge`,
- * `riskStatusBadgeVariant`/`riskStatusLabel`, `formatTimestampDate`, the
- * `NotSetValue` quiet treatment) so the card and table views of the same
- * register never disagree about how a risk is described.
- *
- * The card has exactly two `<Link>`s to the same destination
- * (`/risks/{id}`), deliberately not nested inside one another:
- *   - the code, a real `<Link>` sitting above the rest of the card
- *     (`relative z-10`) with its own, narrower click target;
- *   - the title, a second `<Link>` whose `::after` pseudo-element is
- *     stretched to cover the whole card (the well-known "stretched link"
- *     pattern), so the entire card area is clickable except where the
- *     code's own `<Link>` sits above it. Both resolve to the exact same
- *     record — there is no intermediate quick-view step. This avoids
- *     interactive-in-interactive nesting, which is both invalid HTML and
- *     unpredictable for assistive technology.
- */
 import { EmptyValue, RiskLevelBadge, StatusBadge } from '@pharos/design-system/components';
 import { Building2, CalendarClock, FolderTree, Hourglass, ShieldAlert, User } from 'lucide-react';
 
@@ -40,7 +17,6 @@ import type { RiskLevelBasis, RiskSummary } from '../types';
 
 export interface RiskCardProps {
   risk: RiskSummary;
-  /** Which derived level the card shows and labels — `RESIDUAL` or `INHERENT`, never left implicit. */
   riskLevelBasis: RiskLevelBasis;
 }
 
@@ -119,14 +95,6 @@ export function RiskCard({ risk, riskLevelBasis }: RiskCardProps): React.JSX.Ele
 
       <div className="mt-auto flex flex-col gap-2 pt-2">
         <dl className="grid grid-cols-3 gap-2 text-xs">
-          {/* Label ABOVE value, not beside it (`risks-v2-post-gate` correction
-              1): at 115px per column, "Categoria" beside its own value left no
-              room for the value before truncating it. The icon+label pair was
-              already `sr-only` here — CONVERTED to visible (text-[10px]
-              uppercase, the same compact-caption scale `role-permissions-
-              summary.tsx` and `org-unit-tree.tsx` already use elsewhere in the
-              product), not duplicated: there is still exactly one label text
-              node per field, so a screen reader announces it once. */}
           <div className="flex min-w-0 flex-col gap-0.5">
             <dt className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
               <FolderTree aria-hidden="true" className="size-3 shrink-0" />

@@ -1,21 +1,13 @@
 'use client';
 
-/**
- * The grid frame — list semantics, responsive columns and the
- * loading/error/empty contract — is the shared `CardGrid`; what stays
- * here is which card to render and a skeleton shaped like it.
- *
- * PharosGRC — asset catalog card view, the grid of `AssetCard`s (T046,
- * CLAUDE.md §18.12 — mirrors `AuditEngagementCardGrid`).
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { assets } from '@/lib/messages/assets';
 
 import { AssetCard } from './asset-card';
 
 import type { AssetSummary } from '../types';
-
-import { Skeleton } from '@/components/ui/skeleton';
-import { assets } from '@/lib/messages/assets';
 
 export interface AssetCardGridProps {
   assets: readonly AssetSummary[];

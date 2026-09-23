@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new risk route (T095, FR-053 to FR-056).
- *
- * `RiskForm` itself navigates to `/risks/{id}` on a successful create — see
- * its own doc comment — so this route stays a thin composition of the page
- * chrome and the reusable form.
- */
 import { PageHeader } from '@pharos/design-system/components';
 
 import { RiskForm } from '@/features/risks/components/risk-form';

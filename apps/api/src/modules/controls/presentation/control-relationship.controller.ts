@@ -1,18 +1,3 @@
-/**
- * T040/003-controls-management, User Story 3 — `ControlRelationshipController`:
- * `contracts/controls.openapi.yaml`'s
- * `/controls/{controlId}/risks|processes[/{linkId}]|assets[/{linkId}]`
- * paths (operations 12-18: `listControlRiskLinks`,
- * `listControlProcessLinks`, `linkControlToProcess`,
- * `unlinkControlFromProcess`, `listControlAssetLinks`, `linkControlToAsset`,
- * `unlinkControlFromAsset`).
- *
- * Read (`GET`) is gated by `control:view`; create/withdraw
- * (`POST`/`DELETE`) by `control:edit` (control-permissions.ts: "the
- * permission of the side that registers the link", ADR-020 part 5). The
- * `/risks` path carries only `GET` — deliberately no `POST`/`DELETE`
- * (FR-021).
- */
 import {
   Body,
   Controller,
@@ -69,10 +54,6 @@ export class ControlRelationshipController {
     private readonly unlinkAssetUseCase: UnlinkControlFromAssetUseCase,
   ) {}
 
-  // ---------------------------------------------------------------------
-  // Risks — read-only (FR-021)
-  // ---------------------------------------------------------------------
-
   @RequirePermission('control:view')
   @Get('risks')
   async listRiskLinks(
@@ -87,10 +68,6 @@ export class ControlRelationshipController {
     });
     return links.map(toControlRiskLinkResponse);
   }
-
-  // ---------------------------------------------------------------------
-  // Processes
-  // ---------------------------------------------------------------------
 
   @RequirePermission('control:view')
   @Get('processes')
@@ -133,10 +110,6 @@ export class ControlRelationshipController {
   ): Promise<void> {
     await this.unlinkProcessUseCase.execute({ actorUserId: session.userId, controlId, linkId });
   }
-
-  // ---------------------------------------------------------------------
-  // Assets
-  // ---------------------------------------------------------------------
 
   @RequirePermission('control:view')
   @Get('assets')

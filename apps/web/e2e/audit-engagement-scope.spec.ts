@@ -10,57 +10,6 @@ import {
 
 import type { APIResponse, Page } from '@playwright/test';
 
-/**
- * T084 — E2E of organizational scope on the five new pairs
- * 005-audit-findings introduces (quickstart.md §8, FR-014/FR-015/FR-018,
- * SC-006): with an actor whose scope does NOT cover the target's
- * organizational unit, each of `POST /audits/{id}/scope/controls`,
- * `POST /findings/{id}/controls`, `POST /findings/{id}/risks`,
- * `GET /audits/{id}` and `GET /findings/{id}` must answer exactly like the
- * target does not exist — never `403`, which would disclose it does.
- *
- * ## Fresh actor via the real API, never the shared fixture pool (AGENTS.md)
- *
- * The seeded "Audit Lead" role IS unit-scoped by construction
- * (`platform.seed.ts` gives it no `globalScope: true`), and its dev-fixture
- * user (`fixture-audit-lead@pharosgrc.local`) would work mechanically — but
- * AGENTS.md's own testing rule is explicit: E2E isolation comes from FRESH
- * fixtures created through the real API, never a shared mutable account
- * pool (a shared pool is exactly what produced F-16's login race and
- * F-34's 37 orphaned users). This spec instead follows `admin-access.spec
- * .ts`'s (T175) own established shape: an administrator provisions a brand
- * new user through the real `/admin/users` UI, grants it "Audit Lead", and
- * grants a `UNIT` scope over `DIV-A-TEAM-1` alone — then signs in as that
- * exact user for the five checks. The created user is deactivated in
- * `afterEach`, mirroring T175's own teardown rationale.
- *
- * ## Why the org-unit-less `FIXTURE-CONTROL-1` is NOT used as an
- * out-of-scope control
- *
- * `Control.orgUnitId` is nullable, and a NULL org unit reads as "out of
- * scope" for ANY non-`GLOBAL` actor (`link-control.usecase.ts`'s own
- * `isControlWithinScope`) — mechanically enough to produce the same `422`,
- * but it would not actually prove "a control of ANOTHER organizational
- * unit is refused", only "a control with NO organizational unit is
- * refused" — a materially weaker claim. Controls Management (Phase 2)
- * shipped its own `POST /controls` since `FIXTURE-CONTROL-1` was seeded,
- * so this spec instead plants a REAL control under the root organizational
- * unit — genuinely a different unit from the one the actor's grant covers,
- * verified directly against the running database (41 of 42 seeded/created
- * controls already carry a real `orgUnitId`) rather than assumed.
- *
- * ## The three "no row written" assertions go through the same API the UI
- * uses, never a direct database query
- *
- * This is a Playwright E2E suite with no database connection of its own —
- * "before" and "after" row counts are read back through
- * `GET /audits/{id}/scope`, `GET /findings/{id}/controls?includeWithdrawn=
- * true` and `GET /findings/{id}/risks?includeWithdrawn=true`, the exact
- * same reads the real UI performs, rather than a SQL count this suite has
- * no access to. Equally rigorous: a write that silently succeeded despite
- * the `422` would show up here as a new row in the very same list the
- * application itself renders.
- */
 test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-014/FR-015/FR-018)', () => {
   requireSeedCredentials(
     'SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD are not set in the environment — point this run at a seeded backend to exercise the real organizational-scope journey.',
@@ -108,10 +57,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
       return `${year}-${month}-${day}`;
     }
 
-    // --- Resolve the two organizational units this spec needs: the root
-    // (always outside a `UNIT` grant on a descendant — never itself a
-    // descendant, FR-025b) and "Division A / Team 1 (fixture)" (the unit
-    // the new user's grant will cover) -------------------------------------
     const orgUnitsResponse = await page.request.get('/api/v1/org-units');
     expect(orgUnitsResponse.ok(), await describeFailure(orgUnitsResponse)).toBe(true);
     const orgUnits = (await orgUnitsResponse.json()) as readonly {
@@ -124,8 +69,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
     expect(rootUnit, 'the always-seeded root unit must exist').toBeDefined();
     expect(grantedUnit, 'DIV-A-TEAM-1 must exist — run with SEED_DEV_FIXTURES=true').toBeDefined();
 
-    // --- Plant every OUT-OF-SCOPE target under the root unit, as the
-    // Worker Admin (global scope) ------------------------------------------
     const outOfScopeControlName = `Controle fora do escopo E2E ${uniqueSuffix}`;
     await page.goto('/controls/new');
     await expect(page.getByRole('heading', { name: 'Novo controle' })).toBeVisible();
@@ -136,9 +79,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
         'Controle plantado fora do escopo concedido, para o E2E de escopo organizacional (T084).',
       );
     await page.getByRole('combobox', { name: /Unidade organizacional/ }).click();
-    // The root unit is always this picker's FIRST option (ADR-004's
-    // materialized-path order) — the same choice `admin-access.spec.ts`
-    // already makes for the identical reason, no scrolling required.
     await page.getByRole('option').first().click();
     await page.getByRole('button', { name: 'Cadastrar controle' }).click();
     await page.waitForURL(/\/controls\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
@@ -196,9 +136,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
     );
     const outOfScopeFindingId = ((await outOfScopeFindingResponse.json()) as { id: string }).id;
 
-    // --- Provision the scoped actor (T181-T183's own shape, admin-access
-    // .spec.ts) — "Audit Lead" (holds every write permission this spec
-    // attempts) plus a `UNIT` grant over `DIV-A-TEAM-1` ALONE -------------
     const email = `e2e-audit-scope-${uniqueSuffix}@pharosgrc.local`;
     const fullName = `Usuário Escopo de Auditoria E2E ${uniqueSuffix}`;
     const initialPassword = `${seedPassword}-AuditScope-1`;
@@ -222,9 +159,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
     await page.getByRole('menuitem', { name: 'Papéis' }).click();
     const rolesDialog = page.getByRole('dialog');
     await expect(rolesDialog.getByRole('heading', { name: `Papéis de ${fullName}` })).toBeVisible();
-    // The pt-BR LABEL, not the stored `Role.name` this file's header names
-    // (ADR-022): `UserRolesDialog` prints every role through
-    // `roleDisplayName`, so "Audit Lead" is nowhere on this screen.
     await rolesDialog.getByText('Líder de Auditoria', { exact: true }).click();
     await rolesDialog.getByRole('button', { name: 'Salvar papéis' }).click();
     await expect(page.getByText('Papéis atualizados com sucesso.')).toBeVisible();
@@ -238,19 +172,11 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
     await page.getByRole('button', { name: 'Conceder escopo' }).click();
     await expect(page.getByText('Escopo concedido com sucesso.')).toBeVisible();
 
-    // --- Fresh sign-in as the new, narrowly-scoped actor -------------------
-    // This account was created (and its password set) by THIS test,
-    // seconds ago — known password, no guessing (D-17/research.md step 3,
-    // generalized to every call site sharing the pattern).
     await signOut(page);
     await signInAsFreshlyProvisionedUser(page, email, initialPassword);
     const actorOrigin = new URL(page.url()).origin;
     const actorUserId = await resolveOwnUserId(page);
 
-    // --- The actor plants its OWN in-scope engagement and finding, under
-    // the ONE unit its grant actually covers — these are the {id}s the
-    // three write attempts below target, so a refusal proves the ATTACHED
-    // target is out of scope, not the container itself ---------------------
     const inScopeEngagementResponse = await page.request.post('/api/v1/audits', {
       headers: { Origin: actorOrigin },
       data: {
@@ -283,9 +209,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
     expect(inScopeFindingResponse.ok(), await describeFailure(inScopeFindingResponse)).toBe(true);
     const inScopeFindingId = ((await inScopeFindingResponse.json()) as { id: string }).id;
 
-    // ======================================================================
-    // Pair 1 — Audit -> Control (scope): POST /audits/{id}/scope/controls
-    // ======================================================================
     const scopeCountBefore = await countScopeControlEntries(page, inScopeAuditId);
     const scopeAttempt = await page.request.post(
       `/api/v1/audits/${inScopeAuditId}/scope/controls`,
@@ -303,9 +226,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
       scopeCountBefore,
     );
 
-    // ======================================================================
-    // Pair 2 — Finding -> Control: POST /findings/{id}/controls
-    // ======================================================================
     const findingControlsCountBefore = await countLinks(
       page,
       `/api/v1/findings/${inScopeFindingId}/controls?includeWithdrawn=true`,
@@ -329,9 +249,6 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
       'no finding-control link may be written on a refused attempt',
     ).toBe(findingControlsCountBefore);
 
-    // ======================================================================
-    // Pair 3 — Finding -> Risk: POST /findings/{id}/risks
-    // ======================================================================
     const findingRisksCountBefore = await countLinks(
       page,
       `/api/v1/findings/${inScopeFindingId}/risks?includeWithdrawn=true`,
@@ -354,34 +271,22 @@ test.describe('Organizational scope on the five new pairs never leaks a 403 (FR-
       findingRisksCountBefore,
     );
 
-    // ======================================================================
-    // Pair 4 — the engagement itself: GET /audits/{id}
-    // ======================================================================
     const auditReadAttempt = await page.request.get(`/api/v1/audits/${outOfScopeAuditId}`);
     expect(auditReadAttempt.status(), await describeFailure(auditReadAttempt)).toBe(404);
     expect(auditReadAttempt.status()).not.toBe(403);
 
-    // ======================================================================
-    // Pair 5 — the finding itself: GET /findings/{id}
-    // ======================================================================
     const findingReadAttempt = await page.request.get(`/api/v1/findings/${outOfScopeFindingId}`);
     expect(findingReadAttempt.status(), await describeFailure(findingReadAttempt)).toBe(404);
     expect(findingReadAttempt.status()).not.toBe(403);
   });
 });
 
-/** `GET /auth/session` — the currently signed-in user's own id, shared
- * cookie session (mirrors `grc-foundation.spec.ts`'s identical helper). */
 async function resolveOwnUserId(page: Page): Promise<string> {
   const response = await page.request.get('/api/v1/auth/session');
   expect(response.ok(), await describeFailure(response)).toBe(true);
   return ((await response.json()) as { user: { id: string } }).user.id;
 }
 
-/** `GET /audits/{id}/scope` is the union of all three scope-link kinds,
- * unfiltered by the API (`AuditScopeSection`'s own client-side filtering by
- * `targetType` mirrored here) — counts only the `CONTROL` entries, since
- * that is the one kind this spec's refused attempt could have written. */
 async function countScopeControlEntries(page: Page, auditId: string): Promise<number> {
   const response = await page.request.get(`/api/v1/audits/${auditId}/scope`);
   expect(response.ok(), await describeFailure(response)).toBe(true);
@@ -389,9 +294,6 @@ async function countScopeControlEntries(page: Page, auditId: string): Promise<nu
   return entries.filter((entry) => entry.targetType === 'CONTROL').length;
 }
 
-/** Counts the links a `GET .../controls|risks?includeWithdrawn=true` list
- * returns — `includeWithdrawn=true` so a withdraw-then-relink could never
- * hide a row this assertion should have caught. */
 async function countLinks(page: Page, path: string): Promise<number> {
   const response = await page.request.get(path);
   expect(response.ok(), await describeFailure(response)).toBe(true);
@@ -399,8 +301,6 @@ async function countLinks(page: Page, path: string): Promise<number> {
   return links.length;
 }
 
-/** Formats a failed `page.request` response for a test assertion message —
- * status plus body, mirroring `grc-foundation.spec.ts`'s identical helper. */
 async function describeFailure(response: APIResponse): Promise<string> {
   if (response.ok()) return '';
   return `expected 2xx, got ${String(response.status())}: ${await response.text()}`;

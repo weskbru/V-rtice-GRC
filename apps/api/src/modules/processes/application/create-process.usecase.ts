@@ -1,9 +1,3 @@
-/**
- * T019/006-assets-processes — `CreateProcessUseCase`: identical in shape to
- * `modules/assets/application/create-asset.usecase.ts` (FR-020) — see that
- * file's header for the full account this one does not repeat. Uses the
- * `PRC` code prefix.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

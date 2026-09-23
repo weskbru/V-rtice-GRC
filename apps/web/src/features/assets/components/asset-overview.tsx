@@ -1,33 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — asset detail, "Visão geral" section, two cards
- * (022-asset-detail-experience Fase B — replaces the flat, card-less `<dl>`
- * this component used to be, mirroring `ProblemOverview`'s/`ControlOverview`'s
- * own identical correction on the sibling screens, CLAUDE.md §18.12).
- *
- * Two cards, not three: "Descrição" gets its own prominent card, and the
- * record's remaining classification facts sit together in "Detalhes do
- * ativo", each field anchored by a small semantic icon via the shared
- * `DetailField` (`@/components/detail/detail-field`). There is no third,
- * "central fact" card here the way Control's own "Efetividade" or Problem's
- * own "Causa raiz" earn one — `isActive` IS that central fact for an asset,
- * and it gets its OWN dedicated "Situação" card instead
- * (`AssetLifecycleActions`, composed by `asset-detail-view.tsx` right after
- * this component — see that file's own header comment for why it sits
- * SECOND, ahead of "Detalhes do ativo", mirroring Efetividade's placement
- * rather than a lifecycle card's usual "always last" position).
- *
- * `situação` is deliberately NOT repeated as a `DetailField` cell in
- * "Detalhes do ativo" — the same restraint `ControlOverview`'s own "Detalhes
- * do controle" already shows for `status` (present only in the header badge
- * and its own dedicated card, never a third copy in the classification
- * card).
- *
- * `description` is nullable (`AssetDetail.description`, `types.ts`) — an
- * honest empty sentence when absent, never a placeholder that reads like
- * real content, mirroring `ProblemOverview`'s own "Causa raiz" empty state.
- */
 import { Building2, CalendarClock, CalendarPlus, FileText } from 'lucide-react';
 
 import { DetailField } from '@/components/detail/detail-field';

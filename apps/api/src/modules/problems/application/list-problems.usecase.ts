@@ -1,9 +1,3 @@
-/**
- * 008-incidents-problems, US2 — `ListProblemsUseCase`: `GET /problems`
- * (`listProblems` operation, spec.md FR-014). Always paginated, always
- * scoped — mirrors `modules/controls/application/list-controls.usecase.ts`'s
- * structure.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ScopeResolverService } from '../../../core/organizations/application/scope-resolver.service';

@@ -1,14 +1,3 @@
-/**
- * T133 — FR-073: recording a new treatment decision supersedes the
- * previous one by STAMPING it, never by overwriting it.
- *
- * The core proof this test exists for, mirroring `risk-assessment-history
- * .spec.ts`'s own "byte-for-byte" methodology: the FIRST decision's row is
- * captured via a raw Prisma read before and after the second decision is
- * recorded, and every column except `supersededAt`/`supersededById` is
- * asserted UNCHANGED with `toEqual` on the whole row minus those two
- * fields — not merely "still present with the same id".
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -65,7 +54,6 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('treatment-history-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
     const risk = await createRiskUseCase.execute({
@@ -78,7 +66,6 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
     expect(risk.version).toBe(0);
     expect(risk.currentTreatmentId).toBeUndefined();
 
-    // --- First decision -----------------------------------------------
     const { decision: first, risk: riskAfterFirst } = await recordTreatmentUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -92,13 +79,11 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
     expect(riskAfterFirst.currentTreatmentId).toBe(first.id);
     expect(riskAfterFirst.version).toBe(1);
 
-    // Snapshot the first decision's raw row BEFORE it is superseded.
     const firstRowBefore: RiskTreatmentDecision =
       await ctx.prisma.client.riskTreatmentDecision.findUniqueOrThrow({ where: { id: first.id } });
     expect(firstRowBefore.supersededAt).toBeNull();
     expect(firstRowBefore.supersededById).toBeNull();
 
-    // --- Second decision — supersedes the first ------------------------
     const { decision: second, risk: riskAfterSecond } = await recordTreatmentUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -113,18 +98,12 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
     expect(riskAfterSecond.currentTreatmentId).toBe(second.id);
     expect(riskAfterSecond.version).toBe(2);
 
-    // --- The core proof: the FIRST row is preserved, not overwritten ---
     const firstRowAfter: RiskTreatmentDecision =
       await ctx.prisma.client.riskTreatmentDecision.findUniqueOrThrow({ where: { id: first.id } });
 
-    // The ONLY two columns FR-073's supersession stamp is allowed to
-    // change (and the database's own `risk_treatment_decisions_append_only`
-    // trigger enforces this — see the migration).
     expect(firstRowAfter.supersededAt).not.toBeNull();
     expect(firstRowAfter.supersededById).toBe(second.id);
 
-    // Every OTHER column is byte-for-byte identical to the pre-supersession
-    // snapshot — the decision itself was never touched, only stamped.
     const { supersededAt: _s1, supersededById: _b1, ...firstBeforeRest } = firstRowBefore;
     const { supersededAt: _s2, supersededById: _b2, ...firstAfterRest } = firstRowAfter;
     expect(firstAfterRest).toEqual(firstBeforeRest);
@@ -134,7 +113,6 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
     expect(firstRowAfter.decidedByUserId).toBe(firstRowBefore.decidedByUserId);
     expect(firstRowAfter.decidedAt).toEqual(firstRowBefore.decidedAt);
 
-    // --- Both decisions remain retrievable, newest first ---------------
     const history = await ctx.prisma.client.riskTreatmentDecision.findMany({
       where: { riskId: risk.id },
       orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
@@ -160,7 +138,6 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('treatment-trigger-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
     const risk = await createRiskUseCase.execute({
@@ -179,14 +156,10 @@ describe('Risk treatment decision history (T133, FR-072, FR-073)', () => {
       description: 'Transferir via apólice de seguro.',
     });
 
-    // A DELETE is refused outright — no delete path ever exists for this
-    // table (append-only).
     await expect(
       ctx.prisma.client.riskTreatmentDecision.delete({ where: { id: decision.id } }),
     ).rejects.toThrow();
 
-    // An UPDATE to a business-content field (not the supersession stamp) is
-    // refused by the trigger, even against the restricted application role.
     await expect(
       ctx.prisma.client.riskTreatmentDecision.update({
         where: { id: decision.id },

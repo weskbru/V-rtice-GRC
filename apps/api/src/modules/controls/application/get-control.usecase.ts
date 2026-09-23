@@ -1,12 +1,3 @@
-/**
- * T020/003-controls-management — `GetControlUseCase`: the read side of
- * `GET /controls/{controlId}` (`getControl` operation, FR-007, FR-003).
- * Mirrors `modules/risk/application/get-risk.usecase.ts` exactly — no
- * transaction, no audit entry (a read is never audited, ADR-005); a scope
- * denial IS recorded, via `OrgScopeEnforcerService
- * .assertExistingRecordAccessible` (F-38's mechanism), whenever the control
- * genuinely exists outside the caller's scope.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -34,8 +25,6 @@ export class GetControlUseCase {
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
     const referenceDate = new Date();
 
-    // FR-007/FR-030: a control outside scope reads as `undefined`, mapped
-    // to the same 404 as "does not exist" — never surfaced to the caller.
     const record = await this.controlRepository.findById(scope, input.controlId, referenceDate);
     if (!record) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

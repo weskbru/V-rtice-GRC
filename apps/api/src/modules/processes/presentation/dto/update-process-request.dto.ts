@@ -1,8 +1,3 @@
-/**
- * T022/006-assets-processes — matches `contracts/processes.openapi.yaml`'s
- * `UpdateProcessRequest`. Identical in shape to
- * `modules/assets/presentation/dto/update-asset-request.dto.ts` (FR-020).
- */
 import { IsOptional, IsString, IsUUID, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

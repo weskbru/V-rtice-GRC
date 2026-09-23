@@ -1,10 +1,3 @@
-/**
- * T050/002-shared-grc-foundation, US2 — the sole implementation of
- * `ActionReferenceDataPort`. Mirrors
- * `grc/evidence/infrastructure/prisma-evidence-reference-data.repository.ts`
- * exactly, minus `findOrgUnit` (see the port's own header for why `Action`
- * needs none).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

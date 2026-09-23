@@ -1,13 +1,3 @@
-/**
- * T028/003-controls-management, User Story 2 — the sole implementation of
- * `ControlAssessmentRepositoryPort`. No scope predicate on most methods
- * here — the caller (`Create`/`Get`/`ListControlAssessmentUseCase`) has
- * already resolved and scope-checked the parent `Control` before any of
- * these run, same reasoning as `RiskAssessmentRepository`. The one
- * exception is `listAssessmentIdsInScope` below, which enumerates ids
- * ACROSS controls and is the real authorization decision point in this
- * file — see its own doc comment (007-implementation-remediation, D-11).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -50,8 +40,6 @@ function toRecord(row: AssessmentWithRelations): ControlAssessmentRecord {
   };
 }
 
-/** Ordering `ControlEffectivenessService#mostRecent` and
- * `control_assessments`'s own index both use (data-model.md §2). */
 const NEWEST_FIRST = [
   { assessedOn: 'desc' },
   { createdAt: 'desc' },
@@ -153,29 +141,6 @@ export class ControlAssessmentRepository implements ControlAssessmentRepositoryP
     };
   }
 
-  /**
-   * Coordinator correction, 007-implementation-remediation, Frente D
-   * (D-11): this used to build `{ control: { orgUnitId: { in: ... } } }` —
-   * a JOIN up to `controls.org_unit_id` deciding row visibility, exactly
-   * what this project's own ratified rule forbids ("carregar o escopo
-   * organizacional em toda tabela escopada, mesmo quando derivável por
-   * relação; autorização nunca deve depender de um JOIN"). Now reads
-   * `control_assessments.org_unit_id` directly, through the SAME shared
-   * helper (`applyScopeToWhere`) every other scoped repository in this
-   * codebase uses — the column the migration
-   * `20260911010000_control_assessments_org_unit_id`'s two triggers keep
-   * correct, including across a control changing unit after it already has
-   * assessments (that migration's own header). No `ScopedRepository`
-   * subclass here: every OTHER method on this class is deliberately
-   * unscoped (see this file's own header — the caller has already
-   * scope-checked the parent `Control`); this is the one method that
-   * enumerates ids ACROSS controls and is therefore the one real
-   * authorization decision point in this file.
-   * `test/integration/control-assessment-scope.spec.ts` proves the
-   * difference a stale column would make: a caller scoped to one unit
-   * cannot see another's assessments, and that refusal survives a control
-   * moving between units.
-   */
   async listAssessmentIdsInScope(scope: ScopeFilter): Promise<readonly string[]> {
     const where = applyScopeToWhere<Prisma.ControlAssessmentWhereInput>(scope, 'orgUnitId', {});
     const rows = await this.prisma.client.controlAssessment.findMany({

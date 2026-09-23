@@ -1,9 +1,3 @@
-/**
- * T030/004-compliance-management — maps `FrameworkVersionRecord`
- * (`domain/ports/framework-version-repository.port.ts`) to the wire shape
- * `contracts/compliance.openapi.yaml`'s `FrameworkVersion` schema
- * describes.
- */
 import type {
   FrameworkVersionFrameworkRef,
   FrameworkVersionRecord,

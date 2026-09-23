@@ -39,39 +39,13 @@ const DEFAULT_ICON: Record<StatusVariant, ComponentType<SVGProps<SVGSVGElement>>
 };
 
 export interface StatusBadgeProps {
-  /** Semantic outcome this badge represents. Never rely on this alone — an icon and the text label always render alongside it (FR-091, SC-012). */
   variant: StatusVariant;
-  /** Human-readable label, e.g. "Active", "Overdue", "Pending approval". Required — the label is the primary, color-independent signal. */
   label: string;
-  /** 'subtle' (tinted, default — inline in tables/lists) or 'solid' (strong emphasis, e.g. a single prominent header status). */
   emphasis?: StatusEmphasis;
-  /** Override the variant's default icon. Pass `false` to omit the icon (the text label alone still satisfies FR-091, but the icon is recommended). */
   icon?: ComponentType<SVGProps<SVGSVGElement>> | false;
   className?: string;
 }
 
-/**
- * Generic status indicator (session state, approval outcome, lifecycle
- * status, ...). Distinguishes meaning via color + icon + text label together
- * — never color alone (FR-091, SC-012). For risk severity specifically, use
- * `RiskLevelBadge`, which is a distinct semantic axis (data-model.md
- * `RiskLevel`) even where a hue is shared.
- *
- * ## No `role="status"` (T203, F-2)
- *
- * This is plain content, not an ARIA live region: a badge whose value is
- * usually present at first render (a table cell, a header chip) and, even
- * where a caller re-renders it in place with a new value, `role="status"`
- * cannot promise a reliable announcement either way — some call sites
- * remount the badge (a fresh row keyed by id) rather than mutate it in
- * place, so the same "does this get spoken?" question would have a
- * different, unpredictable answer at every call site. The label is already
- * reachable in normal reading order (visible text, plus `aria-label` where
- * a fuller sentence is warranted) — that is the access guarantee this
- * component makes, consistently, everywhere it is used. `LoadingState` is
- * the platform's one dedicated live-region component (ARIA APG's "busy
- * indicator" pattern) — see its own doc comment.
- */
 export function StatusBadge({
   variant,
   label,

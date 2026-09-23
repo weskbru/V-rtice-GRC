@@ -1,7 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `SetUserStatusRequest`
- * (`additionalProperties: false`).
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

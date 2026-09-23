@@ -5,19 +5,6 @@ interface CacheEntry {
   readonly expiresAt: number;
 }
 
-/**
- * Process-local `CacheProvider` (T017 / D-2), selected by `CacheModule`
- * when `REDIS_URL` is empty — the only option on this development machine,
- * where Redis is not installable (docs/local-environment.md).
- *
- * TTL-aware (lazy expiry on read) and bounded: once `maxEntries` is reached,
- * the oldest-inserted entry is evicted to make room, so an attacker (or a
- * bug) cannot grow this without limit into an out-of-memory condition. This
- * is a strictly weaker guarantee than Redis's shared, cross-process view —
- * which is exactly why `env.schema.ts` refuses an empty `REDIS_URL` in
- * production (D-2): a multi-instance deployment would have one
- * inconsistent cache per instance.
- */
 export class InMemoryCacheProvider implements CacheProvider {
   readonly kind = 'in-memory' as const;
 
@@ -41,7 +28,7 @@ export class InMemoryCacheProvider implements CacheProvider {
   }
 
   set<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
-    this.store.delete(key); // reinsert to refresh insertion order (see evictIfNeeded)
+    this.store.delete(key);
     this.evictIfNeeded();
     this.store.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
     return Promise.resolve();
@@ -80,8 +67,6 @@ export class InMemoryCacheProvider implements CacheProvider {
     return Promise.resolve(true);
   }
 
-  /** FIFO eviction: `Map` preserves insertion order, so the first key
-   * yielded is the oldest surviving entry. */
   private evictIfNeeded(): void {
     if (this.store.size < this.maxEntries) {
       return;

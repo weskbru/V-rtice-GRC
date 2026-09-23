@@ -1,19 +1,3 @@
-/**
- * `IdentityModule` — the identity capability's composition root
- * (T058-T069, ADR-011). Wires `AuthenticationProvider`s, the identity
- * resolver, login throttling, the write-side `AuthUseCasesPort`
- * (`AuthOrchestrator`) and `AuthController`. Reads `AppConfigService` on
- * behalf of every `core-domain`/`core-application` element in this
- * capability that needs configuration but may not import it directly
- * (ARGON2_SETTINGS, AUTH_THROTTLE_SETTINGS, PASSWORD_POLICY_SETTINGS).
- *
- * ## Adding a future LDAP/OIDC/SAML provider (see authentication-provider.ts)
- *
- * Register it on `AUTHENTICATION_PROVIDERS` alongside `LocalAuthenticationProvider`
- * below — one array entry, no edit to any existing provider or to
- * `AuthOrchestrator`, which already picks a provider generically via
- * `supports(...)`.
- */
 import { Module } from '@nestjs/common';
 
 import { AppConfigService } from '../../infrastructure/config/app-config.service';
@@ -64,9 +48,6 @@ import { DirectoryUsersController } from './presentation/directory-users.control
     LoginThrottleService,
     IdentityResolverService,
     ListDirectoryUsersUseCase,
-    // T176/US8 — user administration use cases. `core/users/**` does not
-    // exist as a capability (docs/architecture.md); user administration
-    // lives inside `core/identity`, where `UserDirectoryPort` already is.
     ListUsersUseCase,
     GetUserUseCase,
     CreateUserUseCase,

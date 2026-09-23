@@ -1,17 +1,3 @@
-/**
- * T089/T090 — the sole implementation of `RiskReferenceDataPort`. Deliberate
- * direct `PrismaService` queries against `organizationalUnit`/`user`/
- * `riskCategory`/`riskType`/`riskOrigin` rather than depending on the
- * Identity/Organizations capabilities' own ports (`UserDirectoryPort`,
- * `OrgScopeRepositoryPort`): those ports are shaped for authentication and
- * scope-resolution, not "does this id exist and is it active", and neither
- * capability's composition root currently exports a port answering that
- * narrower question. Reading the shared `users`/`organizational_units`
- * tables directly is consistent with existing precedent elsewhere in this
- * codebase (`prisma-org-scope.repository.ts` reads `organizational_units`
- * directly; `platform.seed.ts` reads/writes `users` directly) — it is not a
- * new privilege, just this module's own narrow, read-only use of it.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

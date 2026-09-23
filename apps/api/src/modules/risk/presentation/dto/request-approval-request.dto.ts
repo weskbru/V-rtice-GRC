@@ -1,9 +1,3 @@
-/**
- * T158 — matches `contracts/risks.openapi.yaml`'s `RequestApprovalRequest`
- * exactly: `additionalProperties: false`, `toStatus` restricted to the two
- * gated targets (FR-029) rather than the full `RiskStatus` union
- * `TransitionRiskRequestDto` accepts.
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

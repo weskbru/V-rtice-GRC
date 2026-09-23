@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — process inventory route (T046), mirroring
- * `(app)/controls/page.tsx`/`(app)/audits/page.tsx` exactly:
- * `ProcessCatalogView` reads `useSearchParams()` (via `useProcessCatalogState`),
- * which Next.js requires behind a `<Suspense>` boundary.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

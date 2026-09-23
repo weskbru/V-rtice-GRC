@@ -1,16 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount-free evidence for `useUserAdminState`, mirroring
- * `use-actions-register-state.test.ts`'s own approach: `next/navigation` is
- * mocked so `currentSearch` stands in for "the URL right now".
- *
- * This hook replaced the screen's former local `useState` filters — these
- * tests pin down that the URL genuinely is the state: a filter change is a
- * committed query string, not memory that a reload would lose, and the
- * chips a caller sees are exactly the fields `activeFilterCount` counts.
- */
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 

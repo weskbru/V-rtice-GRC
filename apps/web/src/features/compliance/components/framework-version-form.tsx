@@ -1,14 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework version create/edit form (US1). A version has
- * exactly one editable field, `label` (FR-002) — and only while `DRAFT`
- * (FR-006): once `PUBLISHED`, `updateFrameworkVersion` is refused by the
- * server, so this form is never rendered for a published version — the
- * caller (`FrameworkVersionDetailView`) decides that, mirroring how
- * `ControlLifecycleActions` never renders a transition the server would
- * refuse.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -43,7 +34,6 @@ export interface FrameworkVersionFormProps {
   frameworkId: string;
   frameworkName: string;
   version?: FrameworkVersion;
-  /** The `ETag` last read for `version`. Required when `mode === 'edit'`. */
   etag?: string;
   onSaved: (result: FrameworkVersionFormSavedResult) => void;
   onCancel?: () => void;

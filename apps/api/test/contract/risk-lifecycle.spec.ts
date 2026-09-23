@@ -1,19 +1,3 @@
-/**
- * T158/T159 — D-11 coverage for every endpoint `LifecycleController` adds:
- * `GET /risks/{riskId}/lifecycle`, `POST /risks/{riskId}/transitions`,
- * `GET`/`POST /risks/{riskId}/approvals`, `POST
- * /risks/{riskId}/approvals/{approvalId}/decision`. For each: the stated
- * authorization rule (including a zero-permission/wrong-permission caller
- * refused), a 401 for an unauthenticated caller, and the declared response
- * shape — per `docs/local-environment.md` D-11, regardless of what
- * `tasks.md` itself lists.
- *
- * T159's own filtering proof lives here too: a caller who holds `risk:view`
- * but NOT `risk:transition` sees NO gated transition
- * (`ACCEPTED`/`UNDER_REVIEW`) in `availableTransitions` from a state where
- * both are structurally legal — FR-082's "valid from the current state AND
- * permitted to the current user".
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -98,9 +82,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
     orgUnitId = orgUnit.id;
     const owner = await createUserFixture(prisma, { email: `${marker}-owner@example.test` });
     ownerUserId = owner.id;
-    // F-CV-2 (`risks-lifecycle-audit`): owner assignability now also
-    // requires `risk:view` + scope reaching the risk's unit — see
-    // `risk-immutability.spec.ts`'s identical fixup for the full reasoning.
     const ownerRole = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-${marker}-owner-role-${randomUUID()}`,
     });
@@ -125,16 +106,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
   });
 
   afterAll(async () => {
-    // `risk_categories` is a global, unscoped reference table that
-    // `global-setup.ts` truncates ONCE per `vitest run`, not per file
-    // (`vitest.contract.config.ts` runs every contract spec sequentially
-    // against ONE shared database, `fileParallelism: false`) — an ACTIVE
-    // row left behind here would leak into `reference-data.spec.ts`'s own
-    // "returns exactly the active categories" assertion, which (correctly,
-    // for ITS OWN fixtures) assumes no other active category exists in the
-    // database at the point it runs. Deactivating rather than deleting:
-    // `Risk.categoryId` is `onDelete: Restrict` and this run's risks still
-    // reference it.
     await ctx.app
       .get(PrismaService)
       .client.riskCategory.update({ where: { id: categoryId }, data: { isActive: false } });
@@ -180,8 +151,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
     return { id: body.id, etag: response.headers.etag! };
   }
 
-  /** Records an assessment on the risk (needed for `HAS_ASSESSMENT`-gated
-   * transitions), returning the risk's current ETag afterward. */
   async function assessRisk(
     agent: ReturnType<typeof request.agent>,
     riskId: string,
@@ -202,10 +171,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
     return response.headers.etag!;
   }
 
-  // -------------------------------------------------------------------
-  // GET /risks/{riskId}/lifecycle
-  // -------------------------------------------------------------------
-
   describe('GET /risks/{riskId}/lifecycle', () => {
     it('succeeds for a caller holding risk:view and returns the declared RiskLifecycleState shape', async () => {
       const agent = await agentWithPermissions(['risk:create', 'risk:view']);
@@ -218,8 +183,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
       expect(body.status).toBe('DRAFT');
       expect(body.pendingApproval).toBeNull();
       expect(Array.isArray(body.availableTransitions)).toBe(true);
-      // F-CV-3: a brand-new risk has traversed exactly its own starting
-      // status — never empty, never inferred from `status` client-side.
       expect(body.traversedStatuses).toEqual(['DRAFT']);
     });
 
@@ -248,15 +211,10 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
       expect(response.status).toBe(200);
       const body = response.body as RiskLifecycleStateBody;
 
-      // DRAFT -> IDENTIFIED (risk:edit) IS offered - the caller holds it.
       const toIdentified = body.availableTransitions.find((t) => t.toStatus === 'IDENTIFIED');
       expect(toIdentified).toBeDefined();
       expect(toIdentified!.preconditionsMet).toBe(true);
 
-      // No OTHER transition is structurally reachable from DRAFT per the
-      // table, so this caller's list is exactly one entry — proving the
-      // endpoint does not offer anything beyond what is BOTH legal from the
-      // current state AND permitted to this caller.
       expect(body.availableTransitions).toHaveLength(1);
     });
 
@@ -285,7 +243,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
         .send({ toStatus: 'ASSESSED' });
       expect(toAssessed.status).toBe(200);
 
-      // Caller WITHOUT risk:transition — only risk:view + risk:treat.
       const limitedViewer = await agentWithPermissions(['risk:view', 'risk:treat']);
       const limitedResponse = await limitedViewer
         .get(`/api/v1/risks/${id}/lifecycle`)
@@ -295,12 +252,8 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
       const limitedTargets = limitedBody.availableTransitions.map((t) => t.toStatus);
       expect(limitedTargets).not.toContain('ACCEPTED');
       expect(limitedTargets).not.toContain('UNDER_REVIEW');
-      // UNDER_TREATMENT (risk:treat) IS offered - the caller holds THAT permission.
       expect(limitedTargets).toContain('UNDER_TREATMENT');
 
-      // Caller WITH risk:transition sees the gated targets too (still
-      // subject to their own preconditions, e.g. HAS_ASSESSMENT — already
-      // met here).
       const fullViewer = await agentWithPermissions(['risk:view', 'risk:transition']);
       const fullResponse = await fullViewer
         .get(`/api/v1/risks/${id}/lifecycle`)
@@ -315,10 +268,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
       expect(acceptedEntry!.preconditionsMet).toBe(true);
     });
   });
-
-  // -------------------------------------------------------------------
-  // POST /risks/{riskId}/transitions
-  // -------------------------------------------------------------------
 
   describe('POST /risks/{riskId}/transitions', () => {
     it('succeeds for a caller holding the transition-specific permission and returns the declared RiskLifecycleTransition shape', async () => {
@@ -368,7 +317,7 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
         .post(`/api/v1/risks/${id}/transitions`)
         .set('Origin', appOrigin)
         .set('If-Match', etag)
-        .send({ toStatus: 'ARCHIVED' }); // DRAFT -> ARCHIVED is not in the table.
+        .send({ toStatus: 'ARCHIVED' });
 
       expect(response.status).toBe(422);
       const problem = response.body as ProblemBody;
@@ -419,10 +368,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
       expect(response.status).toBe(401);
     });
   });
-
-  // -------------------------------------------------------------------
-  // GET/POST /risks/{riskId}/approvals
-  // -------------------------------------------------------------------
 
   describe('GET /risks/{riskId}/approvals', () => {
     it('succeeds for a caller holding risk:view and returns an array (empty when no approval has ever been requested)', async () => {
@@ -478,11 +423,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
 
       expect(outOfScopeResponse.status).toBe(404);
       expect(nonexistentResponse.status).toBe(404);
-      // Byte-identical PROBLEM SHAPE — `detail`/`instance`/`correlationId`
-      // legitimately differ (different risk id, different per-request
-      // correlation id), but nothing else distinguishes "exists, out of
-      // scope" from "does not exist" (the response body's own content,
-      // not merely its status code).
       const nonexistentProblem = nonexistentResponse.body as {
         readonly type: string;
         readonly title: string;
@@ -493,7 +433,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
         title: nonexistentProblem.title,
         status: nonexistentProblem.status,
       });
-      // Not an array of the real approval history (what the bug returned).
       expect(Array.isArray(outOfScopeResponse.body)).toBe(false);
     });
 
@@ -506,8 +445,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
   });
 
   describe('POST /risks/{riskId}/approvals', () => {
-    /** Walks a fresh risk to `ASSESSED` — the state both the direct
-     * transitions and the request-approval flow exercised below need. */
     async function buildAssessedRisk(
       requester: ReturnType<typeof request.agent>,
     ): Promise<{ id: string; etag: string }> {
@@ -556,11 +493,6 @@ describe('Risk Lifecycle endpoints (T158, T159, D-11, ADR-006)', () => {
       expect((getRisk.body as RiskDetailBody).status).toBe('ASSESSED');
     });
 
-    // Assurance fix (Fix 4, confirmed defect) — `GET /risks/{id}` used to
-    // report `pendingApproval: true, pendingApprovalDetail: null`
-    // unconditionally, even though this SAME endpoint
-    // (`GET /risks/{id}/approvals`) already returned the real `PENDING`
-    // row.
     it('Fix 4: GET /risks/{riskId} populates pendingApprovalDetail with the SAME approval GET .../approvals returns, not null', async () => {
       const requester = await agentWithPermissions([
         'risk:create',

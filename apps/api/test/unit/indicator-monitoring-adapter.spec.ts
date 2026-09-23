@@ -1,10 +1,3 @@
-/**
- * Unit test for `IndicatorMonitoringAdapter.getMonitoringSummary`
- * (`src/modules/indicators/infrastructure/indicator-monitoring.adapter.ts`),
- * added for `GET /dashboard/summary`'s `breakdowns.indicators`
- * (`get-dashboard-summary.usecase.ts`). `PrismaService` is a hand-rolled
- * fake — no I/O, no NestJS test module.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { IndicatorMonitoringAdapter } from '../../src/modules/indicators/infrastructure/indicator-monitoring.adapter';
@@ -20,9 +13,6 @@ describe('IndicatorMonitoringAdapter.getMonitoringSummary', () => {
         { metricKey: 'CONTROL_INACTIVE_COUNT' },
         { metricKey: 'ACTION_OVERDUE_COUNT' },
       ]);
-    // Two of the three active definitions have a latest measurement;
-    // RISK_TOTAL_BY_LEVEL breached, CONTROL_INACTIVE_COUNT not,
-    // ACTION_OVERDUE_COUNT has no measurement at all.
     const findManyMeasurements = vi
       .fn()
       .mockResolvedValue([{ breached: true }, { breached: false }]);

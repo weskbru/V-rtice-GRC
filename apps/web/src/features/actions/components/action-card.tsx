@@ -1,26 +1,12 @@
 'use client';
 
-/**
- * PharosGRC — "Planos de Ação" register card view, one action (CLAUDE.md
- * §18, §18.12). Mirrors `AuditEngagementCard`'s shape — whole-card stretched
- * link to `/actions/{id}`, code repeated as its own independent link — since
- * this register offers no quick-view side panel either.
- *
- * Card anatomy follows the family: código → título → badges → three
- * optional description → badges → three metadata fields (Origem,
- * Responsável, Prazo — the same three the table's own columns show,
- * CLAUDE.md §18.12) → "Atualizado em".
- *
- * Three independent click targets, each `relative z-10` above the title's
- * stretched overlay (the well-known pattern `RiskCard`'s own header
- * documents): the code, the whole card (via the title), and — when the
- * origin has a real detail route (`actionOriginHref`) — the origin value
- * itself, plus the row-actions menu in the header. None of the four is
- * nested inside another, which is both valid HTML and predictable for
- * assistive technology.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { AlertTriangle, Building2, CalendarClock, User } from 'lucide-react';
+
+import { Link } from '@/components/navigation/link';
+import cardStyles from '@/components/register/register-card.module.css';
+import { actions } from '@/lib/messages/actions';
+import { cn } from '@/lib/utils';
 
 import { formatDateOnly, formatTimestampDate } from '../../risks/date';
 import { actionOriginHref } from '../origin';
@@ -30,14 +16,8 @@ import { ActionRowMenu } from './action-row-menu';
 
 import type { Action, ActionStatus } from '../types';
 
-import { Link } from '@/components/navigation/link';
-import cardStyles from '@/components/register/register-card.module.css';
-import { actions } from '@/lib/messages/actions';
-import { cn } from '@/lib/utils';
-
 export interface ActionCardProps {
   action: Action;
-  /** Advisory only (FR-042) — controls whether the row-actions menu renders at all, never whether a transition request would succeed. */
   canEdit: boolean;
   onTransition: (action: Action, to: ActionStatus) => void;
   onReopenRequest: (action: Action) => void;

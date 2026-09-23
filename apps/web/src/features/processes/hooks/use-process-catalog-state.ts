@@ -1,29 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — process catalog URL state (T046), mirroring
- * `features/audit-engagements/hooks/use-engagement-catalog-state.ts` for
- * the single-value org unit/situation filters (`GET /processes` accepts
- * exactly one value per filter field — no CSV multi-select, unlike
- * `features/controls/hooks/use-catalog-state.ts`'s own richer filter set),
- * combined with that same file's debounced free-text search — `GET
- * /processes` DOES accept `q`, unlike `GET /audits`.
- *
- * AGENTS.md "Frontend state": this hook owns no `useState` mirror plus a
- * write-back effect for anything the URL itself already represents — every
- * setter commits directly to the URL via `router.replace`, and every read
- * comes straight from `useSearchParams()` on the next render. The one
- * `useState` here (`searchInputValue`) is NOT such a mirror: it holds the
- * in-progress keystroke value between commits, exists so typing doesn't
- * feel throttled by the debounce, and is reconciled FROM the URL by a
- * read-only effect (e.g. browser back/forward) — never written back to the
- * URL by an effect of its own; only `setSearch`'s own debounced timer ever
- * calls `commit`.
- */
-
-// Reads the current screen's own query string. The WRITE side — and the
-// `useRouter` import the loader policy restricts — lives in the shared
-// `@/lib/register/url-state` (specs/014-institutional-loader §2.3).
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -68,7 +44,6 @@ function parseSingleValue(value: string | null): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
-/** Which presentation the results area is currently rendering — cards is the primary view (CLAUDE.md §18). */
 export type ProcessCatalogView = 'cards' | 'table';
 
 export interface ProcessCatalogUrlState {
@@ -94,16 +69,11 @@ export interface UseProcessCatalogStateResult {
   setView: (view: ProcessCatalogView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter fields are currently applied — shown on the collapsed "Filtros" button. */
   activeFilterCount: number;
 }
 
 export function useProcessCatalogState(): UseProcessCatalogStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism — one change applied to the CURRENT query string,
-  // `replace` not `push`, page reset by default — is shared with every
-  // other register (`@/lib/register/url-state`). What stays here is what
-  // only this catalog knows: its enums, sortable fields and defaults.
   const commit = useUrlQueryCommit();
 
   const urlQ = searchParams.get('q') ?? '';
@@ -129,10 +99,6 @@ export function useProcessCatalogState(): UseProcessCatalogStateResult {
     });
   }
 
-  // Both directions (typing → URL after a pause, and URL → input on
-  // Back/Forward, a pasted link or "clear filters") are the shared
-  // mechanism's job, including cancelling a pending commit so it can never
-  // overwrite a change that came from elsewhere mid-debounce.
   const {
     inputValue: searchInputValue,
     setValue: setSearch,
@@ -206,7 +172,6 @@ export function useProcessCatalogState(): UseProcessCatalogStateResult {
     });
   }, [commit, clearSearchInput]);
 
-  /** Which filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows, from the same conditions the chip row is built on. */
   const activeFilterCount =
     (state.q !== '' ? 1 : 0) +
     (state.orgUnitId !== undefined ? 1 : 0) +

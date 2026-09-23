@@ -1,10 +1,3 @@
-/**
- * `SessionRepositoryPort` implementation (T062). Uses `prisma.client`
- * (ambient-transaction-aware getter, see `PrismaService`'s own header) so a
- * caller inside `runInTransaction(...)` gets atomicity with whatever else
- * runs in that scope, and a caller outside one (the lazy-expiry "touch",
- * which needs no atomicity) gets the plain connection.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -40,11 +33,6 @@ export class PrismaSessionRepository extends SessionRepositoryPort {
   }
 
   async findByTokenHash(tokenHash: string): Promise<SessionRecordWithCredentialFlags | undefined> {
-    // S-01 (audit A6-F01): joins the owning user's local credential in the
-    // SAME query — no redundant round-trip — so `SessionService` can
-    // populate `ValidatedSession.mustChangePassword` without a second
-    // lookup. A user with no `LocalCredential` (a federated identity, not
-    // implemented in this release) reads as `false`, never `undefined`.
     const row = await this.prisma.client.session.findUnique({
       where: { tokenHash },
       include: { user: { include: { localCredential: true } } },
@@ -59,10 +47,6 @@ export class PrismaSessionRepository extends SessionRepositoryPort {
   }
 
   async touchLastActivity(sessionId: string, at: Date): Promise<void> {
-    // `updateMany` (not `update`) so a session concurrently deleted/revoked
-    // (which never happens by deletion in this schema, but keeps this
-    // robust) never throws a not-found error for what is, at most, a
-    // best-effort bookkeeping write.
     await this.prisma.client.session.updateMany({
       where: { id: sessionId },
       data: { lastActivityAt: at },

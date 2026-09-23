@@ -1,10 +1,3 @@
-/**
- * T030/004-compliance-management — matches
- * `contracts/compliance.openapi.yaml`'s `CreateRequirementRequest`
- * exactly: `additionalProperties: false` — `complianceState`/`version` are
- * server-owned and rejected as unknown properties by not being declared
- * here (research.md D-8, FR-017).
- */
 import { IsString, Length, MinLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

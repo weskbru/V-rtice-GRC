@@ -1,11 +1,3 @@
-/**
- * 009-indicators-reports, Fase 4 (T037) — maps
- * `IndicatorMeasurementRecord` + its resolved `computedBy` ref (application
- * layer) to the wire shape `contracts/indicators.openapi.yaml`'s
- * `IndicatorMeasurement` schema describes. ONE function is the only place
- * this happens (ADR-009), mirroring `toIndicatorDefinitionResponse`'s own
- * single-mapper discipline.
- */
 import type { IndicatorOwnerRef } from '../../application/resolve-indicator-owner';
 import type { IndicatorMeasurementRecord } from '../../domain/indicator-measurement.entity';
 import type { IndicatorMetricKey } from '@prisma/client';

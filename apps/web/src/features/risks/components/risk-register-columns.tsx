@@ -1,29 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk register column definitions (T111, FR-087, FR-091).
- *
- * `enableSorting` is set to `false` on every column whose field is absent
- * from `GET /risks`'s `sort` enum (`code, title, riskLevel, status, owner,
- * nextReviewOn, identifiedOn, updatedAt` — risks.openapi.yaml) — the UI
- * never offers a sort the server would reject (a documented pitfall for
- * this task). `identifiedOn` itself has no register column at all: it is
- * sortable per the contract but is not one of `RiskSummary`'s own fields
- * (only `RiskDetail` carries it), so there is nothing honest to render in a
- * column for it (SC-013) — offering a sort control with no visible value
- * driving it would be more confusing than omitting it.
- *
- * The risk-level column's header and cell both make the active
- * `riskLevelBasis` explicit (`residual` vs. `inherent`, ADR-006) rather than
- * leaving "risk level" ambiguous — see `risk-level-basis` threaded in from
- * `buildRiskRegisterColumns`'s options.
- *
- * FR-091's non-color-alone requirement is met by composition: `StatusBadge`
- * and `RiskLevelBadge` (both `@pharos/design-system`) already pair an icon,
- * a text label and a color together for every value, including high/critical
- * risk levels; the overdue indicators below reuse `StatusBadge` for the same
- * reason rather than inventing a new colored-dot pattern.
- */
 import { EmptyValue, RiskLevelBadge, StatusBadge } from '@pharos/design-system/components';
 import { CalendarClock, Hourglass } from 'lucide-react';
 
@@ -52,7 +28,6 @@ export const RISK_REGISTER_COLUMN_IDS = {
   updatedAt: 'updatedAt',
 } as const;
 
-/** Columns eligible for `ColumnVisibilityMenu` — code/title stay always visible (`enableHiding: false` below), so they are deliberately excluded here. */
 export const RISK_REGISTER_HIDEABLE_COLUMNS: readonly { id: string; label: string }[] = [
   { id: RISK_REGISTER_COLUMN_IDS.status, label: risks.register.columns.status },
   { id: RISK_REGISTER_COLUMN_IDS.riskLevel, label: risks.register.filters.riskLevelLabel },
@@ -66,7 +41,6 @@ export const RISK_REGISTER_HIDEABLE_COLUMNS: readonly { id: string; label: strin
 ];
 
 export interface BuildRiskRegisterColumnsOptions {
-  /** Which derived level the risk-level column shows and labels (ADR-006) — never left implicit. */
   riskLevelBasis: RiskLevelBasis;
 }
 
@@ -193,12 +167,6 @@ export function buildRiskRegisterColumns({
               <EmptyValue>{risks.register.columns.notSet}</EmptyValue>
             )}
             {risk.overdueReview ? (
-              // `self-start` — F-80 (docs/deferred-findings.md, resolved
-              // 022-asset-detail-experience): a `flex flex-col` parent
-              // stretches a child with no intrinsic width to its own full
-              // width by default. Without this, the badge stretched to the
-              // full column width (confirmed by render: 154px badge inside
-              // a 154px container) instead of a compact pill.
               <StatusBadge
                 variant="danger"
                 label={risks.register.indicators.overdueReview}
@@ -231,14 +199,6 @@ export function buildRiskRegisterColumns({
       header: risks.register.indicators.overdueTreatment,
       enableSorting: false,
       size: 170,
-      /*
-       * A boolean indicator, not a value that can be missing: "Tratamento
-       * vencido: Não definido" said the deadline was unknown, when what the
-       * row actually knows is that the treatment is NOT overdue. The quiet
-       * state now says exactly that (`EmptyValue`'s smaller, italic
-       * treatment keeps it from competing with the rows that do need
-       * attention), and the overdue state keeps its badge.
-       */
       cell: ({ row }) =>
         row.original.overdueTreatment ? (
           <StatusBadge

@@ -1,13 +1,3 @@
-/**
- * 008-incidents-problems, US1 — matches
- * `contracts/incidents.openapi.yaml`'s `TransitionIncidentRequest`
- * exactly: `required: [toStatus]`, with `resolutionSummary`/
- * `cancellationReason`/`reopenReason` all optional at the SHAPE level
- * (`400`) — their REQUIREDNESS per target status is a domain invariant
- * (I1/I2, the reopen-reason rule), enforced at `422` by
- * `incident.entity.ts`'s own assert functions, not here (the same
- * `400`-shape/`422`-business-rule split `CloseFindingRequestDto` follows).
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

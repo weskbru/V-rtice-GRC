@@ -1,22 +1,3 @@
-/**
- * Gap-coverage — `GET /users` (`DirectoryUsersController.list`,
- * `contracts/admin.openapi.yaml` line ~40) had NO test anywhere in the
- * repository before this dispatch, found by the same systematic
- * route-vs-test cross-reference that surfaced the untested
- * `/risk-methodology` endpoints (see `risk-methodology.spec.ts`'s own
- * header comment). Requires only an authenticated session — no
- * administrative permission (`@NoPermissionRequired()`) — and returns the
- * `{data, meta}` envelope (T095b).
- *
- * The listing IS organizational-scope-filtered on `primaryOrgUnitId`
- * (`ListDirectoryUsersUseCase`'s own doc comment: "the coordinator's
- * inviolable rule ... applies FR-025's general principle to every user
- * listing"), even though the contract's own prose for this endpoint does
- * not mention scope — so the actor below is granted a `UNIT` scope
- * (unrelated to RBAC permissions) purely so the success assertions have
- * something deterministic to check against, not because the endpoint
- * requires any permission.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -71,10 +52,6 @@ describe('GET /users — directory lookup (T095b, FR-058)', () => {
     });
     orgUnitId = orgUnit.id;
 
-    // A real, logged-in user holding NO role and therefore NO permission at
-    // all — the contract is explicit that `GET /users` requires "no
-    // administrative permission". A `UNIT` scope grant (not a permission)
-    // is still required for the listing to return anything at all.
     const fixture = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('directory-users-actor')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
@@ -101,8 +78,6 @@ describe('GET /users — directory lookup (T095b, FR-058)', () => {
 
   it('returns the {data, meta} envelope with meta carrying real pagination values, scoped to the org unit', async () => {
     const prisma = ctx.app.get(PrismaService);
-    // A second user in the SAME scoped unit, so the listing has more than
-    // just the caller to return.
     await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('directory-users-peer')}@example.test`,
       primaryOrgUnitId: orgUnitId,
@@ -120,8 +95,6 @@ describe('GET /users — directory lookup (T095b, FR-058)', () => {
     expect(response.status).toBe(200);
     const body = response.body as DirectoryPageBody;
 
-    // The envelope itself: `data`/`meta`, not `PageResponse`'s internal
-    // `items`/flat fields.
     expect(body).toHaveProperty('data');
     expect(body).toHaveProperty('meta');
     expect(body).not.toHaveProperty('items');
@@ -197,30 +170,7 @@ describe('GET /users — directory lookup (T095b, FR-058)', () => {
   });
 });
 
-/**
- * `?assignableForOrgUnitId` — the F-34 fix itself: `GET /users` switching
- * from the BROWSE rule (above) to the ASSIGNMENT rule
- * (`ListDirectoryUsersUseCase`/`AssignmentLineService`). Builds a small
- * real tree — `root -> leaf` and `root -> sibling`, both children of
- * `root` — so "ancestor visible, sibling excluded" is proven against
- * actual materialized paths, not a mock.
- */
 describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () => {
-  /*
-   * Searched for by e-mail rather than scanned out of an unfiltered page.
-   *
-   * These two assertions used to request `pageSize: 100` and look for the
-   * fixture in the result. That passed while the shared contract database was
-   * small and started failing once the suite grew: every spec file adds users
-   * to the SAME database, which `global-setup.ts` truncates once per run and
-   * never between files, so "the first 100 directory rows" stops containing a
-   * specific fixture as the run gets longer. Exactly the assumption F-29
-   * already recorded for the admin user list, reproduced here.
-   *
-   * Narrowing by the fixture's own unique marker makes the assertion
-   * independent of how many users exist — which is what it was always trying
-   * to say.
-   */
   let ancestorOwnerEmail: string;
   let noUnitUserEmail: string;
   let ctx: ContractTestContext;
@@ -238,9 +188,6 @@ describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () =>
 
     const prisma = ctx.app.get(PrismaService);
 
-    // root -> leaf, root -> sibling (materialized-path convention: a
-    // descendant's path extends its parent's path with its own id, exactly
-    // as `org-units.spec.ts` already establishes for `expandToDescendants`).
     const root = await createOrgUnitFixture(prisma, {
       code: uniqueTestMarker('assignment-line-root'),
     });
@@ -265,8 +212,6 @@ describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () =>
     });
     siblingId = sibling.id;
 
-    // Owner whose primary unit is the ANCESTOR (`root`) of the leaf the
-    // caller is scoped to — the exact real case the whole fix exists for.
     const ancestorOwnerEmailValue = `${uniqueTestMarker('assignment-line-ancestor-owner')}@example.test`;
     ancestorOwnerEmail = ancestorOwnerEmailValue;
     const ancestorOwner = await createLocalUserFixture(prisma, {
@@ -275,7 +220,6 @@ describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () =>
     });
     ancestorOwnerId = ancestorOwner.user.id;
 
-    // Active user recorded against NO organizational unit at all.
     const noUnitEmailValue = `${uniqueTestMarker('assignment-line-no-unit')}@example.test`;
     noUnitUserEmail = noUnitEmailValue;
     const noUnitUser = await createLocalUserFixture(prisma, {
@@ -283,13 +227,6 @@ describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () =>
     });
     noUnitUserId = noUnitUser.user.id;
 
-    // F-CV-2 (`risks-lifecycle-audit`): the assignment lookup now also
-    // filters by whether the candidate can SEE a risk in `leafId`
-    // (`risk:view` + scope reaching it) — both of the fixtures above are
-    // the ones this rule exists to accept (an ancestor's owner, a user with
-    // no primary unit at all), so both need exactly that to keep being
-    // returned; `siblingUser` below deliberately gets neither, since the
-    // test it feeds asserts REFUSAL on assignment-line grounds already.
     const viewerRole = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-assignment-line-viewer-role-${randomUUID()}`,
     });
@@ -298,16 +235,12 @@ describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () =>
     await assignRoleFixture(prisma, { user: noUnitUser.user, role: viewerRole });
     await grantUnitScopeFixture(prisma, { user: noUnitUser.user, orgUnitId: leafId });
 
-    // A user in the SIBLING branch — must never appear in the leaf's
-    // assignment line.
     const siblingUser = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('assignment-line-sibling-user')}@example.test`,
       primaryOrgUnitId: siblingId,
     });
     siblingUserId = siblingUser.user.id;
 
-    // The caller: scoped to the LEAF unit only (a `UNIT` grant on `leaf`,
-    // which has no descendants of its own).
     const actor = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('assignment-line-actor')}@example.test`,
       primaryOrgUnitId: leafId,
@@ -367,12 +300,6 @@ describe('GET /users?assignableForOrgUnitId — assignment lookup (F-34)', () =>
 
     expect(response.status).toBe(200);
     const body = response.body as DirectoryPageBody;
-    // The browse rule filters `primaryOrgUnitId IN scope.unitIds` (just
-    // `leaf` here — a `UNIT` grant with no descendants) and, unlike the
-    // assignment rule, never admits `primaryOrgUnitId: null` either
-    // (`IN (...)` never matches NULL) — both the ancestor owner and the
-    // no-unit user must be ABSENT here, proving the assignment rule's
-    // widening only ever applies when the parameter is present.
     expect(body.data.some((row) => row.id === ancestorOwnerId)).toBe(false);
     expect(body.data.some((row) => row.id === noUnitUserId)).toBe(false);
     expect(body.data.some((row) => row.id === siblingUserId)).toBe(false);

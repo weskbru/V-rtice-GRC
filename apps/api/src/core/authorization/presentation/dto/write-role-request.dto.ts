@@ -1,9 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `WriteRoleRequest`
- * exactly (`additionalProperties: false`). `permissionIdentifiers` are
- * plain strings (`resource:action`), not UUIDs — validated against the
- * real permission catalogue by `RoleAdminService`, not by shape here.
- */
 import { ArrayUnique, IsArray, IsString, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

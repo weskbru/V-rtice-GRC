@@ -1,45 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control detail, "Visão geral" section, three cards
- * (021-control-detail-experience, Fase B — replaces the flat, card-less
- * `<dl>` this component used to be, mirroring `ProblemOverview`'s/
- * `ActionOverview`'s own Fase B correction on the sibling screens).
- *
- * Three cards, mirroring the platform's established hierarchy (CLAUDE.md
- * §18.12): "Descrição" gets its own prominent card, "Efetividade" gets its
- * OWN card right after it (see below for why), and the record's remaining
- * classification/ownership facts sit together in "Detalhes do controle",
- * each field anchored by a small semantic icon via the shared `DetailField`
- * (`@/components/detail/detail-field`).
- *
- * The FOURTH card this section shows on screen — "Ciclo de vida" — is
- * `ControlLifecycleSection` (`components/detail/`), composed by the detail
- * view alongside this component, not inside it: a different concern
- * (lifecycle trajectory, transitions, outcome facts), not a classification
- * fact about the record's identity. `retiredAt`/`retiredBy`/
- * `retirementReason` — this component's own flat `<dl>` used to render all
- * three, conditionally on `status === 'RETIRED'` — now live there instead,
- * each independently gated on its own field being present.
- *
- * ## Why "Efetividade" is not a `DetailField` cell (the point of this phase)
- *
- * A control exists to WORK — `effectiveness` is the fact central to the
- * record, the same way "Causa raiz" is the point of a Problem's own record
- * and "Origem" is the point of an Action's. Before this phase it was a
- * discreet badge in the header and nothing else on this section; the
- * verification history lived only inside the "Verificações" tab. This card
- * gives it first-class treatment: the current `ControlEffectiveness` value,
- * `controlEffectivenessHint`'s own explanatory sentence when one applies
- * (`NOT_ASSESSED`/`EXPIRED`), and `frequency` — the field that makes
- * effectiveness VENCIBLE at all. `frequency === null` is rendered with an
- * honest sentence (`overview.frequencyNoExpiry`), never the generic "Não
- * definido" placeholder, because a null frequency is a deliberate fact
- * (FR-015), not a data gap. Nothing here invents a "próxima verificação" or
- * "dias em atraso" — `ControlDetail` carries no such field, and the
- * coordinator's own instruction for this phase was explicit that no
- * derivation the payload does not support may appear.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import {
   Building2,
@@ -96,12 +56,6 @@ export function ControlOverview({ control }: ControlOverviewProps): React.JSX.El
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {/* `self-start` — F-80 (docs/deferred-findings.md, resolved
-              022-asset-detail-experience): a `flex flex-col` parent
-              stretches a child with no intrinsic width to its own full
-              width by default, regardless of the child's own `inline-flex`
-              display. Without this, the badge rendered as a full-width bar
-              instead of a compact pill. */}
           <StatusBadge
             variant={controlEffectivenessBadgeVariant(control.effectiveness)}
             label={controlEffectivenessLabel(control.effectiveness)}

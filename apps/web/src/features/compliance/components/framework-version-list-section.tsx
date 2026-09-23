@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Versões" section of a framework's detail screen (US1).
- * Loading, genuinely-empty and failed-to-load are three distinguishable
- * states, with a retry on failure (CLAUDE.md §18.11) — never a silent
- * empty list.
- */
 import {
   EmptyState,
   ErrorState,
@@ -53,11 +47,6 @@ export function FrameworkVersionListSection({
   const [error, setError] = useState<ErrorStateProblem | undefined>(undefined);
   const [reloadToken, setReloadToken] = useState(0);
 
-  // `loading` is DERIVED from comparing the in-flight request's key against
-  // the last one that actually resolved — never a separate `setLoading(true)`
-  // at the top of the effect — mirroring `FrameworkListView`/
-  // `ControlCatalogView`'s own convention, which avoids the
-  // `react-hooks/set-state-in-effect` cascading-render pattern entirely.
   const requestKey = `${frameworkId}|${reloadToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
   const loading = resolvedRequestKey !== requestKey;

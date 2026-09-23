@@ -9,7 +9,6 @@ import { LoadMoreButton } from './load-more-button';
 
 import type { AuditTimelineLabels, AuditTimelineProps } from './types';
 
-/** Union of every key present in either allow-listed values object, in first-seen order — so a field that only changed FROM something (deleted) or only changed TO something (added) still gets a row. */
 function diffKeys(
   previousValues: Record<string, unknown> | null | undefined,
   newValues: Record<string, unknown> | null | undefined,
@@ -28,19 +27,6 @@ function diffKeys(
   return keys;
 }
 
-/**
- * Renders an allow-listed field's raw value for display. Never assumes a
- * shape beyond JSON — `previousValues`/`newValues` are `Record<string,
- * unknown>` by contract (arbitrary allow-listed fields, FR-035).
- *
- * `labels.resolveFieldValue` gets first refusal on every non-absent value —
- * this is the caller's one hook for turning a raw id/enum/date into
- * something a reader recognizes (a category's name, "Alto", a formatted
- * date). When it declines (not supplied, or returns `undefined` for this
- * particular key/value), this function falls back to the generic,
- * domain-blind formatting below, so an unmapped field still renders
- * something instead of nothing.
- */
 function formatFieldValue(key: string, value: unknown, labels: AuditTimelineLabels): string {
   if (value === null || value === undefined) return labels.notRecordedLabel;
   const resolved = labels.resolveFieldValue?.(key, value);
@@ -50,29 +36,10 @@ function formatFieldValue(key: string, value: unknown, labels: AuditTimelineLabe
   try {
     return JSON.stringify(value);
   } catch {
-    // Circular reference or similar — `JSON.stringify` failed, so fall back
-    // to a value that is always safe to compute (never `String(value)` on
-    // an arbitrary object, which would print the unhelpful
-    // `[object Object]`).
     return Object.prototype.toString.call(value);
   }
 }
 
-/**
- * Platform-wide raw audit-trail timeline (T169, US7, FR-033 to FR-037).
- * Distinct from `ActivityHistory`: this renders the immutable, append-only
- * `audit_event` record itself — actor, action, entity, outcome and the
- * allow-listed before/after values — never a narrative summary. `action`
- * and `entityType` are technical identifiers and are rendered EXACTLY as
- * given (CLAUDE.md §11.1); nothing in this component translates them.
- *
- * Shares `ActivityHistory`'s accessibility approach: a real `<ol role
- * ="list">` / `<li role="listitem">` list (with the roles restated
- * explicitly to survive the `list-style: none` reset across browsers), and
- * outcome is conveyed by `StatusBadge` — icon and text together, never
- * color alone (FR-091) — never this component's own opinion on which
- * `StatusVariant` an outcome deserves (`labels.outcomeVariant`, D-10).
- */
 export function AuditTimeline({
   items,
   labels,
@@ -147,9 +114,6 @@ export function AuditTimeline({
                           {labels.fieldLabel(key)}:
                         </dt>
                         <dd className="flex flex-wrap items-center gap-1.5">
-                          {/* Previous value is struck through AND muted —
-                              two non-color signals that it no longer holds,
-                              never color alone (FR-091). */}
                           <span className="text-muted-foreground line-through decoration-muted-foreground/60">
                             {formatFieldValue(key, entry.previousValues?.[key], labels)}
                           </span>

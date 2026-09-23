@@ -5,15 +5,6 @@ import { RiskCommentsSection } from './risk-comments-section';
 
 import type { Comment } from '../types';
 
-/**
- * Component-mount evidence for T195 (`RiskCommentsSection`, US9, FR-095,
- * FR-098, FR-100, FR-102). `../api` is mocked at the network boundary —
- * the stored-XSS rendering guarantee itself is covered once, thoroughly, by
- * `CommentThread`'s own tests in `design-system.test.tsx` (D-9); this file
- * verifies the section's own responsibilities: fetching scoped to the
- * risk, submitting, and confirming-before-withdrawing (FR-102).
- */
-
 const { listCommentsMock, createCommentMock, withdrawCommentMock } = vi.hoisted(() => ({
   listCommentsMock: vi.fn(),
   createCommentMock: vi.fn(),
@@ -84,7 +75,6 @@ describe('RiskCommentsSection', () => {
         'Um novo comentário sobre este risco.',
       ),
     );
-    // Re-fetches from page 1 after a successful submission.
     await waitFor(() => expect(listCommentsMock).toHaveBeenCalledTimes(2));
   });
 
@@ -96,7 +86,6 @@ describe('RiskCommentsSection', () => {
 
     expect(await screen.findByText('Remover comentário?')).toBeInTheDocument();
     expect(screen.getByText(/continua registrado na trilha de auditoria/)).toBeInTheDocument();
-    // Not yet withdrawn — only confirming triggers the API call.
     expect(withdrawCommentMock).not.toHaveBeenCalled();
   });
 
@@ -107,8 +96,6 @@ describe('RiskCommentsSection', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remover' }));
     await screen.findByText('Remover comentário?');
-    // Radix marks the rest of the page inert once the dialog is open, so
-    // the ONE remaining "Remover" match is the dialog's own confirm button.
     fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
 
     await waitFor(() => expect(withdrawCommentMock).toHaveBeenCalledWith('comment-1'));

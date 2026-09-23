@@ -5,23 +5,6 @@ import { ApiError } from '@/lib/api-client';
 
 import { RiskCausesConsequences } from './risk-causes-consequences';
 
-/**
- * Component-mount evidence for the read/edit-cycle redesign of Causas e
- * Consequências (016-risk-detail-experience, Área 4, 2026-09-17, FR-057).
- *
- * `PUT /risks/{riskId}/causes|consequences` replaces the WHOLE collection —
- * there is no per-item endpoint (`replace-risk-statements-request.dto.ts`).
- * The suite below exists specifically to prove the guarantee that design
- * had to invent to make that collective PUT safe: **at most one item, in
- * EITHER list, is ever in edit/creation mode at a time** — so confirming
- * one item can never silently carry a second, half-typed item's draft text
- * into the same request. Before this redesign no test proved this, for a
- * structural reason: the old `useFieldArray` form saved its whole array in
- * one shot, so "one item pending, a second untouched" was never a state
- * that could exist to be protected — this rewrite is what creates the
- * category of state, so it is also what has to prove it is safe.
- */
-
 const { replaceCausesMock, replaceConsequencesMock } = vi.hoisted(() => ({
   replaceCausesMock: vi.fn(),
   replaceConsequencesMock: vi.fn(),
@@ -78,7 +61,6 @@ describe('RiskCausesConsequences', () => {
 
     expect(screen.getByLabelText('Causa 1')).toHaveValue('Fornecedor único');
     expect(screen.getByText('Editando')).toBeInTheDocument();
-    // The row is no longer plain read-only text while being edited.
     expect(screen.queryByRole('button', { name: 'Editar causa 1' })).not.toBeInTheDocument();
   });
 
@@ -126,7 +108,6 @@ describe('RiskCausesConsequences', () => {
       ],
       etag: '"2"',
     });
-    // Back to read-only once confirmed.
     expect(await screen.findByRole('button', { name: 'Editar causa 2' })).toBeInTheDocument();
   });
 
@@ -146,8 +127,6 @@ describe('RiskCausesConsequences', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Editar causa 1' }));
 
-    // The item being edited is fine; every OTHER row's actions are disabled —
-    // structurally, a second item can never become dirty at the same time.
     expect(screen.getByRole('button', { name: 'Remover causa 2' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Editar consequência 1' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Remover consequência 1' })).toBeDisabled();
@@ -157,7 +136,6 @@ describe('RiskCausesConsequences', () => {
       screen.getByText('Confirme ou cancele a edição em andamento antes de iniciar outra.'),
     ).toBeInTheDocument();
 
-    // Cancelling releases the lock again.
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(screen.getByRole('button', { name: 'Adicionar consequência' })).not.toBeDisabled();
   });
@@ -185,7 +163,6 @@ describe('RiskCausesConsequences', () => {
     expect(screen.getByText('Nova causa')).toBeInTheDocument();
     expect(screen.getByLabelText('Causa 2')).toHaveValue('');
 
-    // Blank is rejected client-side, never reaches the API.
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
     expect(await screen.findByText('Descreva esta causa ou remova a linha.')).toBeInTheDocument();
     expect(replaceCausesMock).not.toHaveBeenCalled();
@@ -258,8 +235,6 @@ describe('RiskCausesConsequences', () => {
         'Este risco foi alterado por outra pessoa. Recarregue a página para ver a versão atual antes de salvar.',
       ),
     ).toBeInTheDocument();
-    // The draft is not discarded — the editor is still open with what the
-    // user typed, since the collective PUT did not succeed.
     expect(screen.getByLabelText('Consequência 1')).toHaveValue('Consequência editada');
   });
 });

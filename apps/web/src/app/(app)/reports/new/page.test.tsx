@@ -1,13 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for the `report:create`/`report:view` permission split (009-
- * indicators-reports, T061 acceptance criteria — "quem só lê não deve ver um formulário
- * quebrado"). `report:view` and `report:create` are distinct permissions (`ReportController`);
- * this page renders a permission-denied state for the former alone, and the real form once
- * `report:create` is present.
- */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));

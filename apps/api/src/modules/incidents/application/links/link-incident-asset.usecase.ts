@@ -1,15 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `LinkIncidentAssetUseCase`/
- * `UnlinkIncidentAssetUseCase`/`ListIncidentAssetLinksUseCase`. Sibling of
- * `link-incident-risk.usecase.ts`, same reasoning, against `Asset` instead
- * of `Risk` — see that file's header for the full account this one does
- * not repeat.
- *
- * `AssetDirectoryEntry.orgUnitId` is `string | null` (an asset may have no
- * organizational unit) — the null-scope idiom below mirrors
- * `modules/risk/application/links/asset-link.usecase.ts` exactly: a
- * `null` unit is in scope only under a `GLOBAL` grant.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

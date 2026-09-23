@@ -1,9 +1,3 @@
-/**
- * 009-indicators-reports, T028 — `PROBLEM_OPEN_COUNT_BY_SEVERITY`.
- * Delegates to `ProblemMetricsPort`
- * (`shared/grc-ports/problem-metrics.port.ts`), which itself reuses
- * `PrismaProblemRepository.list` — no query of this file's own.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ProblemMetricsPort } from '../../../../shared/grc-ports/problem-metrics.port';

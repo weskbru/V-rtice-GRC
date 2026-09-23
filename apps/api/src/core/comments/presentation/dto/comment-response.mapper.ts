@@ -1,7 +1,3 @@
-/**
- * T192 — maps `CommentRecord` to `contracts/platform.openapi.yaml`'s
- * `Comment` schema.
- */
 import type { CommentRecord } from '../../domain/ports/comment-repository.port';
 
 export interface UserRefResponse {

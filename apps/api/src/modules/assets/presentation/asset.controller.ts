@@ -1,25 +1,3 @@
-/**
- * T022/006-assets-processes — `AssetController`: the six operations of
- * `contracts/assets.openapi.yaml` (`listAssetCatalog`, `createAsset`,
- * `getAsset`, `updateAsset`, `deactivateAsset`, `reactivateAsset`). Modeled
- * closely on `modules/controls/presentation/control.controller.ts` and
- * `grc/finding/presentation/finding.controller.ts` — see either file's
- * header for the general shape this one does not repeat.
- *
- * ## No `If-Match`/`ETag` anywhere on this controller
- *
- * `assets` carries no `version` column (data-model.md §1) — see
- * `contracts/assets.openapi.yaml`'s own description section for why no
- * optimistic-locking mechanism applies to any operation here, unlike
- * `ControlController`.
- *
- * ## No `Cache-Control: no-store` anywhere on this controller
- *
- * Every property this controller ever returns is a plain column, or a
- * direct read of an existing link table — never a value computed fresh at
- * read time from mutable state elsewhere (data-model.md §11, unlike
- * `ControlController.findById`'s `effectiveness`).
- */
 import {
   BadRequestException,
   Body,
@@ -86,17 +64,6 @@ export class AssetController {
     private readonly listAssetIncidentLinksUseCase: ListAssetIncidentLinksUseCase,
   ) {}
 
-  /**
-   * `listAssetCatalog` (US1, US2, US3). Declared BEFORE `findById`'s
-   * `:assetId` route in this file for the same reason `RiskController.list`
-   * documents: Nest dispatches `/assets` and `/assets/:assetId`
-   * unambiguously regardless of declaration order.
-   *
-   * Requires `asset:view` — the resource's OWN permission (US2, FR-009),
-   * never `risk:view`. Resolves and applies the caller's `ScopeFilter`
-   * (T017) — closes the "Vazamento 1" read leak the spec measures against
-   * the retired `RegistryController.listAssets`.
-   */
   @RequirePermission('asset:view')
   @Get()
   async list(
@@ -210,13 +177,6 @@ export class AssetController {
     return toAssetDetailResponse(record);
   }
 
-  /**
-   * 013-incidents-problems-reverse-links — READ-ONLY reverse of
-   * `IncidentAssetLink`: `modules/assets` never writes this table
-   * (`modules/incidents`'s `link-incident-asset.usecase.ts` owns that
-   * write path). Requires `asset:view` and scope, resolved by
-   * `GetAssetUseCase` exactly like `findById` above.
-   */
   @RequirePermission('asset:view')
   @Get(':assetId/incidents')
   async listIncidentLinks(
@@ -233,9 +193,6 @@ export class AssetController {
   }
 }
 
-/** `UpdateAssetRequest`'s `minProperties: 1` — see
- * `ControlController.assertUpdateBodyNotEmpty`'s own doc comment for why
- * this is a controller-level check with no dedicated validator class. */
 function assertUpdateBodyNotEmpty(body: UpdateAssetRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

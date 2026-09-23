@@ -1,19 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `useIndicatorOverview` (indicators-round, S2
- * ownership) — network boundary mocked (`dashboardApi.getSummary`,
- * `indicatorsApi.listDefinitions`), everything between them and the returned
- * result is real, same convention as `(app)/dashboard/page.test.tsx`.
- *
- * `usePermissions()` is mocked directly (not via a real `AuthProvider`) so
- * the "permission changes re-derive links without a refetch" test below can
- * change `hasPermission`'s behavior between renders on demand — swapping
- * `AuthProvider`'s `initialSession` prop would NOT do this: that prop only
- * seeds the provider's internal `useState` once, at first mount, and is
- * ignored on every subsequent prop change (`lib/auth-context.tsx`).
- */
 const { getSummaryMock, listDefinitionsMock, usePermissionsMock } = vi.hoisted(() => ({
   getSummaryMock: vi.fn(),
   listDefinitionsMock: vi.fn(),
@@ -34,7 +21,6 @@ vi.mock('@/lib/permissions', () => ({
 
 import { useIndicatorOverview } from './use-indicator-overview';
 
-/** Every test that does not care about permission gating gets "everything granted" by default. */
 function grantAll(): void {
   usePermissionsMock.mockReturnValue({
     permissions: [],
@@ -44,7 +30,6 @@ function grantAll(): void {
   });
 }
 
-/** Builds a `usePermissions()`-shaped return value from an explicit granted list — used by the permission-change test below. */
 function grantOnly(granted: readonly string[]): {
   permissions: readonly string[];
   hasPermission: (permission: string) => boolean;
@@ -178,7 +163,6 @@ describe('useIndicatorOverview', () => {
     });
 
     await waitFor(() => expect(result.current.isRefreshing).toBe(true));
-    // Previous data is kept while refreshing, never cleared to a loading state.
     expect(result.current.status).toBe('success');
     expect(result.current.data).toBe(firstData);
 
@@ -205,7 +189,6 @@ describe('useIndicatorOverview', () => {
       expect(beforeItem.reading.buckets.every((bucket) => bucket.href === undefined)).toBe(true);
     }
 
-    // Permission grant changes — no new fetch is triggered by this alone.
     usePermissionsMock.mockReturnValue(grantOnly(['incident:view']));
     rerender();
 
@@ -225,7 +208,6 @@ describe('useIndicatorOverview', () => {
       );
     }
 
-    // The whole point: request counts are unchanged by the permission change/rerender above.
     expect(getSummaryMock).toHaveBeenCalledTimes(1);
     expect(listDefinitionsMock).toHaveBeenCalledTimes(1);
   });

@@ -1,12 +1,3 @@
-/**
- * T027-T042/003-controls-management, User Story 2/3 — the sole
- * implementation of `ControlLookupPort`
- * (`domain/ports/control-lookup.port.ts` — see that file's header for why
- * this is a narrow, independent read rather than a dependency on
- * `ControlRepositoryPort`). Extends `ControlScopedRepository` (T017), the
- * stable scoped-repository base every Controls read/write ultimately
- * shares.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -39,11 +30,6 @@ export class ControlLookupRepository extends ControlScopedRepository implements 
       this.prisma.client.control.findFirst({ where, select: SELECT }),
     );
     if (!row?.orgUnitId) {
-      // A control with no `orgUnitId` at all (the rare legacy Fase-1 row,
-      // data-model.md §1) can never be proven within a `UNIT` scope and
-      // is only reachable under `GLOBAL` — `withScope`'s own predicate
-      // already enforces that; a `null` org unit here is therefore
-      // treated as "not found", matching FR-007's non-disclosure rule.
       return undefined;
     }
     return {
@@ -57,8 +43,4 @@ export class ControlLookupRepository extends ControlScopedRepository implements 
       version: row.version,
     };
   }
-
-  // `findOrgUnitIdUnscoped` is implemented once, on `ControlScopedRepository`
-  // (research.md D-11/D-R11) — both this class and `ControlRepository` used
-  // to duplicate the identical Prisma query.
 }

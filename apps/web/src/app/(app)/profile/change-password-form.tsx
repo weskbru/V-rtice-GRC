@@ -1,13 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — change-own-password form (T075, FR-010).
- *
- * On success the API revokes every session for the user, including the one
- * making this request (FR-017) — the browser's cookie is no longer valid
- * the instant this resolves, so the only correct next step is to send the
- * user back through sign-in with their new password.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -45,9 +37,6 @@ export function ChangePasswordForm(): React.JSX.Element {
     setFormError(null);
     setSubmitting(true);
     try {
-      // A 401 here is contractually ambiguous (wrong current password vs. an
-      // already-expired session) and this form owns that message — it must
-      // never be swallowed by the global session-expiry prompt.
       await apiClient.post<void>(
         '/auth/me/password',
         { currentPassword: values.currentPassword, newPassword: values.newPassword },

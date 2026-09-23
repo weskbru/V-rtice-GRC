@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Evidence panel (T036/T037, 002-shared-grc-foundation, US1).
- *
- * Consumed by any domain screen's detail view — currently the risk detail
- * screen's own "Evidência" tab (`risk-detail-view.tsx`). No new sidebar
- * entry (R-009): this is a tab within an existing screen, the same pattern
- * `RiskAttachmentsSection`/`RiskCommentsSection` already establish.
- *
- * Lists the evidence currently linked to `subjectId` (`GET /evidence
- * ?subjectType=&subjectId=`, R-010: subjects/evidence the caller cannot
- * see are simply absent from the response, never surfaced as a
- * placeholder). Creating a new evidence links it to this subject in the
- * same flow (`EvidenceCreateDialog`) — SC-001's own target.
- */
 import {
   ConfirmDialog,
   EmptyState,
@@ -42,9 +28,7 @@ export interface EvidencePanelProps {
   canCreate: boolean;
   canLink: boolean;
   canAdminister: boolean;
-  /** `attachment:create` — the SAME entity-type-independent permission `RiskAttachmentsSection` gates on (assurance-audit Fix 1). */
   canUploadAttachment: boolean;
-  /** `attachment:delete`. */
   canWithdrawAttachment: boolean;
 }
 
@@ -79,11 +63,6 @@ export function EvidencePanel({
   const [unlinking, setUnlinking] = useState(false);
   const [linkIdByEvidenceId, setLinkIdByEvidenceId] = useState<Record<string, string>>({});
 
-  // Mirrors `RiskAttachmentsSection`'s own refresh-token convention:
-  // `loading` is DERIVED from comparing the current request's key against
-  // the last one that finished, rather than a `setLoading(true)` call at
-  // the top of the effect body — that would be a synchronous `setState`
-  // inside an effect, which can cascade an extra render.
   const requestKey = `${subjectType}|${subjectId}|${refreshToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
   const loading = resolvedRequestKey !== requestKey;
@@ -96,10 +75,6 @@ export function EvidencePanel({
         if (cancelled) return;
         setItems(page.items);
         setError(false);
-        // Each evidence card's "unlink" action needs the LINK id, not the
-        // evidence id — `listBySubject` (the evidence-centric endpoint)
-        // does not carry it, so the active link per evidence is resolved
-        // once here rather than the card re-deriving it on click.
         const entries = await Promise.all(
           page.items.map(async (item) => {
             try {
@@ -138,9 +113,6 @@ export function EvidencePanel({
       setPendingArchive(null);
       setRefreshToken((token) => token + 1);
     } catch {
-      // The dialog stays open with its own destructive action still
-      // available to retry; no separate toast is needed for a dialog the
-      // user can see failed to close.
     } finally {
       setArchiving(false);
     }
@@ -159,7 +131,6 @@ export function EvidencePanel({
       setPendingUnlink(null);
       setRefreshToken((token) => token + 1);
     } catch {
-      // See `confirmArchive`'s own comment.
     } finally {
       setUnlinking(false);
     }
@@ -244,17 +215,6 @@ export function EvidencePanel({
                   </div>
                 </div>
 
-                {/*
-                 * Assurance-audit Fix 1: a file attached at creation time
-                 * (`EvidenceCreateDialog`'s optional file field) previously
-                 * had no other surface in the product — not here, not
-                 * anywhere. Upload-to-existing-evidence is only offered for
-                 * ACTIVE evidence (an archived record "não pode mais ser
-                 * editada", per `archiveConfirm.description` above) — a UI
-                 * courtesy mirroring the link/archive actions' own
-                 * `item.status === 'ACTIVE'` gate; the server remains the
-                 * actual authority (ADR-003).
-                 */}
                 <EvidenceAttachmentsSection
                   evidenceId={item.id}
                   evidenceLabel={evidenceCardLabel(item)}

@@ -1,13 +1,3 @@
-/**
- * D-11 coverage for `/evidence/{evidenceId}/links[/{linkId}/unlink]`
- * (T018/T021/T022/T023/T025, 002-shared-grc-foundation US1):
- * `listEvidenceLinks`, `linkEvidence`, `unlinkEvidence` — the declared
- * shape, both-sides authorization (FR-031), R-010 visibility filtering,
- * historical preservation on archival (SC-004), the adversarial subject
- * cases (valid enum + nonexistent id, out-of-scope subject, duplicate
- * active link, archived evidence, permission revoked mid-session), and
- * semantic audit events.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -76,9 +66,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       email: `${uniqueTestMarker('evidence-link-contract-owner')}@example.test`,
     });
     ownerUserId = owner.id;
-    // F-CV-2: `owner` is a pure precondition (risk owner, evidence owner) —
-    // not the object of any assertion in this file. Made visible to both
-    // org units `createRisk` can be called with.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     await grantUnitScopeFixture(prisma, { user: owner, orgUnitId: otherOrgUnit.id });
   });
@@ -143,9 +130,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
     return response.body as RiskBody;
   }
 
-  /** Broad setup actor — global scope, every permission this suite needs —
-   * used only to create fixtures (evidence/risks) across BOTH org units;
-   * never the actor under test in an assertion. */
   async function setupActor(): Promise<{ agent: ReturnType<typeof request.agent> }> {
     const prisma = ctx.app.get(PrismaService);
     const fixture = await createLocalUserFixture(prisma, {
@@ -177,10 +161,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
     return { agent };
   }
 
-  // -------------------------------------------------------------------
-  // linkEvidence — the both-sides guarantee (FR-031, R-001)
-  // -------------------------------------------------------------------
-
   describe('POST /evidence/{evidenceId}/links', () => {
     it('succeeds for a caller holding evidence:link and risk:view, both within scope', async () => {
       const { agent: setup } = await setupActor();
@@ -205,16 +185,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       expect(body.subjectLabel).toBeTruthy();
     });
 
-    // Phase 6 audit finding: `EvidenceSubjectType.RISK_TREATMENT_DECISION`
-    // is registered by `RiskModule` (`RiskTreatmentDecisionEvidenceSubjectAccessor`,
-    // T030) and reachable through this exact route in production, but no
-    // test anywhere in this suite had ever exercised it end-to-end before
-    // this one — only the generic registry mechanism was unit-tested
-    // (`test/unit/evidence-subject-resolver-registry.spec.ts`, with a
-    // no-op accessor and only `RISK` as its example key). A declared,
-    // wired, real subject type with zero exercised coverage is exactly
-    // the class of defect this codebase treats seriously (CLAUDE.md
-    // §19.10) — closed here rather than merely reported.
     it('links evidence to a RISK_TREATMENT_DECISION subject — the resolver RiskModule registers but no test had exercised end-to-end', async () => {
       const { agent: setup } = await setupActor();
       const evidence = await createEvidence(setup, orgUnitId);
@@ -251,10 +221,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       expect(body.subjectType).toBe('RISK_TREATMENT_DECISION');
       expect(body.subjectId).toBe(decisionId);
       expect(body.unlinkedAt).toBeNull();
-      // `RiskTreatmentDecisionEvidenceSubjectAccessor` builds this label
-      // from the parent risk's code plus the decision's own strategy
-      // label — proves the composition (decision -> parent risk scope
-      // check -> label), not just that SOME string came back.
       expect(body.subjectLabel).toContain(risk.code);
       expect(body.subjectLabel).toContain('Mitigar');
 
@@ -270,15 +236,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       ).toBe(true);
     });
 
-    // Assurance fix (confirmed breach, FR-030): `resolveViewableSubject`'s
-    // propagated `NotFoundDomainError` used to be keyed by
-    // `decision.riskId` (the PARENT risk — a different entity, a different
-    // label, and a UUID the caller never supplied) rather than by
-    // `subjectId` (the decision the caller actually asked about). Asserts
-    // byte-identical `type`/`title`/`detail` between an out-of-scope
-    // decision and a nonexistent decision id — `detail` specifically,
-    // since the sibling RISK-subject test above only ever compared
-    // `title`, which is exactly why this slipped through.
     it('adversarial: a RISK_TREATMENT_DECISION whose PARENT risk is out of scope is refused as 404, problem+json byte-identical to a nonexistent decision id', async () => {
       const { agent: setup } = await setupActor();
       const evidence = await createEvidence(setup, orgUnitId);
@@ -300,9 +257,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       expect(decisionResponse.status).toBe(201);
       const decisionId = (decisionResponse.body as { id: string }).id;
 
-      // Holds `risk:view` (so the refusal is a SCOPE failure over the
-      // parent risk, not a missing-permission one) but no scope grant over
-      // `otherOrgUnitId`, where the risk (and therefore the decision) live.
       const { agent } = await agentWithPermissions(
         ['evidence:link', 'evidence:view', 'risk:view'],
         orgUnitId,
@@ -333,20 +287,12 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       };
       expect(outOfScopeBody.type).toBe(unknownBody.type);
       expect(outOfScopeBody.title).toBe(unknownBody.title);
-      // `detail` embeds the id the caller themselves supplied — comparing
-      // for bare equality would be wrong (they necessarily differ, since
-      // one call supplied the REAL decision id and the other a random
-      // one); what FR-030 requires, mirroring
-      // `attachment-access.spec.ts`'s identical-class test, is that BOTH
-      // follow the IDENTICAL template, keyed by the DECISION's own id —
-      // never the parent risk's.
       expect(outOfScopeBody.detail).toBe(
         `Decisão de tratamento de risco ${decisionId} não foi encontrado(a).`,
       );
       expect(unknownBody.detail).toBe(
         `Decisão de tratamento de risco ${nonexistentId} não foi encontrado(a).`,
       );
-      // The PARENT risk's id must never appear anywhere in the response.
       expect(JSON.stringify(outOfScopeResponse.body)).not.toContain(risk.id);
     });
 
@@ -492,12 +438,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
         .send({ subjectType: 'RISK', subjectId: riskA.id });
       expect(firstLink.status).toBe(201);
 
-      // Revoke `evidence:link` via the REAL admin endpoint (bumps
-      // `permissionsVersion`, invalidating the cached effective-permission
-      // set for every affected user on their very next request — see
-      // `permission-resolver.service.ts`'s own header) rather than a raw
-      // Prisma delete, which would leave a stale cache entry live and make
-      // this test flaky/wrong about what production actually does.
       const { agent: adminAgent } = await (async () => {
         const prisma = ctx.app.get(PrismaService);
         const adminFixture = await createLocalUserFixture(prisma, {
@@ -555,10 +495,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       expect(auditRow).not.toBeNull();
     });
   });
-
-  // -------------------------------------------------------------------
-  // unlinkEvidence
-  // -------------------------------------------------------------------
 
   describe('POST /evidence/{evidenceId}/links/{linkId}/unlink', () => {
     it('preserves the row with unlinkedAt/unlinkedBy — never a hard delete', async () => {
@@ -618,10 +554,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
     });
   });
 
-  // -------------------------------------------------------------------
-  // SC-004: archival preserves every historical link
-  // -------------------------------------------------------------------
-
   describe('archival preserves links (SC-004, FR-009)', () => {
     it('an evidence linked to two risks keeps both links after archival', async () => {
       const { agent: setup } = await setupActor();
@@ -660,10 +592,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
     });
   });
 
-  // -------------------------------------------------------------------
-  // listEvidenceLinks — R-010 visibility filtering
-  // -------------------------------------------------------------------
-
   describe('GET /evidence/{evidenceId}/links (R-010)', () => {
     it('omits a link whose subject is outside the reading caller scope, and the count reflects only what is visible', async () => {
       const { agent: setup } = await setupActor();
@@ -682,8 +610,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       expect(visibleLinkResponse.status).toBe(201);
       expect(hiddenLinkResponse.status).toBe(201);
 
-      // Reader scoped only to `orgUnitId`: sees the evidence (also in
-      // `orgUnitId`) and `visibleRisk`, but not `hiddenRisk`.
       const { agent: reader } = await agentWithPermissions(
         ['evidence:view', 'risk:view'],
         orgUnitId,
@@ -698,12 +624,6 @@ describe('Evidence Links contract (T018/T021/T022/T023/T025, US1, D-11)', () => 
       expect(items[0]?.subjectId).toBe(visibleRisk.id);
     });
   });
-
-  // -------------------------------------------------------------------
-  // GET /evidence?subjectType=&subjectId= — the "evidence panel on a
-  // domain screen" read path (SC-001 gap closure), not in the original
-  // design contract.
-  // -------------------------------------------------------------------
 
   describe('GET /evidence?subjectType=&subjectId=', () => {
     it('lists only the evidence linked to the given subject, within the caller scope', async () => {

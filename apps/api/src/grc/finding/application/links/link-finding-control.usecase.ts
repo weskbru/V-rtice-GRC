@@ -1,50 +1,3 @@
-/**
- * T062-T064/005-audit-findings, US3 — `LinkFindingControlUseCase`/
- * `UnlinkFindingControlUseCase`/`ListFindingControlLinksUseCase`
- * (`linkFindingToControl`/`unlinkFindingFromControl`/
- * `listFindingControlLinks`, FR-013-FR-016, research.md D-4, D-11).
- *
- * ## ADR-020, all five parts, applied from this pair's first link
- *
- * 1. **Named table**: `FindingControlLink` (`finding_control_links`), not a
- *    generic `related_entity(type, id)`.
- * 2. **Real FK, `onDelete: Restrict`**: `schema.prisma`'s own
- *    `FindingControlLink.control` relation.
- * 3. **Port in `shared/grc-ports/`**: `ControlDirectoryPort` — already
- *    existed (Fase 3), reused unchanged; this is only the fourth consumer
- *    (`modules/risk`, `modules/compliance`, `modules/audit-engagements`,
- *    now `grc/finding`) and the FIRST case of a GRC-KERNEL capability
- *    (not a business module) depending on a `shared/grc-ports/` port —
- *    permitted by the existing lint boundary (`grc/**` -> `modules/**` is
- *    forbidden; `shared/**` is importable by everything).
- * 4. **Scope checked BEFORE any write**: `controlDirectory.findById`'s
- *    `orgUnitId`, checked against the actor's resolved scope, strictly
- *    before `transactionRunner.run` opens — mirrors
- *    `LinkControlUseCase`/`LinkRequirementToControlUseCase` exactly. A
- *    missing/inactive/out-of-scope control is `422` naming `controlId`,
- *    indistinguishable, and NOTHING is written
- *    (`test/integration/finding-control-link.spec.ts` proves the row
- *    count is unchanged).
- * 5. **Both permission halves**: `finding:link` (registering side, checked
- *    by `@RequirePermission` at the controller) AND `control:view`
- *    (referenced side, resolved here via `PermissionResolverService`,
- *    ADR-003's one decision path) — folded into the SAME `422` a
- *    nonexistent/inactive/out-of-scope control already produces, never a
- *    separate `403` branch (the exact form the 2026-09-08 ADR-020
- *    correction established for the two prior pairs, applied here from
- *    the first link rather than discovered later).
- *
- * `UnlinkFindingControlUseCase` deliberately does NOT repeat the
- * `control:view` check — the same exemption
- * `UnlinkControlUseCase`/`UnlinkRequirementFromControlUseCase` document:
- * the control behind `linkId` was already fully disclosed (id, code, name)
- * by `listFindingControlLinks`, gated by `finding:view` alone, which the
- * caller must already have read to obtain `linkId`.
- *
- * `Finding` carries no `version` column (data-model.md §7 of
- * 002-shared-grc-foundation) — no `If-Match`/`ETag` shape here, unlike
- * `LinkControlUseCase`'s own risk-side optimistic lock.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -97,8 +50,6 @@ export class LinkFindingControlUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the finding actually exists outside `scope`.
     const finding = await this.findingRepository.findById(scope, input.findingId);
     if (!finding) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -114,9 +65,6 @@ export class LinkFindingControlUseCase {
     }
     assertFindingEditable(finding.status);
 
-    // ADR-020 parts 4+5 — checked BEFORE any write; a missing, inactive,
-    // out-of-scope control and a control the actor lacks `control:view`
-    // for all answer with the exact same refusal (see this file's header).
     const [control, canViewControl] = await Promise.all([
       this.controlDirectory.findById(input.controlId),
       this.permissionResolver.hasPermission(input.actorUserId, 'control:view'),
@@ -165,10 +113,6 @@ export interface UnlinkFindingControlInput {
   readonly linkId: string;
 }
 
-/**
- * ADR-020 part 5 deliberately NOT extended here — see this file's header,
- * "does NOT repeat the `control:view` check".
- */
 @Injectable()
 export class UnlinkFindingControlUseCase {
   constructor(
@@ -208,10 +152,6 @@ export class UnlinkFindingControlUseCase {
       throw new NotFoundDomainError(USER_MESSAGES.findings.controlLinkEntityLabel, input.linkId);
     }
     if (link.unlinkedAt !== undefined) {
-      // Contract-level distinction (audit.openapi.yaml): an UNKNOWN linkId
-      // is 404; an ALREADY-WITHDRAWN one is 422 — the two causes are
-      // deliberately not folded into one here, unlike the control/risk
-      // existence check above.
       throw new ValidationDomainError(USER_MESSAGES.findings.link.controlLinkAlreadyWithdrawn, [
         { field: 'linkId', message: USER_MESSAGES.findings.link.controlLinkAlreadyWithdrawn },
       ]);

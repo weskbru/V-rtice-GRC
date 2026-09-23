@@ -1,18 +1,3 @@
-/**
- * T143 — maps `ControlLinkRecord`/`EntityLinkRecord`
- * (`domain/ports/risk-relationship-repository.port.ts`) to
- * `contracts/risks.openapi.yaml`'s `RiskControlLink`/`RiskEntityLink` wire
- * shapes. The ONE place either becomes a response body (ADR-009).
- *
- * 013-incidents-problems-reverse-links — also maps `IncidentRiskLinkReadRecord`/
- * `ProblemRiskLinkReadRecord` (`shared/grc-ports/`) to
- * `RiskIncidentLinkResponse`/`RiskProblemLinkResponse`, the reverse,
- * read-only listings backing `GET /risks/{riskId}/incidents|problems`.
- * These two carry `linkedBy: {id, fullName}` (no `email`) — the shape
- * the owning module's own link table actually stores (mirrors
- * `IncidentRiskLinkResponse`'s own `linkedBy` on the forward side), unlike
- * `ControlLinkResponse`/`EntityLinkResponse` above.
- */
 import type { UserRefResponse } from './risk-response.mapper';
 import type {
   IncidentRiskLinkReadRecord,
@@ -91,10 +76,6 @@ export function toEntityLinkResponse(record: EntityLinkRecord): EntityLinkRespon
   };
 }
 
-// ---------------------------------------------------------------------
-// 013-incidents-problems-reverse-links — reverse, read-only listings
-// ---------------------------------------------------------------------
-
 export interface LinkUserRefResponse {
   readonly id: string;
   readonly fullName: string;
@@ -119,10 +100,6 @@ export interface RiskIncidentLinkResponse {
   readonly incident: IncidentRefResponse;
   readonly linkedBy: LinkUserRefResponse;
   readonly linkedAt: string;
-  // No `unlinkedBy` — mirrors `IncidentRiskLinkResponse`/
-  // `IncidentProblemLinkResponse`'s own precedent (incidents.openapi.yaml):
-  // who withdrew the link is not exposed on this same entity's reverse
-  // read either, only that it was.
   readonly unlinkedAt: string | null;
 }
 

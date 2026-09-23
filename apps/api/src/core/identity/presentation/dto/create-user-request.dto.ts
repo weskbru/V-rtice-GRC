@@ -1,11 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `CreateUserRequest`
- * exactly (`additionalProperties: false`). Reuses
- * `GrantOrgScopeRequestDto` (`core/organizations/presentation`) for
- * `scopeGrants` rather than a second, identical DTO class —
- * cross-capability `core-presentation` imports are unrestricted by the
- * ADR-011 boundary rules (`apps/api/eslint.config.mjs`'s own comment).
- */
 import { Type } from 'class-transformer';
 import {
   ArrayUnique,

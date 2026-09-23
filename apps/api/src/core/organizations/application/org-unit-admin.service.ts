@@ -1,39 +1,3 @@
-/**
- * T178 — organizational-unit administration
- * (`contracts/admin.openapi.yaml`'s `Organizational Units` tag; ADR-004,
- * FR-024, FR-060, FR-102).
- *
- * ## Materialized-path maintenance and cycle prevention
- *
- * All path arithmetic is delegated to the pure functions already published
- * in `domain/org-unit-path.ts` (T038) — `computeRootPath`/`computeChildPath`
- * for creation, `canReparent`/`recomputeSubtreePaths` for reparenting. This
- * service's job is only to fetch the real rows those functions need and to
- * persist their output inside one transaction (`applyReparent` updates the
- * moved unit AND every descendant together, data-model.md §4: "the subtree
- * updated ... in the same transaction").
- *
- * A unit's own `id` must be known BEFORE its row is inserted, because the
- * materialized path embeds it (`computeChildPath`/`computeRootPath`) —
- * unlike every other entity in this codebase, which lets
- * `schema.prisma`'s `@default(uuid(7))` generate the id at insert time,
- * this service generates it itself with `randomUUID()` first, exactly the
- * pattern `test/integration/support/fixtures.ts`'s `createOrgUnitFixture`
- * already establishes for the same reason.
- *
- * ## "Become root" as a reparent target
- *
- * `UpdateOrgUnitRequest.parentId: [string, 'null']` allows reparenting to
- * root (`null`). `canReparent`/`recomputeSubtreePaths` both expect a
- * concrete parent's path/depth — there is no real "root" row to fetch, so
- * `ROOT_PARENT_SENTINEL` stands in for one: `{ path: '/', depth: -1 }`
- * makes `recomputeSubtreePaths`'s arithmetic (`newPath = parent.path +
- * unit.id + '/'`, `newDepth = parent.depth + 1`) produce exactly
- * `computeRootPath`'s own output (`/{id}/`, depth `0`) without a special
- * case in that pure module. Its `id` is a fixed non-UUID string so it can
- * never collide with `canReparent`'s `unit.id === newParent.id` cycle
- * check against a real unit.
- */
 import { randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -64,9 +28,6 @@ import {
 
 const ORG_UNIT_ENTITY_LABEL = 'Unidade organizacional';
 
-/** See file header — stands in for "root" when reparenting to `parentId:
- * null`. Never persisted; only ever passed to `domain/org-unit-path.ts`'s
- * pure functions. */
 const ROOT_PARENT_SENTINEL: OrgUnitPathInfo = { id: '__root__', path: '/', depth: -1 };
 
 export interface CreateOrgUnitCommand {
@@ -81,10 +42,6 @@ export interface UpdateOrgUnitCommand {
   readonly orgUnitId: string;
   readonly code?: string;
   readonly name?: string;
-  /** Present (including `null`, meaning "become a root unit") triggers a
-   * reparent; absent leaves the unit where it is. Distinguishing "absent"
-   * from "null" is why this is `string | null | undefined` rather than
-   * `string | undefined`. */
   readonly parentId?: string | null;
 }
 
@@ -139,9 +96,6 @@ export class OrgUnitAdminService {
         depth: pathInfo.depth,
       });
 
-      // US8 AS4: access scoping reflects the new structure immediately — a
-      // caller already holding a UNIT grant on the (now) parent must see
-      // this new unit on their next scope resolution.
       await this.scopeRepository.bumpOrgTreeVersion();
 
       await this.auditRecorder.record({
@@ -176,9 +130,6 @@ export class OrgUnitAdminService {
       }
     }
 
-    // `parentId` present (`'parentId' in command`-equivalent, expressed via
-    // `!== undefined` since the DTO only ever omits the key or sends a
-    // concrete value/`null`) is a reparent request.
     const isReparentRequested = command.parentId !== undefined;
     const newParentPathInfo = isReparentRequested
       ? command.parentId === null
@@ -243,12 +194,6 @@ export class OrgUnitAdminService {
     return this.getById(command.orgUnitId);
   }
 
-  /**
-   * Reparents `unitId` under `newParentPathInfo` — cycle prevention
-   * (refused with `422`) plus the subtree path/depth rewrite, in one
-   * ambient transaction. Must be called from inside the caller's
-   * `transactionRunner.run(...)` scope.
-   */
   private async performReparent(
     unitId: string,
     newParentPathInfo: OrgUnitPathInfo,
@@ -257,8 +202,6 @@ export class OrgUnitAdminService {
     const previousUnit = await this.repository.findById(unitId);
     const unitPathInfo = await this.repository.findPathInfoById(unitId);
     if (!previousUnit || !unitPathInfo) {
-      // Defensive only: `getById` in `update()` already proved the unit
-      // exists moments earlier, inside the same transaction.
       throw new NotFoundDomainError(ORG_UNIT_ENTITY_LABEL, unitId);
     }
 
@@ -279,8 +222,6 @@ export class OrgUnitAdminService {
       descendants: recomputed.updatedDescendants,
     });
 
-    // FR-025b: resolved scopes are recomputed — risks may move in or out
-    // of a user's reach on their next request.
     await this.scopeRepository.bumpOrgTreeVersion();
 
     await this.auditRecorder.record({
@@ -312,9 +253,6 @@ export class OrgUnitAdminService {
     return parentPathInfo;
   }
 
-  /** Defensive-only failure path (see `create-risk.usecase.ts`'s identical
-   * reasoning): `SessionGuard` already proved this actor has a live
-   * session. */
   private async resolveActorLabel(actorUserId: string): Promise<string> {
     const label = await this.actorDirectory.findActorLabel(actorUserId);
     if (!label) {

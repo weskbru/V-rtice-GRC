@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — asset catalog empty states (T046), mirroring
- * `ControlRegisterEmpty`/`AuditEngagementRegisterEmpty` exactly (CLAUDE.md
- * §18.12) — two genuinely different situations, never collapsed into one
- * generic message.
- */
 import { EmptyState } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

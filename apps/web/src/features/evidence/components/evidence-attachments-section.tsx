@@ -1,39 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Evidence attachments, per evidence card (assurance-audit
- * Fix 1, HIGH).
- *
- * Before this file, a file attached at evidence-creation time
- * (`EvidenceCreateDialog`'s optional file field) was never visible again
- * anywhere in the product: no filename, no download link, no icon, no
- * count on `EvidencePanel`'s cards, and no way to attach a file to
- * evidence that already existed. `evidenceApi.listAttachments` existed but
- * had zero callers.
- *
- * ## Reused vs. not — stated explicitly, per the audit's own instruction
- *
- * `@pharos/design-system`'s `AttachmentList` — the actual list/upload/
- * download/withdraw UI — is reused UNCHANGED; it was already a fully
- * generic, entity-agnostic component (`RiskAttachmentsSection` is its only
- * other current consumer) and needed no modification. `formatBytes` moved
- * out of `risk-attachments-section.tsx` into `@/lib/format` once evidence
- * became a genuine second caller (see that file's own comment).
- *
- * What is NOT reused is `RiskAttachmentsSection` itself: that component
- * owns exactly ONE risk's attachment list for a whole page. Evidence has
- * MANY records per panel, each needing its OWN attachment list, upload
- * control and pagination state — a fundamentally different shape (N
- * independent instances vs. one), not a cosmetic difference. Forcing them
- * to share a component would mean threading an evidence-id/risk-id union
- * through it for no real reduction in code. This file instead mirrors
- * `RiskAttachmentsSection`'s data-fetching WIRING (fetch-on-mount with a
- * refresh token, page/hasMore, upload/withdraw handlers) — the same
- * small-per-section-duplication convention every collaboration section in
- * this codebase already follows (`RiskCommentsSection`, `EvidencePanel`
- * itself, `FindingsPanel`), rather than introducing this codebase's first
- * generic data-fetching hook.
- */
 import { AttachmentList, ConfirmDialog } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -48,7 +14,6 @@ import type { Attachment } from '@/features/risks/types';
 
 export interface EvidenceAttachmentsSectionProps {
   evidenceId: string;
-  /** Shown in the section title and the list's accessible caption, e.g. "EVD-2026-0001 — Relatório de teste de intrusão". */
   evidenceLabel: string;
   canUpload: boolean;
   canWithdraw: boolean;
@@ -56,7 +21,6 @@ export interface EvidenceAttachmentsSectionProps {
 
 const PAGE_SIZE = 20;
 
-/** Native file input `accept` hint only — mirrors `RiskAttachmentsSection`'s own, kept in sync with the SAME server-side allow-list (`magic-bytes.ts`), which is not entity-type-specific. */
 const ACCEPTED_CONTENT_TYPES = 'application/pdf,image/png,image/jpeg,text/plain';
 
 function toListItem(attachment: Attachment, canWithdraw: boolean) {
@@ -90,7 +54,6 @@ export function EvidenceAttachmentsSection({
   const [pendingWithdraw, setPendingWithdraw] = useState<Attachment | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
-  // Mirrors `RiskAttachmentsSection`'s own refresh-token convention.
   const [refreshToken, setRefreshToken] = useState(0);
   const requestKey = `${evidenceId}|${refreshToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
@@ -141,8 +104,6 @@ export function EvidenceAttachmentsSection({
       await evidenceApi.uploadAttachment(evidenceId, file);
       setRefreshToken((token) => token + 1);
     } catch (err) {
-      // The server's own refusal reason — never a generic failure message,
-      // matching `RiskAttachmentsSection`'s own handling (US9 AS3).
       const detail = err instanceof ApiError ? err.problem.detail : undefined;
       setUploadErrorDetail(detail ?? evidenceMessages.attachments.uploadGenericError);
     } finally {
@@ -158,9 +119,6 @@ export function EvidenceAttachmentsSection({
       setPendingWithdraw(null);
       setRefreshToken((token) => token + 1);
     } catch {
-      // The dialog stays open with its own destructive action still
-      // available to retry — same reasoning `EvidencePanel`'s own
-      // archive/unlink handlers give for not surfacing a separate toast.
     } finally {
       setWithdrawing(false);
     }
@@ -168,14 +126,6 @@ export function EvidenceAttachmentsSection({
 
   return (
     <>
-      {/*
-       * A plain, borderless block rather than a nested `Card` — this
-       * section already lives inside one `<li>` of `EvidencePanel`'s own
-       * bordered list; a card within that border would be exactly the
-       * "cartão dentro de cartão" CLAUDE.md §18.5 rules out. A top divider
-       * plus a small label is enough to separate it from the evidence
-       * metadata above.
-       */}
       <div className="flex flex-col gap-2 border-t border-border pt-3">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {evidenceMessages.attachments.sectionTitle}

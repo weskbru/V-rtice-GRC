@@ -5,12 +5,6 @@ import { AuthProvider } from './auth-context';
 import { usePermissions } from './permissions';
 import { buildTestSession } from './test-fixtures/session';
 
-/**
- * Component-mount evidence for T078 (`usePermissions`, FR-042, ADR-003).
- * Asserts advisory gating behavior only — see the module's own doc comment
- * for why this hook is never a security boundary.
- */
-
 function Probe(): React.JSX.Element {
   const { hasPermission, hasAnyPermission, hasAllPermissions } = usePermissions();
   return (

@@ -1,15 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk register route (T110, US3, FR-086 to FR-092).
- *
- * `RiskRegisterView` reads `useSearchParams()` (via `useRegisterState`,
- * T112) — Next.js requires that behind a `<Suspense>` boundary so the
- * initial render can be produced without blocking on the client-only
- * search-params read. `LoadingState`'s `variant="table"` fallback keeps the
- * pre-hydration flash looking like the table it is about to become, rather
- * than a generic spinner.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

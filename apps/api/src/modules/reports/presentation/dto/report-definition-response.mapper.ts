@@ -1,12 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T054) — maps
- * `ReportDefinitionWithCreatedBy`/`CreateReportDefinitionResult`
- * (application layer) to the wire shape
- * `contracts/reports.openapi.yaml`'s `ReportDefinition` schema describes.
- * ONE function is the only place a domain record becomes this DTO
- * (ADR-009), mirroring `toIndicatorDefinitionResponse`'s own single-mapper
- * discipline.
- */
 import type { ReportCreatedByRef } from '../../application/resolve-report-created-by';
 import type { ReportDefinitionRecord } from '../../domain/report-definition.entity';
 import type { IndicatorMetricKey } from '@prisma/client';

@@ -1,6 +1,5 @@
 import type { CurrentSession } from '../auth-types';
 
-/** A minimal, complete `CurrentSession` fixture for component tests. */
 export function buildTestSession(overrides: Partial<CurrentSession> = {}): CurrentSession {
   return {
     user: {

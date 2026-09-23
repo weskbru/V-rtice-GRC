@@ -8,20 +8,6 @@ import { RiskForm } from './risk-form';
 
 import type { RiskDetail } from '../types';
 
-/**
- * Component-mount evidence for T095/T099 (`RiskForm`, FR-053 to FR-060,
- * FR-103, ADR-013), plus the owner/responsible ASSIGNMENT-listing fix (the
- * bug this task closes: those pickers were fed by the BROWSE listing, which
- * a narrowly-scoped analyst could see as empty even with a perfectly valid
- * assignment set for their own unit — see `risksApi.searchUsers`'s doc
- * comment), plus the S-10 fix (both pickers now search the directory
- * server-side instead of a fixed `pageSize=100` with no search).
- *
- * `../api` (`risksApi`) is mocked at the network boundary per this project's
- * "program against the contract" instruction — `apps/api` may not exist yet
- * while this suite runs.
- */
-
 const { pushMock, backMock, createRiskMock, updateRiskMock, searchUsersMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   backMock: vi.fn(),
@@ -45,11 +31,6 @@ vi.mock('../api', () => ({
       { id: 'org-1', code: 'ROOT', name: 'PharosGRC' },
       { id: 'org-2', code: 'FILIAL', name: 'Unidade Filial' },
     ]),
-    // Assignment listing (`risksApi.searchUsers(q, orgUnitId)`, S-10) — a
-    // `vi.fn()` on its own (not `.mockResolvedValue(...)` inline) so
-    // individual tests can assert the exact `(q, orgUnitId)` arguments it
-    // was called with, and override its resolution per call (a rejection, a
-    // different set per unit, …).
     searchUsers: searchUsersMock,
   },
 }));
@@ -139,8 +120,6 @@ describe('RiskForm', () => {
       ).toBeInTheDocument();
       expect(screen.getByText('Alterado por: Carlos Lima')).toBeInTheDocument();
 
-      // The exact value the user typed is still in the field — never reset,
-      // never refetched (FR-103).
       expect(screen.getByLabelText(/^Título/)).toHaveValue(
         'Título editado pelo usuário, ainda não salvo',
       );
@@ -172,15 +151,11 @@ describe('RiskForm', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Salvar mesmo assim com meus dados' }));
 
       await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-      // The retried write carries the *current* version from the 409 body
-      // (quoted, matching the ETag convention), not the stale one the form
-      // originally loaded with.
       expect(updateRiskMock).toHaveBeenLastCalledWith(
         'risk-1',
         expect.objectContaining({ title: 'Título editado pelo usuário, ainda não salvo' }),
         '"5"',
       );
-      // The conflict banner is gone once the informed retry succeeds.
       expect(
         screen.queryByText('Este risco foi alterado por outra pessoa'),
       ).not.toBeInTheDocument();
@@ -203,9 +178,6 @@ describe('RiskForm', () => {
 
     fireEvent.click(screen.getByRole('combobox', { name: /Unidade organizacional/ }));
     fireEvent.click(await screen.findByRole('option', { name: 'PharosGRC' }));
-    // Lets the Radix `Select` above fully close before opening the
-    // `UserPicker` popover right after it — see the identical fix and its
-    // comment in `audit-engagement-form.test.tsx`.
     await waitFor(() => expect(screen.queryByRole('option', { name: 'PharosGRC' })).toBeNull());
 
     fireEvent.click(screen.getByRole('combobox', { name: /Gestor do risco/ }));
@@ -222,8 +194,6 @@ describe('RiskForm', () => {
         ownerUserId: 'user-1',
       }),
     );
-    // Never sends a derived field — the API rejects these as unknown
-    // properties (FR-062, FR-063).
     const [submittedBody] = createRiskMock.mock.calls[0] as [Record<string, unknown>];
     expect(submittedBody).not.toHaveProperty('inherentScore');
     expect(submittedBody).not.toHaveProperty('inherentLevel');
@@ -241,8 +211,6 @@ describe('RiskForm', () => {
       render(<RiskForm mode="edit" risk={baseRisk} etag='"3"' onSaved={vi.fn()} />);
       await waitFor(() => expect(screen.getByLabelText(/^Título/)).not.toBeDisabled());
 
-      // `baseRisk.orgUnit.id` is 'org-1' — the picker must ask for THAT
-      // unit's assignment set, never call the zero-argument browse listing.
       await waitFor(() => expect(searchUsersMock).toHaveBeenCalledWith('', 'org-1'));
       expect(searchUsersMock).not.toHaveBeenCalledWith('', undefined);
 
@@ -274,7 +242,6 @@ describe('RiskForm', () => {
       expect(
         screen.getByText(risks.form.fields.responsible.selectOrgUnitFirst),
       ).toBeInTheDocument();
-      // No unit chosen yet — the assignment listing must never be requested.
       expect(searchUsersMock).not.toHaveBeenCalled();
     });
 
@@ -287,10 +254,7 @@ describe('RiskForm', () => {
 
       expect(await screen.findByText(risks.form.fields.owner.loadError)).toBeInTheDocument();
       expect(screen.getByText(risks.form.fields.responsible.loadError)).toBeInTheDocument();
-      // A retry action is offered next to each error — never a dead end.
       expect(screen.getAllByRole('button', { name: 'Tentar novamente' }).length).toBeGreaterThan(0);
-      // The picker itself carries no options to choose from — the failure
-      // is never papered over as "nobody is assignable here".
       fireEvent.click(screen.getByRole('combobox', { name: /Gestor do risco/ }));
       expect(screen.queryByRole('option', { name: 'Ana Souza' })).not.toBeInTheDocument();
     });
@@ -301,13 +265,13 @@ describe('RiskForm', () => {
         .mockResolvedValueOnce({
           data: [{ id: 'user-1', fullName: 'Ana Souza' }],
           isPartial: false,
-        }) // org-1, initial mount
+        })
         .mockResolvedValueOnce({
           data: [{ id: 'user-2', fullName: 'Carlos Lima' }],
           isPartial: false,
-        }) // org-2, after change: unsearched first page
-        .mockResolvedValueOnce({ data: [], isPartial: false }) // org-2, targeted re-check by Ana Souza's own name — genuinely not assignable here
-        .mockResolvedValue({ data: [{ id: 'user-2', fullName: 'Carlos Lima' }], isPartial: false }); // org-2, every later open of either picker (the picker's own onSearch('') on open)
+        })
+        .mockResolvedValueOnce({ data: [], isPartial: false })
+        .mockResolvedValue({ data: [{ id: 'user-2', fullName: 'Carlos Lima' }], isPartial: false });
 
       render(<RiskForm mode="edit" risk={baseRisk} etag='"3"' onSaved={vi.fn()} />);
       await waitFor(() => expect(screen.getByLabelText(/^Título/)).not.toBeDisabled());

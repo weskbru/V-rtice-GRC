@@ -1,11 +1,3 @@
-/**
- * T180/D-11 — `/admin/users[/**]` (excluding `scope-grants`, covered by
- * `admin-scope-grants.spec.ts`): success-shape and business-rule coverage
- * for an administrator holding `user:administer`/`role:administer`.
- * Permission refusal (403) and unauthenticated refusal (401) are covered
- * exhaustively for every admin endpoint by `admin-permissions.spec.ts` and
- * `admin-unauthenticated.spec.ts` respectively — not repeated here.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -251,13 +243,6 @@ describe('Admin user administration (T180, US8)', () => {
     expect(body.userId).toBe(userId);
     expect(body.roles.map((r) => r.id)).toContain(role.id);
 
-    // F-73 — the contract answers `UserRoleAssignment`, not `UserDetail`.
-    // Asserted as the EXACT key set rather than a list of forbidden names:
-    // that is what also catches a field nobody thought to forbid. This
-    // caller happens to hold `user:administer`, so the assertion is about
-    // the REPRESENTATION, which is the same for everyone — the reason it
-    // matters is the caller who holds only `role:administer`
-    // (`test/integration/role-administer-user-boundary.spec.ts`).
     expect(Object.keys(body).sort()).toEqual(['roles', 'userId']);
     for (const assignedRole of body.roles) {
       expect(Object.keys(assignedRole).sort()).toEqual(['id', 'name']);

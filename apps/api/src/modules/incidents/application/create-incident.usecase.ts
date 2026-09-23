@@ -1,27 +1,3 @@
-/**
- * 008-incidents-problems, US1 — `CreateIncidentUseCase` (`createIncident`,
- * spec.md FR-001, FR-022, ADR-005). Mirrors
- * `grc/finding/application/create-finding.usecase.ts`'s shape — see that
- * file's header for the transaction-boundary reasoning this one does not
- * repeat.
- *
- * ## Order of checks
- *
- * 1. `orgUnitId` must exist, be active, and lie within the caller's
- *    authorized scope (spec.md FR-022) — `422`, not `404` (no existing
- *    record's existence could be disclosed at creation time). Existence
- *    and scope failures throw the IDENTICAL message (assurance fix
- *    pattern already established for `Evidence`/`Finding`/`Asset`).
- * 2. `ownerUserId` (defaults to the caller when omitted,
- *    `CreateIncidentRequest`'s own description) must exist and be active.
- *
- * `reportedByUserId` is ALWAYS the caller — `CreateIncidentRequest` has no
- * such field at all (contracts/incidents.openapi.yaml): a user reports
- * the incidents they observe.
- *
- * Always created `status = OPEN` (schema default) — no `status` field on
- * the request at all.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -121,9 +97,6 @@ export class CreateIncidentUseCase {
   }
 
   private async assertOrgUnitCreatable(scope: ScopeFilter, orgUnitId: string): Promise<void> {
-    // Assurance fix pattern — existence and scope failures are
-    // indistinguishable to the caller, both in status (422) and in
-    // message, never a separate "out of scope" message.
     const orgUnit = await this.referenceData.findOrgUnit(orgUnitId);
     if (!orgUnit?.isActive || !isOrgUnitWithinScope(scope, orgUnitId)) {
       throw new ValidationDomainError(USER_MESSAGES.incidents.orgUnitNotFound, [

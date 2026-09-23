@@ -1,13 +1,3 @@
-/**
- * 008-incidents-problems, foundation — `modules/problems`'s own
- * registration against `EvidenceSubjectResolverPort`'s registry for
- * `EvidenceSubjectType.PROBLEM` (spec.md FR-017). Mirrors
- * `IncidentEvidenceSubjectAccessor` exactly, depending on
- * `ProblemLookupPort` (`domain/ports/problem-lookup.port.ts`, this
- * module's own minimal scoped read) rather than `PrismaService` directly
- * — keeps this file a `module-application` element depending only on its
- * own `module-domain` port, never `module-infrastructure` (ADR-011).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PermissionResolverService } from '../../../core/authorization/application/permission-resolver.service';

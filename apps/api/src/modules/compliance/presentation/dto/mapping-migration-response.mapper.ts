@@ -1,9 +1,3 @@
-/**
- * T043/004-compliance-management — maps `MappingMigrationSummaryRecord`/
- * `MappingMigrationDetailRecord` to the wire shapes
- * `contracts/compliance.openapi.yaml`'s `MappingMigrationSummary`/
- * `MappingMigrationDetail` schemas describe.
- */
 import type {
   MappingMigrationDetailRecord,
   MappingMigrationFrameworkVersionRef,

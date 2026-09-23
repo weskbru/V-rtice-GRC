@@ -5,14 +5,6 @@ import { ControlRegisterSummary } from './control-register-summary';
 
 import type { Page } from '../types';
 
-/**
- * Component-mount evidence for `ControlRegisterSummary` (CLAUDE.md §19.7) —
- * `controlsApi.listCatalog` is mocked at the network boundary, mirroring
- * `risk-register-summary.test.tsx`'s own approach. Each mocked call
- * resolves a distinct `meta.total`, keyed by the query it received, so a
- * wrong filter (e.g. showing the "ineffective" count under "Ativos") fails
- * one of the assertions rather than passing by coincidence.
- */
 const { listCatalogMock } = vi.hoisted(() => ({ listCatalogMock: vi.fn() }));
 
 vi.mock('../api', () => ({

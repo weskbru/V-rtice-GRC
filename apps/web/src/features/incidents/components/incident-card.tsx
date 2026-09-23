@@ -1,29 +1,17 @@
 'use client';
 
-/**
- * PharosGRC — incident register card view, one incident (008-incidents-
- * problems, US1, CLAUDE.md §18, §18.12). Mirrors `AssetCard`/
- * `AuditEngagementCard`: no quick-view side panel for this register, so the
- * whole card is one stretched link to `/incidents/{id}`, with the code
- * repeated as its own smaller link purely so it can be opened in a new tab
- * independently.
- *
- * `IncidentSummary` carries no description field (`incidents.openapi.yaml`)
- * — this card never invents one, the same precedent `AuditEngagementCard`
- * already set for a description-less summary shape.
- */
 import { EmptyValue, StatusBadge } from '@pharos/design-system/components';
 import { Building2, CalendarClock, User } from 'lucide-react';
-
-import { formatDateOnly, formatTimestampDate } from '../date';
-import { incidentSeverityBadgeVariant, incidentStatusBadgeVariant } from '../status';
-
-import type { IncidentSummary } from '../types';
 
 import { Link } from '@/components/navigation/link';
 import cardStyles from '@/components/register/register-card.module.css';
 import { incidents } from '@/lib/messages/incidents';
 import { cn } from '@/lib/utils';
+
+import { formatDateOnly, formatTimestampDate } from '../date';
+import { incidentSeverityBadgeVariant, incidentStatusBadgeVariant } from '../status';
+
+import type { IncidentSummary } from '../types';
 
 export interface IncidentCardProps {
   incident: IncidentSummary;

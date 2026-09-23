@@ -1,25 +1,14 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement catalog compact summary row (T076,
- * CLAUDE.md §18.5, §19.7), mirroring `ControlRegisterSummary`'s own shape
- * and reasoning — see that component's own doc comment for why each figure
- * reads `meta.total` of the SAME `GET /audits` catalog query the register
- * itself uses (`pageSize: 1`), rather than a second, independently
- * maintained calculator.
- *
- * A failure degrades to one quiet message in place of the row — it must
- * never hide or block the catalog underneath it.
- */
 import { CheckCircle2, Loader2, Layers, NotebookPen } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { RegisterSummaryCard } from '@/components/register/register-summary-card';
+import { auditEngagements } from '@/lib/messages/audit-engagements';
 
 import { auditEngagementsApi } from '../api';
 
 import type { ComponentType, SVGProps } from 'react';
-
-import { RegisterSummaryCard } from '@/components/register/register-summary-card';
-import { auditEngagements } from '@/lib/messages/audit-engagements';
 
 export interface AuditEngagementRegisterSummaryProps {
   className?: string;

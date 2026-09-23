@@ -1,31 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — "Planos de Ação" register screen (T056, US2, SC-002, FR-091,
- * R-009), brought into the shared register family (CLAUDE.md §18.12):
- * `useActionsRegisterState` (URL-persisted filters/page/view), the KPI strip
- * (`ActionRegisterSummary`), the collapsible `MyActionsFilters`,
- * `ResultsToolbar`, and then EITHER `ActionCardGrid` or `DataTable`
- * (`@pharos/design-system`) around one `GET /actions` call per state
- * change — mirroring `RiskRegisterView`'s own orchestration exactly. Never
- * fetches more than the current page, never sorts, filters or paginates
- * client-side.
- *
- * Two deliberate simplifications relative to `RiskRegisterView`, both
- * tracing back to `GET /actions`'s own contract (`ListActionsQuery`), not to
- * a smaller ambition for this screen: no `SortSelect` (the endpoint accepts
- * no `sort` parameter — every column stays `enableSorting: false`) and no
- * quick-view panel (mirrors `AuditEngagementCatalogView`'s identical
- * precedent — the code and the whole card already open `/actions/{id}`).
- *
- * `onlyMine` defaults to `true` — SC-002's own scenario ("um responsável vê
- * todo o trabalho atribuído a ele, de qualquer origem, numa única lista")
- * is this screen's whole reason to exist.
- *
- * Every transition offered client-side is advisory only (FR-042) — the
- * server re-validates the FULL legality table and every permission/scope
- * check independently on submit (`status.ts`'s own header).
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -35,6 +9,14 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+import { feedback } from '@/components/shell/feedback-provider';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
+import { actions } from '@/lib/messages/actions';
+import { common } from '@/lib/messages/common';
+import { usePermissions } from '@/lib/permissions';
 
 import { actionsApi } from '../api';
 import {
@@ -53,14 +35,6 @@ import { ReopenActionDialog } from './reopen-action-dialog';
 import type { ActionsRegisterView } from '../hooks/use-actions-register-state';
 import type { Action, ActionStatus } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { feedback } from '@/components/shell/feedback-provider';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { useAuth } from '@/lib/auth-context';
-import { actions } from '@/lib/messages/actions';
-import { common } from '@/lib/messages/common';
-import { usePermissions } from '@/lib/permissions';
 
 const VIEW_OPTIONS = [
   {
@@ -156,9 +130,6 @@ export function MyActionsView(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from every one of these `state.*` fields above; see `RiskRegisterView`'s identical, documented pattern.
   }, [requestKey]);
 
-  // Self-corrects a page position left stranded by a narrower result set —
-  // the same pattern `RiskRegisterView` documents for the identical
-  // situation, rather than rendering a permanently empty page.
   useEffect(() => {
     if (!loading && state.page > totalPages) {
       setPage(totalPages);
@@ -228,8 +199,6 @@ export function MyActionsView(): React.JSX.Element {
         onClearFilters={clearFilters}
       />
 
-      {/* GET /actions has no `sort` parameter. Presentation stays beside the
-          real filter controls above; this strip carries count + page size. */}
       <ResultsToolbar
         count={actions.myActions.results.count(total)}
         isLoading={loading}
@@ -275,12 +244,7 @@ export function MyActionsView(): React.JSX.Element {
           data={rows}
           getRowId={(row) => row.id}
           sorting={[]}
-          onSortingChange={() => {
-            // No server-side sort exists on `GET /actions` — every column is
-            // declared `enableSorting: false`, so this is never actually
-            // invoked by a header click; required only because
-            // `DataTableProps` always takes a controlled sorting pair.
-          }}
+          onSortingChange={() => undefined}
           pageIndex={state.page - 1}
           pageSize={state.pageSize}
           totalRows={total}

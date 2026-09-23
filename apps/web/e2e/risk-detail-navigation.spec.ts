@@ -19,47 +19,11 @@ import {
 
 import type { Page } from '@playwright/test';
 
-/**
- * 016-risk-detail-experience — E2E for the composition itself: the
- * two-level navigation, the `?section=` deep link, and the "Editar" overlay
- * panel. Every OTHER risk-detail spec in this directory exercises a
- * business flow (assessment, treatment, collaboration, …) THROUGH this
- * navigation; this file exercises the navigation as its own subject —
- * exactly the split `support/risk-detail-sections.ts`'s own header comment
- * draws between `openRiskDetailSection` (click path matters) and
- * `gotoRiskDetailSection` (deep link, click path does not matter).
- *
- * Runs against a real backend, seeded per
- * `apps/api/prisma/seed/platform.seed.ts` — same convention as every other
- * spec in this directory.
- */
 test.describe('Risk detail — two-level navigation, deep link, and the edit overlay', () => {
   requireSeedCredentials(
     'SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD are not set in the environment — point this run at a seeded backend to exercise the real risk-detail navigation.',
   );
 
-  /**
-   * F-71 (`docs/deferred-findings.md`) — a `useId()` mismatch between the
-   * server-rendered HTML and the client's first hydration pass, exclusive to
-   * `next dev --turbopack` (measured: 0 occurrences in 165 loads against a
-   * production build). It hits the APP SHELL's own account-menu
-   * `DropdownMenuTrigger` (`app-shell.tsx`, "Menu da conta de …") — nothing
-   * this file's own risk-detail markup renders — spot-checked directly
-   * against this rodada's own build on 2026-09-16: 2 of 10 hard navigations
-   * to a risk detail page at 390px reproduced it, always on that exact
-   * element, never on anything inside `RiskDetailView`/`EntityTabs`.
-   *
-   * This filters ONLY that specific signature — the React boilerplate line
-   * AND the component name AND the account-menu's own accessible-name
-   * prefix, all three together — never bare "any hydration mismatch"
-   * (CLAUDE.md §18.8: a filter a real defect could also satisfy protects
-   * nothing). A genuine hydration defect inside the risk-detail screen
-   * itself would carry neither "DropdownMenuTrigger" nor "Menu da conta" and
-   * would still fail this test's `consoleErrors` assertion.
-   *
-   * REMOVE THIS FILTER once F-71 is fixed — at that point a recurrence here
-   * is real and this test should catch it again.
-   */
   function isKnownF71ShellHydrationMismatch(text: string): boolean {
     return (
       text.includes(
@@ -89,9 +53,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
   test('every one of the fifteen leaf sections is reachable through the two-level navigation and renders', async ({
     page,
   }, testInfo) => {
-    // Every section (Auditoria/Evidência/Achados included) needs to be
-    // VISIBLE for this to prove all fifteen, not just the twelve any caller
-    // gets — the Platform Administrator equivalent holds every gate.
     await signInAsWorkerAdmin(page, testInfo);
     await createFixtureRisk(page, 'quinze-secoes');
 
@@ -158,10 +119,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
 
     await page.goto(`${riskDetailUrl}?section=isto-nao-existe`);
 
-    // Falls back to "overview" (the first visible group's first visible
-    // section, `resolveActiveRiskDetailSection`'s own documented contract)
-    // — the page renders normally, the risk's own heading is still there,
-    // and nothing in the console complains.
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
     await expect(riskDetailSectionPanel(page, 'overview')).toBeVisible();
     await expect(
@@ -170,31 +127,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     expect(consoleErrors).toEqual([]);
   });
 
-  /**
-   * §4.4 (corrected 2026-09-16, coordinator): section changes commit through
-   * `?section=` with `router.replace`, deliberately — the SAME convention
-   * `apps/web/src/lib/register/url-state.ts` already established and
-   * documents in its own header ("a register must not stack one history
-   * entry per filter click, so the Back button from a record's detail page
-   * lands on the register exactly as it was left, rather than unwinding a
-   * trail of filter states"). §18.12 forbids a module inventing its own
-   * convention here. The version of this test that shipped in the previous
-   * round of this rodada asserted the OPPOSITE — that Back should unwind the
-   * section trail one section at a time — which the coordinator confirmed is
-   * the wrong requirement, not a defect in the code: a user who opened six
-   * sections would need seven Backs just to leave the risk's screen. That
-   * assertion is gone; this is what actually needs protecting.
-   *
-   * The real guarantee: visiting several sections costs the URL's `?section=`
-   * value, never a history entry, so a SINGLE Back after any number of
-   * section changes takes the user all the way back to wherever they came
-   * from — the risk register, exactly as they left it (FR-092, already
-   * proven for the register's OWN filters by `risk-register.spec.ts`'s
-   * "navigating to a risk and back preserves the register's search and
-   * sort") — never to an intermediate section. Three-plus sections are
-   * visited (pinned, not "one or two") so this assertion would fail the
-   * moment a future change swapped `replace` for `push` on section commits.
-   */
   test('a single Back after visiting several sections leaves the risk screen entirely, landing back on the register as left', async ({
     page,
   }, testInfo) => {
@@ -212,13 +144,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     await page.getByRole('button', { name: 'Criar risco' }).click();
     await page.waitForURL(/\/risks\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
 
-    // Leave from the REGISTER, with real state of its own (table view +
-    // search) — mirroring `risk-register.spec.ts`'s own "navigating to a
-    // risk and back preserves the register's search and sort" test, so the
-    // register side of this guarantee is exercised the exact same way it
-    // already is. Table view first: the register opens on Cards by default
-    // (`action-plan.spec.ts`'s own comment on the same register family),
-    // whose rows are not `role="link"` by title the way table rows are.
     await page.goto('/risks');
     await page.getByRole('radio', { name: 'Ver os riscos em tabela' }).click();
     await expect(page).toHaveURL(/[?&]view=table/);
@@ -236,8 +161,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     await page.waitForURL(/\/risks\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
 
-    // Visit four sections, spanning three different top-level groups —
-    // FOUR, not one, is the point: none of this may cost a history entry.
     await openRiskDetailSection(page, 'causes-consequences');
     await expect(riskDetailSectionPanel(page, 'causes-consequences')).toBeVisible();
     await openRiskDetailSection(page, 'assessment');
@@ -247,10 +170,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     await openRiskDetailSection(page, 'history');
     await expect(riskDetailSectionPanel(page, 'history')).toBeVisible();
 
-    // ONE Back, after four section changes, must leave the risk screen
-    // entirely and land on the register — exactly where it was left, not on
-    // an intermediate section and not on a bare `/risks` with the search box
-    // reset.
     await page.goBack();
 
     await expect(page).toHaveURL(registerUrl);
@@ -265,14 +184,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     const title = await createFixtureRisk(page, 'editar-painel');
     const editedTitle = `${title} (editado)`;
 
-    // The page BEHIND the sheet stays read-only throughout (§4.8) — checked
-    // BEFORE opening it, not while it is open: Radix marks the rest of the
-    // page `aria-hidden` for the duration (the same mechanism this
-    // directory's other specs already document, e.g.
-    // `risk-collaboration.spec.ts`'s "Radix marks the rest of the page
-    // inert" comment), so a role-based query for the overview panel would
-    // find nothing while the sheet is up — that is the dialog behaving
-    // correctly, not the overview content having been replaced.
     await expect(riskDetailSectionPanel(page, 'overview')).toBeVisible();
 
     const editTrigger = page.getByRole('button', { name: 'Editar' });
@@ -286,18 +197,9 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
 
     await expect(sheet).toBeHidden();
     await expect(page.getByRole('heading', { name: editedTitle })).toBeVisible();
-    // D-15's shared focus-restore mechanism (`useDialogFocusRestore`) — the
-    // same one every other dialog on this screen already relies on.
     await expect(editTrigger).toBeFocused();
   });
 
-  /**
-   * FR-030 (omission, never disabling) applied to the new two-level
-   * navigation specifically: the Risk Analyst fixture holds `risk:view` but
-   * not `audit:view` (`platform.seed.ts`, and already exercised by
-   * `risk-history.spec.ts`) — reused here rather than inventing a second
-   * identity mechanism, per this rodada's own instruction.
-   */
   test('a caller without audit:view never sees the Auditoria leaf, including via a stale deep link', async ({
     page,
   }) => {
@@ -309,8 +211,6 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     await expect(page.getByRole('heading', { name: 'Novo risco' })).toBeVisible();
     await page.getByLabel('Título').fill(title);
     await page.getByLabel('Descrição').fill('Risco do E2E que verifica a omissão de Auditoria.');
-    // This fixture's org-unit picker offers only its own unit (see
-    // `action-plan.spec.ts`'s identical comment on the same fixture).
     await page.getByRole('combobox', { name: /Unidade organizacional/ }).click();
     await page.getByRole('option').first().click();
     await page.getByRole('combobox', { name: /Gestor do risco/ }).click();
@@ -319,17 +219,11 @@ test.describe('Risk detail — two-level navigation, deep link, and the edit ove
     await page.waitForURL(/\/risks\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
     const riskDetailUrl = page.url();
 
-    // "Registro" still renders — it keeps three always-visible sections
-    // (Histórico/Anexos/Comentários) — but its own leaf tablist never
-    // contains "Auditoria".
     await openRiskDetailSection(page, 'history');
     await expect(
       riskDetailLeafTablist(page, 'register')!.getByRole('tab', { name: 'Auditoria' }),
     ).toHaveCount(0);
 
-    // A stale/guessed `?section=audit` link falls back silently to the
-    // first visible section rather than ever disclosing that the section
-    // exists (`resolveActiveRiskDetailSection`'s own contract).
     await gotoRiskDetailSection(page, riskDetailUrl, 'audit');
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
     await expect(riskDetailSectionPanel(page, 'overview')).toBeVisible();

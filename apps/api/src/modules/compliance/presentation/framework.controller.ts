@@ -1,13 +1,3 @@
-/**
- * T030/004-compliance-management — `FrameworkController`: the framework
- * catalog operations of `contracts/compliance.openapi.yaml`
- * (`listFrameworks`, `createFramework`, `getFramework`, `updateFramework`
- * — operations 1-4). Mirrors `modules/controls/presentation/control.controller.ts`'s
- * structure exactly — see that file's header for the `formatETag`/
- * `parseIfMatchHeader`/`assertUpdateBodyNotEmpty` reasoning this one does
- * not repeat. Re-declared locally rather than imported (ADR-011/SC-007: no
- * business module imports another).
- */
 import {
   BadRequestException,
   Body,
@@ -60,10 +50,6 @@ export class FrameworkController {
     private readonly listFrameworksUseCase: ListFrameworksUseCase,
   ) {}
 
-  /** `listFrameworks` — declared BEFORE `findById`'s `:frameworkId` route
-   * for the same reason `ControlController.list` documents: Nest
-   * dispatches `/frameworks` and `/frameworks/:frameworkId` unambiguously
-   * regardless of declaration order. */
   @RequirePermission('compliance:view')
   @Get()
   async list(@Query() query: ListFrameworksQueryDto): Promise<FrameworkListResponse> {
@@ -146,18 +132,10 @@ export class FrameworkController {
   }
 }
 
-/** Exported for reuse by `framework-version.controller.ts`/
- * `requirement.controller.ts` — every mutating endpoint in this module
- * formats/parses `ETag`/`If-Match` identically (ADR-013), so this is the
- * one place any of them does it, mirroring `ControlController
- * .formatETag`. */
 export function formatETag(version: number): string {
   return `"${String(version)}"`;
 }
 
-/** Exported for reuse — see `formatETag`'s doc comment above, and
- * `ControlController.parseIfMatchHeader` for the full `400`/`409` split
- * this mirrors. */
 export function parseIfMatchHeader(headerValue: string | undefined): number {
   if (headerValue === undefined || headerValue.trim().length === 0) {
     throw new BadRequestException({
@@ -179,9 +157,6 @@ export function parseIfMatchHeader(headerValue: string | undefined): number {
   return version;
 }
 
-/** `UpdateFrameworkRequest`'s `minProperties: 1` — see
- * `ControlController.assertUpdateBodyNotEmpty`'s own doc comment for why
- * this is a controller-level check with no dedicated validator class. */
 function assertUpdateBodyNotEmpty(body: UpdateFrameworkRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

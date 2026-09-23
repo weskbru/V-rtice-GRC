@@ -1,25 +1,14 @@
 'use client';
 
-/**
- * PharosGRC — process catalog compact summary row (T046, CLAUDE.md §18.5,
- * §19.7), mirroring `ControlRegisterSummary`'s/
- * `AuditEngagementRegisterSummary`'s own shape and reasoning — each figure
- * reads `meta.total` of the SAME `GET /processes` catalog query the register
- * itself uses (`pageSize: 1`), rather than a second, independently
- * maintained calculator.
- *
- * A failure degrades to one quiet message in place of the row — it must
- * never hide or block the catalog underneath it.
- */
 import { CheckCircle2, Layers, MinusCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { RegisterSummaryCard } from '@/components/register/register-summary-card';
+import { processes } from '@/lib/messages/processes';
 
 import { processesApi } from '../api';
 
 import type { ComponentType, SVGProps } from 'react';
-
-import { RegisterSummaryCard } from '@/components/register/register-summary-card';
-import { processes } from '@/lib/messages/processes';
 
 export interface ProcessRegisterSummaryProps {
   className?: string;

@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement catalog screen (T076), mirroring
- * `ControlCatalogView`'s overall orchestration (CLAUDE.md §18.12): summary
- * indicators, filter bar, results bar, cards-or-table, shared pagination —
- * reused rather than reinvented for Audit Engagements. See
- * `AuditEngagementCard`'s and `use-engagement-catalog-state.ts`'s own doc
- * comments for the two deliberate simplifications this register makes
- * relative to Controls' (no quick-view panel, single-value filters, no
- * free-text search — all three trace back to `GET /audits`'s own
- * contract, not to a smaller ambition for this screen).
- *
- * Never fetches more than the current page — never sorts, filters or
- * paginates client-side.
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -24,6 +10,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { auditEngagements } from '@/lib/messages/audit-engagements';
+import { common } from '@/lib/messages/common';
 
 import { auditEngagementsApi } from '../api';
 import {
@@ -40,12 +32,6 @@ import { AuditEngagementRegisterSummary } from './audit-engagement-register-summ
 import type { EngagementCatalogView as CatalogViewMode } from '../hooks/use-engagement-catalog-state';
 import type { AuditEngagement, AuditEngagementListSortField } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { auditEngagements } from '@/lib/messages/audit-engagements';
-import { common } from '@/lib/messages/common';
 
 const VIEW_OPTIONS = [
   {
@@ -206,10 +192,6 @@ export function AuditEngagementCatalogView(): React.JSX.Element {
         hasActiveFilters={hasActiveFilters}
         activeFilterCount={activeFilterCount}
         onClearFilters={clearFilters}
-        // S-10 — resolves the active filter chip's label with no extra
-        // request when the selected lead auditor also owns a currently
-        // loaded row (the common case: usually why the filter matched
-        // anything at all). See the filters component's own doc comment.
         knownLeadAuditor={
           rows.find((row) => row.leadAuditor.id === state.leadAuditorUserId)?.leadAuditor
         }

@@ -1,60 +1,3 @@
-/**
- * PharosGRC — one wide card for a `BY_BUCKET` indicator's distribution on
- * the redesigned `/indicators` first screen ("Composição por nível e
- * severidade" section, indicators-round, S1 ownership, coordinator
- * PLAN.md §2 step 4, refined twice per the coordinator's rendered reviews).
- *
- * Composes S2's `IndicatorDistributionBar` (the decorative, `aria-hidden`
- * proportional bar, `../indicator-distribution-bar.tsx`) with a real legend
- * list underneath — the bar alone is never the only carrier of the
- * distribution (CLAUDE.md §18.8): every one of the four buckets, including a
- * genuine `0`, gets its own `RiskLevelBadge` (hue + icon + text, never
- * colour alone, `packages/design-system/src/components/risk/
- * risk-level-badge.tsx`'s own doc comment) and its own number in the legend,
- * so the bar can be skipped entirely by a screen reader without losing any
- * information.
- *
- * ## Same grammar as `IndicatorSingleValueCard`, so the card always ends at
- * ## the legend
- *
- * The second review measured a real raggedness this card's OWN first
- * refinement introduced: "Ver registros" trailing at the bottom made
- * Problemas/Incidentes taller than Riscos/Achados (which have none), the
- * exact row-height inconsistency the single-value card's own header already
- * solved once by moving that link into the HEADER row. This card now uses
- * the identical structure: header (domain caption left, "Ver registros →"
- * right, present or absent, never adding a trailing row), name, the total AS
- * THE BIG NUMBER (left-aligned, small "Total" caption below it — the same
- * value-above-label convention `IndicatorSingleValueCard`'s own number and
- * `DashboardModuleCard` already use), the bar, then the legend — always the
- * LAST thing on the card, so every distribution card's own height is decided
- * by the same four elements, never by whether a link happens to exist.
- *
- * ## A bucket's count becomes a `Link` only when `bucket.href` is set
- *
- * S2's `buildReading` (`../indicator-overview-model.ts`) only ever populates
- * that field when the coordinator-approved navigation table has an EXACT,
- * permission-checked target for this bucket. A `0`-count bucket still gets
- * whatever `href` the model supplied — a filtered register legitimately
- * returning zero rows is not this card's decision to prevent.
- *
- * A linked number's REST-state cue is a subtle underline
- * (`decoration-border`, the same neutral token every hairline border in this
- * product already uses, never the link's own text colour repurposed as a
- * decoration source) that turns solid/full-strength (`decoration-current`)
- * on hover/focus — added deliberately WITHOUT touching `text-primary-on
- * -surface` itself (the second review's own instruction: the colour token is
- * correct and shared with every other link in the product; light theme's
- * dark-on-dark contrast between a linked and a plain number was too subtle
- * on its own, so the fix is an additional non-colour cue, not a new colour).
- *
- * The accessible name of a bucket link names the actual count, the domain's
- * own plural noun and the level — "213 incidentes de severidade Alta — ver
- * registros" — never the bare visible "213" a screen reader would otherwise
- * announce with no context of what it counts (see `card
- * .bucketLinkAccessibleLabelBySeverity`'s own message doc comment for why
- * `RISK_TOTAL_BY_LEVEL` uses the "nível" wording instead).
- */
 import { RiskLevelBadge } from '@pharos/design-system/components';
 import { ArrowRight } from 'lucide-react';
 
@@ -75,7 +18,6 @@ export interface IndicatorDistributionCardProps {
   readonly name: string;
   readonly detailHref: string;
   readonly total: number;
-  /** Always the four `BUCKET_LEVEL_ORDER` levels, zero-filled — never a subset (S2's `buildReading` own guarantee). */
   readonly buckets: readonly IndicatorBucket[];
   readonly recordsHref?: string;
 }
@@ -88,8 +30,6 @@ function bucketAccessibleLabel(domain: IndicatorDomain, level: RiskLevel, count:
       indicators.bucketBadgeLabels.levelName(level),
     );
   }
-  // `domainLabels` is already the plural pt-BR noun ("Incidentes",
-  // "Problemas", "Achados") — lowercased for a mid-sentence position.
   const domainNoun = indicators.overview.domainLabels[domain].toLowerCase();
   return card.bucketLinkAccessibleLabelBySeverity(
     count,

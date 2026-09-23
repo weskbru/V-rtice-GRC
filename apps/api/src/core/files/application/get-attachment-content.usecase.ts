@@ -1,10 +1,3 @@
-/**
- * T190 — `GetAttachmentContentUseCase`: the read side of
- * `GET /attachments/{attachmentId}/content` (FR-098, FR-099, ADR-010). No
- * permission decorator gates this handler (see `AttachmentController`) —
- * the ENTIRE authorization decision is "can this actor view the parent
- * record", resolved here via `assertAttachmentAccessible`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';

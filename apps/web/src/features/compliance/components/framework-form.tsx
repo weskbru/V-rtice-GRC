@@ -1,47 +1,10 @@
 'use client';
 
-/**
- * PharosGRC — framework create/edit form (US1), mirroring
- * `features/controls/components/control-form.tsx`'s conflict-handling
- * convention exactly (CLAUDE.md §18.12). Much shorter than `ControlForm`:
- * a framework has no organizational unit, owner or classification fields —
- * just name, description and origin (FR-001).
- *
- * F-56 (`docs/deferred-findings.md`): `name`/`description` are exactly the
- * D-21 shape (`login-form.tsx`'s own header comment has the full mechanism)
- * — text fields reachable as the literal first paint of `/compliance/new`,
- * enabled immediately (no `loadingReferenceData`-style gate unlike
- * `RiskForm`/`ControlForm`/etc., which disable every field until an async
- * fetch resolves well after hydration and are therefore NOT exposed to
- * this defect). A value typed into `name`/`description` before hydration
- * commits can be silently discarded the instant hydration catches up —
- * `react-hook-form`'s `register()` ref-callback churns identity on every
- * render and force-writes its still-empty tracked value onto the DOM on
- * the first post-hydration (re)attach, exactly as `login-form.tsx`
- * diagnoses. Both fields use a plain `useRef` (stable across renders, so
- * React attaches it once and never touches the DOM again) instead of
- * `register()`, and their value is read directly from the DOM at submit
- * time rather than trusted from `react-hook-form`'s tracked state — see
- * `handleSubmit` below. `origin` stays on `react-hook-form`'s `Controller`
- * unchanged: a Radix `Select` cannot be operated before its own JS
- * hydrates, so it was never exposed to this defect and rewriting it would
- * only add risk without closing anything.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-
-import { complianceApi } from '../api';
-
-import type {
-  CreateFrameworkRequest,
-  Framework,
-  FrameworkOrigin,
-  UpdateFrameworkRequest,
-} from '../types';
-import type { ApiProblem } from '@/lib/api-client';
 
 import { feedback } from '@/components/shell/feedback-provider';
 import { useNavigate } from '@/components/shell/navigation-pending';
@@ -61,6 +24,16 @@ import { common } from '@/lib/messages/common';
 import { compliance } from '@/lib/messages/compliance';
 import { frameworkFormSchema, type FrameworkFormValues } from '@/lib/validation/compliance';
 
+import { complianceApi } from '../api';
+
+import type {
+  CreateFrameworkRequest,
+  Framework,
+  FrameworkOrigin,
+  UpdateFrameworkRequest,
+} from '../types';
+import type { ApiProblem } from '@/lib/api-client';
+
 export interface FrameworkFormSavedResult {
   framework: Framework;
   etag: string;
@@ -69,7 +42,6 @@ export interface FrameworkFormSavedResult {
 export interface FrameworkFormProps {
   mode: 'create' | 'edit';
   framework?: Framework;
-  /** The `ETag` last read for `framework`. Required when `mode === 'edit'`. */
   etag?: string;
   onSaved: (result: FrameworkFormSavedResult) => void;
   onCancel?: () => void;
@@ -88,7 +60,6 @@ function defaultValuesFor(framework: Framework | undefined): FrameworkFormValues
   return { name: framework.name, description: framework.description, origin: framework.origin };
 }
 
-/** `name`/`description` field-level errors, tracked outside `react-hook-form` — see the module header comment (F-56). */
 interface UncontrolledFieldErrors {
   name?: string;
   description?: string;
@@ -117,9 +88,6 @@ export function FrameworkForm({
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [fieldErrors, setFieldErrors] = useState<UncontrolledFieldErrors>({});
   const initialValues = defaultValuesFor(framework);
-  // F-56 — plain object refs, stable across renders (unlike `register()`'s
-  // ref-callback), so React attaches once at mount and never rewrites the
-  // DOM. See the module header comment for the full mechanism.
   const nameRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
@@ -158,15 +126,6 @@ export function FrameworkForm({
     setFormError(compliance.frameworkForm.genericError);
   }
 
-  /**
-   * F-56 — replaces `form.handleSubmit(onSubmit)`: `name`/`description`
-   * are read directly from the DOM (never from `react-hook-form`'s tracked
-   * state, which pre-hydration typing can leave stale — see the module
-   * header comment), `origin` still comes from `react-hook-form`. Errors
-   * for `name`/`description` go to local `fieldErrors`; `origin` keeps
-   * using `form.setError` so its existing `Controller`-driven `FormField`
-   * is untouched.
-   */
   function handleFormSubmit(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     form.clearErrors('origin');
@@ -230,7 +189,6 @@ export function FrameworkForm({
     setFormError(null);
     setSubmitting(true);
     try {
-      // F-56 — name/description read from the DOM, not `form.getValues()`; see `handleFormSubmit`.
       const values: FrameworkFormValues = {
         name: nameRef.current?.value ?? '',
         description: descriptionRef.current?.value ?? '',

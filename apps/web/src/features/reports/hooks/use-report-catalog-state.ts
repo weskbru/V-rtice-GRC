@@ -1,25 +1,10 @@
 'use client';
 
-/**
- * PharosGRC — report catalog URL state (009-indicators-reports, T062).
- *
- * Same mechanism, and trimmed to the same axes, as `features/indicators/hooks/
- * use-indicator-catalog-state.ts` (that file's own header explains the shareable-link/Back-button/
- * no-drift reasoning this one does not repeat: every setter commits directly to the URL via
- * `router.replace`, every read comes straight from `useSearchParams()` on the next render) —
- * `page`, `pageSize`, `isActive` are the only parameters `listReportDefinitions` actually declares
- * (`contracts/reports.openapi.yaml`). No `search`, no `sort`.
- */
-
-// This hook writes the CURRENT screen's own query string (filters, sorting, pagination): not a
-// navigation between screens, and routing it through `useNavigate` would raise the page-level
-// loader over a filter change (specs/014-institutional-loader §2.3).
 // eslint-disable-next-line no-restricted-imports -- see above.
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
 
 export const REPORT_CATALOG_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
-/** Matches `reports.openapi.yaml`'s own `PageSize` parameter default. */
 const DEFAULT_PAGE_SIZE = 20;
 
 function parsePositiveInt(value: string | null, fallback: number): number {
@@ -53,7 +38,6 @@ export interface UseReportCatalogStateResult {
   setPageSize: (size: number) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button (CLAUDE.md §18.12 family convergence). */
   activeFilterCount: number;
 }
 
@@ -134,9 +118,6 @@ export function useReportCatalogState(): UseReportCatalogStateResult {
   }, [commit]);
 
   const hasActiveFilters = state.isActive !== undefined;
-  // Only one filter field exists on this contract (`isActive`) — the count is therefore 0 or 1,
-  // never more, but it is still computed rather than hardcoded so a future filter field cannot
-  // silently drift from what the chip row actually shows.
   const activeFilterCount = state.isActive !== undefined ? 1 : 0;
 
   return {

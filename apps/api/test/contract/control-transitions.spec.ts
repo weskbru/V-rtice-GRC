@@ -1,20 +1,3 @@
-/**
- * T024/T025/003-controls-management, User Story 1 — contract coverage for
- * the lifecycle operations of `contracts/controls.openapi.yaml`
- * (operations 5-6 of 6: `getControlLifecycle`, `transitionControl`, D-6,
- * FR-004, FR-005, FR-006).
- *
- * Exercises EVERY declared transition at least once — no state is
- * declared-but-unreachable (research.md D-6's own account of the
- * `FindingStatus` defect this phase deliberately avoids repeating):
- *
- *   DRAFT -> ACTIVE (requires owner)      DRAFT -> RETIRED (requires justification)
- *   ACTIVE -> SUSPENDED                   ACTIVE -> RETIRED
- *   SUSPENDED -> ACTIVE                   SUSPENDED -> RETIRED
- *
- * Uses `buildControlsContractTestApp` — see `control-catalog.spec.ts`'s
- * header for why (this task does not own `controls.module.ts`).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -210,11 +193,6 @@ describe('Control lifecycle (US1, operations 5-6, D-6)', () => {
         .set('If-Match', version)
         .send({ ownerUserId: userId });
       const afterOwner = await agent.get(`/api/v1/controls/${id}`).set('Origin', appOrigin);
-      // `GET /controls/{id}` carries no `ETag` (`ControlController.findById`'s
-      // own doc comment — `effectiveness` is derived at read time and
-      // must never be presented as version-scoped freshness), so the next
-      // `If-Match` is built from the body's own `version` instead, exactly
-      // like the frontend's `resolveEtag` fallback does.
       const currentVersion = formatETag((afterOwner.body as ControlDetailBody).version);
 
       const activated = await agent
@@ -227,9 +205,6 @@ describe('Control lifecycle (US1, operations 5-6, D-6)', () => {
       expect(body.fromStatus).toBe('DRAFT');
       expect(body.toStatus).toBe('ACTIVE');
 
-      // Observable consequence of ACTIVE: is_active reads true through the
-      // detail response's derived fields — the control is now genuinely
-      // "in operation".
       const detail = await agent.get(`/api/v1/controls/${id}`).set('Origin', appOrigin);
       expect((detail.body as ControlDetailBody).status).toBe('ACTIVE');
     });
@@ -248,10 +223,6 @@ describe('Control lifecycle (US1, operations 5-6, D-6)', () => {
         .set('If-Match', version)
         .send({ toStatus: 'ACTIVE' });
 
-      // `GET /controls/{id}` carries no `ETag` (`ControlController.findById`'s
-      // own doc comment) — `If-Match` for the next transition is built
-      // from the body's own `version`, exactly like the frontend's
-      // `resolveEtag` fallback does.
       const afterActivate = await agent.get(`/api/v1/controls/${id}`).set('Origin', appOrigin);
       const suspended = await agent
         .post(`/api/v1/controls/${id}/transitions`)

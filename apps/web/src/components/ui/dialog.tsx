@@ -59,37 +59,6 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
-  // T203 finding: every dialog in this app is opened from a plain trigger
-  // `<Button>`, never Radix's own `<Dialog.Trigger>` (confirmed across
-  // every call site — `risk-lifecycle-actions.tsx`, `approval-dialogs.tsx`,
-  // every admin create/edit dialog). `@radix-ui/react-dialog`'s MODAL
-  // content (`DialogContentModal`) hard-codes its `onCloseAutoFocus` to
-  // `event.preventDefault(); context.triggerRef.current?.focus()` —
-  // unconditionally, regardless of whether a `Dialog.Trigger` was ever
-  // rendered. `preventDefault()` also discards the underlying
-  // `FocusScope`'s own generic "restore whatever had focus before the
-  // dialog opened" fallback (it only runs `if
-  // (!unmountEvent.defaultPrevented)`), so with no registered trigger,
-  // NOTHING is restored: focus silently falls back to `<body>` on every
-  // close (Escape, the X button, or a Cancel button) — reproduced directly
-  // against a production build, not merely inferred. Capturing and
-  // restoring focus ourselves here, ahead of Radix's own handler (composed
-  // handlers run in the order listed — ours below runs first and stops
-  // Radix's with `preventDefault()`), fixes every dialog built on this one
-  // component without touching a single call site.
-  //
-  // D-15 update: the capture used to happen in `onOpenAutoFocus`, which
-  // Radix fires AFTER commit. Two patterns defeated it there: (a) a native
-  // `autoFocus` on a field inside the dialog moves focus onto that field
-  // during commit, before `onOpenAutoFocus` runs, so it was the field —
-  // not the real trigger — that got captured, and it no longer exists once
-  // the dialog closes; (b) a dialog opened from a `DropdownMenuItem`'s
-  // `onSelect` captured the menu item, which unmounts during the menu's
-  // own exit animation. `useDialogFocusRestore` (design system, shared with
-  // `ConfirmDialog`) fixes both: it captures during React's RENDER phase —
-  // strictly before any commit-phase `autoFocus` — via `FocusRestoreAnchor`
-  // mounted as the content's first child, and resolves a captured menu item
-  // to its trigger via the menu's own `aria-labelledby`.
   const { FocusRestoreAnchor, restoreTargetRef, handleCloseAutoFocus } = useDialogFocusRestore()
 
   return (

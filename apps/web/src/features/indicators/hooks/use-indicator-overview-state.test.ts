@@ -1,12 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Mirrors `use-actions-register-state.test.ts`'s own approach: `next/
- * navigation` is mocked so `currentSearch` stands in for "the URL right
- * now". `q` goes through `useDebouncedSearchParam`, so its own commit is
- * exercised via fake timers rather than asserted synchronously.
- */
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 

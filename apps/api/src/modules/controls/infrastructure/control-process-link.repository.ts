@@ -1,11 +1,3 @@
-/**
- * T037/003-controls-management, User Story 3 — the sole implementation of
- * `ControlProcessLinkRepositoryPort`. No scope predicate anywhere in this
- * file — the caller (`LinkControlToProcessUseCase`/
- * `UnlinkControlFromProcessUseCase`) has already resolved and
- * scope-checked the parent `Control`, and separately scope-checked the
- * referenced `Process` (ADR-020 part 4), before any of these run.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

@@ -1,8 +1,3 @@
-/**
- * T043/004-compliance-management — matches `GET
- * /frameworks/{frameworkId}/versions/{versionId}/mapping-migrations`'s
- * query parameters (`listMappingMigrations` operation).
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 

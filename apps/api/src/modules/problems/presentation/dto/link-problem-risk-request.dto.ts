@@ -1,7 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `LinkProblemRiskRequestDto`
- * (`linkProblemToRisk`, contracts/problems.openapi.yaml).
- */
 import { IsUUID } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

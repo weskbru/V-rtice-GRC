@@ -1,35 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — action detail, lifecycle action bar. Mirrors
- * `IncidentLifecycleActions`'s own shape: renders ONLY the transitions
- * `availableTransitions(action.status)` returns — an illegal move is never
- * offered disabled-then-refused, it is simply absent. A terminal status
- * (`CANCELLED`) therefore renders no actions at all.
- *
- * The one transition requiring a reason (`COMPLETED -> OPEN`, Invariant
- * A2) opens the EXISTING `ReopenActionDialog` — reused verbatim, not
- * reimplemented, exactly as this task's own instruction requires. Every
- * other transition applies immediately on click, mirroring `MyActionsView
- * .applyTransition`'s own direct-call pattern.
- *
- * Every transition offered here is advisory only (FR-042) — the server
- * re-validates the full legality table and every permission/scope check
- * independently on submit (`status.ts`'s own header).
- *
- * ## No `Card` of its own (020-action-detail-experience, Fase B)
- *
- * Used to be a page-level `Card` on its own, sitting above the tabs. It is
- * now composed INSIDE `ActionLifecycleSection`'s own "Ciclo de vida" card,
- * below the track visual — mirroring `IncidentLifecycleActions`'s/
- * `ProblemLifecycleActions`'s own identical correction: a full-width card
- * holding nothing but a short button row (or nothing at all, on a terminal
- * status) measured mostly empty space. The `!canTransition ||
- * options.length === 0` early return is UNCHANGED — `null` here now simply
- * means the button row is absent from the surrounding card, not that the
- * card itself disappears; the track above renders unconditionally either
- * way (`ActionLifecycleSection`'s own header comment).
- */
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -113,13 +83,7 @@ export function ActionLifecycleActions({
           actionsApi
             .getAction(action.id)
             .then(onChanged)
-            .catch(() => {
-              // Best-effort refresh only — `ReopenActionDialog` already
-              // showed its own success feedback for the transition itself;
-              // a failed re-fetch here just leaves the detail view showing
-              // the pre-reopen snapshot until the next reload, never a
-              // silently wrong status.
-            });
+            .catch(() => undefined);
         }}
       />
     </div>

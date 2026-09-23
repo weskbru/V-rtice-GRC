@@ -1,18 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem create/edit form (008-incidents-problems, US2),
- * mirroring `AssetForm`'s overall shape (CLAUDE.md §18.12): no `ETag`/
- * conflict handling (`Problem` carries no `version` column), plain
- * `<Select>` for organizational unit and owner (bounded reference data,
- * fetched once — the searchable remote picker is reserved for the
- * relationship sections' Risk/Incident pickers, whose registries can be
- * arbitrarily large, per Front H).
- *
- * `status`/`code`/`rootCause` are never fields here — `UpdateProblemRequest`
- * does not accept them (the contract's own description); the lifecycle
- * transition endpoint is the only writer of those.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -79,10 +66,6 @@ export function ProblemForm({ mode, problem, onSaved }: ProblemFormProps): React
   const [formError, setFormError] = useState<string | null>(null);
 
   const [orgUnits, setOrgUnits] = useState<OrgUnitNode[] | null>(null);
-  // S-10 — the owner picker now searches the directory server-side
-  // (`UserPicker`) instead of a preloaded, bounded list. Seeded from
-  // `problem.owner` itself in edit mode (already carries `fullName`);
-  // stays unselected in create mode, exactly like the old `<Select>` did.
   const [owner, setOwner] = useState<UserRef | undefined>(problem?.owner);
   const [referenceDataError, setReferenceDataError] = useState(false);
   const [loadingReferenceData, setLoadingReferenceData] = useState(true);

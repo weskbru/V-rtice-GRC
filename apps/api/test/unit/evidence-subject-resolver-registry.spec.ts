@@ -1,11 +1,3 @@
-/**
- * T029/002-shared-grc-foundation, US1 — unit coverage for the
- * `EvidenceSubjectResolverPort` registry
- * (`grc/shared/domain/ports/evidence-subject-resolver.port.ts`): the
- * registration/lookup mechanics themselves, independent of any concrete
- * subject type's accessor. Mirrors the discipline
- * `core/comments/domain/entity-registry.ts`'s own tests would apply.
- */
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {

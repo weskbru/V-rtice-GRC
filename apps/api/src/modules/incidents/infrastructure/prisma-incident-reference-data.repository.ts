@@ -1,10 +1,3 @@
-/**
- * 008-incidents-problems, US1 — the sole implementation of
- * `IncidentReferenceDataPort`. Mirrors
- * `grc/finding/infrastructure/prisma-finding-reference-data.repository.ts`
- * exactly — see that file's header for why reading these shared tables
- * directly is consistent, established precedent.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

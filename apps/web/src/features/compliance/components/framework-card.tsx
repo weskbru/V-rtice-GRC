@@ -1,32 +1,15 @@
 'use client';
 
-/**
- * PharosGRC — framework register card view, one framework (US1, CLAUDE.md
- * §18, §18.12). Mirrors `AssetCard`/`AuditEngagementCard`: no quick-view
- * side panel for this register, so the whole card is one stretched link to
- * `/compliance/{id}`, with the code repeated as its own smaller link purely
- * so it can be opened in a new tab independently.
- *
- * ## One deliberate difference from every other card in this family: no badge row
- *
- * `Framework` carries no lifecycle status of its own — only its
- * `FrameworkVersion`s do (`DRAFT`/`PUBLISHED`), and this register lists
- * frameworks, not versions. `origin` is a plain classification, never a
- * `StatusBadge` — the exact same "quiet text, not a colour, for a
- * non-lifecycle classifier" precedent `framework-register-columns.tsx`
- * already set for the table view, so the two views of this same register
- * never disagree about how a framework is described.
- */
 import { Tag } from 'lucide-react';
-
-import { formatTimestampDate } from '../date';
-
-import type { Framework } from '../types';
 
 import { Link } from '@/components/navigation/link';
 import registerCardStyles from '@/components/register/register-card.module.css';
 import { compliance } from '@/lib/messages/compliance';
 import { cn } from '@/lib/utils';
+
+import { formatTimestampDate } from '../date';
+
+import type { Framework } from '../types';
 
 export interface FrameworkCardProps {
   framework: Framework;

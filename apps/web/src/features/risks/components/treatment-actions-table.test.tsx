@@ -5,23 +5,6 @@ import { TreatmentActionsTable } from './treatment-actions-table';
 
 import type { RiskTreatmentAction, TreatmentActionSummary, UserRef } from '../types';
 
-/**
- * Component-mount evidence for `TreatmentActionsTable` (T145, FR-074,
- * FR-074a, FR-074b, ADR-015; lifecycle/edit/summary added once this table
- * became the "Planos de Ação" tab's own content — see that file's own
- * header for the full account of what moved and why, including the
- * corrected routing below).
- *
- * ALL FOUR operations — list, create, edit, transition — go through the
- * RISK's own routes (`../api`, mocked here). There is deliberately no mock
- * of `@/features/actions/api` in this file: this component never calls it
- * (a first pass routed the lifecycle transition through the shared
- * `POST /actions/{id}/transitions` — wrong, see the component's own header
- * for why, and corrected here to `risksApi.updateTreatmentAction` with
- * `status`/`reopenReason`, exactly like the old `<Select>` this table used
- * to render already did).
- */
-
 const {
   listTreatmentActionsMock,
   searchUsersMock,
@@ -117,7 +100,6 @@ describe('TreatmentActionsTable', () => {
     );
 
     await screen.findByText('Ação vencida');
-    // "Vencida" is a text label, findable by role — never a bare colour cue.
     expect(screen.getAllByText('Vencida')).toHaveLength(1);
     expect(screen.queryByText('Ação futura')?.closest('tr')?.textContent).not.toContain('Vencida');
   });
@@ -271,10 +253,6 @@ describe('TreatmentActionsTable', () => {
 
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Iniciar' }));
 
-    // The RISK's own route — never the shared `POST /actions/{id}/
-    // transitions` — carrying the risk's `If-Match` (`etag`), exactly like
-    // create/edit above. This is the specific proof the coordinator asked
-    // for after the routing correction.
     await waitFor(() => expect(updateTreatmentActionMock).toHaveBeenCalledTimes(1));
     expect(updateTreatmentActionMock).toHaveBeenCalledWith(
       'risk-1',

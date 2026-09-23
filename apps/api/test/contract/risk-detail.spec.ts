@@ -1,14 +1,3 @@
-/**
- * US5 backend gap (architect-directed, alongside T136/T144-T146) — D-11
- * coverage for `GET /risks/{riskId}`'s `currentTreatment`, `controls`,
- * `processes`, `assets`, `treatmentActionSummary` and `overdueTreatment`:
- * these were hardcoded null/empty/false in `risk-response.mapper.ts` while
- * the US5 write paths did not exist. They now do, so this asserts BOTH
- * directions the architect flagged as the risk of getting this wrong: a
- * risk with real treatment/action/link data must show it, and a risk
- * without must still show the documented deterministic empty shape, never
- * an error or an omitted field.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -74,9 +63,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       email: `${uniqueTestMarker('risk-detail-contract-owner')}@example.test`,
     });
     ownerUserId = owner.id;
-    // F-CV-2: this owner is a precondition for a risk to exist — not the
-    // object of any assertion in this file (all about GET's response
-    // shape) — so it gets the minimum eligibility, never elevated scope.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
   });
 
@@ -145,13 +131,7 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       'risk:view',
       'risk:treat',
       'risk:edit',
-      // ADR-020 part 5 — this fixture links a control to the risk, which
-      // now also requires `control:view` on the referenced control.
       'control:view',
-      // FR-011 (006-assets-processes) — linking a process/asset to the
-      // risk now also requires `process:view`/`asset:view` on the
-      // referenced side, the same requirement F-46 already added for
-      // `control:view` above.
       'process:view',
       'asset:view',
     ]);
@@ -188,10 +168,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       .send({ title: 'Ação futura', responsibleUserId: ownerUserId, dueOn: '2099-01-01' });
     expect(futureAction.status).toBe(201);
 
-    // F-46 (ADR-020 part 4, `docs/deferred-findings.md`) — `agent` here
-    // holds only UNIT scope over `orgUnitId` (`agentWithPermissions`), so
-    // the control must belong to that same unit or `LinkControlUseCase`'s
-    // new scope check refuses the link below (this test expects 201).
     const control = await ctx.app.get(PrismaService).client.control.create({
       data: {
         code: uniqueTestMarker('risk-detail-control'),
@@ -207,9 +183,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       .send({ id: control.id });
     expect(controlLink.status).toBe(201);
 
-    // FR-011 (006-assets-processes) — same reason as the control fixture
-    // above: must be within `agent`'s UNIT scope, or `LinkProcessUseCase`'s
-    // new scope check refuses the link below (this test expects 201).
     const process = await ctx.app.get(PrismaService).client.process.create({
       data: {
         code: uniqueTestMarker('risk-detail-process'),
@@ -225,8 +198,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       .send({ id: process.id });
     expect(processLink.status).toBe(201);
 
-    // FR-011 (006-assets-processes) — same reason as above, for
-    // `LinkAssetUseCase`.
     const asset = await ctx.app.get(PrismaService).client.asset.create({
       data: {
         code: uniqueTestMarker('risk-detail-asset'),
@@ -251,8 +222,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
     expect(body.currentTreatment!.id).toBe(decisionId);
     expect(body.currentTreatment!.strategy).toBe('MITIGATE');
     expect(body.currentTreatment!.supersededAt).toBeNull();
-    // FR-075: the deadline (2027-06-30) has not passed, so not overdue
-    // regardless of outstanding actions.
     expect(body.currentTreatment!.deadlineOverdue).toBe(false);
 
     expect(body.controls).toHaveLength(1);
@@ -263,9 +232,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
     expect(body.assets[0]!.entity.id).toBe(asset.id);
 
     expect(body.treatmentActionSummary).toEqual({ total: 2, open: 2, overdue: 1 });
-    // T141/US5 parity: `overdueTreatment` must agree with
-    // `treatmentActionSummary.overdue > 0` (same rule the register uses),
-    // never a second, independently-arrived-at answer.
     expect(body.overdueTreatment).toBe(true);
   });
 
@@ -275,8 +241,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       'risk:view',
       'risk:treat',
       'risk:edit',
-      // ADR-020 part 5 — this fixture links a control to the risk, which
-      // now also requires `control:view` on the referenced control.
       'control:view',
     ]);
     const { id, version } = await createRisk(agent);
@@ -295,9 +259,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       .send({ strategy: 'MITIGATE', description: 'Decisão vigente.' });
     expect(second.status).toBe(201);
 
-    // F-46 (ADR-020 part 4) — same reason as the control fixture above:
-    // must be within `agent`'s UNIT scope, or the link (expected to
-    // succeed here, then be unlinked) is refused.
     const control = await ctx.app.get(PrismaService).client.control.create({
       data: {
         code: uniqueTestMarker('risk-detail-unlink-control'),
@@ -326,17 +287,9 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
 
     expect(body.currentTreatment!.strategy).toBe('MITIGATE');
     expect(body.currentTreatment!.description).toBe('Decisão vigente.');
-    // The withdrawn control link must not appear among current links.
     expect(body.controls).toEqual([]);
   });
 
-  // T039 (006-assets-processes, US3 cenário 3) — the fix closes the door
-  // for NEW cross-unit links (T034/T035); it must NOT erase a link that
-  // already exists between units, created before this fase (or by a
-  // GLOBAL-scoped actor, or by direct data migration). This link is
-  // inserted directly, bypassing `LinkAssetUseCase`/`LinkProcessUseCase`
-  // entirely — exactly what "created before this fase" means structurally,
-  // since those use cases would themselves refuse to create it today.
   it('T039: a risk-asset/risk-process link between units, created BEFORE the scope check existed, stays fully readable', async () => {
     const { agent } = await agentWithPermissions(['risk:create', 'risk:view']);
     const { id: riskId } = await createRisk(agent);
@@ -362,7 +315,6 @@ describe('GET /risks/{riskId} — currentTreatment/controls/processes/assets/tre
       },
     });
 
-    // Direct insertion — the historical fact this fix must not erase.
     await prisma.client.riskProcessLink.create({
       data: {
         riskId,

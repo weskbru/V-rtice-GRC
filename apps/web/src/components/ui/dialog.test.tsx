@@ -10,20 +10,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-/**
- * S-03 regression coverage (D-15 update, `docs/local-environment.md`).
- * `DialogContent` used to capture the element to restore focus to in
- * Radix's `onOpenAutoFocus`, which fires AFTER commit — too late for two
- * real patterns in this codebase:
- *
- * (a) a native `autoFocus` on a field inside the dialog moves focus onto
- *     that field during commit, before `onOpenAutoFocus` ran, so the
- *     "previous" element captured was the dialog's OWN field, not the
- *     trigger — gone once the dialog closes, so focus fell to `<body>`;
- * (b) a dialog opened from a `DropdownMenuItem`'s `onSelect` captured the
- *     menu ITEM, which unmounts during the menu's own exit animation, so
- *     the restore target no longer existed at close time either.
- */
 
 function AutoFocusFieldHarness(): React.JSX.Element {
   const [open, setOpen] = useState(false);
@@ -36,7 +22,6 @@ function AutoFocusFieldHarness(): React.JSX.Element {
         <DialogContent>
           <DialogTitle>Reabrir ação</DialogTitle>
           <DialogDescription>Descreva o motivo.</DialogDescription>
-          {/* Reproduces the exact pattern (`ReopenActionDialog`'s `<Textarea autoFocus>`) this test protects. */}
           <textarea autoFocus aria-label="Motivo" />
           <button type="button" onClick={() => setOpen(false)}>
             Cancelar
@@ -56,9 +41,6 @@ function MenuOpenedDialogHarness(): React.JSX.Element {
           <button type="button">Ações</button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          {/* Deliberately the historical, unfixed pattern (opens straight from
-              onSelect, not deferred to the menu's own onCloseAutoFocus) — this
-              test asserts `DialogContent` itself is now safe against it. */}
           <DropdownMenuItem onSelect={() => setOpen(true)}>Editar</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -80,11 +62,6 @@ describe('DialogContent — focus restoration (S-03)', () => {
     render(<AutoFocusFieldHarness />);
     const trigger = screen.getByRole('button', { name: 'Reabrir' });
 
-    // `fireEvent.click` (unlike a real browser click) does not itself move
-    // focus onto the clicked element — focus it explicitly first, matching
-    // what a real mouse or keyboard activation always does, so the
-    // precondition this test protects (the dialog's real trigger has focus
-    // right before it opens) is actually exercised.
     trigger.focus();
     fireEvent.click(trigger);
     const field = await screen.findByLabelText('Motivo');
@@ -128,9 +105,6 @@ describe('DialogContent — focus restoration (S-03)', () => {
     );
     await waitFor(() => expect(document.activeElement).toBe(menuTrigger));
 
-    // The menu itself is long gone by the time the dialog closed — proving
-    // this could only have worked by resolving the trigger EARLY (at
-    // capture time), not by looking the menu item up again at close time.
     expect(menu).not.toBeInTheDocument();
   });
 });

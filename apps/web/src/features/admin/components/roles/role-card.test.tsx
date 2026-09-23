@@ -1,28 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `RoleCard`
- * (015-roles-permissions-surface FR-006 to FR-008, D-03, T032).
- *
- * ## Most of this file is MIGRATED coverage, not new coverage
- *
- * The card replaces the table row `specs/012-admin-roles-screen/STATE.md`
- * §2.1 chose, so the behaviours `role-admin-columns.test.tsx` guarded had to
- * land somewhere before that file could be removed (D-07, T049). The
- * permission-count wording (none / singular / plural) and the capped module
- * preview with its complete screen-reader list were guarded there against
- * `RolePermissionOverview`; they are guarded here against the card that now
- * carries them. A behaviour must never lose its test because the component
- * that held it was replaced.
- *
- * The RANKING rule itself — modules ordered by how many permissions the role
- * concentrates in each, never by product order (012 §2.3, kept by FR-007) —
- * lives in `roleModuleReach` and is guarded in `role-filtering.test.ts`.
- * What is asserted here is that the card actually SHOWS that order and does
- * not re-sort it on its way to the screen.
- */
-
 import { RoleCard } from './role-card';
 
 import type { Permission, Role } from '../../types';
@@ -80,11 +58,6 @@ describe('RoleCard — permission and user counts (migrated from RolePermissionO
 
 describe('RoleCard — module reach (migrated from RolePermissionOverview)', () => {
   it('shows the modules in concentration order and never lets the visible cap hide any from a screen reader', () => {
-    // Product order alone would open with "Riscos" (the first area of the
-    // sidebar) — the effect 012 §2.3 measured and rejected, which made the
-    // Audit Lead read as a risk role. This role holds one risk permission
-    // against three audit ones, and reaches five modules in total, so the
-    // preview is also capped and the remainder summarised.
     const target = role({
       permissions: [
         permission('risk:view', 'risk'),
@@ -101,15 +74,10 @@ describe('RoleCard — module reach (migrated from RolePermissionOverview)', () 
 
     const card = screen.getByRole('button', { name: /Abrir detalhes do papel/ });
 
-    // Three chips are printed, "Auditoria e achados" (3) leading, then
-    // "Controles" (2); the two single-permission modules beyond the cap
-    // collapse into a count.
     expect(within(card).getByText('Auditoria e achados')).toBeInTheDocument();
     expect(within(card).getByText('Controles')).toBeInTheDocument();
     expect(within(card).getByText('+2 módulos')).toBeInTheDocument();
 
-    // FR-007 — the cap is visual only. The COMPLETE list, in the same
-    // ranked order, is always available to assistive technology.
     expect(
       within(card).getByText(
         'Módulos alcançados: Auditoria e achados, Controles, Riscos, Ativos, Processos',
@@ -153,8 +121,6 @@ describe('RoleCard — the card is the control', () => {
     renderCard(role(), true);
     const card = screen.getByRole('button', { name: /Abrir detalhes do papel/ });
 
-    // `aria-current`, not `aria-pressed`: selecting another card REPLACES
-    // the selection rather than toggling this one off.
     expect(card).toHaveAttribute('aria-current', 'true');
     expect(within(card).getByText('Papel selecionado')).toBeInTheDocument();
   });
@@ -177,13 +143,10 @@ describe('RoleCard — the card is the control', () => {
       </ul>,
     );
     expect(screen.getByText('Sistema')).toBeInTheDocument();
-    // FR-035 — `role:administer` is one of the three access-administration
-    // permissions that make a role privileged.
     expect(screen.getByText('Privilegiado')).toBeInTheDocument();
     unmount();
 
     renderCard(role({ isSystem: false, permissions: [permission('risk:view', 'risk')] }));
-    // Never distinguished by the ABSENCE of a tag (012 §2.2, kept).
     expect(screen.getByText('Personalizado')).toBeInTheDocument();
     expect(screen.queryByText('Privilegiado')).not.toBeInTheDocument();
   });
@@ -192,8 +155,6 @@ describe('RoleCard — the card is the control', () => {
     const long =
       'Este papel concede acesso amplo à gestão de riscos corporativos, incluindo a criação, edição, avaliação, tratamento e encerramento de riscos em todas as unidades organizacionais sob sua responsabilidade.';
     renderCard(role({ description: long }));
-    // The whole text, not an ellipsised prefix: truncation is `line-clamp-2`
-    // in CSS, so a screen reader still reads every word.
     expect(screen.getByText(long)).toBeInTheDocument();
   });
 
@@ -203,10 +164,6 @@ describe('RoleCard — the card is the control', () => {
   });
 });
 
-/**
- * ADR-022 — the two halves of the role's name, asserted on the card because
- * the card is where a reader meets a role for the first time.
- */
 describe('RoleCard — the role name the reader sees', () => {
   it('gives a seeded role its pt-BR name, in the heading and in the accessible name', () => {
     renderCard(
@@ -221,20 +178,14 @@ describe('RoleCard — the role name the reader sees', () => {
     expect(
       screen.getByRole('button', { name: /Abrir detalhes do papel Administrador da Plataforma/ }),
     ).toBeInTheDocument();
-    // The stored identifier is not printed on the card: it belongs behind
-    // "Ver identificadores técnicos" in the panel, next to `risk:view`.
     expect(screen.queryByText('Platform Administrator')).not.toBeInTheDocument();
 
-    // The privilege badge speaks about the role the reader can see named.
     expect(
       screen.getByText('Administrador da Plataforma concede permissões de administração de acesso'),
     ).toBeInTheDocument();
   });
 
   it('prints a custom role exactly as it was typed, with no translation attempted', () => {
-    // Named to collide with a seeded role's pt-BR label on purpose: the two
-    // are different roles, and the tag beside the name is what tells them
-    // apart. Nothing here may be rewritten towards the seeded one.
     renderCard(role({ name: 'Administrador da Plataforma — Filial SP', isSystem: false }));
 
     expect(screen.getByText('Administrador da Plataforma — Filial SP')).toBeInTheDocument();

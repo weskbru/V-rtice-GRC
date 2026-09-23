@@ -8,15 +8,6 @@ import type {
   UpdateProcessRequest,
 } from './types';
 
-/**
- * Compile-time regression tests locking shapes this module's contract
- * (processes.openapi.yaml) declares differently from a sibling module, or
- * declares deliberately different from what the interface might otherwise
- * assume — the same class of defect `features/audit-engagements/
- * types.test.ts`'s own tests guard against (assurance-audit Fix 3), and the
- * same set `features/assets/types.test.ts` locks for its own, form-
- * identical contract (FR-020).
- */
 describe('OrgUnitRef (processes.openapi.yaml)', () => {
   it('is exactly {id, code, name} — the RISKS/CONTROLS-domain shape, unlike audit-engagements', () => {
     const value: OrgUnitRef = { id: 'org-1', code: 'ORG', name: 'Unidade de teste' };

@@ -1,69 +1,3 @@
-/**
- * T197 — `DashboardQueryService`: the sole Prisma-backed implementation of
- * `DashboardQueryPort` (`domain/ports/dashboard-query.port.ts`), backing
- * `GET /dashboard`'s Risk Management areas
- * (`contracts/platform.openapi.yaml`'s `getDashboard` operation, ~414,
- * FR-047 to FR-052).
- *
- * ## Aggregate in the database, never in application code
- *
- * Every number this service returns comes from a `COUNT(*)`/`FILTER`
- * aggregate evaluated by PostgreSQL. Nothing here fetches rows and counts
- * them in TypeScript — that would both duplicate the register's own
- * counting logic and be unable to meet plan.md's dashboard p95 budget
- * (≤600ms) at 50,000 risks (`prisma/seed/performance.seed.ts`, T200): a
- * full-table fetch to count in-process pays the network/deserialization
- * cost of every matching row on every dashboard load, where a `FILTER`
- * aggregate pays it once, inside the database, and returns a handful of
- * integers.
- *
- * ## Same conventions as `risk-query.service.ts` (this file's sibling)
- *
- * Read that file's header first — this one follows it exactly:
- *
- * - Raw SQL via `Prisma.sql`, every value parameterized; the only
- *   interpolated fragments are fixed, whitelisted literals this file
- *   builds from `@prisma/client`'s own enum exports (`RiskLevel`,
- *   `RiskStatus`) — never from request input (FR-106).
- * - `COUNT(*) OVER()` for a tile's `total` alongside its capped `items`
- *   page, in the SAME statement, so a 10-row tile does not cost a second
- *   round trip to learn how many rows exist beyond page 1. When the page
- *   comes back with zero items (either genuinely no matches, or the item
- *   cap is 0) there is no row to read `total` from, so `total: 0` is
- *   returned directly rather than a second `COUNT(*)` query — for these
- *   dashboard tiles (`limit` is always ≥1, from `GetDashboardUseCase`'s own
- *   constant), a zero-row page and a genuinely empty result are the same
- *   case, unlike the register's arbitrary-offset pagination.
- * - `scopeFragment` mirrors `risk-query.service.ts`'s OWN `scopeFragment`
- *   function verbatim (`GLOBAL` -> `TRUE`, empty `UNIT` scope -> `FALSE`,
- *   otherwise `org_unit_id = ANY(...)`) — the SAME "documented parity"
- *   pattern already established between that file's
- *   `overdueReviewFragment`/`domain/risk-overdue.ts`'s `isOverdueReview`.
- *   Not imported from that file because `RiskQueryService`'s own
- *   `scopeFragment` is a private, unexported function of a stable, already
- *   tested module — duplicating five lines here is materially safer than
- *   widening that file's surface to export a helper it has no other reason
- *   to expose. A change to the scope rule must update both; both carry
- *   this comment pointing at the other.
- * - `overdueTreatment` uses the IDENTICAL rule
- *   `domain/risk-overdue.ts`'s `isOverdueTreatmentAction` and
- *   `risk-query.service.ts`'s `overdueTreatmentExistsFragment` already
- *   encode: `status NOT IN ('COMPLETED','CANCELLED') AND due_on < today`.
- *   `overdueReview` uses the identical rule to
- *   `domain/risk-overdue.ts`'s `isOverdueReview`: `next_review_on IS NOT
- *   NULL AND next_review_on < today`.
- *
- * ## Risk level agrees with the register (ADR-006, Constitution VI)
- *
- * `byResidualLevel` groups the SAME `risks.residual_level` column the
- * register's `riskLevel`/`riskLevelBasis=RESIDUAL` filter reads
- * (`risk-query.service.ts`'s `riskLevelColumn`) — no separate scoring or
- * band lookup happens here. A risk's level is computed exactly once, by
- * `RiskScoringService` at assessment time, and stored on `risks.residual_level`
- * / `risks.inherent_level`; every reader (register, dashboard, this file)
- * reads that same column. See `test/contract/dashboard.spec.ts`'s
- * "agrees with the register" assertion for the end-to-end proof.
- */
 import { Injectable } from '@nestjs/common';
 import { Prisma, RiskLevel, RiskStatus } from '@prisma/client';
 
@@ -168,9 +102,6 @@ export class DashboardQueryService implements DashboardQueryPort {
 
     const row = rows[0];
     if (!row) {
-      // Unreachable in practice (a bare aggregate with no GROUP BY always
-      // returns exactly one row, even over zero matching source rows), but
-      // typed defensively rather than with a non-null assertion.
       return {
         total: 0,
         byResidualLevel: zeroed(ALL_RISK_LEVELS),
@@ -230,23 +161,6 @@ export class DashboardQueryService implements DashboardQueryPort {
     };
   }
 
-  // 007-implementation-remediation, Frente A, D-7 — both queries below read
-  // `actions` directly, by origin (`a.origin_type = 'RISK_TREATMENT' AND
-  // a.origin_id = r.id`) — `Action` is the sole authority for a risk
-  // treatment action's status/due date/title/responsible now (D-1);
-  // `risk_treatment_actions` no longer carries any of those columns. The
-  // scope predicate stays on `r` (the RISK) via the SAME `scopeFragment`
-  // as before — never on `a.org_unit_id`, which is a creation-time
-  // snapshot that can go stale after a reorganization (data-model.md §3's
-  // invariant; the SAME rule `overdueTreatmentExistsFragment` in
-  // `risk-query.service.ts` now follows). The overdue-eligible statuses are
-  // never a literal here — coordinator correction: this used to hand-write
-  // `IN ('OPEN', 'IN_PROGRESS')` independently of that file and of
-  // `grc/shared/domain/overdue.service.ts#isActionOverdue`, agreeing only
-  // because nobody had changed one without the others yet.
-  // `overdueEligibleActionStatusSqlList()` generates this text FROM that
-  // file's own array on every call, proven by
-  // `test/integration/overdue-eligible-status-consolidation.spec.ts`.
   async getOverdueActions(scope: ScopeFilter, limit: number): Promise<OverdueActionsRecord> {
     const todayParam = toDateOnlyParam(todayDateOnlyUtc());
     const overdueStatusList = Prisma.raw(overdueEligibleActionStatusSqlList());
@@ -285,11 +199,6 @@ export class DashboardQueryService implements DashboardQueryPort {
 
   async getTreatmentActionsSummary(scope: ScopeFilter): Promise<TreatmentActionsSummaryRecord> {
     const todayParam = toDateOnlyParam(todayDateOnlyUtc());
-    // Same authority, same generated text, as `getOverdueActions` above —
-    // see that method's own comment. `open_count` reuses the identical
-    // list for a plain "not yet terminal" count (no due-date condition);
-    // it is the SAME status set this front's specification treats as one
-    // rule, not a second, coincidentally-identical one.
     const overdueStatusList = Prisma.raw(overdueEligibleActionStatusSqlList());
 
     const rows = await this.prisma.client.$queryRaw<TreatmentSummaryRow[]>(Prisma.sql`
@@ -344,19 +253,11 @@ export class DashboardQueryService implements DashboardQueryPort {
   }
 }
 
-/**
- * Mirrors `risk-query.service.ts`'s own private `scopeFragment` — see this
- * file's header for why it is duplicated rather than imported. Every query
- * in this file joins `risks` under the alias `r`, so a single, fixed
- * `r.org_unit_id` reference (never request input) covers all of them.
- */
 function scopeFragment(scope: ScopeFilter): Prisma.Sql {
   if (scope.kind === 'GLOBAL') {
     return Prisma.sql`TRUE`;
   }
   if (scope.unitIds.size === 0) {
-    // CLAUDE.md "escopo vazio": a caller with no grants sees zeroed tiles,
-    // never an error and never every risk.
     return Prisma.sql`FALSE`;
   }
   return Prisma.sql`r.org_unit_id = ANY(${Array.from(scope.unitIds)}::uuid[])`;
@@ -370,15 +271,6 @@ function zeroed<T extends string>(keys: readonly T[]): Readonly<Record<T, number
   return Object.fromEntries(keys.map((key) => [key, 0])) as Record<T, number>;
 }
 
-/**
- * `requestedTransition` is stored as `"FROM_STATUS->TO_STATUS"`
- * (`Approval.requestedTransition`, `domain/ports/approval-repository.port.ts`).
- * Only the target status matters for display — reusing
- * `USER_MESSAGES.risk.history.approvalRequested`, the SAME sentence the
- * risk-history timeline already shows for this exact event
- * (`risk-history.service.ts`), rather than inventing a second phrasing
- * here.
- */
 function approvalRequestedDueContext(requestedTransition: string): string {
   const toStatus = requestedTransition.split('->')[1] as RiskStatus | undefined;
   const toLabel = toStatus

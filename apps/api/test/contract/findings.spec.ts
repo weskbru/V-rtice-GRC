@@ -1,17 +1,3 @@
-/**
- * D-11 coverage for `/findings` and
- * `/findings/{findingId}[/close|/reopen|/archive]` (T059-T066b,
- * 002-shared-grc-foundation US3): `listFindings`, `createFinding`,
- * `getFinding`, `updateFinding`, `closeFinding`, `reopenFinding`,
- * `archiveFinding` — the declared shape, the stated permission per route,
- * 401 for an unauthenticated caller, organizational-scope non-disclosure
- * (SC-005), the segregation-of-duties rule on closure (FR-025), Invariant
- * F1 (closure requirement), Invariant F3 (completing every action does not
- * close the finding), Invariant F4 (only CLOSED may be archived), the
- * `updateFinding`/`status` adversarial path (C5), severity vs. priority
- * independence (FR-022), and `EvidenceSubjectType.FINDING`/
- * `ActionOriginType.FINDING` (T072, FR-023).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -167,22 +153,11 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     'action:create',
     'action:view',
     'action:edit',
-    // FR-010/005-audit-findings — closing now requires an active evidence
-    // link too (Invariant F5, additive to F1). Every fixture in this file
-    // that closes a finding needs to be able to attach one.
     'evidence:create',
     'evidence:view',
     'evidence:link',
   ];
 
-  /**
-   * FR-010/005-audit-findings, T052 — attaches one active evidence link to
-   * `findingId`, satisfying Invariant F5 so a subsequent `POST
-   * .../close` is not refused for lacking evidence. Every Phase 1 test
-   * below that used to close a finding on justification/a completed
-   * action ALONE now calls this first — cited here once so each call site
-   * does not have to repeat the citation.
-   */
   async function attachEvidenceToFinding(
     agent: ReturnType<typeof request.agent>,
     findingId: string,
@@ -207,10 +182,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       .send({ subjectType: 'FINDING', subjectId: findingId });
     expect(linkResponse.status).toBe(201);
   }
-
-  // -------------------------------------------------------------------
-  // createFinding
-  // -------------------------------------------------------------------
 
   describe('POST /findings', () => {
     it('succeeds for a caller holding finding:create and returns the declared Finding shape, status OPEN', async () => {
@@ -267,13 +238,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(response.status).toBe(422);
     });
 
-    // Assurance fix (confirmed breach): a REAL, out-of-scope org unit and a
-    // NONEXISTENT org unit id used to produce two different 422 messages,
-    // letting a scope-limited caller probe for the existence of an
-    // organizational unit — exactly what this endpoint's own contract
-    // promises never happens. Asserts message EQUALITY, not merely status
-    // equality — the class of defect the audit found no existing test
-    // anywhere asserted.
     it('a real out-of-scope orgUnitId and a nonexistent orgUnitId produce the byte-identical 422 message', async () => {
       const { agent } = await agentWithPermissions(['finding:create', 'finding:view']);
 
@@ -294,10 +258,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(outOfScopeBody.detail).toBe(nonexistentBody.detail);
     });
   });
-
-  // -------------------------------------------------------------------
-  // listFindings
-  // -------------------------------------------------------------------
 
   describe('GET /findings', () => {
     it('refuses a caller lacking finding:view — 403, audited as DENIED', async () => {
@@ -368,10 +328,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // getFinding — scope non-disclosure (SC-005)
-  // -------------------------------------------------------------------
-
   describe('GET /findings/{findingId}', () => {
     it('an out-of-scope finding reads 404, byte-identical to an unknown id', async () => {
       const { agent: ownerAgent } = await agentWithPermissions(
@@ -392,17 +348,11 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(unknownResponse.status).toBe(404);
       const outOfScopeBody = outOfScopeResponse.body as ProblemBody & { type?: string };
       const unknownBody = unknownResponse.body as ProblemBody & { type?: string };
-      // `detail` legitimately differs only by the id itself — title, status
-      // and the stable `type` URI must be byte-identical (SC-005).
       expect(outOfScopeBody.title).toBe(unknownBody.title);
       expect(outOfScopeBody.status).toBe(unknownBody.status);
       expect(outOfScopeBody.type).toBe(unknownBody.type);
     });
   });
-
-  // -------------------------------------------------------------------
-  // updateFinding — severity/priority independence, C5 adversarial
-  // -------------------------------------------------------------------
 
   describe('PATCH /findings/{findingId}', () => {
     it('updates descriptive fields and severity without touching priority', async () => {
@@ -475,8 +425,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('Phase 6 correction: an archived finding rejects edits with 422, mirroring Evidence’s assertEvidenceEditable', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       const closeResponse = await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -498,8 +446,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('a CLOSED (not yet archived) finding stays editable — post-closure correction is legitimate', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       const closeResponse = await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -515,10 +461,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect((response.body as FindingBody).title).toBe('Correção pós-encerramento');
     });
   });
-
-  // -------------------------------------------------------------------
-  // closeFinding — F1, F2 (segregation of duties), F3
-  // -------------------------------------------------------------------
 
   describe('POST /findings/{findingId}/close', () => {
     async function findingWithCompletedAction(responsibleUserId: string): Promise<{
@@ -548,12 +490,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
         .send({ to: 'COMPLETED' });
       expect(completed.status).toBe(200);
 
-      // FR-010/005-audit-findings, T052 — quickstart.md §6 lists evidence
-      // as an explicit PRECONDITION of the segregation-of-duties scenario
-      // (Invariant F5 is checked BEFORE F2 in `CloseFindingUseCase`, see
-      // that file's own header): without this, every test below that
-      // exercises F2 through this fixture would now be refused 422 for
-      // missing evidence before F2 is ever reached.
       await attachEvidenceToFinding(agent, finding.id);
 
       return { agent, finding, action };
@@ -573,13 +509,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('F1: closing without a completed action but WITH a justification succeeds (FR-010: now also requires evidence, attached here)', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — before this fase, this exact
-      // fixture (justification alone, no evidence) already closed
-      // successfully. Invariant F5 now also requires an active evidence
-      // link, so this test attaches one to keep proving F1's own
-      // "justification alone satisfies F1" behaviour without conflating it
-      // with F5's separate requirement (SC-003's own hardening case is
-      // tested without this call, below).
       await attachEvidenceToFinding(agent, finding.id);
 
       const response = await agent
@@ -618,8 +547,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(deniedEvent).not.toBeNull();
       expect(deniedEvent?.outcome).toBe('DENIED');
 
-      // The finding must remain open — the refusal must not have partially
-      // applied.
       const stillOpen = await closerAgent
         .get(`/api/v1/findings/${finding.id}`)
         .set('Origin', appOrigin);
@@ -650,9 +577,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
         dueOn: '2035-01-01',
       });
       expect(actionResponse.status).toBe(201);
-      // Action stays OPEN — never transitioned to COMPLETED.
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
 
       const response = await agent
@@ -676,8 +600,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('closing twice is refused 422 the second time (already CLOSED is not a legal source state)', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — the first close used to succeed
-      // on justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       const first = await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -710,8 +632,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('emits a distinct finding.closed audit event', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -725,12 +645,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(auditRow).not.toBeNull();
     });
   });
-
-  // -------------------------------------------------------------------
-  // T053-T055/005-audit-findings — FR-010 hardening: closing now requires
-  // evidence, additive to Invariant F1 (justification/completed action)
-  // above, never a substitute for it.
-  // -------------------------------------------------------------------
 
   describe('closeFinding — Invariant F5 (FR-010, SC-003, additive to F1)', () => {
     it('T053: a finding that satisfies F1 (justification, no completed action) but has NO evidence at all is refused 422 — exactly the case that closed before this fase', async () => {
@@ -748,9 +662,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     });
 
     it('T054: an evidence archived AFTER being linked still sustains closure — only the ABSENCE of an active link refuses (spec.md edge case)', async () => {
-      // `evidence:administer` (archiving evidence) is not part of the
-      // shared `FULL_LIFECYCLE_PERMISSIONS` — added here only, the one
-      // test in this file that archives evidence rather than a finding.
       const { agent } = await agentWithPermissions([
         ...FULL_LIFECYCLE_PERMISSIONS,
         'evidence:administer',
@@ -777,8 +688,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
         .send({ subjectType: 'FINDING', subjectId: finding.id });
       expect(linkResponse.status).toBe(201);
 
-      // Archive the evidence WITHOUT unlinking it — its own status changes,
-      // the link's `unlinkedAt` stays null.
       const archiveResponse = await agent
         .post(`/api/v1/evidence/${evidence.id}/archive`)
         .set('Origin', appOrigin);
@@ -828,7 +737,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
         .send({ reason: 'Reabertura para novo teste.' });
       expect(reopenResponse.status).toBe(200);
 
-      // Genuinely unlink the evidence — not archive it.
       const unlinkResponse = await agent
         .post(`/api/v1/evidence/${evidence.id}/links/${link.id}/unlink`)
         .set('Origin', appOrigin);
@@ -841,11 +749,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(secondClose.status).toBe(422);
     });
   });
-
-  // -------------------------------------------------------------------
-  // T047-T049/005-audit-findings — startFindingRemediation: the operation
-  // that finally traverses OPEN -> IN_REMEDIATION (SC-002).
-  // -------------------------------------------------------------------
 
   describe('POST /findings/{findingId}/start-remediation (SC-002, FR-009)', () => {
     it('moves an OPEN finding to IN_REMEDIATION and emits finding.remediation_started with previous/new status', async () => {
@@ -937,12 +840,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // T056/005-audit-findings — SC-004: segregation of duties (Invariant
-  // F2, already existing since Phase 1) exercised through the real
-  // remediation producer (start-remediation), not only the manual path.
-  // -------------------------------------------------------------------
-
   describe('SC-004: segregation of duties exercised through the real remediation producer', () => {
     it('a finding moved to IN_REMEDIATION via start-remediation, remediated by A, cannot be closed by A — 403, audited; B closes it successfully', async () => {
       const { agent, userId: remediatorUserId } = await agentWithPermissions(
@@ -996,16 +893,10 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // reopenFinding
-  // -------------------------------------------------------------------
-
   describe('POST /findings/{findingId}/reopen', () => {
     it('reopens a closed finding, requires a reason, and preserves the previous closure in the audit trail', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -1041,8 +932,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('422/adversarial: reopening without a reason is refused', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -1070,8 +959,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('refuses a caller lacking finding:close — 403', async () => {
       const { agent: closerAgent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(closerAgent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(closerAgent, finding.id);
       await closerAgent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -1087,10 +974,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // archiveFinding — F4
-  // -------------------------------------------------------------------
-
   describe('POST /findings/{findingId}/archive', () => {
     it('F4/422: archiving a finding that is not CLOSED is refused', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
@@ -1105,8 +988,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('archives a CLOSED finding and emits finding.archived', async () => {
       const { agent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(agent, finding.id);
       await agent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -1129,8 +1010,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     it('refuses a caller lacking finding:administer — 403', async () => {
       const { agent: closerAgent } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(closerAgent);
-      // FR-010/005-audit-findings, T052 — this close used to succeed on
-      // justification alone; Invariant F5 now also requires evidence.
       await attachEvidenceToFinding(closerAgent, finding.id);
       await closerAgent
         .post(`/api/v1/findings/${finding.id}/close`)
@@ -1144,10 +1023,6 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
       expect(response.status).toBe(403);
     });
   });
-
-  // -------------------------------------------------------------------
-  // T072 — Evidence linked to a Finding, Action originated from a Finding
-  // -------------------------------------------------------------------
 
   describe('Evidence and Action integrity for Finding (T072, FR-023)', () => {
     it('evidence can be linked to a finding, and evidenceCount reflects it', async () => {
@@ -1300,17 +1175,8 @@ describe('Finding contract (T059-T066b, US3, D-11)', () => {
     });
   });
 
-  // -------------------------------------------------------------------
-  // SC-003 — full provenance reconstructable from the API
-  // -------------------------------------------------------------------
-
   describe('SC-003: closed finding provenance is reconstructable via the API', () => {
     it('reconstructs opening -> evidence -> action -> completion -> closure with actor and date at each step', async () => {
-      // FR-010/005-audit-findings, T052 — `FULL_LIFECYCLE_PERMISSIONS`
-      // already carries `evidence:create/view/link` (Invariant F5); this
-      // used to `.concat(...)` the same three identifiers again, which
-      // `createRoleWithPermissionsFixture` turned into a duplicate
-      // `RolePermission` insert and a unique-constraint failure.
       const { agent, userId } = await agentWithPermissions(FULL_LIFECYCLE_PERMISSIONS);
       const finding = await createFindingViaApi(agent);
 

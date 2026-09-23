@@ -1,9 +1,3 @@
-/**
- * T043/004-compliance-management, User Story 2 —
- * `RequirementControlLinkController`: `listRequirementControlLinks`,
- * `linkRequirementToControl`, `unlinkRequirementFromControl` (operations
- * 14-16).
- */
 import {
   Controller,
   Delete,

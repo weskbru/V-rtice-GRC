@@ -1,30 +1,3 @@
-/**
- * T051/002-shared-grc-foundation, US2 — `UpdateActionUseCase`
- * (`updateAction`). Field-by-field audit diff, mirroring
- * `grc/evidence/application/update-evidence.usecase.ts`'s own reasoning —
- * see that file's header for why the diff always compares against the
- * record's CURRENT value.
- *
- * `status` is NOT part of `UpdateActionInput` at all — matching
- * `contracts/grc-foundation.openapi.yaml`'s `UpdateActionRequest`, which
- * simply does not declare it (lifecycle transitions have their own
- * operation, `TransitionActionUseCase`, so each emits its own semantic
- * event rather than a generic update, FR-028).
- *
- * ## Scope is decided by the origin's CURRENT unit, not `Action.orgUnitId`
- *
- * Assurance fix (confirmed breach) — see
- * `assert-action-origin-in-scope.ts`'s header for the full reasoning. The
- * record is read unscoped, then `assertActionOriginInScope` re-checks the
- * origin's LIVE unit; the actual write is then issued against a
- * single-unit scope built from that SAME row's own currently-stored
- * `orgUnitId` (`unitScope([current.orgUnit.id])`) purely so it targets the
- * exact row already authorized above — it is never used as an access
- * decision, which is why it is safe even when that stored value is stale.
- * The audit entry's own `organizationalUnitId` uses the LIVE unit instead,
- * so the trail is visible to whoever currently holds scope, not to whoever
- * held it when the action was created.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -74,8 +47,6 @@ export class UpdateActionUseCase {
       throw new NotFoundDomainError(USER_MESSAGES.action.entityLabel, input.actionId);
     }
 
-    // Assurance fix — see this file's own header: gates the write on the
-    // origin's LIVE unit rather than `current.orgUnit` (possibly stale).
     const origin = await assertActionOriginInScope(
       input.actorUserId,
       input.actionId,
@@ -127,9 +98,6 @@ export class UpdateActionUseCase {
       return current;
     }
 
-    // Scoped to exactly this row's OWN currently-stored `orgUnitId` — never
-    // an access decision (that already happened above), only how the write
-    // targets the right row through the existing scoped repository method.
     const rowScope = unitScope([current.orgUnit.id]);
 
     return this.transactionRunner.run(async () => {

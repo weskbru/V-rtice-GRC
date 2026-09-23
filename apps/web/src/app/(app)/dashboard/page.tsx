@@ -1,83 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the platform's landing screen (FR-047 to FR-052, SC-013).
- *
- * ## What this screen is for
- *
- * Understand the general state, see what needs attention now, go to the right
- * place. Not a register and not business intelligence: anything that needs a
- * row per record belongs to the module that owns those records.
- *
- * ## Layout
- *
- * Hero (`DashboardHero`: greeting, title, one line of purpose, today's date)
- * → "O que requer atenção agora" (compact number cards) → "Visão dos
- * módulos" (one card per area, two
- * or three real figures side by side) → the distributions → "Ações rápidas".
- *
- * Contextual polish: attention icons, wash and left edge use `contextTone` —
- * the tile's own subject family (amber approvals, red overdue items and
- * incidents, blue upcoming deadlines, teal risk review, violet problems) —
- * the same IDENTITY mechanism the module cards below already use. Colour
- * never encodes severity on this screen; a tile's title, number and context
- * line say how urgent something is, never its tint.
- *
- * ## Tint means IDENTITY everywhere on this screen, never severity
- *
- * Every card on this screen wears its icon on a soft tint
- * (`DashboardIconChip`), and the meaning is now the SAME in every section —
- * `dashboard-icon-chip.tsx`'s own header is the full account:
- *
- * - **"O que requer atenção agora"** — tint is `contextTone`, the tile's
- *   own subject family, not urgency. "Ações atrasadas" is red because red
- *   is what this screen uses for that family, not because red means
- *   "danger" here — the word "atrasadas" and the figure beside it are what
- *   say the deadline was missed. A zero/undefined-value tile drops the
- *   stripe entirely regardless of family (`DashboardIconChip`'s `idle`),
- *   so "nothing to act on" still reads as visually quiet.
- * - **"Visão dos módulos"** — tint is AREA IDENTITY, unchanged since this
- *   screen's first version. "Incidentes" is red because it is Incidentes,
- *   the same red every time that card appears, regardless of how bad
- *   things are inside it.
- * - **"Distribuições"** — tint is AREA IDENTITY again (Dashboard V2 Fase
- *   D), same rule as the module cards, but applied ONLY through the icon
- *   chip and a thin base accent — never a surface wash, because a chart's
- *   own drawing already carries its own meaningful colour (risk level,
- *   status) that a wash would compete with. Not a fourth rule: it is the
- *   module-card rule, deliberately narrowed for this one section.
- *
- * Dashboard V2 Fase B had briefly made the attention edge mean SEVERITY
- * instead (red for overdue/blocked, amber for pending), with a
- * `severityTone()` helper computing tone from a by-severity breakdown for
- * the two tiles that sum across an entire range. A later round decided
- * identity reads better here too, exactly like the module cards beside it,
- * and that `severityTone()`/`tone` mechanism was removed along with every
- * call site that fed it.
- *
- * What the code guarantees today, and nothing beyond it: a tile's colour —
- * the left edge and the icon chip alike — comes from `contextTone`, the
- * identity of the subject it reports on. `DashboardStatCard` carries no
- * second, severity-driven colour layer. Whether any given tile also states
- * a critical count is a per-tile decision made by the `contextLabel` each
- * call site passes, and this comment makes no claim about it.
- *
- * ## Permission-aware by omission (FR-042)
- *
- * A capability the caller cannot read has no card. For risks, that is
- * `risk:view` (and `risk:approve` for approvals), exactly what `GET /dashboard`
- * already zeroes on the server. For every other area, presence in
- * `GET /dashboard/summary` IS the permission answer: the server omits a
- * catalogue metric — and a whole `breakdowns` block — whose source-domain read
- * permission the caller lacks. Nothing is fetched and hidden here;
- * `usePermissions()` is advisory display logic over what the server decided.
- *
- * ## Two requests, both aggregated server-side
- *
- * Nothing on this screen is counted from a downloaded list. The only
- * arithmetic is adding buckets or statuses that arrived together in one
- * response (`summary.ts#bucketTotal`, `#sumOf`), documented where it happens.
- */
 import { EmptyState, ErrorState, LoadingState } from '@pharos/design-system/components';
 import {
   AlertTriangle,
@@ -129,11 +51,6 @@ import type { ErrorStateProblem } from '@pharos/design-system/components';
 
 const SECTION_HEADING = 'text-base font-semibold text-foreground';
 
-/**
- * One status column taken from a domain's own status catalogue, present only
- * when the owning module's breakdown arrived — never a column of dashes for a
- * block the server did not send.
- */
 function optionalStatusMetric(label: string, value: number | undefined): DashboardModuleMetric[] {
   return value === undefined ? [] : [{ label, value, tone: 'info' }];
 }
@@ -150,11 +67,6 @@ export default function DashboardPage(): React.JSX.Element {
   useEffect(() => {
     let cancelled = false;
 
-    // Both requests together: independent aggregations owned by different
-    // modules. They fail differently on purpose — `/dashboard` failing leaves
-    // no landing screen, so the page errors with a retry; `/dashboard/summary`
-    // failing costs only the cross-domain half, and the page renders without
-    // it and SAYS so.
     Promise.allSettled([dashboardApi.getDashboard(), dashboardApi.getSummary()])
       .then(([dashboardResult, summaryResult]) => {
         if (cancelled) return;
@@ -245,21 +157,12 @@ export default function DashboardPage(): React.JSX.Element {
               aria-labelledby="dashboard-attention-heading"
               className={`flex flex-col gap-2.5 rounded-xl p-3.5 ${surfaces.attention}`}
             >
-              {/* The section is a PANEL with its own header row (icon +
-                  title), perceived first — the seven tiles read as
-                  signals INSIDE it, not titles floating loose over the
-                  page canvas with cards scattered under them
-                  (`025-dashboard-composition` F2). No link here: unlike a
-                  module card's own "Acessar X", there is no
-                  "ver todas as pendências" destination this platform
-                  actually has. */}
               <div className="flex items-center gap-2">
                 <Bell aria-hidden="true" className={`size-5 ${surfaces.attentionIcon}`} />
                 <h2 id="dashboard-attention-heading" className={SECTION_HEADING}>
                   {dashboard.sections.needsAttention}
                 </h2>
               </div>
-              {/* Six balanced columns on desktop; two rows of three on tablets. */}
               <div className="grid grid-cols-1 gap-2 min-[640px]:grid-cols-3 min-[1440px]:grid-cols-6">
                 {canDecideApprovals ? (
                   <DashboardStatCard
@@ -339,20 +242,12 @@ export default function DashboardPage(): React.JSX.Element {
             </section>
           ) : null}
 
-          {/* Overview retains its own visibility gate. Quick actions follow the
-              charts with their independent permissions unchanged. */}
           <div className="flex flex-col gap-3">
             {hasOverview ? (
               <section
                 aria-labelledby="dashboard-overview-heading"
                 className={`flex flex-col gap-2 rounded-xl p-3 ${surfaces.overview}`}
               >
-                {/* Same panel language as "O que requer atenção agora"
-                    (`025-dashboard-composition` F3): icon + heading inside
-                    its own surface, module cards read as signals INSIDE it.
-                    No link here either — "Acessar todos os módulos" has no
-                    real destination, same reasoning as the attention
-                    panel's own header. */}
                 <div className="flex items-center gap-2">
                   <LayoutGrid aria-hidden="true" className="size-5 text-foreground" />
                   <h2 id="dashboard-overview-heading" className={SECTION_HEADING}>
@@ -581,14 +476,6 @@ export default function DashboardPage(): React.JSX.Element {
               <h2 id="dashboard-distribution-heading" className="sr-only">
                 {dashboard.sections.distribution}
               </h2>
-              {/* Four column TRACKS, same as "Visão dos módulos" above (visual
-                  rhythm — card edges line up down the page), redistributed
-                  across three cards rather than left equal (`025-dashboard-
-                  composition` F4). "Riscos por nível (residual)" — four bars
-                  plus a scaled axis, the densest of the three — spans two
-                  tracks; the other two, a compact status list and a donut,
-                  take one each. No fourth card invented to fill the row, and
-                  no "Atividades recentes" substitute. */}
               <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
                 {canViewRisks ? (
                   <DashboardChartCard
@@ -629,9 +516,6 @@ export default function DashboardPage(): React.JSX.Element {
 
           <DashboardQuickActions />
 
-          {/* Rendered only when the registry actually holds something — an
-              always-present heading over an empty grid was the largest blank
-              region on an earlier build. The extension point itself stays. */}
           {data.plannedAreas.length > 0 ? (
             <section aria-labelledby="dashboard-planned-heading" className="flex flex-col gap-3">
               <h2 id="dashboard-planned-heading" className={SECTION_HEADING}>

@@ -5,21 +5,6 @@ import { ActionEditForm } from './action-edit-form';
 
 import type { Action } from '../types';
 
-/**
- * S-10 (CONSOLIDATED.md; A7-F10, A5-F02, A1-report.md's "74 entradas quase
- * idênticas" note) — regression coverage for `ActionEditForm`'s
- * "Responsável" field. Before this fix, `actionsApi.listUsers()` fetched a
- * single, fixed `pageSize=100` page and fed a plain `<Select>` — a user
- * outside that first page could never be chosen, with no search and no
- * indication anything was missing. `searchUsers(q)` now backs a `UserPicker`
- * (`SearchablePicker`-based) that searches the directory server-side.
- *
- * Reverting the fix (`ActionEditForm` back to `listUsers()` + `<Select>`)
- * makes this test fail: there is no `Buscar por nome ou e-mail…` search
- * input in the old markup at all, so the "far" user (returned only by a
- * search, never by the bounded first page) can never be found or selected.
- */
-
 const { searchUsersMock, updateActionMock } = vi.hoisted(() => ({
   searchUsersMock: vi.fn(),
   updateActionMock: vi.fn(),
@@ -56,9 +41,6 @@ const FAR_USER = { id: 'user-999', fullName: 'Usuário Além da Página 1' };
 beforeEach(() => {
   searchUsersMock.mockReset();
   updateActionMock.mockReset();
-  // The bounded "browse" page — mirrors the exact defect: a user beyond it
-  // (`FAR_USER`) is absent from the unsearched result, present only once
-  // the caller actually searches for them.
   searchUsersMock.mockResolvedValue({
     data: [{ id: 'user-1', fullName: 'Ana Souza' }],
     isPartial: true,

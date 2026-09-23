@@ -1,12 +1,3 @@
-/**
- * T023/003-controls-management — matches `contracts/controls.openapi.yaml`'s
- * `TransitionControlRequest` exactly: `additionalProperties: false` (global
- * `ValidationPipe`'s `forbidNonWhitelisted`). `justification` is required
- * for `toStatus: RETIRED` — enforced by the domain's `HAS_JUSTIFICATION`
- * precondition (`domain/control-lifecycle.ts`), not a conditional
- * class-validator decorator here, matching the same discipline
- * `TransitionRiskRequestDto` uses for its own gated transitions.
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

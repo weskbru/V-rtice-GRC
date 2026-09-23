@@ -1,19 +1,3 @@
-/**
- * T073/002-shared-grc-foundation, US3 — maps `FindingRecord`
- * (`domain/ports/finding-repository.port.ts`) to the wire shape
- * `contracts/grc-foundation.openapi.yaml`'s `Finding` schema describes.
- * ONE mapper is the only place a domain object becomes this DTO
- * (ADR-009), mirroring `evidence-response.mapper.ts`/
- * `action-response.mapper.ts`'s discipline.
- *
- * `auditEngagementId` (T089/005-audit-findings, research.md D-5) — `null`
- * for a finding recorded manually (`POST /findings`, FR-008); set for one
- * produced by `POST /audits/{auditId}/findings`
- * (`CreateFindingFromEngagementUseCase`, SC-001). Populated on EVERY read
- * of a `Finding`, not only the audit-engagement module's own
- * `FindingSummary` projection — the whole point of this task being tracked
- * separately from the rest of Phase 4 (`tasks.md` T089's own note).
- */
 import type { FindingRecord } from '../../domain/ports/finding-repository.port';
 import type {
   FindingCategory,

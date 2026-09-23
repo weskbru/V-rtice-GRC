@@ -1,15 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount-free evidence for T112 (`useRegisterState`, FR-092).
- *
- * `next/navigation` is mocked so `currentSearch` stands in for "the URL
- * right now" — tests set it before rendering to simulate a fresh visit, a
- * shared link, or the browser Back button restoring an earlier state, and
- * assert on what `router.replace` is called with to simulate the opposite
- * direction (the hook committing a change back to the URL).
- */
 const { replaceMock } = vi.hoisted(() => ({ replaceMock: vi.fn() }));
 let currentSearch = new URLSearchParams();
 
@@ -128,9 +119,6 @@ describe('useRegisterState', () => {
       act(() => {
         result.current.setStatus(['DRAFT']);
       });
-      // Simulates Next.js having navigated to the URL `setStatus` just
-      // committed — the debounce timer armed by `setSearch` above is still
-      // pending and must not later overwrite this.
       currentSearch = new URLSearchParams('status=DRAFT');
       rerender();
 
@@ -181,13 +169,9 @@ describe('useRegisterState', () => {
       act(() => {
         result.current.setSearch('fornecedor');
       });
-      // Back button: `q` is still absent (same as before typing started),
-      // but another param the user had set earlier is restored externally.
       currentSearch = new URLSearchParams('status=DRAFT');
       rerender();
 
-      // The debounce must NOT have been cancelled by this — the input still
-      // shows what the user typed.
       expect(result.current.searchInputValue).toBe('fornecedor');
 
       act(() => {
@@ -195,8 +179,6 @@ describe('useRegisterState', () => {
       });
 
       const lastCall = replaceMock.mock.calls.at(-1)?.[0] as string;
-      // Both survive: the Back-restored filter is not clobbered, and the
-      // in-flight search term is still applied on top of it.
       expect(lastCall).toContain('status=DRAFT');
       expect(lastCall).toContain('q=fornecedor');
     } finally {
@@ -216,14 +198,6 @@ describe('useRegisterState', () => {
     expect(result.current.searchInputValue).toBe('');
   });
 
-  /**
-   * The basis decides whether each risk's level is LABELLED residual or
-   * inherent. It never changes which risks come back, so it is not a filter:
-   * counting it as one let "Limpar filtros" silently switch the column the
-   * user was reading, and let an empty result set be explained as "no risk
-   * matches these filters" when the basis had nothing to do with it. It now
-   * sits with the ordering and the Cards/Tabela toggle.
-   */
   it('leaves the risk-level basis out of the filter state entirely', () => {
     currentSearch = new URLSearchParams('riskLevelBasis=INHERENT');
     const { result } = renderHook(() => useRegisterState());
@@ -250,7 +224,6 @@ describe('useRegisterState', () => {
     );
     const { result } = renderHook(() => useRegisterState());
 
-    // Four fields, not the five values selected across them.
     expect(result.current.activeFilterCount).toBe(4);
     expect(result.current.hasActiveFilters).toBe(true);
   });

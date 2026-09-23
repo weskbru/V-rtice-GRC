@@ -1,64 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, lifecycle action bar (T160, US6, FR-080 to
- * FR-085, FR-029/FR-029a-d, ADR-006).
- *
- * ## Renders exactly what the server returns; never re-derives the rules
- *
- * `GET /risks/{riskId}/lifecycle` already filters `availableTransitions` by
- * BOTH what is legal from the current state and what this caller is
- * permitted to do (`getRiskLifecycleUseCase`, the same permission resolver
- * the `PermissionGuard` uses). This component contains no transition table,
- * no permission check, and no precondition logic of its own — every button
- * below exists because one entry in `lifecycle.availableTransitions` said
- * so, and `POST /risks/{riskId}/transitions`/`POST .../approvals` still
- * re-evaluate the same table server-side on every request (FR-081).
- * Duplicating any of this client-side is exactly the drift ADR-006 exists
- * to prevent.
- *
- * ## The fetch itself lives at the PAGE, not here (016-risk-detail-experience
- * §4.7/§4.9, corrected 2026-09-15)
- *
- * Before 016, this component owned its own `GET .../lifecycle` fetch and its
- * own loading/error card — it mounted unconditionally, outside any tab, so
- * the request was never at risk of the "exactly two requests, page-level"
- * rule (§4.9) being violated by a section that only mounts once opened.
- * 016's contextual aside ("Atenção") and the "Ciclo de vida" section
- * (`RiskLifecycleSpine`, `components/detail/`) both need this SAME state,
- * and the aside is visible before any section is ever opened — so the fetch
- * moved up to `RiskDetailView` (`useRiskLifecycle`, `components/detail/`),
- * once, still page-level, still exactly the second of the two requests the
- * page fires on mount. This component now takes `lifecycle`/`loading`/
- * `loadError` as props instead of fetching them itself, and `onChanged`
- * alone is what the caller re-fetches after a mutation (both the risk AND
- * the lifecycle) — this component itself no longer re-fetches anything.
- *
- * ## Approval-gated is visibly different from immediate — not by colour
- *
- * A transition with `requiresApproval: true` renders with a different
- * VERB ("Solicitar aprovação: …" vs. "Aplicar: …"), a different ICON
- * (`Send`, evoking "submitted for someone else's decision", vs.
- * `ArrowRightCircle`, evoking "happens now"), and a different button
- * EMPHASIS (`outline` — a request, not yet a fact — vs. `default` — the
- * risk actually changes state). Three independent, non-color signals
- * (FR-091, SC-012's own reasoning applied to lifecycle actions): a reader
- * who cannot perceive colour still gets two different words and two
- * different icons.
- *
- * ## Self-approval (FR-029a)
- *
- * The decide controls (`Aprovar`/`Rejeitar`) are rendered only for a caller
- * holding `risk:approve` (`canApprove` — an advisory mirror, like every
- * other permission check in this app) AND whose id differs from the
- * pending approval's `requestedBy.id`. When the signed-in user IS the
- * requester, the controls are not merely hidden — `selfRequestNotice`
- * explains plainly why no decide action is offered, so a caller who
- * legitimately holds `risk:approve` for other risks is not left wondering
- * whether something is broken. The server remains the sole authority
- * either way — see `approval-dialogs.tsx`'s own doc comment for how a
- * refusal is still surfaced if the decision reaches the server regardless.
- */
 import { FormField, ReadOnlyField } from '@pharos/design-system/components';
 import { ArrowRightCircle, Loader2, Send } from 'lucide-react';
 import { useState } from 'react';
@@ -89,31 +30,13 @@ import type { ReactNode } from 'react';
 
 export interface RiskLifecycleActionsProps {
   riskId: string;
-  /** The risk's current `ETag` (ADR-013) — required by every transition/approval call. */
   etag: string;
-  /** The signed-in user's own id — used only to decide whether to offer the decide controls for a pending approval (FR-029a), never to enforce anything (the server does that unconditionally). */
   currentUserId: string;
-  /** Whether the caller holds `risk:approve` — advisory, like every permission check in this app (`usePermissions()`'s own module doc comment). */
   canApprove: boolean;
-  /** `GET /risks/{riskId}/lifecycle`'s own result, fetched once at the page level (`useRiskLifecycle`, `components/detail/`) — see this file's own header comment for why the fetch moved out of this component. */
   lifecycle: RiskLifecycleState | null;
   loading: boolean;
   loadError: boolean;
-  /** Called after any successful transition, approval request or decision. Like `AssessmentForm.onAssessed`, none of these responses carry the risk's full updated state, so the caller re-reads BOTH the whole risk and the lifecycle (`useRiskLifecycle`'s own `reload`). */
   onChanged: () => void;
-  /**
-   * The lifecycle trajectory visual (`RiskLifecycleSpineView`), rendered at
-   * the top of this SAME card, above the pending-approval condition and the
-   * transition buttons — never a second card with a second "Ciclo de vida"
-   * title (016-risk-detail-experience P1, corrected 2026-09-15: the spine
-   * and this card used to be two separate blocks, both of which could show
-   * a blocked transition's unmet-preconditions text, reading as the same
-   * pendency duplicated on screen). This component still owns the ONLY
-   * rendering of that text (below, per transition) — the trajectory itself
-   * never repeats it (see `RiskLifecycleSpineView`'s own doc comment).
-   * Omitted entirely when the caller has none (the loading/error states
-   * below never receive it, since there is no lifecycle yet to draw).
-   */
   trajectory?: ReactNode;
 }
 
@@ -136,13 +59,6 @@ function TransitionConfirmDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Fields are cleared on CLOSE, not in an effect keyed on `open` — this
-   * dialog stays mounted (Radix, not unmounted) across opens, and a
-   * `useEffect` that sets state synchronously on `open` becoming true trips
-   * `react-hooks/set-state-in-effect`. Resetting on the way out leaves the
-   * next open already blank, with the same net effect.
-   */
   function handleOpenChange(next: boolean): void {
     if (submitting) return;
     if (!next) {
@@ -372,11 +288,6 @@ export function RiskLifecycleActions({
                     ? risks.lifecycle.actions.requestApproval(riskStatusLabel(transition.toStatus))
                     : risks.lifecycle.actions.apply(riskStatusLabel(transition.toStatus))}
                 </Button>
-                {/* Clarity pass: who is the next functional actor for this
-                    transition, in business language — never the raw
-                    `resource:action` permission identifier (CLAUDE.md
-                    §11.1). Shown for every transition the server already
-                    offered, available or blocked alike. */}
                 <p className="pl-1 text-xs text-muted-foreground">
                   {risks.lifecycle.actions.authorizedFor(transition.requiredPermission)}
                   {transition.requiresApproval

@@ -1,13 +1,3 @@
-/**
- * T020/006-assets-processes — `UpdateAssetUseCase`: field-by-field update
- * with per-field audit (`PATCH /assets/{assetId}`, `updateAsset`
- * operation, FR-003). Mirrors
- * `grc/finding/application/update-finding.usecase.ts`'s structure — no
- * optimistic-lock version (`assets` carries no `version` column,
- * data-model.md §1/contract's own description — see
- * `contracts/assets.openapi.yaml`'s header for why no `If-Match` applies
- * here).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

@@ -9,46 +9,27 @@ import type { ComponentType, SVGProps } from 'react';
 
 export type MetricCardTone = 'neutral' | 'info' | 'warning' | 'danger' | 'success';
 
-/** One band of a `BY_BUCKET` metric (data-model.md §3), e.g. `RISK_TOTAL_BY_LEVEL`. */
 export interface MetricCardBucketEntry {
   level: RiskLevel;
-  /** Already-computed count for this band — never derived or re-aggregated here. */
   count: number;
 }
 
-/**
- * The metric's current value, in one of the two shapes the indicator catalog
- * defines (data-model.md §3, `shape`), or absent because the caller lacks
- * read permission on the metric's source domain (a report item the viewer
- * cannot see into).
- *
- * `status: 'unavailable'` is a distinct state, not a zero — CLAUDE.md §18.11
- * ("erros são compreensíveis sem depender só de cor") and the phase's own
- * acceptance criterion require this to be visually and semantically
- * impossible to confuse with a real computed zero.
- */
 export type MetricCardValue =
   | { status: 'available'; shape: 'single'; value: string; unit?: string }
   | {
       status: 'available';
       shape: 'byBucket';
       buckets: readonly MetricCardBucketEntry[];
-      /** Passed straight through to `RiskLevelBadge` — this component never restates that vocabulary. */
       badgeLabels: RiskLevelBadgeLabels;
     }
   | { status: 'unavailable'; unavailableLabel: string; unavailableHint?: string };
 
 export interface MetricCardProps {
-  /** Metric name, e.g. "Total de riscos por nível". Subordinate to the value (§18.11). */
   label: string;
-  /** Applicable organizational unit, e.g. "Unidade: Financeiro", or "Organização inteira" for an org-wide metric. Omit when the caller has nothing to show. */
   orgUnitLabel?: string;
-  /** Already-formatted "updated at" text, e.g. "Atualizado em 12/09/2026 14:32". */
   updatedAtLabel?: string;
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
-  /** Moderate semantic tint on the icon chip and a thin accent border only — same convention as `SummaryStatCard`. */
   tone?: MetricCardTone;
-  /** Renders a skeleton in place of `value`. `value` is still required and simply not read while true (same convention as `SummaryStatCard.isLoading`). */
   isLoading?: boolean;
   value: MetricCardValue;
   className?: string;
@@ -70,43 +51,6 @@ const ACCENT_BORDER_CLASSES: Record<MetricCardTone, string> = {
   success: 'border-l-status-success-solid-bg',
 };
 
-/**
- * Generic metric card for the Indicators/Reports module (data-model.md §3):
- * the calculated value dominates the card, and the metric label, applicable
- * organizational unit and "updated at" render as visibly subordinate
- * metadata beneath it (CLAUDE.md §18.11, "a informação importante domina os
- * metadados secundários").
- *
- * ## Two value shapes, one card
- *
- * `shape: 'single'` renders one dominant number (optionally with a smaller
- * adjacent unit, e.g. "%"). `shape: 'byBucket'` renders one dominant number
- * per band, each paired with the existing `RiskLevelBadge` as the band
- * indicator — this component never introduces a second severity-color
- * vocabulary (CLAUDE.md §19.6/§19.4); every `BY_BUCKET` metric in the
- * catalog (Risco, Achado, Incidente, Problema) uses the same
- * `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` shape `RiskLevelBadge` already renders,
- * even where the underlying domain enum has its own name
- * (`FindingSeverity`/`IncidentSeverity`/`ProblemSeverity`) — the caller maps
- * its domain value onto `RiskLevel` before handing it to this card.
- *
- * ## `status: 'unavailable'` is never a zero
- *
- * A report item the caller cannot read (missing source permission) renders
- * with a muted dashed treatment and an "eye-off" glyph plus the caller's own
- * explanatory text — never a bare `0`, which would misreport "computed and
- * empty" as if it were "not computed at all" (phase acceptance criterion,
- * CLAUDE.md §18.11).
- *
- * Deliberately not an extension of `SummaryStatCard`: that component is
- * documented as intentionally compact ("explicitly not a dashboard tile"),
- * takes a single pre-formatted string value, and has established call sites
- * across five register screens. Folding a three-way value shape
- * (single/byBucket/unavailable) into its props would change what that
- * component visually promises at every existing call site to serve a
- * genuinely different layout need — a new, purpose-built card that shares
- * its tone/icon-chip vocabulary is the smaller change (CLAUDE.md §19.4).
- */
 export function MetricCard({
   label,
   orgUnitLabel,

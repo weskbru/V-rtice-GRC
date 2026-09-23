@@ -1,14 +1,3 @@
-/**
- * `OrgScopeRepositoryPort` implementation backed by PostgreSQL via
- * `PrismaService` (T039, ADR-004). Lives in
- * `core/organizations/infrastructure` because `PrismaService`
- * (`infrastructure/prisma/prisma.service.ts`) is the top-level
- * `infrastructure` element, which only `core-infrastructure`/
- * `core-presentation` may import under the ADR-011 boundary rules.
- *
- * No caching here — that is `ScopeResolverService`'s job, one layer up,
- * via the separate `ScopeCachePort`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -21,9 +10,6 @@ import {
 
 import type { Prisma } from '@prisma/client';
 
-/** The one row `org_scope_cache_state` will ever hold (see the
- * `20260905130100_authorization_scope_cache_counters` migration, which
- * seeds it). */
 const SINGLETON_ROW_ID = 'singleton';
 
 @Injectable()
@@ -40,9 +26,6 @@ export class PrismaOrgScopeRepository extends OrgScopeRepositoryPort {
 
     return grants.map((grant) => ({
       scopeType: grant.scopeType,
-      // `exactOptionalPropertyTypes` forbids assigning `undefined` to an
-      // optional property explicitly — omit it entirely for a GLOBAL grant
-      // rather than setting `orgUnitId: undefined`.
       ...(grant.orgUnitId !== null ? { orgUnitId: grant.orgUnitId } : {}),
     }));
   }
@@ -61,10 +44,6 @@ export class PrismaOrgScopeRepository extends OrgScopeRepositoryPort {
       return new Set();
     }
 
-    // Each granted unit's own path is itself a prefix of its own path, so
-    // this single query returns the granted units AND every descendant
-    // (ADR-004: prefix match over the materialized `path` column) in one
-    // round trip, unioned across every granted unit via `OR`.
     const descendants = await this.prisma.client.organizationalUnit.findMany({
       where: { OR: grantedUnits.map((unit) => ({ path: { startsWith: unit.path } })) },
       select: { id: true },

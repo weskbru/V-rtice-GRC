@@ -1,12 +1,3 @@
-/**
- * 009-indicators-reports, Fase 3 (T031) — maps
- * `IndicatorDefinitionWithOwner`/`CreateIndicatorDefinitionResult`
- * (application layer) to the wire shape
- * `contracts/indicators.openapi.yaml`'s `IndicatorDefinition` schema
- * describes. ONE function is the only place a domain record becomes this
- * DTO (ADR-009), mirroring `toIncidentResponse`'s own single-mapper
- * discipline.
- */
 import type { IndicatorOwnerRef } from '../../application/resolve-indicator-owner';
 import type { IndicatorDefinitionRecord } from '../../domain/indicator-definition.entity';
 import type { IndicatorMetricKey, IndicatorThresholdComparator } from '@prisma/client';

@@ -1,10 +1,3 @@
-/**
- * T027/003-controls-management, User Story 2 — unit coverage for
- * `domain/control-assessment.entity.ts` (FR-010/FR-011) and for the
- * IMMUTABILITY of `ControlAssessment`: this file also documents, by
- * static inspection, that no update/delete function exists anywhere in
- * this module for the entity.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -62,14 +55,6 @@ describe('ControlAssessment is immutable by construction (FR-010)', () => {
           continue;
         }
         const contents = fs.readFileSync(fullPath, 'utf8');
-        // A real update/delete surface would name itself close to these
-        // shapes — `updateControlAssessment`/`deleteControlAssessment`/
-        // `UpdateControlAssessmentUseCase`, or a repository method literally
-        // called `update`/`delete` on a `ControlAssessment`-shaped port.
-        // `attest`/`setApprovalId` (this workstream's own two narrow,
-        // single-purpose exceptions — data-model.md §2/§4) are
-        // deliberately excluded from this pattern; they never touch
-        // `assessedOn`/`assessorUserId`/`result`/`conclusion`.
         if (/updateControlAssessment|deleteControlAssessment/i.test(contents)) {
           offenders.push(fullPath);
         }

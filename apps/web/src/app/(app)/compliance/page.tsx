@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — compliance framework register route (US1, T063), mirroring
- * `(app)/controls/page.tsx` exactly: `FrameworkListView` reads
- * `useSearchParams()`, which Next.js requires behind a `<Suspense>`
- * boundary.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

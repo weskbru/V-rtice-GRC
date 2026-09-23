@@ -1,35 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — indicator history section (T060, 009-indicators-reports,
- * US2/US6). Renders inside the indicator detail page's "Histórico" tab.
- *
- * ## The scope gate is explained, never a bare error (this task's own
- * ## explicit acceptance criterion)
- *
- * `GET/POST .../measurements` both require the caller's resolved scope to
- * be `GLOBAL` (research.md D-6). This component checks `useAuth().scope
- * .global` FIRST, before issuing any request: a `UNIT`-scoped caller never
- * even sees a loading spinner or a `403` — they see
- * `indicators.history.scopeRestricted`'s own explanation, rendered as an
- * ordinary, expected state (CLAUDE.md §18.11), never as `ErrorState`. The
- * server's own `403` (`CreateIndicatorMeasurementUseCase`/
- * `ListIndicatorMeasurementsUseCase`) remains the actual authorization
- * boundary (ADR-003) — this is advisory UI, same warning as
- * `usePermissions()`'s own — but the client-provided `EffectiveScope
- * .global` is not a permission the server might revoke asynchronously the
- * way an RBAC grant can be; it is the same scope the session itself
- * carries, so treating it as reliable here (rather than always attempting
- * the request and parsing a 403) is deliberate, not a shortcut.
- *
- * ## One fetch feeds both the chart and the table
- *
- * `TrendChart` (`@pharos/design-system`, T059 — its first real render) and
- * `DataTable` below both render the SAME page of `IndicatorMeasurement`
- * records from the SAME `listMeasurements` response — never two
- * independent fetches that could show a different set of points (the
- * defect class F-28 already paid for once, `docs/deferred-findings.md`).
- */
 import {
   DataTable,
   EmptyState,
@@ -60,9 +30,7 @@ import type { ErrorStateProblem, TrendChartSeriesDef } from '@pharos/design-syst
 export interface IndicatorHistorySectionProps {
   metricKey: IndicatorMetricKey;
   metricLabel: string;
-  /** Whether the metric's CURRENT `IndicatorDefinition` has a threshold configured — see `indicator-measurement-columns.tsx`'s own header for why this changes how `breached` renders. */
   hasThreshold: boolean;
-  /** Advisory-only (`usePermissions()`'s own warning) — hides the "Registrar medição" action for a caller who would definitely get a `403`. */
   canEdit: boolean;
 }
 
@@ -136,9 +104,6 @@ export function IndicatorHistorySection({
     try {
       await indicatorsApi.createMeasurement(metricKey);
       feedback.success(indicators.history.registerMeasurementSuccess(metricLabel));
-      // A new point sorts to the END of the ascending series — jump to the
-      // last page so the caller actually sees what they just recorded,
-      // rather than landing back on whatever page they started from.
       const refreshed = await indicatorsApi.listMeasurements(metricKey, {
         page: 1,
         pageSize: PAGE_SIZE,

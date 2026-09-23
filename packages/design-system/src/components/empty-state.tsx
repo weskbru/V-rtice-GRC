@@ -23,23 +23,14 @@ const DEFAULTS: Record<
 };
 
 export interface EmptyStateProps {
-  /**
-   * 'empty' — the collection genuinely has no records yet.
-   * 'no-results' — records exist but the current filters/search exclude
-   * all of them. The register (and any future filterable list) MUST tell
-   * these apart, since the correct next action differs (create vs. clear
-   * filters).
-   */
   variant?: EmptyStateVariant;
   title?: string;
   description?: string;
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
-  /** e.g. a "Create risk" or "Clear filters" button, owned by the caller. */
   action?: ReactNode;
   className?: string;
 }
 
-/** Platform-wide empty-state pattern (FR-045). */
 export function EmptyState({
   variant = 'empty',
   title,

@@ -1,7 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `GET /admin/permissions`
- * `resource` query parameter.
- */
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

@@ -5,11 +5,6 @@ import { RiskCard } from './risk-card';
 
 import type { RiskSummary } from '../types';
 
-/**
- * Component-mount evidence for the register's card view (CLAUDE.md §18,
- * SC-013) — mirrors `risk-register-columns.test.tsx`'s fixture shape so the
- * two views are exercised against comparable data.
- */
 const baseRisk: RiskSummary = {
   id: 'risk-1',
   code: 'RSK-2026-0001',
@@ -25,32 +20,10 @@ const baseRisk: RiskSummary = {
   overdueTreatment: false,
   pendingApproval: false,
   version: 1,
-  /**
-   * Midday UTC on purpose, not midnight. `updatedAt` is a `date-time`, and
-   * rendering an instant in the reader's local zone is correct — but
-   * `T00:00:00.000Z` lands on the PREVIOUS local day anywhere behind UTC
-   * (this repo's own machines run at UTC-3), which would make any assertion
-   * on the formatted text pass or fail depending on where the suite runs.
-   * Midday keeps the local calendar date stable from UTC-11 to UTC+11.
-   */
   updatedAt: '2026-09-04T12:00:00.000Z',
 };
 
 describe('RiskCard', () => {
-  /**
-   * Regression guard, added after a rendered-screen capture caught every
-   * card in the register reading "Atualizado em Invalid Date" with this
-   * whole suite green.
-   *
-   * The fixture above was never the problem — it already carried a realistic
-   * `date-time`. The problem was that no test asserted the rendered date at
-   * all, so a field visible on every single card had zero coverage and a
-   * wrong formatter (`formatDateOnly`, which is for `date` fields and
-   * produces `NaN` from an ISO timestamp) shipped straight past the suite.
-   *
-   * Asserting the formatted text — not merely that the label is present —
-   * is what makes this fail if the formatter is swapped back.
-   */
   it('renders the last update as a calendar date, never "Invalid Date"', () => {
     render(<RiskCard risk={baseRisk} riskLevelBasis="RESIDUAL" />);
 
@@ -75,10 +48,6 @@ describe('RiskCard', () => {
   });
 
   it('renders "no assessment" text, never a fabricated level, when the relevant level is absent', () => {
-    // F-18: the contract OMITS these fields when not yet assessed, never
-    // sends `null` — `residualLevel`/`inherentLevel` are optional now, so
-    // "unassessed" is modelled by destructuring them away, not by setting
-    // them to a value `exactOptionalPropertyTypes` no longer accepts here.
     const { residualLevel: _residualLevel, inherentLevel: _inherentLevel, ...rest } = baseRisk;
     const unassessed: RiskSummary = rest;
     render(<RiskCard risk={unassessed} riskLevelBasis="RESIDUAL" />);

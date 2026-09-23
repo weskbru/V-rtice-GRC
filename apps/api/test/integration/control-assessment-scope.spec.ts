@@ -1,23 +1,3 @@
-/**
- * 007-implementation-remediation, Frente D (D-11) — proves
- * `ControlAssessmentRepository.listAssessmentIdsInScope` now decides
- * visibility from `control_assessments.org_unit_id` directly, through the
- * shared `applyScopeToWhere` helper, rather than joining to
- * `controls.org_unit_id`.
- *
- * The case that actually distinguishes a correct denormalised column from
- * a stale one is not "a caller in unit A sees unit A's assessment" — a
- * hard-coded `true` would pass that too. It is: the refusal must SURVIVE a
- * control moving to a different unit. A join gets this right automatically
- * (it always re-reads the control's CURRENT unit). A denormalised column
- * gets it right only if something keeps it in sync when the control
- * moves — here, the `control_assessments_cascade_org_unit_from_control`
- * trigger the sibling migration
- * (`20260911010000_control_assessments_org_unit_id`) adds. This suite
- * exercises that trigger for real, through the repository's real
- * `create()`/`listAssessmentIdsInScope()` methods — never asserting
- * against the column directly.
- */
 import { randomUUID } from 'node:crypto';
 
 import { describe, expect, it, afterAll, beforeAll } from 'vitest';
@@ -61,7 +41,6 @@ describe('ControlAssessmentRepository.listAssessmentIdsInScope — column, not j
       unitAId,
     );
 
-    // Real create() -> exercises the BEFORE INSERT trigger for real.
     const created = await repo.create({
       controlId,
       assessedOn: new Date(),
@@ -92,9 +71,6 @@ describe('ControlAssessmentRepository.listAssessmentIdsInScope — column, not j
   });
 
   it('THE decisive case: after the control moves from A to B, the SAME assessment flips scope with it — proving the column tracks the move rather than having been correct only by coincidence at creation time', async () => {
-    // Before the move: A can see it, B cannot (already proven above, but
-    // re-asserted here as the "before" half of this specific test so it
-    // stands on its own).
     const beforeA = await repo.listAssessmentIdsInScope({
       kind: 'UNIT',
       unitIds: new Set([unitAId]),
@@ -106,16 +82,12 @@ describe('ControlAssessmentRepository.listAssessmentIdsInScope — column, not j
     expect(beforeA).toContain(assessmentId);
     expect(beforeB).not.toContain(assessmentId);
 
-    // Move the control itself — fires the AFTER UPDATE cascade trigger.
     await ctx.prisma.client.$executeRawUnsafe(
       `UPDATE controls SET org_unit_id = $2::uuid WHERE id = $1::uuid`,
       controlId,
       unitBId,
     );
 
-    // After the move: A must now be REFUSED (this is the case a stale
-    // denormalised column would get wrong — it would still say A) and B
-    // must now see it.
     const afterA = await repo.listAssessmentIdsInScope({
       kind: 'UNIT',
       unitIds: new Set([unitAId]),

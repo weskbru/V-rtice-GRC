@@ -1,11 +1,3 @@
-/**
- * Unit test for `ProblemMetricsAdapter.getCountByStatus`
- * (`src/modules/problems/infrastructure/problem-metrics.adapter.ts`), added
- * for `GET /dashboard/summary`'s `breakdowns.problems.byStatus`
- * (`get-dashboard-summary.usecase.ts`). Mirrors
- * `incident-metrics-adapter-count-by-status.spec.ts` exactly — see that
- * file's own header for the full reasoning this one does not repeat.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { ProblemMetricsAdapter } from '../../src/modules/problems/infrastructure/problem-metrics.adapter';

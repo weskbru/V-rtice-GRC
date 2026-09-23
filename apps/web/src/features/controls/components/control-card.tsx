@@ -1,18 +1,12 @@
 'use client';
 
-/**
- * PharosGRC — control catalog card view, one control (CLAUDE.md §18,
- * §18.12 — reusing exactly the pattern `risk-card.tsx` established rather
- * than inventing a Controls-specific visual language).
- *
- * Two `<Link>`s to the same destination (`/controls/{id}`), deliberately not
- * nested inside one another: the code, sitting above the rest of the card
- * (`relative z-10`) with its own, narrower click target; and the name, whose
- * stretched `::after` pseudo-element covers the whole card. Both resolve to
- * the exact same record — there is no intermediate quick-view step.
- */
 import { EmptyValue, StatusBadge } from '@pharos/design-system/components';
 import { Building2, ShieldCheck, User } from 'lucide-react';
+
+import { Link } from '@/components/navigation/link';
+import registerCardStyles from '@/components/register/register-card.module.css';
+import { controls } from '@/lib/messages/controls';
+import { cn } from '@/lib/utils';
 
 import { formatTimestampDate } from '../date';
 import {
@@ -25,11 +19,6 @@ import {
 } from '../status';
 
 import type { ControlSummary } from '../types';
-
-import { Link } from '@/components/navigation/link';
-import registerCardStyles from '@/components/register/register-card.module.css';
-import { controls } from '@/lib/messages/controls';
-import { cn } from '@/lib/utils';
 
 export interface ControlCardProps {
   control: ControlSummary;

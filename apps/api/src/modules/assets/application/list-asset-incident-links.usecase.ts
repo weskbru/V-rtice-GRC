@@ -1,15 +1,3 @@
-/**
- * 013-incidents-problems-reverse-links — `ListAssetIncidentLinksUseCase`:
- * the read-only reverse side of `IncidentAssetLink`, backing
- * `GET /assets/{assetId}/incidents`. `modules/assets` never writes to this
- * table — `modules/incidents` (`link-incident-asset.usecase.ts`) owns that
- * write path.
- *
- * Mirrors `modules/risk`'s own `ListRiskIncidentLinksUseCase` exactly:
- * resolve the caller's access to the asset they already hold
- * (`GetAssetUseCase`, `asset:view` + scope, gated on the controller) and
- * then read the far side's link table through its boundary port.
- */
 import { Injectable } from '@nestjs/common';
 
 import { IncidentAssetLinkReadPort } from '../../../shared/grc-ports/incident-asset-link-read.port';

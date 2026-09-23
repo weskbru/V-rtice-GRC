@@ -1,15 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new report route (009-indicators-reports, T061, US5).
- *
- * Gates on `report:create` before ever rendering `ReportForm` — `report:view` and `report:create`
- * are distinct permissions (`ReportController`), and a caller who only has the former must see an
- * explained permission-denied state, never a broken/erroring form (this task's own acceptance
- * criteria). This is an advisory UI courtesy only (`lib/permissions.ts`'s own module doc comment)
- * — `PermissionGuard` re-checks `report:create` unconditionally on the server regardless of this
- * check ever running.
- */
 import { EmptyState, PageHeader } from '@pharos/design-system/components';
 import { ShieldOff } from 'lucide-react';
 

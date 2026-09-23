@@ -1,16 +1,3 @@
-/**
- * T034/002-shared-grc-foundation, US1 — `EvidenceController`:
- * `contracts/grc-foundation.openapi.yaml`'s `/evidence` and
- * `/evidence/{evidenceId}/**` paths (`listEvidence`, `createEvidence`,
- * `getEvidence`, `updateEvidence`, `archiveEvidence`, `listEvidenceLinks`,
- * `linkEvidence`, `unlinkEvidence`). Every route carries its own
- * `@RequirePermission` (FR-033) — there is no route on this controller
- * without one.
- *
- * No `DELETE` route exists, and never will (FR-009: evidence is archived,
- * never physically deleted) — the contract itself defines no such
- * operation.
- */
 import {
   BadRequestException,
   Body,
@@ -225,11 +212,6 @@ export class EvidenceController {
   }
 }
 
-/** `UpdateEvidenceRequest`'s `minProperties: 1` — controller-level check,
- * mirroring `risk.controller.ts#assertUpdateBodyNotEmpty`'s own documented
- * reasoning (a key-count check misses `class-transformer`'s
- * own-property-with-`undefined`-value behavior under this project's
- * `target: ES2023`). */
 function assertUpdateBodyNotEmpty(body: UpdateEvidenceRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

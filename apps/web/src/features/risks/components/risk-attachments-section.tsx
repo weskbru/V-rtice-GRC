@@ -1,45 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Attachments section (T195, US9, FR-096 to
- * FR-100, FR-102).
- *
- * Consumes `GET/POST /attachments` and `DELETE /attachments/{attachmentId}`,
- * scoped to this risk via `entityType=RISK&entityId={riskId}`
- * (`risksApi.listAttachments`/`uploadAttachment`/`withdrawAttachment`,
- * ADR-008's entity-type registry). Renders through `AttachmentList`
- * (`@pharos/design-system`, T194) — a generic, domain-agnostic component;
- * this file supplies every word (D-10) and owns the fetch/pagination/
- * mutation lifecycle, mirroring `RiskCommentsSection`'s own pattern.
- *
- * ## The allow-list is communicated BEFORE an upload, not only after a refusal
- *
- * The server sniffs the uploaded bytes' actual magic number and requires
- * them to agree with the declared content type — PDF, PNG, JPEG or plain
- * text only, 25 MB maximum by default (`magic-bytes.ts`,
- * `.env.example`'s `ATTACHMENT_ALLOWED_MIME_TYPES`/`ATTACHMENT_MAX_SIZE_BYTES`).
- * `risks.attachments.allowedTypesHint` states this in the UI itself, always
- * visible next to the upload control (US9 AS3) — a user learns the
- * constraint before attempting an upload, not only from a `422`/`413`
- * refusal. `ACCEPTED_CONTENT_TYPES` below is the native file input's
- * `accept` hint only (a browser courtesy, easily bypassed) — the server
- * remains the sole authority, and its own refusal `detail` (already pt-BR)
- * is surfaced verbatim through `uploadErrorDetail`, never replaced with a
- * generic message.
- *
- * ## Withdrawing is audited, not erased (FR-102) — confirmed before it happens
- *
- * Same `ConfirmDialog`-gated pattern as `RiskCommentsSection`/
- * `RiskControlsSection`. `attachment:delete` carries no author restriction
- * server-side (`WithdrawAttachmentUseCase`), so `canWithdraw` applies
- * uniformly to every attachment for a caller holding it.
- *
- * ## Download never routes through this component's own fetch
- *
- * `AttachmentList` renders `Attachment.contentUrl` as a plain `<a href>` —
- * this section only ever passes that server-supplied path through
- * unchanged (ADR-010).
- */
 import { AttachmentList, ConfirmDialog } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -62,7 +22,6 @@ export interface RiskAttachmentsSectionProps {
 
 const PAGE_SIZE = 20;
 
-/** Native file input `accept` hint only — a courtesy, not the actual allow-list authority. Kept in sync with `magic-bytes.ts`'s `SNIFFABLE_CONTENT_TYPES` / `.env.example`'s `ATTACHMENT_ALLOWED_MIME_TYPES` default. */
 const ACCEPTED_CONTENT_TYPES = 'application/pdf,image/png,image/jpeg,text/plain';
 
 function toListItem(attachment: Attachment, canWithdraw: boolean) {
@@ -95,7 +54,6 @@ export function RiskAttachmentsSection({
   const [pendingWithdraw, setPendingWithdraw] = useState<Attachment | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
-  // Mirrors `RiskCommentsSection`'s own refresh-token convention.
   const [refreshToken, setRefreshToken] = useState(0);
   const requestKey = `${riskId}|${refreshToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
@@ -147,10 +105,6 @@ export function RiskAttachmentsSection({
       feedback.success(risks.attachments.uploadSuccess);
       setRefreshToken((token) => token + 1);
     } catch (err) {
-      // The server's own refusal reason — magic-byte mismatch (422),
-      // disallowed type (422) or excessive size (413) — is already pt-BR
-      // and specific (FR-097); surfaced verbatim rather than replaced by a
-      // generic failure message (US9 AS3).
       const detail = err instanceof ApiError ? err.problem.detail : undefined;
       setUploadErrorDetail(detail ?? risks.attachments.uploadGenericError);
       feedback.error(detail ?? risks.attachments.uploadGenericError);

@@ -2,12 +2,6 @@ import { z } from 'zod';
 
 import { findings } from '../messages/findings';
 
-/**
- * Client-side shape/presence validation for `FindingCreateDialog` (T075),
- * mirroring `contracts/grc-foundation.openapi.yaml`'s `CreateFindingRequest`
- * on shape only — the server is the last line, the same discipline
- * `lib/validation/evidence.ts`'s own header documents.
- */
 export const createFindingFormSchema = z.object({
   title: z.string().min(1, findings.form.validation.title.required),
   description: z.string().min(1, findings.form.validation.description.required),
@@ -22,9 +16,6 @@ export const createFindingFormSchema = z.object({
 
 export type CreateFindingFormValues = z.infer<typeof createFindingFormSchema>;
 
-/** `FindingEditDialog` — every field optional (PATCH-merge semantics), but
- * a value the user DID type for a required-when-present field (title/
- * description) must not be blanked out to empty. */
 export const editFindingFormSchema = z.object({
   title: z.string().min(1, findings.form.validation.title.required),
   description: z.string().min(1, findings.form.validation.description.required),

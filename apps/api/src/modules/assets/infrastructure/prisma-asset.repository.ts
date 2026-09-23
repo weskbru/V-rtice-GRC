@@ -1,26 +1,3 @@
-/**
- * T017-T021/006-assets-processes — `PrismaAssetRepository`, the sole
- * implementation of `AssetRepositoryPort`. Extends `AssetScopedRepository`
- * (T016), which fixes `applyScope`/`withScope` to `orgUnitId` — every
- * scoped method below is compile-time required to thread the caller's
- * `ScopeFilter` through it (FR-010).
- *
- * ## Reading `risk_asset_links`/`control_asset_links` directly — not a
- * boundary violation
- *
- * `findById` reads both link tables directly via the SAME `PrismaService`
- * client this repository already holds, filtered to `assetId = :id AND
- * unlinkedAt IS NULL` (FR-008, "só os vínculos ATIVOS"). This is NOT
- * `modules/assets` depending on `modules/risk`'s or `modules/controls`'s
- * domain ports — no import of either module's `*.repository.port.ts`
- * appears anywhere in this file. `modules/assets` OWNS the `assets` table
- * and, by the same reasoning `PrismaFindingRepository`'s header documents
- * for `actions`/`evidence_links`, reading the two link tables that carry a
- * foreign key BACK to this module's own row is a plain infrastructure-layer
- * read of the platform's one shared database, not a cross-module import
- * (data-model.md §9: "GET /assets/{id} mostra... lendo essas tabelas pelo
- * lado do dono — sem criar tabela nem tipo de vínculo novo").
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -64,8 +41,6 @@ export class PrismaAssetRepository extends AssetScopedRepository implements Asse
       },
       include: ASSET_INCLUDE,
     });
-    // A brand-new asset cannot yet be the target of any link — no query
-    // needed for `risks`/`controls`.
     return this.toAssetRecord(created, [], []);
   }
 
@@ -159,16 +134,6 @@ export class PrismaAssetRepository extends AssetScopedRepository implements Asse
       where.orgUnitId = { in: Array.from(filter.orgUnitId) };
     }
 
-    // FR-010/contract description — `orgUnitId` filter, when supplied, is
-    // always INTERSECTED with the caller's own authorized scope: it never
-    // widens the result. Applying `applyScope` AFTER the caller-supplied
-    // filter is what guarantees the intersection rather than an override —
-    // `applyScope` unconditionally sets/merges the scope predicate on top
-    // of whatever `where.orgUnitId` the block above already set, and
-    // `applyScopeToWhere`'s `UNIT` arm always REPLACES `where[scopeField]`
-    // with its own `{ in: [...] }`, so a caller-supplied `orgUnitId`
-    // outside scope narrows to nothing rather than ever being honored on
-    // its own.
     const scopedWhere = this.combineOrgUnitScope(scope, where, filter.orgUnitId);
 
     const orderBy: Prisma.AssetOrderByWithRelationInput[] = [
@@ -190,12 +155,6 @@ export class PrismaAssetRepository extends AssetScopedRepository implements Asse
     return { items: rows.map((row) => this.toSummaryRecord(row)), total };
   }
 
-  /** Intersects a caller-supplied `orgUnitId` filter with the resolved
-   * scope, rather than letting `applyScope` blindly overwrite it — a
-   * `GLOBAL` scope leaves the caller's own filter untouched; a `UNIT`
-   * scope narrows it to the intersection of the two sets (never their
-   * union), so `orgUnitId` "narrows, never widens" (contract's own
-   * wording) even for a caller whose scope already covers many units. */
   private combineOrgUnitScope(
     scope: ScopeFilter,
     where: Prisma.AssetWhereInput,

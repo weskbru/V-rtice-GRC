@@ -1,8 +1,3 @@
-/**
- * Unit tests for `PermissionResolverService` (T036, ADR-003). Pure unit
- * tests, no I/O: fake in-memory implementations of `PermissionRepositoryPort`
- * and `PermissionCachePort` stand in for PostgreSQL and `CacheProvider`.
- */
 import { describe, expect, it } from 'vitest';
 
 import { PermissionResolverService } from '../../src/core/authorization/application/permission-resolver.service';
@@ -28,9 +23,6 @@ class FakePermissionRepository extends PermissionRepositoryPort {
     return Promise.resolve(this.version);
   }
 
-  // T177 — not exercised by this suite (role/permission administration is
-  // covered by its own tests); stubbed only so this fake still satisfies
-  // the port's full interface.
   listAll(): ReturnType<PermissionRepositoryPort['listAll']> {
     return Promise.resolve([]);
   }
@@ -95,9 +87,6 @@ describe('PermissionResolverService', () => {
 
     expect(await service.hasPermission('user-1', 'risk:administer')).toBe(false);
 
-    // A role/permission change happens (would be done by the T177
-    // administration use case) — simulated here by mutating the
-    // repository's data and bumping the durable version counter.
     repository.permissionsByUser.set('user-1', ['risk:view', 'risk:administer']);
     await repository.bumpPermissionsVersion();
 
@@ -117,9 +106,6 @@ describe('PermissionResolverService', () => {
     await repository.bumpPermissionsVersion();
     await service.getEffectivePermissions('user-1');
 
-    // The old (version 1) entry is still sitting in the cache, unevicted —
-    // and that is fine, because the new lookup key embeds version 2 and
-    // never reads it.
     expect(cache.store.size).toBe(cacheSizeBeforeBump + 1);
     expect(await service.hasPermission('user-1', 'risk:view')).toBe(false);
   });

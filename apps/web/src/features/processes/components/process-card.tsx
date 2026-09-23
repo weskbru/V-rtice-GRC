@@ -1,24 +1,17 @@
 'use client';
 
-/**
- * PharosGRC — process catalog card view, one process (T046, CLAUDE.md §18,
- * §18.12). Mirrors `AuditEngagementCard`: no quick-view side panel for this
- * register, so the whole card is one stretched link to `/processes/{id}`, with
- * the code repeated as its own smaller link purely so it can be opened in a
- * new tab independently.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { Building2, Workflow } from 'lucide-react';
-
-import { formatTimestampDate } from '../date';
-import { processSituationLabel, processSituationVariant } from '../situation';
-
-import type { ProcessSummary } from '../types';
 
 import { Link } from '@/components/navigation/link';
 import registerCardStyles from '@/components/register/register-card.module.css';
 import { processes } from '@/lib/messages/processes';
 import { cn } from '@/lib/utils';
+
+import { formatTimestampDate } from '../date';
+import { processSituationLabel, processSituationVariant } from '../situation';
+
+import type { ProcessSummary } from '../types';
 
 export interface ProcessCardProps {
   process: ProcessSummary;

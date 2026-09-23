@@ -1,27 +1,3 @@
-/**
- * T049/004-compliance-management, User Story 3 (research.md D-11) — the
- * sole implementation of `RequirementComplianceAuditMarkRepositoryPort`.
- * Raw SQL, not the Prisma query builder: the whole point of this table is
- * a single atomic "insert if absent, else update only if the value
- * actually changed" statement pair, which Prisma's generated client has
- * no builder API for (an `upsert` always writes; it has no conditional
- * `WHERE` on the update branch). Every statement below is the exact
- * mechanism research.md D-11 specifies: `INSERT ... ON CONFLICT DO
- * NOTHING` for first-observation creation (never audited), then, only
- * when that inserted nothing, `UPDATE ... WHERE last_audited_state IS
- * DISTINCT FROM $new` for the race-free conditional change (D-11's own
- * concurrency guarantee: two concurrent transactions racing this UPDATE
- * serialize on the row lock, and the loser's own `WHERE` re-evaluates
- * against the winner's already-committed value, so at most one of them
- * ever sees a row affected).
- *
- * The single-row and batch variants share these two statement shapes; the
- * batch variant (`recordObservations`) builds one multi-row `VALUES (...)`
- * list per statement via `Prisma.join` instead of looping — two round
- * trips total regardless of how many requirements are being observed
- * (research.md D-10's own "uma leitura em lote", applied to this
- * bookkeeping write rather than to the compliance calculation itself).
- */
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 

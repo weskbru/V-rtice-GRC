@@ -5,11 +5,6 @@ import { NotificationBell } from './notifications';
 
 import type { Notification } from './notifications-api';
 
-/**
- * Component-mount evidence for T196 (`NotificationBell`, US9, FR-101).
- * `./notifications-api` is mocked at the network boundary.
- */
-
 const { listMock, markAllReadMock, markReadMock } = vi.hoisted(() => ({
   listMock: vi.fn(),
   markAllReadMock: vi.fn(),
@@ -60,7 +55,6 @@ describe('NotificationBell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Notificações' }));
 
     expect(await screen.findByText('Nenhuma notificação por enquanto.')).toBeInTheDocument();
-    // Never rendered as an error or a "coming soon" placeholder.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 

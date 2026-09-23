@@ -1,9 +1,3 @@
-/**
- * T158 — matches `contracts/risks.openapi.yaml`'s
- * `ApprovalDecisionRequest` exactly: `additionalProperties: false` (the
- * deciding user and timestamp are taken from the session, never from the
- * request body — FR-029a/FR-029b).
- */
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

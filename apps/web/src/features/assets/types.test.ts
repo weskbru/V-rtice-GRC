@@ -8,13 +8,6 @@ import type {
   UpdateAssetRequest,
 } from './types';
 
-/**
- * Compile-time regression tests locking shapes this module's contract
- * (assets.openapi.yaml) declares differently from a sibling module, or
- * declares deliberately different from what the interface might otherwise
- * assume — the same class of defect `features/audit-engagements/
- * types.test.ts`'s own tests guard against (assurance-audit Fix 3).
- */
 describe('OrgUnitRef (assets.openapi.yaml)', () => {
   it('is exactly {id, code, name} — the RISKS/CONTROLS-domain shape, unlike audit-engagements', () => {
     const value: OrgUnitRef = { id: 'org-1', code: 'ORG', name: 'Unidade de teste' };

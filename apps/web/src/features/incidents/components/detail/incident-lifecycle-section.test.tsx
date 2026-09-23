@@ -5,23 +5,6 @@ import { IncidentLifecycleSection } from './incident-lifecycle-section';
 
 import type { IncidentDetail } from '../../types';
 
-/**
- * Component-mount evidence for the "Ciclo de vida" card
- * (018-incident-detail-experience, Fase 2+3). Two guarantees this suite
- * exists to prove:
- *
- *   1. The behaviour change this rodada makes deliberately: the card keeps
- *      rendering its read-only track EVEN when `IncidentLifecycleActions`
- *      itself renders nothing (`!canTransition` or a terminal status) — see
- *      this component's own header comment. Before this rodada, the whole
- *      card WAS `IncidentLifecycleActions`, so this exact scenario used to
- *      make the card disappear entirely.
- *   2. The conditional outcome facts (resolution summary, resolved/closed
- *      at/by, cancellation reason) render ONLY when the underlying value is
- *      actually present on the incident — never a "Não definido" for a
- *      fact that has not happened yet.
- */
-
 vi.mock('../../api', () => ({
   incidentsApi: {
     transition: vi.fn(() => new Promise(() => undefined)),
@@ -55,15 +38,8 @@ describe('IncidentLifecycleSection', () => {
     );
 
     expect(screen.getByText('Ciclo de vida')).toBeInTheDocument();
-    // The track's own node labels are still on screen — `getAllByText`
-    // because the track renders twice in the DOM (once for the vertical,
-    // below-`sm` layout, once for the horizontal, `sm`+ layout — C1 fix,
-    // toggled with `hidden`/responsive `display`, the same dual-render
-    // `DetailLayout` itself already documents), and jsdom applies no real
-    // CSS layout to hide either copy from a query.
     expect(screen.getAllByText('Aberto').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Em andamento').length).toBeGreaterThan(0);
-    // But no transition button — the row this component owns is gone.
     expect(screen.queryByRole('button', { name: 'Iniciar atendimento' })).not.toBeInTheDocument();
   });
 
@@ -120,7 +96,6 @@ describe('IncidentLifecycleSection', () => {
     expect(screen.getByText('Resolvido em')).toBeInTheDocument();
     expect(screen.getByText('Resolvido por')).toBeInTheDocument();
     expect(screen.getByText('Carla Dias')).toBeInTheDocument();
-    // Closure/cancellation facts do not exist yet for a merely-resolved incident.
     expect(screen.queryByText('Fechado em')).not.toBeInTheDocument();
     expect(screen.queryByText('Motivo do cancelamento')).not.toBeInTheDocument();
   });

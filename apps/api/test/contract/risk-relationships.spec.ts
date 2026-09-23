@@ -1,12 +1,3 @@
-/**
- * D-11 coverage for every "Risk Relationships" and registry endpoint this
- * dispatch adds (T142/T143, FR-076, FR-077): the stated authorization rule
- * (including a caller lacking it refused, and — for the registries — a
- * zero-permission-beyond-risk:view caller genuinely succeeding), 401 for an
- * unauthenticated caller, and the declared response shape. Controls are
- * gated by `risk:treat`; processes and assets are gated by `risk:edit` —
- * distinct permissions per the contract, both exercised here.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -98,7 +89,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
       email: `${uniqueTestMarker('risk-relationship-contract-owner')}@example.test`,
     });
     ownerUserId = owner.id;
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
   });
 
@@ -144,13 +134,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     return { id: body.id, version: response.headers.etag! };
   }
 
-  // F-46 (ADR-020 part 4, `docs/deferred-findings.md`) — `LinkControlUseCase`
-  // now refuses a control outside the actor's organizational scope. Every
-  // agent this file creates (`agentWithPermissions`) is granted UNIT scope
-  // over the shared `orgUnitId` (`beforeAll`), so this fixture creates the
-  // control there too — omitting `orgUnitId` (defaulting to `null`) would
-  // now be out of scope for a UNIT-scoped actor and every "succeeds" test
-  // below would be refused by the very check this fix adds.
   async function createControl(): Promise<{ id: string; code: string; name: string }> {
     const prisma = ctx.app.get(PrismaService);
     return prisma.client.control.create({
@@ -163,15 +146,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
   }
 
-  // T034/T035 (006-assets-processes, FR-011, ADR-020 part 4) —
-  // `LinkAssetUseCase`/`LinkProcessUseCase` now refuse a target outside the
-  // actor's organizational scope. Every agent this file creates
-  // (`agentWithPermissions`) is granted UNIT scope over the shared
-  // `orgUnitId` (`beforeAll`), so — mirroring `createControl`'s own comment
-  // above, added for the identical reason by F-46 — these fixtures create
-  // the process/asset there too — omitting `orgUnitId` (defaulting to
-  // `null`) would now be out of scope for a UNIT-scoped actor and every
-  // "succeeds" test below would be refused by the very check this fix adds.
   async function createProcess(): Promise<{ id: string; code: string; name: string }> {
     const prisma = ctx.app.get(PrismaService);
     return prisma.client.process.create({
@@ -196,14 +170,8 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
   }
 
-  // -------------------------------------------------------------------
-  // Controls — risk:treat
-  // -------------------------------------------------------------------
-
   describe('POST /risks/{riskId}/controls', () => {
     it('succeeds for a caller holding risk:treat and returns the declared RiskControlLink shape', async () => {
-      // ADR-020 part 5 — linking a control now also requires `control:view`
-      // on the referenced control, not only `risk:treat`.
       const { agent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -261,8 +229,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
 
     it('returns 409 (type=conflict) when the control is already linked', async () => {
-      // ADR-020 part 5 — linking a control now also requires `control:view`
-      // on the referenced control, not only `risk:treat`.
       const { agent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -291,8 +257,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
 
   describe('GET /risks/{riskId}/controls', () => {
     it('succeeds for a caller holding ONLY risk:view and returns a plain array (not a paginated envelope)', async () => {
-      // ADR-020 part 5 — linking a control now also requires `control:view`
-      // on the referenced control, not only `risk:treat`.
       const { agent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -344,8 +308,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
 
   describe('DELETE /risks/{riskId}/controls/{linkId}', () => {
     it('succeeds for a caller holding risk:treat, withdraws the link and returns 204', async () => {
-      // ADR-020 part 5 — linking a control now also requires `control:view`
-      // on the referenced control, not only `risk:treat`.
       const { agent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -371,9 +333,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
 
     it('refuses a caller lacking risk:treat — 403', async () => {
-      // ADR-020 part 5 — this fixture's `creatorAgent` links a control
-      // before the DELETE is attempted, which now also requires
-      // `control:view` on the referenced control.
       const { agent: creatorAgent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -407,16 +366,8 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
   });
 
-  // -------------------------------------------------------------------
-  // Processes — risk:edit
-  // -------------------------------------------------------------------
-
   describe('POST /risks/{riskId}/processes', () => {
     it('succeeds for a caller holding risk:edit and process:view, and returns the declared RiskEntityLink shape', async () => {
-      // FR-011 (006-assets-processes) — creating this link now also
-      // requires `process:view` on the referenced process, not only
-      // `risk:edit` (ADR-020 part 5). This test used to grant only
-      // `risk:edit`; updated to cite the requirement it now exercises.
       const { agent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -459,9 +410,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
       expect(response.status).toBe(403);
     });
 
-    // FR-011, T038 (006-assets-processes, ADR-020 part 5) — a caller with
-    // link authority (`risk:edit`) but WITHOUT `process:view` is refused:
-    // authority is required on both sides of the link, never one alone.
     it('T038: refuses a caller holding risk:edit but NOT process:view — the referenced side is also required (ADR-020 part 5, FR-011)', async () => {
       const { agent: creatorAgent } = await agentWithPermissions([
         'risk:create',
@@ -482,11 +430,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
       expect(response.status).toBe(422);
     });
 
-    // T037 (006-assets-processes, SC-003, FR-010, FR-011) — a process
-    // outside the actor's organizational scope answers exactly as a
-    // nonexistent one, and no row is written. This is the defect the spec
-    // measures as open for this pair; the equivalent for
-    // `POST /risks/{riskId}/controls` already passes today (F-46).
     it('T037: refuses a process outside the actor organizational scope exactly as a nonexistent one, and writes no row', async () => {
       const { agent } = await agentWithPermissions([
         'risk:create',
@@ -600,16 +543,8 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
   });
 
-  // -------------------------------------------------------------------
-  // Assets — risk:edit
-  // -------------------------------------------------------------------
-
   describe('POST /risks/{riskId}/assets', () => {
     it('succeeds for a caller holding risk:edit and asset:view, and returns the declared RiskEntityLink shape', async () => {
-      // FR-011 (006-assets-processes) — creating this link now also
-      // requires `asset:view` on the referenced asset, not only
-      // `risk:edit` (ADR-020 part 5). This test used to grant only
-      // `risk:edit`; updated to cite the requirement it now exercises.
       const { agent } = await agentWithPermissions([
         'risk:create',
         'risk:view',
@@ -651,9 +586,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
       expect(response.status).toBe(403);
     });
 
-    // FR-011, T038 (006-assets-processes, ADR-020 part 5) — a caller with
-    // link authority (`risk:edit`) but WITHOUT `asset:view` is refused:
-    // authority is required on both sides of the link, never one alone.
     it('T038: refuses a caller holding risk:edit but NOT asset:view — the referenced side is also required (ADR-020 part 5, FR-011)', async () => {
       const { agent: creatorAgent } = await agentWithPermissions([
         'risk:create',
@@ -674,11 +606,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
       expect(response.status).toBe(422);
     });
 
-    // T037 (006-assets-processes, SC-003, FR-010, FR-011) — an asset
-    // outside the actor's organizational scope answers exactly as a
-    // nonexistent one, and no row is written. This is the defect the spec
-    // measures as open for this pair; the equivalent for
-    // `POST /risks/{riskId}/controls` already passes today (F-46).
     it('T037: refuses an asset outside the actor organizational scope exactly as a nonexistent one, and writes no row', async () => {
       const { agent } = await agentWithPermissions([
         'risk:create',
@@ -767,41 +694,7 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
     });
   });
 
-  // -------------------------------------------------------------------
-  // Registries — GET /processes, /assets. `GET /controls` moved OUT of
-  // this describe block (003-controls-management, Task A): it is no
-  // longer `RegistryController`'s Fase 1 minimal-registry endpoint —
-  // ownership transferred to the Controls Management module's own
-  // `ControlController` (`listControlCatalog`,
-  // `contracts/controls.openapi.yaml`), which requires `control:view`
-  // (never `risk:view` alone) and enforces real organizational scope on
-  // every row (data-model.md §9, FR-007) — a control with no organizational
-  // unit (this file's own `createControl()` fixture, used elsewhere in
-  // this file to exercise `RiskControlLink`, deliberately creates one with
-  // no `orgUnitId`) is therefore no longer visible to a caller who only
-  // holds a UNIT-scoped grant, which is a genuine, intentional tightening
-  // — not a regression. Equivalent coverage (200 for `control:view`, 403
-  // for zero permissions, 401 unauthenticated) now lives in
-  // `test/contract/control-catalog.spec.ts`.
-  //
-  // `GET /processes`/`GET /assets` moved the SAME way in
-  // 006-assets-processes (Fase 4, T029/T030): ownership transferred to
-  // `ProcessController`/`AssetController`, which require
-  // `process:view`/`asset:view` — the resource's OWN permission (FR-009),
-  // never `risk:view` alone. The two tests below used to assert the
-  // OPPOSITE — that `risk:view` alone was sufficient — which was exactly
-  // today's defect (US2, SC-002): a Controls/Compliance/Audit user with no
-  // authority over Risk could not browse the inventory their own module's
-  // link picker needs. They are rewritten here to prove the fix, per
-  // FR-009 and SC-006's own requirement that a test changed for this
-  // reason cites it explicitly. Equivalent, more complete coverage (scope
-  // filtering, search, pagination) lives in
-  // `test/contract/{assets,processes}.spec.ts`.
-  // -------------------------------------------------------------------
-
   describe('GET /processes | /assets', () => {
-    // FR-009 — reading the inventory requires the resource's OWN
-    // permission (`process:view`/`asset:view`), never `risk:view` alone.
     it('FR-009: GET /processes succeeds for a caller holding ONLY process:view (no risk:view at all)', async () => {
       const process = await createProcess();
       const { agent } = await agentWithPermissions(['process:view']);
@@ -830,10 +723,6 @@ describe('Risk Relationships and registry endpoints (T142, T143, FR-076, FR-077,
       expect(body.data[0]!.id).toBe(asset.id);
     });
 
-    // FR-009, T031 (006-assets-processes, SC-002) — the exact defect this
-    // fase closes: `risk:view` alone used to be sufficient for both
-    // endpoints (the assertion these two tests replaced); now it refuses,
-    // because the required authority is the resource's own.
     it('FR-009/T031: refuses a caller holding ONLY risk:view (no process:view) on GET /processes — 403', async () => {
       await createProcess();
       const { agent } = await agentWithPermissions(['risk:view']);

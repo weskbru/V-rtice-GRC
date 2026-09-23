@@ -7,12 +7,6 @@ import { AuditEngagementForm } from './audit-engagement-form';
 
 import type { AuditEngagement } from '../types';
 
-/**
- * Component-mount evidence for T076 (`AuditEngagementForm`) — mirroring
- * `control-form.test.tsx`'s/`risk-form.test.tsx`'s own conflict-handling
- * convention (ADR-013 equivalent): on a `409`, nothing already typed is
- * discarded. `../api` is mocked at the network boundary.
- */
 const { pushMock, backMock, createEngagementMock, updateEngagementMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   backMock: vi.fn(),
@@ -120,11 +114,6 @@ describe('AuditEngagementForm', () => {
     fireEvent.change(screen.getByLabelText(/^Fim do período/), { target: { value: '2026-03-31' } });
     fireEvent.click(screen.getByRole('combobox', { name: /Unidade organizacional/ }));
     fireEvent.click(await screen.findByRole('option', { name: 'PharosGRC' }));
-    // Lets the Radix `Select` above fully close before opening the
-    // `UserPicker` popover right after it — without this, the very next
-    // click opened nothing (`data-state` stuck at `closed`), a timing
-    // interaction between the two Radix layers this jsdom environment does
-    // not settle on its own between two synchronous `fireEvent.click` calls.
     await waitFor(() =>
       expect(screen.queryByRole('option', { name: 'PharosGRC' })).not.toBeInTheDocument(),
     );

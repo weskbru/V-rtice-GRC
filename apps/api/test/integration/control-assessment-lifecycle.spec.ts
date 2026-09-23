@@ -1,11 +1,3 @@
-/**
- * T035/003-controls-management, User Story 2 — end-to-end coverage
- * against the real database for the assessment/attestation lifecycle:
- * immutability, effectiveness before/after (D-2, FR-020), the two
- * independent segregation-of-duties invariants (C1/C2, FR-017/FR-018,
- * both audited on refusal per FR-019), and D-8's "at most one attestation
- * lifecycle, ever".
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -53,9 +45,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
     await ctx.close();
   });
 
-  /** A single actor holding both `control:test` and `control:approve` —
-   * used only as a NEUTRAL third party in the tests below, never as the
-   * assessor/owner under test in a segregation assertion. */
   async function setupThirdPartyActor(orgUnitId: string): Promise<User> {
     const actor = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('ctl-assess-third')}@example.test`,
@@ -112,8 +101,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
 
     const assessment = await recordAssessment(actor.id, controlId, 'EFFECTIVE');
 
-    // Recorded, but NOT attested: effectiveness is still NOT_ASSESSED
-    // (FR-016 — registering is not declaring).
     const rows = await ctx.prisma.client.controlAssessment.findMany({ where: { controlId } });
     const effectivenessBeforeAttestation = calculateControlEffectiveness(
       rows.map((row) => ({
@@ -127,8 +114,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
     );
     expect(effectivenessBeforeAttestation).toBe('NOT_ASSESSED');
 
-    // A SECOND, DIFFERENT actor requests and decides attestation (a
-    // neutral third party — never the assessor).
     const approver = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('ctl-assess-approver')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
@@ -172,7 +157,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
     );
     expect(effectivenessAfterAttestation).toBe('EFFECTIVE');
 
-    // FR-020 — the change is audited with previous and new value.
     const effectivenessAudit = await ctx.prisma.client.auditEvent.findFirst({
       where: {
         entityType: AuditEntityType.CONTROL_ASSESSMENT,
@@ -252,7 +236,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
     expect(refusalAudit).not.toBeNull();
     expect(refusalAudit!.newValues).toMatchObject({ violatedRules: ['ASSESSOR'] });
 
-    // Left PENDING — never attested.
     const row = await ctx.prisma.client.controlAssessment.findUniqueOrThrow({
       where: { id: assessment.id },
     });
@@ -363,7 +346,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
       assessmentId: assessment.id,
     });
 
-    // Second request while PENDING — refused.
     await expect(
       requestAttestationUseCase.execute({
         actorUserId: actor.id,
@@ -372,7 +354,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
       }),
     ).rejects.toThrow(ConflictDomainError);
 
-    // Decide it (no owner set, so no C2; a third party decides to avoid C1).
     const approver = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('ctl-assess-d8-approver')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
@@ -391,8 +372,6 @@ describe('Control assessment/attestation lifecycle (T035, FR-016-FR-020, D-2, D-
       justification: 'Evidência insuficiente.',
     });
 
-    // Requesting AGAIN after a decision is refused too (D-8: "inclusive
-    // depois de uma decisão de recusa").
     await expect(
       requestAttestationUseCase.execute({
         actorUserId: actor.id,

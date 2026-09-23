@@ -1,8 +1,3 @@
-/**
- * T061/005-audit-findings, US3 — the sole implementation of
- * `FindingRiskLinkRepositoryPort`. Sibling of
- * `prisma-finding-control-link.repository.ts`, same reasoning.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

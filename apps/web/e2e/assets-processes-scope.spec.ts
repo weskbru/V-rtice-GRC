@@ -10,39 +10,6 @@ import {
 
 import type { APIResponse } from '@playwright/test';
 
-/**
- * T055/006-assets-processes — E2E of organizational scope on Assets and
- * Processes (FR-010, FR-011, SC-003, SC-003b): an actor scoped to ONE
- * organizational unit never sees another unit's assets/processes in the
- * listing (not in the body, not in the total, not in pagination), a direct
- * read of an out-of-scope record answers exactly like it does not exist,
- * and a write that would LINK a risk to an out-of-scope asset/process is
- * refused identically to a nonexistent target — with no row ever written.
- *
- * Mirrors `audit-engagement-scope.spec.ts` (T084) shape-for-shape: a fresh
- * actor is provisioned through the real `/admin/users` +
- * `/admin/organization` UI (never the shared fixture pool, AGENTS.md), and
- * the "no row written" assertions read back through the SAME endpoints the
- * real UI uses (`GET /risks/{riskId}`'s own embedded `assets`/`processes`
- * arrays — there is no standalone `GET /risks/{riskId}/assets` list
- * endpoint; `risk-controls-section.tsx`'s own header comment states this
- * explicitly) rather than a SQL count this Playwright suite has no access
- * to.
- *
- * ## Role: "Risk Manager", not "Platform Administrator"
- *
- * `platform.seed.ts`'s "Risk Manager" is `globalScope: false` and holds
- * exactly `risk:edit`/`risk:create` plus `asset:view`/`process:view` — no
- * `asset:create`/`asset:edit`/`asset:administer` at all (write authority on
- * the inventory itself is Platform-Administrator-only, per this feature's
- * own task brief). That is precisely the shape this scenario needs: an
- * actor who CAN attempt the link (holds `risk:edit` and the read
- * permission on the target's own resource) but whose ORGANIZATIONAL SCOPE,
- * not their permission set, is what must refuse the out-of-scope attempt —
- * never conflating a 403 (missing permission) with the 422/404 this
- * feature's contract specifically requires so scope can never be inferred
- * from status code (ADR-020 parts 4/5).
- */
 test.describe('Organizational scope on Asset/Process listing and risk-link writes never leaks a 403 (FR-010/FR-011)', () => {
   requireSeedCredentials(
     'SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD are not set in the environment — point this run at a seeded backend to exercise the real organizational-scope journey.',
@@ -81,8 +48,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
 
     const uniqueSuffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-    // --- Resolve the two organizational units (mirrors
-    // `audit-engagement-scope.spec.ts` exactly) -----------------------------
     const orgUnitsResponse = await page.request.get('/api/v1/org-units');
     expect(orgUnitsResponse.ok(), await describeFailure(orgUnitsResponse)).toBe(true);
     const orgUnits = (await orgUnitsResponse.json()) as readonly {
@@ -95,8 +60,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
     expect(rootUnit, 'the always-seeded root unit must exist').toBeDefined();
     expect(grantedUnit, 'DIV-A-TEAM-1 must exist — run with SEED_DEV_FIXTURES=true').toBeDefined();
 
-    // --- Plant the OUT-OF-SCOPE asset and process under the root unit, as
-    // the Worker Admin (global scope), through the real UI -----------------
     const outOfScopeAssetName = `Ativo fora do escopo E2E ${uniqueSuffix}`;
     await page.goto('/assets/new');
     await expect(page.getByRole('heading', { name: 'Novo ativo' })).toBeVisible();
@@ -105,10 +68,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
       .getByLabel('Descrição')
       .fill('Ativo plantado fora do escopo concedido, para o E2E de escopo organizacional (T055).');
     await page.getByRole('combobox', { name: /Unidade organizacional/ }).click();
-    // The root unit is always this picker's FIRST option (ADR-004's
-    // materialized-path order) — the same choice `admin-access.spec.ts`/
-    // `audit-engagement-scope.spec.ts` already make for the identical
-    // reason, no scrolling required.
     await page.getByRole('option').first().click();
     await page.getByRole('button', { name: 'Cadastrar ativo' }).click();
     await page.waitForURL(/\/assets\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
@@ -129,10 +88,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
     await page.waitForURL(/\/processes\/[0-9a-fA-F-]+$/, { timeout: 15_000 });
     const outOfScopeProcessId = page.url().split('/').pop()!;
 
-    // --- Provision the scoped actor (T175/T084's own shape): "Risk
-    // Manager" (holds `risk:edit`/`risk:create` and `asset:view`/
-    // `process:view` — see this file's own header comment) plus a `UNIT`
-    // grant over `DIV-A-TEAM-1` ALONE ---------------------------------------
     const email = `e2e-asset-process-scope-${uniqueSuffix}@pharosgrc.local`;
     const fullName = `Usuário Escopo de Ativos/Processos E2E ${uniqueSuffix}`;
     const initialPassword = `${seedPassword}-AssetProcessScope-1`;
@@ -156,9 +111,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
     await page.getByRole('menuitem', { name: 'Papéis' }).click();
     const rolesDialog = page.getByRole('dialog');
     await expect(rolesDialog.getByRole('heading', { name: `Papéis de ${fullName}` })).toBeVisible();
-    // The pt-BR LABEL, not the stored `Role.name` this file's header names
-    // (ADR-022): `UserRolesDialog` prints every role through
-    // `roleDisplayName`, so "Risk Manager" is nowhere on this screen.
     await rolesDialog.getByText('Gestor de Riscos', { exact: true }).click();
     await rolesDialog.getByRole('button', { name: 'Salvar papéis' }).click();
     await expect(page.getByText('Papéis atualizados com sucesso.')).toBeVisible();
@@ -172,19 +124,10 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
     await page.getByRole('button', { name: 'Conceder escopo' }).click();
     await expect(page.getByText('Escopo concedido com sucesso.')).toBeVisible();
 
-    // --- Fresh sign-in as the new, narrowly-scoped actor -------------------
-    // This account was created (and its password set) by THIS test,
-    // seconds ago — known password, no guessing (D-17/research.md step 3,
-    // generalized to every call site sharing the pattern).
     await signOut(page);
     await signInAsFreshlyProvisionedUser(page, email, initialPassword);
     const actorOrigin = new URL(page.url()).origin;
 
-    // ======================================================================
-    // Read leak — listing: GET /assets, GET /processes never surface the
-    // root unit's inventory, not in `data`, not in `meta.total`, not across
-    // pagination (FR-010, SC-003b) -----------------------------------------
-    // ======================================================================
     const assetListResponse = await page.request.get('/api/v1/assets?pageSize=100');
     expect(assetListResponse.ok(), await describeFailure(assetListResponse)).toBe(true);
     const assetListBody = (await assetListResponse.json()) as {
@@ -209,9 +152,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
       'no row from the root unit may appear in a unit-A-scoped listing',
     ).toBe(false);
 
-    // `meta.total` must count ONLY what this actor can see — a total that
-    // included the out-of-scope row would leak its existence through a
-    // number even if `data` itself were filtered correctly.
     const scopedAssetIdsResponse = await page.request.get(
       '/api/v1/assets?pageSize=100&orgUnitId=' + grantedUnit!.id,
     );
@@ -222,10 +162,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
     };
     expect(assetListBody.meta.total).toBe(scopedAssetsBody.meta.total);
 
-    // ======================================================================
-    // Read leak — direct record read: GET /assets/{id}, GET /processes/{id}
-    // answer `404`, never `403` (non-disclosure, FR-010) --------------------
-    // ======================================================================
     const assetReadAttempt = await page.request.get(`/api/v1/assets/${outOfScopeAssetId}`);
     expect(assetReadAttempt.status(), await describeFailure(assetReadAttempt)).toBe(404);
     expect(assetReadAttempt.status()).not.toBe(403);
@@ -234,12 +170,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
     expect(processReadAttempt.status(), await describeFailure(processReadAttempt)).toBe(404);
     expect(processReadAttempt.status()).not.toBe(403);
 
-    // ======================================================================
-    // Write leak — the actor plants its OWN in-scope risk (under the ONE
-    // unit its grant actually covers), then attempts to link it to each
-    // OUT-OF-SCOPE target: `422` naming the field, never `403`, and no row
-    // written (FR-011, SC-003) ----------------------------------------------
-    // ======================================================================
     await page.goto('/risks/new');
     await expect(page.getByRole('heading', { name: 'Novo risco' })).toBeVisible();
     const riskTitle = `Risco do ator com escopo E2E ${uniqueSuffix}`;
@@ -271,7 +201,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
       return { etag: etag!, assets: body.assets, processes: body.processes };
     }
 
-    // --- Asset link ---------------------------------------------------------
     const beforeAssetLink = await readRisk();
     expect(beforeAssetLink.assets.length).toBe(0);
     const assetLinkAttempt = await page.request.post(`/api/v1/risks/${riskId}/assets`, {
@@ -290,8 +219,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
       'no asset link row may be written on a refused attempt',
     ).toBe(beforeAssetLink.assets.length);
 
-    // --- Process link (re-reads the ETag: the risk's version has not moved
-    // since the refused asset-link attempt above touched nothing) ----------
     const beforeProcessLink = await readRisk();
     expect(beforeProcessLink.processes.length).toBe(0);
     const processLinkAttempt = await page.request.post(`/api/v1/risks/${riskId}/processes`, {
@@ -312,9 +239,6 @@ test.describe('Organizational scope on Asset/Process listing and risk-link write
   });
 });
 
-/** Formats a failed `page.request` response for a test assertion message —
- * status plus body, mirroring `audit-engagement-scope.spec.ts`'s identical
- * helper. */
 async function describeFailure(response: APIResponse): Promise<string> {
   if (response.ok()) return '';
   return `expected 2xx, got ${String(response.status())}: ${await response.text()}`;

@@ -1,13 +1,3 @@
-/**
- * T073/002-shared-grc-foundation, US3 — `FindingController`:
- * `contracts/grc-foundation.openapi.yaml`'s `/findings` and
- * `/findings/{findingId}[/close|/reopen|/archive]` paths (`listFindings`,
- * `createFinding`, `getFinding`, `updateFinding`, `closeFinding`,
- * `reopenFinding`, `archiveFinding`). Every route carries its own
- * `@RequirePermission` (FR-033) — there is no route on this controller
- * without one, and no `DELETE` route exists (FR-027: findings are
- * archived, never physically deleted).
- */
 import {
   BadRequestException,
   Body,
@@ -195,9 +185,6 @@ export class FindingController {
     return toFindingResponse(archived);
   }
 
-  /** T047/005-audit-findings, US2 — `startFindingRemediation`, the
-   * operation that finally makes `OPEN -> IN_REMEDIATION` reachable
-   * (SC-002, research.md D-10). No request body. */
   @RequirePermission('finding:remediate')
   @Post(':findingId/start-remediation')
   @HttpCode(HttpStatus.OK)
@@ -213,9 +200,6 @@ export class FindingController {
   }
 }
 
-/** `UpdateFindingRequest`'s `minProperties: 1` — controller-level check,
- * mirroring `evidence.controller.ts#assertUpdateBodyNotEmpty`'s own
- * documented reasoning. */
 function assertUpdateBodyNotEmpty(body: UpdateFindingRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

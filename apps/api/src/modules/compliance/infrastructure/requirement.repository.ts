@@ -1,23 +1,3 @@
-/**
- * T026/004-compliance-management — `RequirementRepository`: the sole
- * Prisma-backed implementation of `RequirementRepositoryPort`. No
- * `ScopeFilter` anywhere (research.md D-2).
- *
- * `updateWithVersion` additionally guards against the narrow race
- * research.md D-4 accepts: the parent version publishing between the use
- * case's own `isRequirementEditable` check and this call. The
- * `requirements_immutable_after_publish` trigger (T006) would reject the
- * underlying `UPDATE` in that case — this method catches exactly that
- * Postgres error (by its `RAISE EXCEPTION` message, the only signal a
- * trigger-raised error carries) and reports it as a version conflict
- * rather than letting a raw database error escape to the client. This is
- * deliberately NOT the guarantee `requirement-immutability-trigger.spec.ts`
- * (T028) tests — that test proves the trigger fires when the ENTIRE
- * application layer, including this catch, is bypassed via raw SQL. This
- * catch is defense in depth for the ordinary HTTP path, tested by
- * `update-requirement-refused-after-publish.spec.ts` (T029) only via the
- * use case's own pre-check (the common path), not via forcing this race.
- */
 import { Injectable } from '@nestjs/common';
 import { Prisma as PrismaRuntime } from '@prisma/client';
 
@@ -42,10 +22,6 @@ type RequirementWithRelations = Prisma.RequirementGetPayload<{
   include: typeof REQUIREMENT_INCLUDE;
 }>;
 
-/** The trigger's own `RAISE EXCEPTION` message prefix
- * (`20260908100600_compliance_requirement_immutability_trigger/migration.sql`)
- * — matched narrowly so this catch never swallows an unrelated database
- * error. */
 const IMMUTABILITY_TRIGGER_MESSAGE_FRAGMENT = 'is immutable';
 
 @Injectable()

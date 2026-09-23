@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident register screen (008-incidents-problems, US1),
- * joining the shared exploration frame (CLAUDE.md §18.12): `PageHeader` (in
- * `page.tsx`) → KPI strip → collapsible `FilterBar` → `ResultsToolbar` →
- * `CardGrid`/`DataTable` → `PaginationFooter`, the same composition
- * `AssetCatalogView`/`AuditEngagementCatalogView` already use. No quick-view
- * side panel — this register's own message catalog carries no
- * `quickView`-shaped strings, matching `AssetCatalogView`'s own precedent.
- *
- * Never fetches more than the current page, never sorts/filters/paginates
- * client-side (same discipline as every other register in this product).
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -22,6 +10,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { common } from '@/lib/messages/common';
+import { incidents } from '@/lib/messages/incidents';
 
 import { incidentsApi } from '../api';
 import {
@@ -38,12 +32,6 @@ import { IncidentRegisterSummary } from './incident-register-summary';
 import type { IncidentRegisterView as CatalogViewMode } from '../hooks/use-incident-register-state';
 import type { IncidentRegisterQuery, IncidentSummary } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { common } from '@/lib/messages/common';
-import { incidents } from '@/lib/messages/incidents';
 
 type SortField = NonNullable<IncidentRegisterQuery['sort']>;
 

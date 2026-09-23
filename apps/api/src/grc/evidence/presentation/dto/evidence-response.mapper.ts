@@ -1,18 +1,3 @@
-/**
- * T034/002-shared-grc-foundation, US1 — maps `EvidenceRecord`
- * (`domain/ports/evidence-repository.port.ts`) to the wire shape
- * `contracts/grc-foundation.openapi.yaml`'s `Evidence` schema describes
- * (revised: no `fileId` — see that document's own revision note). ONE
- * mapper is the only place a domain object becomes this DTO (ADR-009),
- * mirroring `risk-response.mapper.ts`'s discipline.
- *
- * `expired` is computed HERE, on read, from `validUntil` and a
- * caller-supplied reference instant — never stored (data-model.md §6).
- * `linkCount` is populated only when the use case supplied it
- * (`EvidenceWithLinkCount`, R-010) — `undefined` maps to `0` rather than
- * omitting the field, since the schema types it as a plain (non-nullable)
- * integer.
- */
 import { isEvidenceExpired } from '../../domain/evidence.entity';
 
 import type { EvidenceRecord } from '../../domain/ports/evidence-repository.port';

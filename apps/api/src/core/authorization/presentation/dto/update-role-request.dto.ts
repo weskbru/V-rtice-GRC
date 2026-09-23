@@ -1,9 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s `UpdateRoleRequest`:
- * every property optional (partial update), `additionalProperties: false`,
- * `minProperties: 1` — enforced in `AdminRolesController` itself (see that
- * file), the same pattern `UpdateRiskRequestDto`'s header documents.
- */
 import { ArrayUnique, IsArray, IsOptional, IsString, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, reset user password (T181, FR-006, FR-017).
- * Resetting a password revokes every session the user holds — stated
- * plainly before submission (task brief, FR-017).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { KeyRound, Loader2 } from 'lucide-react';

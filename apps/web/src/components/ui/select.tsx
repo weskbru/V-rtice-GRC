@@ -52,25 +52,6 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  // T203/F-17: "item-aligned" (Radix's own primitive default, and what this
-  // file previously hard-coded) reproduces a real, confirmed Firefox defect
-  // — selecting an option several items down a long list leaves the
-  // listbox open (`docs/deferred-findings.md` F-17, reproduced directly in
-  // `e2e/admin-access.spec.ts`'s header comment). "item-aligned" positions
-  // the listbox by measuring and re-aligning the highlighted item against
-  // the trigger on open — in Firefox specifically, that same-frame
-  // measurement interacts with the pointerdown/pointerup pair used to
-  // commit a selection (`@radix-ui/react-select`'s `SelectItem` fires
-  // `handleSelect` only when `pointerup` lands on the item that recorded
-  // `pointerdown`), and a distant item's own alignment pass can shift
-  // layout between the two events. "popper" positioning never runs that
-  // realignment step — it anchors like an ordinary popover — which
-  // sidesteps the interaction entirely. This file's own styling for
-  // `position === "popper"` (the trigger-width sync a few lines below, the
-  // side-aware slide-in classes) was already present but dead: nothing
-  // ever selected "popper" until now, which is the "something this project
-  // does to this component" F-17 asked to establish, not a Radix defect —
-  // verified fixed in Firefox in this pass, not merely asserted.
   position = "popper",
   align = "center",
   ...props

@@ -1,16 +1,3 @@
-/**
- * T022/005-audit-findings — proves `grc/finding` never imports
- * `modules/risk` or `modules/controls` directly: every dependency it will
- * have on either (`FindingControlLink`/`FindingRiskLink`, Fase 5, owned by
- * the `grc/finding` workstream, out of this task's own scope) must cross
- * `shared/grc-ports/*` (`ControlDirectoryPort`, already reused unchanged;
- * `RiskDirectoryPort`, new — T012) — the first case registered in
- * research.md D-4 of a GRC-KERNEL module (`grc/**`), not a business
- * module, consuming a `shared/grc-ports/` port. Same filesystem-scan
- * method as `audit-engagements-module-boundary.spec.ts`/
- * `compliance-controls-risk-module-boundary.spec.ts` — this file does not
- * edit `grc/finding` itself, only reads it.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 

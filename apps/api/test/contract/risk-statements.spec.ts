@@ -1,21 +1,3 @@
-/**
- * T093/F-31 — `PUT /risks/{riskId}/causes` and `PUT /risks/{riskId}/consequences`
- * (`contracts/risks.openapi.yaml` ~320/~364, FR-057, ADR-013). Neither
- * route existed at all before this dispatch (`docs/deferred-findings.md`
- * F-31) — the causes/consequences editor was mounted on the risk detail
- * page and silently could not save. This file proves the fix end to end
- * against real HTTP, mirroring `risk-update.spec.ts`'s coverage shape for
- * `PATCH /risks/{riskId}` (D-11: success path, optimistic locking,
- * authorization, and the declared response shape) plus the replace-specific
- * behaviour the contract calls out: the complete list is replaced
- * (including emptying it), and the SAME `ETag`/`If-Match` mechanism the
- * risk aggregate already uses elsewhere covers BOTH lists —
- * `apps/web/src/features/risks/components/risk-causes-consequences.tsx`'s
- * own comment: "the ETag ... after either list saves successfully, so the
- * caller (and this component's *other* list) always mutate against the
- * current version" — proven here by using the `ETag` returned from a causes
- * save as the `If-Match` for the following consequences save.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -96,7 +78,6 @@ describe('PUT /risks/{riskId}/causes and /consequences (T093, F-31, FR-057, ADR-
       email: `${uniqueTestMarker('risk-statements-owner')}@example.test`,
     });
     ownerId = owner.id;
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
 
     const actorFixture = await createLocalUserFixture(prisma, {
@@ -160,9 +141,6 @@ describe('PUT /risks/{riskId}/causes and /consequences (T093, F-31, FR-057, ADR-
     const causesEtag = causesResponse.headers.etag!;
     expect(causesEtag).toBe(formatETag(1));
 
-    // The editor's own comment: the ETag from saving ONE list is what the
-    // OTHER list's next save must use — never a stale value carried from
-    // before the causes save.
     const consequencesResponse = await agent
       .put(`/api/v1/risks/${riskId}/consequences`)
       .set('Origin', appOrigin)
@@ -175,8 +153,6 @@ describe('PUT /risks/{riskId}/causes and /consequences (T093, F-31, FR-057, ADR-
     expect(consequencesBody[0]!.description).toBe('Nova consequência');
     expect(consequencesResponse.headers.etag).toBe(formatETag(2));
 
-    // Persisted, not merely echoed: a fresh GET agrees on both lists and
-    // the final version.
     const getResponse = await agent.get(`/api/v1/risks/${riskId}`).set('Origin', appOrigin);
     expect(getResponse.status).toBe(200);
     const detail = getResponse.body as RiskDetailBody;
@@ -384,7 +360,6 @@ describe('PUT /risks/{riskId}/causes and /consequences (T093, F-31, FR-057, ADR-
     expect(nonexistentBody.type).toBe(existingBody.type);
     expect(nonexistentBody.detail).toBe(existingBody.detail);
 
-    // Nothing written by the refused attempt.
     const getAfter = await agent.get(`/api/v1/risks/${riskId}`).set('Origin', appOrigin);
     expect((getAfter.body as RiskDetailBody).causes).toEqual([]);
   });

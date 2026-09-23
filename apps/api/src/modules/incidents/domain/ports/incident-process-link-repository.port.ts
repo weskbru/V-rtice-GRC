@@ -1,8 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `IncidentProcessLinkRepositoryPort`.
- * Sibling of `incident-risk-link-repository.port.ts`, same reasoning,
- * against `Process` instead of `Risk`.
- */
 import type { IncidentProcessLinkRecord } from '../incident-process-link.entity';
 
 export abstract class IncidentProcessLinkRepositoryPort {

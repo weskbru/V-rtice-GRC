@@ -1,66 +1,8 @@
-/**
- * Structural guard against F-32 (`docs/deferred-findings.md`) being
- * reintroduced: a seeded role's `description` is **product prose shown to a
- * customer's administrator**, not an engineering note.
- *
- * ## Why a guard exists at all
- *
- * These strings are seeded into `role.description` and rendered verbatim on
- * "Papéis e permissões" — since the 015 redesign, as the two-line body of
- * each role card, the most-read text on that screen. Nothing in the web app
- * contains them, so **no frontend gate could ever catch them**: F-32 was
- * found by a person reading a rendered screen, and F-63 confirmed it a
- * second time, seven months later, still unfixed. Between those two
- * readings the descriptions grew — Problem Manager reached 599 characters,
- * Risk Analyst 528 — because every phase that touched a role appended its
- * own justification to the user-facing string.
- *
- * Three rules, in descending order of seriousness, each of which F-32
- * recorded being broken:
- *
- *  1. **No internal specification artefact.** `spec.md`, `data-model.md`,
- *     `research.md`, `FR-017`, `D-13`, `§4`, `invariante P3`,
- *     `008-incidents-problems` — internal structure leaking into the
- *     product. The reasoning is not deleted; it moves to a code comment
- *     beside the definition, which CLAUDE.md §11.1 explicitly permits in
- *     any language.
- *  2. **No raw permission identifier.** `control:approve`,
- *     `risk:create/edit/assess/treat/transition` — an administrator picking
- *     a role needs to know what it lets someone DO, in business language.
- *     The identifier already has its own place on that screen, beside the
- *     pt-BR verb the web catalogue gives it; it does not belong in prose.
- *     Checked against the REAL catalogue (`getAllPermissionDefinitions()`),
- *     never a hand-copied list, so a permission added tomorrow is covered
- *     the day it is added.
- *  3. **A length ceiling.** The card gives the description two clamped
- *     lines. Past roughly 200 characters the essential sentence is pushed
- *     out of view by whatever came first, which is precisely how F-32's
- *     worst offenders read on screen.
- *
- * ## Non-vacuity
- *
- * A guard that passes because its detector matches nothing protects
- * nothing — the lesson of F-28/F-31/F-33, and of `openapi:check` describing
- * routes it could not see fields in. So the detectors here are also run
- * against the ACTUAL pre-fix strings, quoted from F-32/STATE.md §9, and
- * each must be caught. If someone weakens a pattern to let a new violation
- * through, that half of the suite goes red first.
- *
- * This guards the SEED, i.e. a definition written wrong in this repository.
- * It does not guard a description an operator types into a custom role
- * through the admin UI — that is user content, not shipped product text.
- */
 import { describe, expect, it } from 'vitest';
 
 import { SYSTEM_ROLE_DEFINITIONS } from '../../prisma/seed/platform.seed';
 import { getAllPermissionDefinitions } from '../../src/permission-catalogue';
 
-/**
- * Every shape an internal specification reference has taken in this
- * repository's role descriptions, as observed in F-32 and F-63. Kept as
- * named data so a future reviewer can see what each pattern is for instead
- * of decoding a regular expression.
- */
 const SPEC_ARTEFACT_PATTERNS: readonly { readonly label: string; readonly pattern: RegExp }[] = [
   { label: 'a spec-kit artefact filename', pattern: /\b\w+[-\w]*\.md\b/i },
   {
@@ -80,26 +22,14 @@ const SPEC_ARTEFACT_PATTERNS: readonly { readonly label: string; readonly patter
   },
 ];
 
-/** The real catalogue — never a hand-copied list (ADR-003's own rule, and
- * the reason `upsertPermissions` reads the same function). */
 const ALL_PERMISSION_IDENTIFIERS: readonly string[] = getAllPermissionDefinitions().map(
   (definition) => definition.identifier,
 );
 
-/**
- * Catches an identifier-shaped token that the catalogue does not (yet)
- * contain — `control:create/edit/test` collapses several at once, and a
- * permission renamed tomorrow would otherwise slip past the catalogue
- * check. Deliberately requires NO whitespace around the colon, so ordinary
- * pt-BR prose ("plataforma: usuários") is not a match.
- */
 const IDENTIFIER_SHAPED_TOKEN = /\b[a-z][a-z-]*:[a-z][a-z-]*\b/;
 
-/** F-32/STATE.md §9's own measurement: the card body is two clamped lines. */
 const DESCRIPTION_MAX_LENGTH = 200;
 
-/** The actual strings this guard exists to have rejected, quoted from
- * `docs/deferred-findings.md` F-32 and `specs/015-roles-permissions-surface/STATE.md` §9. */
 const HISTORICAL_VIOLATIONS: readonly { readonly label: string; readonly text: string }[] = [
   {
     label: 'Compliance Manager (spec directory + research.md + D-13)',
@@ -148,8 +78,6 @@ const HISTORICAL_VIOLATIONS: readonly { readonly label: string; readonly text: s
   },
 ];
 
-/** The three detectors, as one predicate, so the guard and its
- * non-vacuity proof exercise exactly the same code. */
 function findContentViolations(description: string): string[] {
   const violations: string[] = [];
 
@@ -204,10 +132,6 @@ describe('Seeded role descriptions are product prose (F-32)', () => {
   );
 
   it('gives every role a description of its own — no two roles read alike', () => {
-    // Segregation of duties is only legible if the two halves of each pair
-    // say different things. A copy-paste that collapses Risk Analyst into
-    // Risk Approver (or Control Owner into Control Approver) while trimming
-    // for length would otherwise pass every check above.
     const descriptions = SYSTEM_ROLE_DEFINITIONS.map((role) => role.description);
     expect(new Set(descriptions).size).toBe(descriptions.length);
   });
@@ -221,10 +145,6 @@ describe('Seeded role descriptions are product prose (F-32)', () => {
     expect(executor, `${a} must be seeded`).toBeDefined();
     expect(decider, `${b} must be seeded`).toBeDefined();
 
-    // The deciding half must name a decision in business language, and the
-    // executing half must not read as if it also decided. This is the one
-    // piece of meaning the length ceiling could plausibly squeeze out, so
-    // it is asserted rather than trusted.
     expect(decider!.description).toMatch(/\b(decide|decisão|atesta)\b/i);
     expect(executor!.description).toMatch(/\b(não|nunca)\b/i);
   });
@@ -244,9 +164,6 @@ describe('The F-32 guard is not vacuously true', () => {
   });
 
   it('rejects a description that is merely too long, with no forbidden token in it', () => {
-    // The length rule is independently non-vacuous: a 599-character
-    // Problem Manager description written entirely in clean product prose
-    // still fails the card, and this proves the ceiling is what catches it.
     const longButClean = 'Opera o registro de problemas no seu escopo organizacional. '.repeat(10);
 
     expect(findContentViolations(longButClean)).toEqual([]);
@@ -254,8 +171,6 @@ describe('The F-32 guard is not vacuously true', () => {
   });
 
   it('accepts ordinary pt-BR prose that uses a colon — the token detector is not trigger-happy', () => {
-    // `IDENTIFIER_SHAPED_TOKEN` would be useless if it also matched every
-    // enumeration these descriptions legitimately contain.
     const ordinary =
       'Acesso administrativo completo à plataforma: usuários, papéis, unidades organizacionais e ' +
       'configuração da metodologia.';

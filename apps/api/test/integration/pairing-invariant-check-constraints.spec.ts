@@ -1,22 +1,3 @@
-/**
- * Assurance fix (Fix 5, confirmed gap) — proves the additive CHECK
- * constraints from `20260907100000_pairing_invariant_check_constraints`
- * are real DATABASE backstops, not merely the "one use case happens to
- * write both columns together" guarantee the schema comments used to
- * claim alone (Invariant E3 had NO assertion function at all).
- *
- * Each test builds a valid base row through the ordinary, type-safe Prisma
- * Client API (so it can never itself violate an invariant it is not
- * testing), then attempts — via a direct raw SQL `UPDATE` that bypasses
- * every use case and every domain-level assertion — EXACTLY the one
- * invalid state the matching constraint forbids, isolated from every
- * other constraint on the same table. Every assertion pins PostgreSQL's
- * own `23514` (`check_violation`) SQLSTATE and the constraint's name, the
- * same locale-independent pattern `audit-append-only.spec.ts` already
- * establishes for this codebase's other database-level backstop. Without
- * the migration, every one of these `UPDATE`s would silently succeed —
- * the failure mode these tests exist to catch.
- */
 import { randomUUID } from 'node:crypto';
 
 import { Prisma, type PrismaClient } from '@prisma/client';

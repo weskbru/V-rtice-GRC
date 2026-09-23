@@ -1,24 +1,3 @@
-/**
- * T102 — combined filter, search and sort correctness against the real
- * test database (US3, `ListRisksUseCase`/`RiskQueryService`).
- *
- * CLAUDE.md is explicit that testing one filter at a time is not enough —
- * "a combinação é onde o bug mora" — so every scenario below applies AT
- * LEAST a status filter, a risk-level filter and a search term together,
- * and asserts the exact set AND order of the surviving rows, not just
- * "some rows came back".
- *
- * `inherentLevel`/`residualLevel`/`inherentScore`/`residualScore` are
- * written here directly through `ctx.prisma.client.risk.update(...)`
- * rather than through an assessment use case — US4 (assessment) is out of
- * scope for this task (CLAUDE.md's explicit boundary) and does not exist
- * yet. This is legitimate because T102's subject is the REGISTER's read
- * side: given values in those columns (however they got there), does
- * filtering/sorting/`riskLevelBasis` behave correctly. `data-model.md` §8
- * itself describes these columns as "a denormalization ... maintained in
- * the same transaction" by a later use case; this test exercises the
- * reader, not the writer.
- */
 import { randomUUID } from 'node:crypto';
 
 import { PrismaClient, RiskLevel, RiskStatus } from '@prisma/client';
@@ -53,7 +32,6 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
   let orgUnitId: string;
   let marker: string;
 
-  /** Ids keyed by a short mnemonic so assertions read as intent, not UUIDs. */
   const riskIds: Record<string, string> = {};
 
   beforeAll(async () => {
@@ -82,12 +60,8 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('risk-query-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // `marker` makes every seeded title/description uniquely findable by
-    // `q`, isolating this suite's assertions from any other risk that
-    // might exist in the (shared, never-truncated) `risks` table.
     marker = uniqueTestMarker('QUERYMARK').toUpperCase().replace(/-/g, '');
 
     async function seed(
@@ -113,10 +87,6 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       }
     }
 
-    // Deliberately varied on every axis a combined filter can touch, so a
-    // query that silently drops a predicate (AND becoming OR, or one
-    // filter overriding another instead of combining) produces a WRONG
-    // set, not coincidentally the right one.
     await seed(
       'a-draft-high-match',
       { title: `Alfa ${marker} risco de acesso` },
@@ -132,12 +102,12 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       { status: RiskStatus.DRAFT, residualLevel: RiskLevel.HIGH, inherentLevel: RiskLevel.LOW },
     );
     await seed(
-      'c-draft-low-match', // wrong risk level — must be excluded by the HIGH filter
+      'c-draft-low-match',
       { title: `Gama ${marker} risco de acesso` },
       { status: RiskStatus.DRAFT, residualLevel: RiskLevel.LOW, inherentLevel: RiskLevel.HIGH },
     );
     await seed(
-      'd-identified-high-match', // wrong status — must be excluded by the DRAFT filter
+      'd-identified-high-match',
       { title: `Delta ${marker} risco de acesso` },
       {
         status: RiskStatus.IDENTIFIED,
@@ -146,7 +116,7 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       },
     );
     await seed(
-      'e-draft-high-nomatch', // wrong text — must be excluded by the search term
+      'e-draft-high-nomatch',
       { title: 'Épsilon sem relação alguma', description: 'Nada a ver com o marcador.' },
       { status: RiskStatus.DRAFT, residualLevel: RiskLevel.HIGH },
     );
@@ -180,8 +150,6 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       sortDirection: 'asc',
     });
 
-    // Only rows satisfying ALL THREE predicates together: DRAFT status,
-    // RESIDUAL level HIGH, and the search marker in the text.
     expect(result.items.map((row) => row.id)).toEqual([
       riskIds['a-draft-high-match'],
       riskIds['b-draft-high-match'],
@@ -203,10 +171,6 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       sortDirection: 'asc',
     });
 
-    // 'a' has inherent CRITICAL (excluded), 'b' has inherent LOW (excluded),
-    // 'c' has inherent HIGH (residual LOW — excluded under RESIDUAL, but
-    // matches here) — proving the basis switch changes which column is
-    // actually consulted, not just which risks happen to match.
     expect(result.items.map((row) => row.id)).toEqual([riskIds['c-draft-low-match']]);
   });
 
@@ -216,7 +180,7 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       page: 1,
       pageSize: 50,
       q: marker,
-      status: [RiskStatus.ACCEPTED], // none of the seeded rows are ACCEPTED
+      status: [RiskStatus.ACCEPTED],
       riskLevelBasis: 'RESIDUAL',
       includeDescendants: true,
       sortField: 'code',
@@ -273,17 +237,6 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
     expect(desc.items.map((row) => row.id)).toEqual([...asc.items.map((row) => row.id)].reverse());
   });
 
-  /**
-   * N+1 proof (CLAUDE.md verification item 8): a page of 50 rows resolves
-   * category/orgUnit/owner/responsible via the JOINs already in
-   * `RiskQueryService`'s single statement, never one query per row. A
-   * SEPARATE `PrismaClient` with query-event logging enabled is used here
-   * (rather than the shared `PrismaService`, which does not enable Prisma's
-   * `log: [{emit: 'event', level: 'query'}]` option in production — adding
-   * it there would be a production behavior change this task does not
-   * need) pointed at the SAME test database, running the exact same
-   * `RiskQueryService` implementation.
-   */
   it('issues one SQL statement to list a full page — no N+1 resolving category/orgUnit/owner (CLAUDE.md verification item 8)', async () => {
     let queryCount = 0;
     const loggingClient = new PrismaClient({
@@ -314,16 +267,10 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
       });
 
       expect(page.items.length).toBeGreaterThan(0);
-      // Every relation the row needs (category/orgUnit/owner/responsible)
-      // must already be populated — proof the JOINs actually ran, not
-      // just that the count stayed low by coincidence.
       for (const row of page.items) {
         expect(row.orgUnit.id).toBeTruthy();
         expect(row.owner.id).toBeTruthy();
       }
-      // Exactly one statement for the data (the window-function query);
-      // the empty-page COUNT(*) fallback is not reached here since this
-      // page has rows.
       expect(queryCount).toBe(1);
     } finally {
       await loggingClient.$disconnect();
@@ -331,20 +278,6 @@ describe('Risk register — combined filter, search and sort correctness (T102, 
   });
 });
 
-/**
- * `sort=owner` orders by the owner's DISPLAY NAME (`owner.full_name`), not
- * the owner's opaque `owner_user_id`, and does so with pt-BR-correct
- * (accent-aware) ordering — see `RiskQueryService`'s `SORT_COLUMNS.owner`
- * comment for the collation reasoning and the measured performance cost.
- *
- * Owner ids are deliberately assigned so that UUID order and display-name
- * order DISAGREE: `ownerZoe`'s id sorts first among UUIDs while `Zoe`'s
- * name sorts LAST among these names, and vice versa for `ownerAlvaro`. A
- * test asserting only "some order came back" would pass against the old
- * (id-based) implementation too — asserting the actual owner names in the
- * response, in this specific sequence, is what makes these tests fail
- * against the pre-existing `r.owner_user_id` sort.
- */
 describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR-087)', () => {
   let ctx: IntegrationTestContext;
   let createRiskUseCase: CreateRiskUseCase;
@@ -352,15 +285,8 @@ describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR
   let actorId: string;
   let marker: string;
 
-  /** Small UUID — sorts FIRST by `owner_user_id`, even though `Zoe`'s name
-   * sorts LAST among this suite's owners. */
   const OWNER_ZOE_ID = '00000000-0000-0000-0000-0000000000f1';
-  /** Large UUID — sorts LAST by `owner_user_id`, even though `Álvaro`'s
-   * name sorts FIRST among this suite's owners (and, under plain byte/`C`
-   * ordering, an accented name like `Álvaro` would ALSO sort after `Zoe` —
-   * this id/name pairing catches both regressions at once). */
   const OWNER_ALVARO_ID = 'ffffffff-ffff-ffff-ffff-fffffffffff2';
-  /** Mid-range UUID, used only for the tie/pagination test below. */
   const OWNER_CARLOS_ID = '77777777-7777-7777-7777-777777777773';
 
   let ownerZoeName: string;
@@ -411,8 +337,6 @@ describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR
       fullName: ownerCarlosName,
       email: `${uniqueTestMarker('risk-query-owner-carlos')}@example.test`,
     });
-    // F-CV-2: all three are pure preconditions (this test's subject is
-    // SORTING by owner name, never their own permissions).
     await makeRiskAssignmentVisible(ctx.prisma, { user: ownerZoe, orgUnitId: orgUnit.id });
     await makeRiskAssignmentVisible(ctx.prisma, { user: ownerAlvaro, orgUnitId: orgUnit.id });
     await makeRiskAssignmentVisible(ctx.prisma, { user: ownerCarlos, orgUnitId: orgUnit.id });
@@ -428,9 +352,6 @@ describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR
       riskIds[key] = risk.id;
     }
 
-    // One risk each for Zoe and Álvaro (the accent/UUID-disagreement
-    // case), and TWO risks for Carlos, created in a known order, to prove
-    // the `code` tiebreaker still applies among risks sharing one owner.
     await seed('zoe-1', ownerZoe.id);
     await seed('alvaro-1', ownerAlvaro.id);
     await seed('carlos-1', ownerCarlos.id);
@@ -467,10 +388,6 @@ describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR
     const { names, ids, total } = await listByOwner('asc');
 
     expect(total).toBe(4);
-    // Álvaro's id sorts LAST but the name sorts FIRST; Zoe's id sorts
-    // FIRST but the name sorts LAST. Under the old `r.owner_user_id` sort
-    // this would come back Zoe, Carlos, Carlos, Álvaro — the REVERSE
-    // ordering of owner names — so this assertion fails against it.
     expect(names).toEqual([ownerAlvaroName, ownerCarlosName, ownerCarlosName, ownerZoeName]);
     expect(ids[0]).toBe(riskIds['alvaro-1']);
     expect(ids[3]).toBe(riskIds['zoe-1']);
@@ -478,16 +395,11 @@ describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR
 
   it('breaks ties on the same owner by `code`, ascending, without duplicates across pages', async () => {
     const page1 = await listByOwner('asc', 1, 1);
-    // Carlos owns two of the four risks; with pageSize=1 the two Carlos
-    // rows land on consecutive pages (positions 2 and 3 overall).
     const page2 = await listByOwner('asc', 2, 1);
     const page3 = await listByOwner('asc', 3, 1);
 
     expect(page2.names).toEqual([ownerCarlosName]);
     expect(page3.names).toEqual([ownerCarlosName]);
-    // `code` is a strictly increasing per-year sequence (domain/risk-code.ts)
-    // — creation order 'carlos-1' then 'carlos-2' means 'carlos-1' has the
-    // lower code and must come first within the tie.
     expect(page2.ids[0]).toBe(riskIds['carlos-1']);
     expect(page3.ids[0]).toBe(riskIds['carlos-2']);
     expect(page1.ids[0]).not.toBe(page2.ids[0]);
@@ -503,20 +415,6 @@ describe('Risk register — sort=owner orders by display name, pt-BR-correct (FR
   });
 });
 
-/**
- * Diagnostic guard, not a functional test: `RiskQueryService`'s
- * `SORT_COLUMNS.owner` (`apps/api/src/modules/risk/infrastructure/
- * risk-query.service.ts`) hardcodes `owner.full_name COLLATE
- * "pt-BR-x-icu"`. That collation is expected to exist on any PostgreSQL
- * built with ICU support — this machine's native PostgreSQL 18 and the
- * `postgres:17-alpine` image `docker-compose.test.yml`/CI use both should
- * qualify — but it cannot be verified against the CI/Docker image from this
- * machine (Docker is not installed here, see docs/local-environment.md
- * D-1). If that assumption is ever wrong, `GET /risks?sort=owner` would
- * fail with a bare `collation "pt-BR-x-icu" for encoding "UTF8" does not
- * exist` PostgreSQL error, with nothing pointing a reader at the cause.
- * This test turns that into an explicit, actionable failure instead.
- */
 describe('Diagnostic guard — ICU collation required by RiskQueryService.SORT_COLUMNS.owner', () => {
   it('fails with an explicit message naming the file/constant if the database lacks the "pt-BR-x-icu" ICU collation', async () => {
     const client = new PrismaClient({ datasourceUrl: TEST_DATABASE_URL });

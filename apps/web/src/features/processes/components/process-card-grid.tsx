@@ -1,21 +1,13 @@
 'use client';
 
-/**
- * The grid frame — list semantics, responsive columns and the
- * loading/error/empty contract — is the shared `CardGrid`; what stays
- * here is which card to render and a skeleton shaped like it.
- *
- * PharosGRC — process catalog card view, the grid of `ProcessCard`s (T046,
- * CLAUDE.md §18.12 — mirrors `AuditEngagementCardGrid`).
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { processes } from '@/lib/messages/processes';
 
 import { ProcessCard } from './process-card';
 
 import type { ProcessSummary } from '../types';
-
-import { Skeleton } from '@/components/ui/skeleton';
-import { processes } from '@/lib/messages/processes';
 
 export interface ProcessCardGridProps {
   processes: readonly ProcessSummary[];

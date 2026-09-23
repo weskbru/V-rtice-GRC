@@ -1,14 +1,3 @@
-/**
- * T040/005-audit-findings, User Story 1 — matches `GET /audits`'s query
- * parameters exactly (`contracts/audit.openapi.yaml`'s
- * `listAuditEngagements` operation): `status`, `orgUnitId` and
- * `leadAuditorUserId` are each a SINGLE value in the contract (unlike
- * `ListControlsQueryDto`'s comma-separated arrays) — `AuditEngagementController.list`
- * wraps each into a one-element array before calling
- * `ListAuditEngagementUseCase`, whose own `AuditEngagementListInput` accepts
- * an array for forward compatibility with a future multi-value filter, not
- * because this operation's contract asks for one today.
- */
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 

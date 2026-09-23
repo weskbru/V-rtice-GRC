@@ -1,18 +1,3 @@
-/**
- * Minimal, composable fixtures for integration tests (T031/T032 harness
- * deliverable: "the minimum rows other phases will need — a user, an org
- * unit"). Deliberately not a fake dataset: each function creates exactly
- * one row, using the real `PrismaService` (so it participates in the
- * caller's ambient transaction via `prisma.client`, exactly like
- * production code would), with sensible defaults and every field
- * overridable.
- *
- * Every fixture defaults its unique fields (`email`, `code`) to a fresh
- * `randomUUID()`-derived value, so tests never need a global reset between
- * them to avoid unique-constraint collisions — consistent with this
- * harness's "unique marker, not empty table" isolation strategy (see
- * support/database-roles.ts).
- */
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -71,13 +56,6 @@ export interface OrganizationalUnitFixtureOverrides {
   readonly status?: OrgUnitStatus;
 }
 
-/**
- * Creates a root-level organizational unit (no parent) by default. A
- * caller building a hierarchy passes `parentId`/`path`/`depth` explicitly
- * — this fixture does not attempt to maintain the materialized path
- * across a whole subtree (ADR-004's maintenance rule is application
- * logic, not test-fixture responsibility).
- */
 export async function createOrgUnitFixture(
   prisma: PrismaService,
   overrides: OrganizationalUnitFixtureOverrides = {},
@@ -98,12 +76,6 @@ export async function createOrgUnitFixture(
   });
 }
 
-/** The plaintext password every `createLocalUserFixture` call hashes by
- * default (T050-T055 test fixtures) — never a real secret, this is a
- * throwaway per-test-database value. Deliberately meets the seeded
- * password policy (min length 12, three character classes) so tests that
- * exercise policy-adjacent behavior are not tripped up by the fixture's own
- * password failing validation. */
 export const FIXTURE_USER_PASSWORD = 'Fixture-Passw0rd!';
 
 export interface LocalUserFixtureOverrides extends UserFixtureOverrides {
@@ -119,11 +91,6 @@ export interface LocalUserFixture {
   readonly rawPassword: string;
 }
 
-/** Creates a `User` + `LocalCredential` pair with a real argon2id hash
- * (fixed, low cost parameters — fast enough for tests, no bearing on the
- * cost parameters the running application uses in `apps/api/.env`, since
- * the stored hash is self-describing) so login-flow tests can authenticate
- * against a real, verifiable credential rather than a stubbed hash. */
 export async function createLocalUserFixture(
   prisma: PrismaService,
   overrides: LocalUserFixtureOverrides = {},
@@ -185,23 +152,6 @@ export interface MethodologyVersionFixtureOverrides {
   readonly effectiveFrom?: Date;
 }
 
-/**
- * T116/T117 (US4) — `RiskMethodology.isActive` is enforced by a GLOBAL
- * partial unique index (data-model.md §7: "exactly one active"), which is
- * NOT per-test-scoped the way a fixture's `email`/`code` uniqueness is —
- * this harness truncates `risk_methodologies` only ONCE, in
- * `global-setup.ts`, before the whole integration run starts (see
- * `database-roles.ts`'s own doc comment), so a second test file naively
- * creating a second `isActive: true` row would collide with whichever ran
- * first.
- *
- * This fixture is therefore idempotent for the METHODOLOGY itself — reusing
- * the existing active one if any test has already created it — and always
- * adds a fresh VERSION under it (append-only, so a fresh version per call
- * is exactly what production code does on every "publish" too). Each test
- * gets its own new version to assert against; none needs its own private
- * methodology.
- */
 export async function createMethodologyVersionFixture(
   prisma: PrismaService,
   createdByUserId: string,
@@ -223,10 +173,6 @@ export async function createMethodologyVersionFixture(
     data: {
       methodologyId: methodology.id,
       versionNumber: nextVersionNumber,
-      // Same "genuinely required once checked against Prisma's stricter
-      // JSON input type" cast as `methodology.seed.ts` — see that file's
-      // comment for why `as unknown as object` (what `eslint`'s
-      // type-aware rule suggests) does not actually satisfy `tsc`.
       probabilityScale: (overrides.probabilityScale ??
         DEFAULT_SCALE) as unknown as Prisma.InputJsonValue,
       impactScale: (overrides.impactScale ?? DEFAULT_SCALE) as unknown as Prisma.InputJsonValue,

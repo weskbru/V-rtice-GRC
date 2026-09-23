@@ -10,12 +10,10 @@ import { PageSizeSelect } from './page-size-select';
 import type { DataTableLabels } from './types';
 
 export interface PaginationFooterProps {
-  /** 0-based. */
   pageIndex: number;
   pageSize: number;
   totalRows: number;
   pageSizeOptions?: readonly number[];
-  /** Hide only when the caller renders the same page-size control above the results. */
   showPageSize?: boolean;
   onPageIndexChange: (pageIndex: number) => void;
   onPageSizeChange: (pageSize: number) => void;
@@ -25,19 +23,8 @@ export interface PaginationFooterProps {
 
 type PageWindowItem = number | 'ellipsis';
 
-/**
- * Windows a 1-based page range down to a small, fixed-size set of numbered
- * entries — the first page, the last page, the current page and one
- * neighbour on each side — with a non-interactive `'ellipsis'` marker
- * standing in for each collapsed run in between. Below the threshold where
- * everything already fits (`pageCount` small enough that first + last +
- * current + both neighbours + two ellipses would cover the whole range
- * anyway), every page number is returned as-is and no ellipsis is ever
- * inserted just to be inserted.
- */
 function buildPageWindow(currentPage: number, pageCount: number): PageWindowItem[] {
   const siblingCount = 1;
-  // first + ellipsis + (siblingCount neighbours + current + siblingCount neighbours) + ellipsis + last
   const totalPageNumbersWithoutCollapsing = siblingCount * 2 + 5;
 
   if (totalPageNumbersWithoutCollapsing >= pageCount) {
@@ -71,33 +58,6 @@ function buildPageWindow(currentPage: number, pageCount: number): PageWindowItem
   return [1, 'ellipsis', ...middleRange, 'ellipsis', pageCount];
 }
 
-/**
- * Pagination chrome shared by every `DataTable` caller and, starting with
- * the risk register's upcoming card view, by non-table presentations of the
- * same server-paginated results too. Extracted out of `DataTable` itself so
- * a second consumer of the exact same results-summary / rows-per-page /
- * page-navigation controls never has to duplicate them — this project has a
- * recorded, repeated defect class of a fix applied to one copy of something
- * and never propagated to its sibling.
- *
- * Numbered pages (`buildPageWindow`) replace the previous "Página X de Y"
- * span plus first/last chevrons: a nearby page is now one click away
- * instead of requiring a step-through, and page 1 / the last page are
- * always among the rendered buttons, so dedicated first/last controls
- * became redundant. The current page is marked with `aria-current="page"`
- * plus a filled background, heavier font weight AND a heavier border —
- * never colour alone (CLAUDE.md §18.8).
- *
- * The go-to-page input is kept — jumping straight to page 137 of 400 is a
- * real capability a numbered control alone can't offer — but it is no
- * longer a permanent field competing with the numbered pages for the same
- * attention. It now opens from the ellipsis, which is already the exact
- * marker for "there are pages in here you cannot reach with one click", and
- * therefore only exists when `buildPageWindow` actually collapsed something
- * (`pageCount > 7`). Opening it moves focus into the field; Escape closes it
- * and returns focus to the ellipsis, so the capability is reachable by
- * keyboard alone and never strands focus on a node that stopped existing.
- */
 export function PaginationFooter({
   pageIndex,
   pageSize,
@@ -128,8 +88,6 @@ export function PaginationFooter({
     jumpToggleRef.current?.focus();
   }
 
-  // Focus follows the control that was just revealed — opening a field the
-  // user then has to go looking for with the Tab key is not a shortcut.
   useEffect(() => {
     if (jumpOpen) {
       jumpInputRef.current?.focus();
@@ -137,8 +95,6 @@ export function PaginationFooter({
   }, [jumpOpen]);
 
   const pageWindow = buildPageWindow(currentPage, pageCount);
-  // The window only ever produces an ellipsis when it collapsed pages, so
-  // this is precisely "a click cannot reach every page from here".
   const hasCollapsedPages = pageWindow.includes('ellipsis');
   let renderedEllipsisCount = 0;
 
@@ -176,9 +132,6 @@ export function PaginationFooter({
 
           {pageWindow.map((item, index) =>
             item === 'ellipsis' ? (
-              // Position is the ellipsis's identity — at most two ever render, and they never reorder.
-              // The first one carries the jump control; a second would only
-              // offer the same action under the same name twice.
               renderedEllipsisCount++ === 0 ? (
                 <button
                   key={`ellipsis-${index}`}

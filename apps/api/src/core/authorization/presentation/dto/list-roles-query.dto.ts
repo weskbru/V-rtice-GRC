@@ -1,11 +1,3 @@
-/**
- * T180 — `GET /admin/roles`'s `page`/`pageSize` query parameters
- * (`contracts/admin.openapi.yaml`'s `#/components/parameters/Page`/
- * `PageSize`). Not `PageQueryDto` (`modules/risk`) — `core/**` may never
- * import from `modules/**` (ADR-011) — this capability defines its own,
- * same pattern `ListRisksQueryDto`'s own header documents for its first
- * consumer.
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 

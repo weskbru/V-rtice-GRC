@@ -1,28 +1,3 @@
-/**
- * D-11 coverage for `GET /dashboard/summary`
- * (`contracts/platform.openapi.yaml`'s `getDashboardSummary` operation).
- * Mirrors `dashboard.spec.ts`'s own structure for the sibling `GET
- * /dashboard` endpoint and reuses `reports.spec.ts`'s fixture shapes
- * (`agentWithPermissions`) for a caller holding an arbitrary permission
- * set.
- *
- * Central proofs (see the use case's own header for the full reasoning):
- *
- *   1. The authorization rule the contract states in prose — an
- *      authenticated session with NO additional permission gating the
- *      endpoint itself; a zero-source-permission caller gets a genuine
- *      `200` with `metrics: []`, never `403`.
- *   2. `401` for an unauthenticated caller.
- *   3. The declared `DashboardSummary` shape for a caller with real data.
- *   4. **The one property this file exists to prove above all others**: a
- *      metric key whose source permission the caller LACKS is OMITTED
- *      from `metrics` entirely, and the SAME key IS present once the
- *      caller is GRANTED that permission — proving "omitted by
- *      permission" is distinguishable from "omitted by lack of data",
- *      which a test that only checks "the key is absent" could never
- *      show on its own (it would pass identically if the whole endpoint
- *      always returned nothing).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -120,8 +95,6 @@ describe('GET /dashboard/summary — the cross-domain GRC dashboard summary (get
   it('returns the declared shape for a caller holding risk:view and control:view: RISK_TOTAL_BY_LEVEL (BY_BUCKET) and CONTROL_INACTIVE_COUNT (SINGLE_VALUE) both present', async () => {
     const { agent, orgUnitId } = await agentWithPermissions(['risk:view', 'control:view']);
     const prisma = ctx.app.get(PrismaService);
-    // Real, non-zero data behind CONTROL_INACTIVE_COUNT so this test does
-    // not merely prove "the key is present with an incidental zero".
     await prisma.client.control.create({
       data: {
         code: uniqueTestMarker('dbs-shape-ctl'),
@@ -152,16 +125,8 @@ describe('GET /dashboard/summary — the cross-domain GRC dashboard summary (get
     expect(controlItem!.valueByBucket).toBeUndefined();
   });
 
-  // -------------------------------------------------------------------
-  // The central proof: omitted by permission, never zeroed, never
-  // flagged — and the SAME key reappears once the permission is granted.
-  // -------------------------------------------------------------------
-
   it('OMITS CONTROL_INACTIVE_COUNT for a caller lacking control:view, while RISK_TOTAL_BY_LEVEL (granted) is still present', async () => {
-    const { agent } = await agentWithPermissions([
-      'risk:view',
-      // Deliberately NOT `control:view`.
-    ]);
+    const { agent } = await agentWithPermissions(['risk:view']);
 
     const response = await agent.get('/api/v1/dashboard/summary').set('Origin', appOrigin);
     expect(response.status).toBe(200);
@@ -186,10 +151,6 @@ describe('GET /dashboard/summary — the cross-domain GRC dashboard summary (get
     expect(typeof controlItem!.value).toBe('number');
   });
 
-  // -------------------------------------------------------------------
-  // `breakdowns` — the same "omitted, never zeroed" rule, per block.
-  // -------------------------------------------------------------------
-
   it('always sends breakdowns, as an empty object for a caller holding none of the six block permissions', async () => {
     const { agent } = await agentWithPermissions([]);
 
@@ -200,12 +161,6 @@ describe('GET /dashboard/summary — the cross-domain GRC dashboard summary (get
     expect(body.breakdowns).toEqual({});
   });
 
-  /**
-   * The pair that makes the omission meaningful: `incidents` is absent for a
-   * caller without `incident:view` and present — with every status key — for
-   * a caller with it. A test that only checked absence would pass against an
-   * endpoint that never sent the block to anyone.
-   */
   it('omits a block without its permission and sends it, zero-filled for every status, with it', async () => {
     const { agent: without } = await agentWithPermissions(['risk:view']);
     const { agent: withIt } = await agentWithPermissions(['incident:view']);
@@ -284,9 +239,9 @@ describe('GET /dashboard/summary — the cross-domain GRC dashboard summary (get
     const response = await agent.get('/api/v1/dashboard/summary').set('Origin', appOrigin);
     expect(response.status).toBe(200);
     const raw = JSON.stringify(response.body);
-    expect(raw).not.toMatch(/at [\w.]+ \(.*:\d+:\d+\)/); // stack trace frame
+    expect(raw).not.toMatch(/at [\w.]+ \(.*:\d+:\d+\)/);
     expect(raw.toLowerCase()).not.toContain('password');
     expect(raw.toLowerCase()).not.toContain('secret');
-    expect(raw).not.toMatch(/[A-Za-z]:\\\\/); // Windows absolute path
+    expect(raw).not.toMatch(/[A-Za-z]:\\\\/);
   });
 });

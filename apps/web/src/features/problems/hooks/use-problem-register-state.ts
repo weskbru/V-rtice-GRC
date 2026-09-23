@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem register URL state, brought into the shared register
- * family (CLAUDE.md §18.12): the SAME `useUrlQueryCommit`/
- * `useDebouncedSearchParam` mechanism `use-register-state.ts` (Risks) and
- * `use-catalog-state.ts` (Controls) already use, replacing this hook's own
- * former hand-rolled copy of that mechanism (`@/lib/register/url-state`'s
- * own doc comment: "copied into eight hooks... fixed here once, through a
- * ref that always holds the latest query string, instead of eight times" —
- * this was one of the eight that had not yet been migrated).
- *
- * Trimmed to the axes `problems.openapi.yaml`'s own `listProblems`
- * operation actually accepts (`search`, `status[]`, `severity[]`, `sort`,
- * `direction`), plus `view` — presentation, not a filter, mirroring
- * `RiskRegisterUrlState.view`'s own identical reasoning.
- */
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -86,11 +71,9 @@ function parseSort(value: string | null): ProblemSortField {
     : DEFAULT_SORT;
 }
 
-/** Which presentation the results area is currently rendering. Cards is the primary view (CLAUDE.md §18), matching every other register in this codebase. */
 export type ProblemRegisterView = 'cards' | 'table';
 
 export interface ProblemRegisterUrlState {
-  /** Committed (URL) search term — for display use `searchInputValue` instead. */
   search: string;
   page: number;
   pageSize: number;
@@ -113,17 +96,11 @@ export interface UseProblemRegisterStateResult {
   setView: (view: ProblemRegisterView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter FIELDS are currently applied — shown on the collapsed "Filtros" button. */
   activeFilterCount: number;
 }
 
 export function useProblemRegisterState(): UseProblemRegisterStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism itself — one change applied to the CURRENT query
-  // string, `replace` not `push`, page reset by default — is shared with
-  // every other register (`@/lib/register/url-state`). What stays here is
-  // only what this register knows: its enums, its sortable fields and its
-  // own defaults.
   const commit = useUrlQueryCommit();
 
   const urlSearch = searchParams.get('search') ?? '';
@@ -200,7 +177,6 @@ export function useProblemRegisterState(): UseProblemRegisterStateResult {
     [commit],
   );
 
-  /** `resetPage: false` — mirrors `RiskRegisterUrlState.view`'s own setter: switching Cards ↔ Tabela is a presentation change, never a change to which problems matched. */
   const setView = useCallback(
     (view: ProblemRegisterView) => {
       commit((params) => {

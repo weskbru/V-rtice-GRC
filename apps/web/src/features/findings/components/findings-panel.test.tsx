@@ -8,22 +8,6 @@ import { FindingsPanel } from './findings-panel';
 
 import type { Finding } from '../types';
 
-/**
- * Component-mount evidence for T076/T077/T078 (`FindingsPanel`,
- * 002-shared-grc-foundation + 005-audit-findings, US3). `../api` is mocked
- * at the network boundary, mirroring `evidence-panel.test.tsx`'s own
- * pattern. `getFindingMock`/`startRemediationMock` back
- * `FindingRemediationAction`; the four `list*Links`/`list*Options` mocks
- * back the two `FindingLinksSection` subsections every row now renders
- * unconditionally (T078) — every existing test below default-resolves them
- * to an empty list so the section's own "Nenhum vinculado" text is all that
- * appears, never a thrown error from an unmocked call.
- * `@/features/audit-engagements/api` is mocked too, for the origin-notice
- * lookup (T077, SC-001) — its `getEngagement` is only ever actually called
- * when a fixture's own `auditEngagementId` is non-null (the default fixture
- * below keeps it `null`), so most tests never touch it either.
- */
-
 const {
   listByOrgUnitMock,
   getFindingMock,
@@ -64,10 +48,6 @@ const {
 
 const { getEngagementMock } = vi.hoisted(() => ({ getEngagementMock: vi.fn() }));
 
-// `FindingCorrectiveActions` (audit-findings follow-up, 2026-09-12) — mounted
-// only after a row's own "N ações em aberto" toggle is expanded, never on
-// this panel's own mount. Mocked here purely to prove that non-vacuity: most
-// tests below never touch it.
 const { listActionsMock } = vi.hoisted(() => ({ listActionsMock: vi.fn() }));
 
 vi.mock('@/features/actions/api', () => ({
@@ -78,12 +58,6 @@ vi.mock('@/features/actions/api', () => ({
   },
 }));
 
-// T077, FR-010 — `FindingCloseDialog` (rendered by this panel) now checks
-// for an active evidence link before allowing a close attempt. Default to
-// "an evidence link exists" so every pre-existing close/segregation test
-// below keeps exercising exactly what it did before this rule existed; the
-// "no evidence" and "evidence check failed" paths get their own dedicated
-// coverage in `finding-close-dialog.test.tsx`.
 const { listBySubjectMock } = vi.hoisted(() => ({ listBySubjectMock: vi.fn() }));
 
 vi.mock('@/features/evidence/api', () => ({
@@ -148,13 +122,6 @@ function pageOf(items: Finding[]) {
   return { items, page: 1, pageSize: 100, total: items.length };
 }
 
-/**
- * 2026-09-17, Área 5 — every row is now a collapsed `DisclosureGroup` by
- * default (status/severity/edit/close/reopen/archive/links all live in its
- * unmounted-while-closed content). Tests that need any of that reveal the
- * row first, exactly like a real reader would, via the toggle's own
- * accessible name (code + title, from `DisclosureGroup`'s `title`/`meta`).
- */
 async function expandFinding(codeAndTitle: string | RegExp): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: codeAndTitle }));
 }
@@ -182,13 +149,8 @@ beforeEach(() => {
   listActionsMock.mockReset();
   listByOrgUnitMock.mockResolvedValue(pageOf([]));
   searchUsersMock.mockResolvedValue({ data: [], isPartial: false });
-  // T078 — every row's `FindingLinksSection` always renders (regardless of
-  // `canLinkFindings`); default both its lists to empty so its own "Nenhum
-  // vinculado" text is all any pre-existing test below sees.
   listControlLinksMock.mockResolvedValue([]);
   listRiskLinksMock.mockResolvedValue([]);
-  // T077, FR-010 — default to "an active evidence link exists" (see the
-  // mock's own comment above).
   listBySubjectMock.mockResolvedValue({
     items: [{ id: 'evidence-1' }],
     page: 1,
@@ -208,10 +170,6 @@ describe('FindingsPanel', () => {
   it('lists findings within the organizational unit, with their metadata', async () => {
     listByOrgUnitMock.mockResolvedValue(pageOf([findingFixture({})]));
 
-    // `canCreate` mounts `FindingCreateDialog`, which reads `useAuth().user`
-    // unconditionally (S-10, to seed its owner picker's initial label with
-    // no extra request) — every other `canCreate` render below is `false`
-    // for exactly this reason, except the one right after this comment.
     render(
       <AuthProvider initialSession={buildTestSession({ permissions: [] })}>
         <FindingsPanel {...BASE_PROPS} canCreate canEdit canClose canAdminister />
@@ -224,10 +182,6 @@ describe('FindingsPanel', () => {
     expect(screen.getByText('Alta')).toBeInTheDocument();
   });
 
-  // 2026-09-17, Área 5 — collapsed shows only what identifies/prioritizes
-  // (code, title, status, severity), never the rest of the row's content;
-  // expanding it reveals everything that rendered unconditionally before
-  // this change, byte for byte (no capability removed).
   it('collapses each finding to code/title/status/severity only, revealing everything else on demand', async () => {
     listByOrgUnitMock.mockResolvedValue(pageOf([findingFixture({})]));
 
@@ -239,7 +193,6 @@ describe('FindingsPanel', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('Aberto')).toBeInTheDocument();
     expect(screen.getByText('Alta')).toBeInTheDocument();
-    // Everything else stays unmounted while collapsed.
     expect(
       screen.queryByText('A autoavaliação identificou uma não conformidade.'),
     ).not.toBeInTheDocument();
@@ -428,10 +381,6 @@ describe('FindingsPanel', () => {
     await screen.findByText('Arquivado');
   });
 
-  // -------------------------------------------------------------------
-  // 005-audit-findings, T077 additions
-  // -------------------------------------------------------------------
-
   it('shows the manual-origin notice for a finding recorded without an engagement', async () => {
     listByOrgUnitMock.mockResolvedValue(pageOf([findingFixture({ auditEngagementId: null })]));
 
@@ -521,10 +470,6 @@ describe('FindingsPanel', () => {
     await expandFinding(/FND-2026-0001/);
     expect(screen.queryByRole('button', { name: 'Mover para remediação' })).not.toBeInTheDocument();
   });
-
-  // -------------------------------------------------------------------
-  // Corrective actions disclosure (audit-findings follow-up, 2026-09-12)
-  // -------------------------------------------------------------------
 
   it('never fetches corrective actions on mount, regardless of how many findings render', async () => {
     listByOrgUnitMock.mockResolvedValue(

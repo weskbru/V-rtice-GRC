@@ -3,16 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ReportRegisterSummary } from './report-register-summary';
 
-/**
- * Component-mount evidence for `ReportRegisterSummary` (CLAUDE.md §19.7) —
- * `reportsApi.listDefinitions` is mocked at the network boundary, mirroring
- * `asset-register-summary.test.tsx`'s own approach. Only TWO calls are ever
- * made (total, active) — the mock's default branch stands in for the
- * unfiltered "total" call, and "Inativos" is asserted as the SUBTRACTION,
- * never a third mocked `isActive=false` call, so a regression back to a
- * third request would leave that branch of the mock unreached and the
- * `mockCounts` total call count assertion below would fail.
- */
 const { listDefinitionsMock } = vi.hoisted(() => ({ listDefinitionsMock: vi.fn() }));
 
 vi.mock('../api', () => ({
@@ -42,11 +32,8 @@ describe('ReportRegisterSummary', () => {
 
     await waitFor(() => expect(screen.getByText('45')).toBeInTheDocument());
     expect(screen.getByText('30')).toBeInTheDocument();
-    // 45 - 30 = 15, never independently fetched.
     expect(screen.getByText('15')).toBeInTheDocument();
 
-    // Exactly two requests: one unfiltered, one `isActive: true`. A third
-    // (`isActive: false`) would mean the subtraction was abandoned.
     expect(listDefinitionsMock).toHaveBeenCalledTimes(2);
     expect(listDefinitionsMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ isActive: false }),

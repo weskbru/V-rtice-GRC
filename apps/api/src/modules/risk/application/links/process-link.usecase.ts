@@ -1,21 +1,3 @@
-/**
- * T142 — `LinkProcessUseCase`/`UnlinkProcessUseCase` (FR-053, FR-076,
- * FR-025c, FR-084, ADR-005, ADR-013, ADR-008).
- * `POST`/`DELETE /risks/{riskId}/processes[/{linkId}]`
- * (`contracts/risks.openapi.yaml`'s `linkProcessToRisk`/
- * `unlinkProcessFromRisk`). Gated by `risk:edit`, not `risk:treat`
- * (contract: "Requires risk:edit and scope") — see `control-link.usecase.ts`
- * for the identical mechanism this mirrors, with `risk:treat`.
- *
- * ## T035/006-assets-processes — "Vazamento 2" closed (ADR-020 parts 4/5)
- *
- * See `asset-link.usecase.ts`'s own header for the full account this file
- * mirrors exactly, replacing "asset" with "process": the referenced
- * process is now resolved through `ProcessDirectoryPort`
- * (`shared/grc-ports/`), its `orgUnitId` is checked against the actor's
- * resolved scope before any write, and creating the link now also
- * requires `process:view` on the referenced process.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -75,8 +57,6 @@ export class LinkProcessUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the risk actually exists outside `scope`.
     const currentRisk = await this.riskRepository.findById(scope, input.riskId);
     if (!currentRisk) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -92,19 +72,10 @@ export class LinkProcessUseCase {
     }
     assertBusinessContentEditable(currentRisk.status);
 
-    // ADR-020 part 4 (FR-010, FR-011) - a process outside the actor's
-    // organizational scope answers exactly as a nonexistent one. ADR-020
-    // part 5 - a process that does not exist/is inactive and one the actor
-    // lacks `process:view` for answer with the exact same refusal: all
-    // conditions are folded into ONE check, never branches that could
-    // diverge in shape.
     const [process, canViewProcess] = await Promise.all([
       this.processDirectory.findById(input.processId),
       this.permissionResolver.hasPermission(input.actorUserId, 'process:view'),
     ]);
-    // A process with `orgUnitId === null` is visible only to a caller with
-    // `GLOBAL` scope - matches `LinkControlUseCase`'s own null-handling
-    // exactly.
     const processOutOfScope = Boolean(
       process &&
       (process.orgUnitId === null
@@ -188,8 +159,6 @@ export class UnlinkProcessUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the risk actually exists outside `scope`.
     const currentRisk = await this.riskRepository.findById(scope, input.riskId);
     if (!currentRisk) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

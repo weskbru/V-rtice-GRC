@@ -1,8 +1,3 @@
-/**
- * T028/003-controls-management, User Story 2 — `GetControlAssessmentUseCase`.
- * `GET /controls/{controlId}/assessments/{assessmentId}`
- * (`getControlAssessment` operation). Requires `control:view` and scope.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

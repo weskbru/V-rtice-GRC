@@ -1,13 +1,3 @@
-/**
- * T034/002-shared-grc-foundation, US1 — matches
- * `contracts/grc-foundation.openapi.yaml`'s `LinkEvidenceRequest` exactly.
- * `subjectType` is validated against the closed `EvidenceSubjectType` enum
- * at the DTO boundary (shape validity) — existence and scope of the
- * concrete `subjectId` are the USE CASE's job
- * (`EvidenceSubjectResolverPort`), never conflated with this shape check
- * (a valid enum value with a nonexistent id must still be rejected, by a
- * later, deliberate check — see `LinkEvidenceUseCase`).
- */
 import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

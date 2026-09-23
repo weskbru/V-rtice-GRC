@@ -1,22 +1,3 @@
-/**
- * 007-implementation-remediation, Frente A, D-1/D-2/D-5/D-6 —
- * `CreateTreatmentActionUseCase`. `POST /risks/{riskId}/treatment-actions`
- * (`contracts/risks.openapi.yaml`'s `createRiskTreatmentAction`).
- *
- * `Action` (`grc/action`) is now the SOLE authority for title, description,
- * responsible, due date and status (D-1). This use case creates the shared
- * `Action` (via `CreateActionUseCase`, which fires its OWN `action.created`
- * audit event) and, in the SAME transaction, creates the link row
- * (`risk_treatment_actions`, now reduced to `riskId`/`treatmentDecisionId`/
- * `actionId`) and fires `risk.treatment_action_created` for it — TWO
- * events for TWO rows written (D-5), never one event standing in for both.
- *
- * `action:create` is never checked for this caller — see
- * `CreateActionUseCase`'s own header for why bypassing its controller is
- * correct here: the actor already proved `risk:treat` (this route's own
- * `@RequirePermission`), which `RiskActionOriginAccessor.resolveEditableOrigin`
- * re-derives as `CreateActionUseCase`'s own origin check (D-4).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -82,8 +63,6 @@ export class CreateTreatmentActionUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the risk actually exists outside `scope`.
     const current = await this.riskRepository.findById(scope, input.riskId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -120,10 +99,6 @@ export class CreateTreatmentActionUseCase {
     const description = input.description ?? null;
 
     return this.transactionRunner.run(async () => {
-      // D-1/D-6 — the shared `Action` is created FIRST, inside this SAME
-      // transaction (nested `TransactionRunnerPort.run` joins the ambient
-      // one), so its `id` is already known for the link row insert below.
-      // `CreateActionUseCase` fires its OWN `action.created` audit event.
       const { record: sharedAction } = await this.createActionUseCase.execute({
         actorUserId: input.actorUserId,
         originType: 'RISK_TREATMENT',
@@ -159,15 +134,6 @@ export class CreateTreatmentActionUseCase {
         );
       }
 
-      // D-5 — the LINK ROW's own event, distinct from `action.created`
-      // above: two rows written, two events, each attributable to the row
-      // it describes. `entityId` is the LINK ROW's OWN id
-      // (coordinator review, 2026-09-11), never the action's — an entity
-      // TYPE column that identifies a link row in every historical event
-      // and an action in every new one is exactly the drift an
-      // evidentiary trail cannot absorb quietly. The action's id is still
-      // fully reachable from `newValues.actionId` below, so the trail
-      // stays navigable from either direction.
       await this.auditRecorder.record({
         action: 'risk.treatment_action_created',
         entityType: AuditEntityType.RISK_TREATMENT_ACTION,

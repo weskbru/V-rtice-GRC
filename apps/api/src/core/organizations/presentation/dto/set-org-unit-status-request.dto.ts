@@ -1,7 +1,3 @@
-/**
- * T180 — matches `contracts/admin.openapi.yaml`'s
- * `SetOrgUnitStatusRequest` (`additionalProperties: false`).
- */
 import { IsIn } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

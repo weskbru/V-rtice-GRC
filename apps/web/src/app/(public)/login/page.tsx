@@ -1,12 +1,3 @@
-/**
- * PharosGRC — login screen (T070, FR-047, SC-001).
- *
- * The first thing any user sees. Renders an accessible sign-in form
- * (`LoginForm`) inside a calm, enterprise card. A visitor who already holds
- * a valid session is sent straight to the dashboard rather than shown a
- * sign-in form they do not need (reuses the same server-side session check
- * `(app)/layout.tsx` uses, ADR-014).
- */
 import { Shield } from 'lucide-react';
 import { redirect } from 'next/navigation';
 
@@ -23,7 +14,6 @@ export const metadata: Metadata = {
   title: auth.login.pageTitle,
 };
 
-/** Only a same-origin, absolute path is accepted — anything else falls back to `/dashboard` (never trust a redirect target from a query string). */
 function sanitizeReturnTo(value: string | undefined): string {
   if (value && value.startsWith('/') && !value.startsWith('//') && !value.includes('://')) {
     return value;
@@ -55,7 +45,6 @@ export default async function LoginPage({
             sizes="(max-width: 1199px) 100vw, 90vw"
             type="image/webp"
           />
-          {/* A transparent fallback avoids downloading the decorative artwork on mobile. */}
           <img
             src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="
             alt=""

@@ -1,7 +1,3 @@
-/**
- * T018/006-assets-processes — `GetProcessUseCase`: identical in shape to
- * `modules/assets/application/get-asset.usecase.ts` (FR-020).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

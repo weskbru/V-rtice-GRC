@@ -1,9 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, create user dialog (T181, FR-021, FR-005).
- * The initial password is sent once and never re-displayed (FR-005, FR-035).
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';

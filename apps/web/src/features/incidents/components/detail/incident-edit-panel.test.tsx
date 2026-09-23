@@ -6,15 +6,6 @@ import { IncidentEditPanel } from './incident-edit-panel';
 import type { IncidentDetail } from '../../types';
 import type { IncidentFormProps } from '../incident-form';
 
-/**
- * Component-mount evidence for `IncidentEditPanel`
- * (018-incident-detail-experience, Fase 4) — mirrors `RiskEditPanel`'s own
- * shape. `../incident-form` is mocked at the module boundary: this suite's
- * job is to prove the PANEL wires the right props and chrome, not to
- * re-exercise `IncidentForm` itself (untouched, and out of this rodada's
- * scope).
- */
-
 vi.mock('../incident-form', () => ({
   IncidentForm: (props: IncidentFormProps) => (
     <div data-testid="incident-form-mock">

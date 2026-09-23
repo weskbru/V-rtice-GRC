@@ -1,16 +1,3 @@
-/**
- * 008-incidents-problems, US3 — maps `IncidentRiskLinkRecord`/
- * `IncidentAssetLinkRecord`/`IncidentProcessLinkRecord`/
- * `IncidentProblemLinkRecord` to the wire shapes
- * `contracts/incidents.openapi.yaml`'s `IncidentRiskLinkResponse`/
- * `IncidentAssetLinkResponse`/`IncidentProcessLinkResponse`/
- * `IncidentProblemLinkResponse` describe. ONE mapper per resource is the
- * only place a domain object becomes this DTO (ADR-009).
- *
- * Deliberately does NOT expose `unlinkedBy` — unlike
- * `finding-relationship-response.mapper.ts`'s own responses, none of the
- * four schemas above declare it (contract-checked, not an oversight).
- */
 import type { IncidentAssetLinkRecord } from '../../domain/incident-asset-link.entity';
 import type { IncidentProblemLinkRecord } from '../../domain/incident-problem-link.entity';
 import type { IncidentProcessLinkRecord } from '../../domain/incident-process-link.entity';

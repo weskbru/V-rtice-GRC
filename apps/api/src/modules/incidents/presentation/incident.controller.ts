@@ -1,18 +1,3 @@
-/**
- * 008-incidents-problems, US1 — `IncidentController`:
- * `contracts/incidents.openapi.yaml`'s `/incidents` and
- * `/incidents/{incidentId}[/transitions]` paths (`listIncidents`,
- * `createIncident`, `getIncident`, `updateIncident`,
- * `transitionIncident`). Every route carries its own `@RequirePermission`
- * — there is no route on this controller without one, and no `DELETE`
- * route exists (the contract's own description: an incident opened by
- * mistake is cancelled, never removed).
- *
- * The four relationship routes
- * (`/incidents/{incidentId}/[risks|assets|processes|problems]`) are
- * explicitly OUT of this task's scope — another agent owns the links
- * between domains (coordinator, 2026-09-11's own scope boundary).
- */
 import {
   BadRequestException,
   Body,
@@ -165,9 +150,6 @@ export class IncidentController {
   }
 }
 
-/** `UpdateIncidentRequest`'s `minProperties: 1` — controller-level check,
- * mirroring `FindingController#assertUpdateBodyNotEmpty`'s own documented
- * reasoning. */
 function assertUpdateBodyNotEmpty(body: UpdateIncidentRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

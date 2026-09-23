@@ -1,12 +1,3 @@
-/**
- * T032/002-shared-grc-foundation, US1 — `GetEvidenceUseCase`
- * (`getEvidence`, FR-032). Scoped read: an evidence outside the caller's
- * organizational scope reads as `undefined` from the repository, turned
- * into `NotFoundDomainError` here — indistinguishable from a genuinely
- * unknown id (SC-005). Reused verbatim by `EvidenceParentRecordAccessor`
- * (the attachable-entity-type registration, T030a) the same way
- * `RiskParentRecordAccessor` reuses `GetRiskUseCase`.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -24,11 +15,6 @@ export interface GetEvidenceInput {
   readonly evidenceId: string;
 }
 
-/** `EvidenceRecord` plus `linkCount` (contracts/grc-foundation.openapi.yaml)
- * — "active links the caller may see, not necessarily the true total"
- * (R-010). Computed here, not stored on `EvidenceRecord` itself: the
- * repository has no way to resolve subject visibility (see
- * `EvidenceLinkVisibilityService`'s own header). */
 export interface EvidenceWithLinkCount extends EvidenceRecord {
   readonly linkCount: number;
 }
@@ -46,8 +32,6 @@ export class GetEvidenceUseCase {
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
     const record = await this.evidenceRepository.findById(scope, input.evidenceId);
     if (!record) {
-      // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-      // whenever the evidence actually exists outside `scope`.
       return this.scopeEnforcer.assertExistingRecordAccessible(
         {
           scope,

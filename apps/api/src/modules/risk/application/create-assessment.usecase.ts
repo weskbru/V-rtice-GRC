@@ -1,44 +1,3 @@
-/**
- * T124 — `CreateAssessmentUseCase` (FR-062 to FR-068, FR-070, FR-025c,
- * ADR-006).
- *
- * ## Order of operations
- *
- * 1. Resolve actor + scope; read the risk (scoped — FR-025/FR-030).
- * 2. FR-084: refuse on `CLOSED`/`ARCHIVED` (reuses `risk.entity.ts`'s
- *    `assertBusinessContentEditable` — the same locked-status set governs
- *    both business-content edits and new assessments).
- * 3. Resolve the methodology version to score against: the active one, or
- *    the caller-supplied id IF it still equals the active one — anything
- *    else is refused with 422 (US4 AS5, FR-068): the platform never
- *    silently rescopes an assessment onto a stale, no-longer-active
- *    version, and never accepts one explicitly either.
- * 4. Score inherent and residual factors via `RiskScoringService` — the
- *    ONLY place either score/level is computed (ADR-006). A
- *    `ValidationDomainError` from `.score()` is re-thrown with the request
- *    DTO's actual field name (`inherentProbability`, `residualImpact`, ...)
- *    substituted for the generic `probability`/`impact` the pure service
- *    itself uses (see `remapFactorFieldError` below).
- * 5. One transaction (`TransactionRunnerPort`, same pattern as
- *    `CreateRiskUseCase`/`UpdateRiskUseCase`): insert the new assessment
- *    (linking `previousAssessmentId` to the risk's PRE-transaction current
- *    assessment), then `RiskRepositoryPort.applyAssessmentResult` — a
- *    single conditional `UPDATE ... WHERE id = ? AND version = ?`
- *    repointing `Risk.currentAssessmentId`/denormalized levels/
- *    `lastAssessedOn`/`nextReviewOn` (FR-065). If that conditional update
- *    does not affect the row (version conflict or the risk vanished from
- *    scope mid-flight), this throws — which rolls back the WHOLE
- *    transaction, including the assessment `INSERT` that ran first, so a
- *    lost race never leaves an orphaned assessment record behind. Finally,
- *    `AuditRecorder.record(...)` in the same transaction (ADR-005).
- *
- * `previousAssessmentId` is read from the PRE-transaction `current` risk
- * record — safe despite the gap before the transaction opens, for the exact
- * reason `UpdateRiskUseCase`'s field diffing is safe: the value is only
- * ever COMMITTED if the version-gated write inside the transaction
- * succeeds, which itself proves no concurrent write landed between the read
- * and the commit.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -71,7 +30,6 @@ const RISK_ENTITY_LABEL = 'Risco';
 export interface CreateAssessmentInput {
   readonly actorUserId: string;
   readonly riskId: string;
-  /** From the `If-Match` header (ADR-013) — the risk's expected `version`. */
   readonly expectedVersion: number;
   readonly assessedOn?: string | undefined;
   readonly inherentProbability: number;
@@ -116,7 +74,6 @@ export class CreateAssessmentUseCase {
       throw new NotFoundDomainError(RISK_ENTITY_LABEL, input.riskId);
     }
 
-    // FR-084 — the same locked-status rule as business-content edits.
     assertBusinessContentEditable(current.status);
 
     const methodologyVersion = await this.resolveMethodologyVersion(input.methodologyVersionId);
@@ -218,9 +175,6 @@ export class CreateAssessmentUseCase {
     });
   }
 
-  /** US4 AS5/FR-068: omitted = active version; supplied = MUST equal the
-   * active version's id, or the request is refused (422) — a stale,
-   * no-longer-active version is never silently accepted. */
   private async resolveMethodologyVersion(
     methodologyVersionId: string | null | undefined,
   ): Promise<MethodologyVersionRecord> {
@@ -250,9 +204,6 @@ export class CreateAssessmentUseCase {
     return activeVersion;
   }
 
-  /** Calls `RiskScoringService.score()` and remaps its generic
-   * `probability`/`impact` field errors onto the request DTO's actual
-   * field names (see this file's header). */
   private scoreOrRemap(
     factors: { probability: number; impact: number },
     methodologyVersion: MethodologyVersionRecord,

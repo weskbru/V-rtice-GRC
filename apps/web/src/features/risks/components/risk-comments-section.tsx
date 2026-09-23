@@ -1,38 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Comments section (T195, US9, FR-095, FR-098,
- * FR-100, FR-102).
- *
- * Consumes `GET/POST /comments` and `DELETE /comments/{commentId}`,
- * scoped to this risk via `entityType=RISK&entityId={riskId}`
- * (`risksApi.listComments`/`createComment`/`withdrawComment`,
- * ADR-008's entity-type registry). Renders through `CommentThread`
- * (`@pharos/design-system`, T194) — a generic, domain-agnostic component
- * that knows nothing about risks; this file supplies every word (D-10) and
- * owns the fetch/pagination/mutation lifecycle, mirroring
- * `RiskHistorySection`'s own pagination pattern exactly.
- *
- * ## A comment body is never rendered as markup
- *
- * `CommentThread` renders `item.body` as a plain JSX text child — see its
- * own doc comment for the full reasoning. This section passes the raw
- * server-returned `Comment.body` straight through, with no markdown/HTML
- * processing of its own, so the guarantee holds end to end.
- *
- * ## Withdrawing is audited, not erased (FR-102) — confirmed before it happens
- *
- * `ConfirmDialog` gates every withdrawal, exactly like
- * `RiskControlsSection`'s own unlink pattern, and its description states
- * plainly that the comment is not erased — it remains in the audited
- * history, only that it stops appearing in this list.
- *
- * `comment:delete` is a fixed, entity-type-independent permission
- * (`data-model.md` §3) with no author restriction server-side
- * (`WithdrawCommentUseCase` checks only the permission plus parent access,
- * never authorship) — so `canWithdraw` here applies uniformly to every
- * comment for a caller holding it, not only their own.
- */
 import { CommentThread, ConfirmDialog } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -81,9 +48,6 @@ export function RiskCommentsSection({
   const [pendingWithdrawId, setPendingWithdrawId] = useState<string | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
-  // Bumped after a successful create/withdraw so the effect below re-fetches
-  // from page 1 — mirrors `RiskHistorySection`'s `resolvedRequestKey`
-  // convention exactly.
   const [refreshToken, setRefreshToken] = useState(0);
   const requestKey = `${riskId}|${refreshToken}`;
   const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);

@@ -1,18 +1,3 @@
-/**
- * 009-indicators-reports, Fase 8 (T068 prep) — `UpdateReportDefinitionUseCase`
- * (`updateReportDefinition`, `PATCH /reports/{reportId}`). No
- * `ScopeFilter`/optimistic lock (research.md D-8; `ReportDefinition` has no
- * `version` column, and `contracts/reports.openapi.yaml`'s own
- * `UpdateReportDefinitionRequest` declares no `minProperties`). Mirrors
- * `modules/indicators/application/update-indicator-definition.usecase.ts`'s
- * field-by-field diff shape — see that file's header for the
- * audit-only-when-changed reasoning this one does not repeat.
- *
- * `metricKeys`, when supplied, is re-validated by the SAME
- * `assertValidReportMetricKeys` function `CreateReportDefinitionUseCase`
- * uses (CLAUDE.md §19.7) — non-empty, closed catalog membership — never a
- * second copy of that rule.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

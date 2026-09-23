@@ -1,22 +1,3 @@
-/**
- * T027/T056/004-compliance-management — `ListRequirementsUseCase`: the
- * read side of `GET
- * /frameworks/{frameworkId}/versions/{versionId}/requirements`
- * (`listRequirements` operation). Wired to `RequirementController` by
- * T056 (Fase 5) — see `GetRequirementUseCase`'s own header for why it was
- * built ahead of that wiring.
- *
- * ## `complianceState` filter — compute-then-filter-then-paginate
- *
- * When `complianceStates` is supplied, the contract's own description
- * requires computing `complianceState` for EVERY requirement of the
- * version first (the same bounded, one-version batch the compliance
- * summary endpoint uses, research.md D-10), filtering over that complete
- * set, and only THEN paginating — never filtering within an
- * already-paginated page, which would silently under-report matches on
- * later pages. Absent the filter, this stays the cheap path: one
- * paginated repository read plus a batched derivation for just that page.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';
@@ -125,9 +106,6 @@ function toRecord(
 ): RequirementRecord {
   return {
     ...row,
-    // Defensive fallback only: `deriveForMany` derives one entry per row
-    // it was given, so a missing key here would signal a bug in that
-    // method, not a real runtime case.
     ...(derivedByRequirementId.get(row.id) ?? {
       applicability: undefined,
       complianceState: 'NOT_MET' as const,

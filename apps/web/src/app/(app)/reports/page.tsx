@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report register route (009-indicators-reports, T061, US5), mirroring
- * `(app)/incidents/page.tsx` exactly: `ReportCatalogView` reads `useSearchParams()` (via
- * `useReportCatalogState`), which Next.js requires behind a `<Suspense>` boundary.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

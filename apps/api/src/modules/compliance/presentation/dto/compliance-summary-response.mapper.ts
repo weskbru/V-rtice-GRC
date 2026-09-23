@@ -1,11 +1,3 @@
-/**
- * T056/004-compliance-management — maps `ComplianceSummaryResult`
- * (`application/compliance-summary/get-framework-version-compliance-summary.usecase.ts`)
- * to the wire shape `contracts/compliance.openapi.yaml`'s
- * `ComplianceSummary` schema describes. `compliancePercentage: undefined`
- * becomes `null` on the wire — "nothing to measure yet", never `0`/`100`
- * (FR-020).
- */
 import type { ComplianceSummaryResult } from '../../application/compliance-summary/get-framework-version-compliance-summary.usecase';
 
 export interface ComplianceSummaryResponse {

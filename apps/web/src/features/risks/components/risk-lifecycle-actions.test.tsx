@@ -5,19 +5,6 @@ import { RiskLifecycleActions } from './risk-lifecycle-actions';
 
 import type { Approval, RiskLifecycleState } from '../types';
 
-/**
- * Component-mount evidence for T160 (`RiskLifecycleActions`, US6, FR-080 to
- * FR-085, ADR-006). `../api` is mocked at the network boundary, matching
- * `risk-treatment-section.test.tsx`'s own convention.
- *
- * 016-risk-detail-experience moved the `GET .../lifecycle` fetch itself up
- * to the page (`useRiskLifecycle`, `components/detail/`) — this component
- * now takes `lifecycle`/`loading`/`loadError` as plain props instead of
- * fetching them, so this suite no longer mocks `getLifecycle` at all; only
- * the mutation endpoints (`transitionRisk`/`requestApproval`/
- * `decideApproval`) still go through the network-boundary mock.
- */
-
 const { transitionRiskMock } = vi.hoisted(() => ({
   transitionRiskMock: vi.fn(),
 }));
@@ -145,22 +132,15 @@ describe('RiskLifecycleActions', () => {
       />,
     );
 
-    // Two distinct verbs — "Aplicar" (happens now) vs. "Solicitar
-    // aprovação" (asks someone else to decide) — never the same wording
-    // with only a colour difference.
     expect(screen.getByRole('button', { name: 'Aplicar: Avaliado' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Solicitar aprovação: Aceito' })).toBeInTheDocument();
 
-    // Clarity pass: who is authorized, in business language — never the raw
-    // `resource:action` identifier the transition actually carries.
     expect(
       screen.getByText('Disponível para usuários autorizados a avaliar riscos neste escopo.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/risk:assess/)).not.toBeInTheDocument();
     expect(screen.queryByText(/risk:transition/)).not.toBeInTheDocument();
 
-    // The approval-gated transition ALSO states the SoD condition as an
-    // explicit sentence, not only through the "Solicitar aprovação" verb.
     expect(
       screen.getByText(
         'Disponível para usuários autorizados a conduzir o ciclo de vida do risco neste escopo. Esta transição exige aprovação por outro usuário autorizado.',

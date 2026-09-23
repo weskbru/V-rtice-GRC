@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new asset route (T048). `AssetForm` navigates to
- * `/assets/{id}` on a successful create — this route stays a thin
- * composition of the page chrome and the reusable form.
- */
 import { PageHeader } from '@pharos/design-system/components';
 
 import { AssetForm } from '@/features/assets/components/asset-form';

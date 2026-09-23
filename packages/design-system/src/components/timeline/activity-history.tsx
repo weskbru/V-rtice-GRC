@@ -6,34 +6,6 @@ import { LoadMoreButton } from './load-more-button';
 
 import type { ActivityHistoryProps } from './types';
 
-/**
- * Platform-wide merged-activity timeline (T169, US7, FR-105). Renders a
- * chronological, attributed account of domain events — assessments,
- * decisions, transitions, approvals, ownership changes today; whatever a
- * future module's own history assembles tomorrow. Deliberately dumb: it
- * never sorts, paginates client-side, or invents a translation for a
- * `kindLabel` it was not given — the caller (today, `risk-history-section
- * .tsx`) owns the data and every word (D-10).
- *
- * ## Accessibility
- *
- * A real ordered list (`<ol role="list">` / `<li role="listitem">`), not a
- * stack of `<div>`s — a screen reader announces "list, N items" and lets a
- * user navigate entry by entry. The explicit `role="list"`/`role
- * ="listitem"` (redundant with the native semantics on their own) is
- * deliberate: Safari/VoiceOver drops the implicit list role once
- * `list-style: none` is applied (a well-documented cross-browser gotcha),
- * and this component sets exactly that to remove the browser's bullet
- * glyph — so the roles are restated explicitly rather than relying on
- * native semantics surviving the visual reset.
- *
- * An entry's kind is conveyed by its own visible text (`kindLabel`), never
- * by color or an icon alone. The recorded-instant vs. asserted-date
- * distinction (F-9, `docs/deferred-findings.md`) is rendered as two
- * separately labeled facts side by side (`recordedAtLabel`/
- * `assertedDateLabel`) whenever an entry carries both — never flattened
- * into one ambiguous "date".
- */
 export function ActivityHistory({
   items,
   labels,
@@ -70,14 +42,6 @@ export function ActivityHistory({
               <span className="text-sm text-muted-foreground">{entry.actorName}</span>
             </div>
 
-            {/* F-9's recorded-instant vs. asserted-date distinction: always
-                two separately labeled facts, never one merged value — and
-                never merely two differently-worded labels either. The
-                asserted date additionally renders in a dashed-border chip
-                (a THIRD, shape-based signal, alongside the wording and the
-                date-only vs. date+time formatting the caller already
-                applies) so a reader who skims past the labels still sees at
-                a glance which of the two is a claim rather than a record. */}
             <dl className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <dt className="font-medium">{labels.recordedAtLabel}</dt>

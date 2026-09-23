@@ -1,41 +1,3 @@
-/**
- * T086/005-audit-findings — FR-012/SC-005, the CONTRACT half of the
- * no-deletion proof.
- *
- * `finding-no-delete.spec.ts` (T059) proves the same absence from the CODE
- * side, and says so in its own header: it is scoped to `grc/finding`'s
- * presentation/infrastructure layers and explicitly leaves "the companion
- * assertion over `modules/audit-engagements`'s own presentation layer and
- * over `contracts/audit.openapi.yaml`" to whichever task owns it. This file
- * is that task.
- *
- * The two directions are not redundant. A code-side scan cannot see an
- * operation that was PROMISED but never built (the F-31 failure mode), and
- * a contract-side scan cannot see a repository method that deletes a row
- * behind an innocuous-looking route. FR-012 needs both.
- *
- * ## What this asserts
- *
- * 1. Exactly TWO `delete:` HTTP verbs exist in the whole document, and they
- *    are `unlinkFindingFromControl` and `unlinkFindingFromRisk`.
- * 2. Both return `200` with a link body — never `204`/empty. That is the
- *    observable difference between WITHDRAWING a link (row preserved,
- *    `unlinkedAt` stamped) and deleting one, and it is the difference
- *    FR-016 turns on. A `204` here would be the contract quietly agreeing
- *    to destroy GRC history.
- * 3. No `DELETE /audits/{auditId}`, no `DELETE /findings/{findingId}`, and
- *    no `DELETE` under `/audits/{auditId}/scope/...` exists anywhere —
- *    research.md D-12's "nenhuma operação de remoção de escopo nesta fase",
- *    stated as a check rather than a comment.
- * 4. `modules/audit-engagements`'s own presentation layer registers no
- *    `@Delete` route at all — the code-side half T059 left open.
- *
- * The parser is the same deliberate line scanner
- * `contract-coverage.spec.ts` uses, for the same reason its header gives:
- * no YAML parser is a dependency of `apps/api`, and adding one as a second
- * consumer for a single test would be exactly the unjustified dependency
- * CLAUDE.md §2 forbids.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -133,8 +95,6 @@ function listTsFiles(dir: string): string[] {
 describe('005-audit-findings contract destroys nothing (FR-012, SC-005)', () => {
   const operations = parseOperations();
 
-  // Guards the parser itself: if the scanner silently stopped matching,
-  // every assertion below would pass over an empty list.
   it('parses the contract — the scan is not vacuously empty', () => {
     expect(operations.length).toBe(20);
     expect(operations.filter((operation) => operation.method === 'GET').length).toBeGreaterThan(0);
@@ -170,7 +130,6 @@ describe('005-audit-findings contract destroys nothing (FR-012, SC-005)', () => 
     expect(forbidden.map((operation) => `${operation.method} ${operation.path}`)).toEqual([]);
   });
 
-  // The code-side half T059 explicitly left to this task.
   it('registers no @Delete route anywhere under modules/audit-engagements/presentation', () => {
     const offenders = listTsFiles(AUDIT_ENGAGEMENTS_PRESENTATION)
       .filter((file) => /@Delete\s*\(/.test(fs.readFileSync(file, 'utf8')))

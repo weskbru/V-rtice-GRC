@@ -1,10 +1,3 @@
-/**
- * T014/003-controls-management — exhaustive unit coverage for the single
- * calculator, `calculateControlEffectiveness`
- * (`modules/controls/domain/control-effectiveness.service.ts`, T013,
- * data-model.md §3, D-2). No I/O, no NestJS, no database — pure domain
- * logic, exactly like `risk-overdue.spec.ts`.
- */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,7 +7,7 @@ import {
 
 import type { ControlAssessmentForEffectiveness } from '../../src/modules/controls/domain/control-effectiveness.service';
 
-const REFERENCE_DATE = new Date(Date.UTC(2026, 8, 7)); // 2026-09-07
+const REFERENCE_DATE = new Date(Date.UTC(2026, 8, 7));
 
 function daysBefore(reference: Date, days: number): Date {
   return new Date(reference.getTime() - days * 24 * 60 * 60 * 1000);
@@ -58,8 +51,6 @@ describe('calculateControlEffectiveness (T013, data-model.md §3, D-2)', () => {
     it('ignores a MORE RECENT unattested assessment in favor of an older ATTESTED one', () => {
       const history = [
         attested({ result: 'INEFFECTIVE', assessedOn: daysBefore(REFERENCE_DATE, 2) }),
-        // Recorded most recently, and would flip the result to EFFECTIVE if
-        // it counted — it must not, because it was never attested.
         unattested({ result: 'EFFECTIVE', assessedOn: REFERENCE_DATE }),
       ];
       expect(calculateControlEffectiveness(history, null, REFERENCE_DATE)).toBe('INEFFECTIVE');
@@ -92,7 +83,6 @@ describe('calculateControlEffectiveness (T013, data-model.md §3, D-2)', () => {
 
   describe('a stale window -> EXPIRED (FR-014)', () => {
     it('is EXPIRED when the latest attested assessment is strictly older than the declared frequency window', () => {
-      // quickstart.md §3's own worked example: MONTHLY + 60 days ago.
       const stale = attested({ assessedOn: daysBefore(REFERENCE_DATE, 60) });
       expect(calculateControlEffectiveness([stale], 'MONTHLY', REFERENCE_DATE)).toBe('EXPIRED');
     });

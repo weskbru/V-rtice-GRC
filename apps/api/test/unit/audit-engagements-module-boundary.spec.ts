@@ -1,19 +1,3 @@
-/**
- * T021/005-audit-findings (FR-017, SC-008) — a static, filesystem-level
- * proof that `modules/audit-engagements` never imports `modules/risk`,
- * `modules/controls` or `modules/compliance`, and none of those three
- * imports it back. Same method as
- * `compliance-controls-risk-module-boundary.spec.ts`: a plain text scan of
- * import specifiers, with relative ones RESOLVED to an absolute path
- * before being classified — complementing (not replacing)
- * `eslint-plugin-boundaries`.
- *
- * Every dependency `modules/audit-engagements` has on Risk/Controls/
- * Compliance crosses `shared/grc-ports/` (`RiskDirectoryPort`,
- * `ControlDirectoryPort`, `FrameworkVersionDirectoryPort`,
- * `RequirementDirectoryPort`) — never a direct import, in either
- * direction (research.md D-11).
- */
 import fs from 'node:fs';
 import path from 'node:path';
 

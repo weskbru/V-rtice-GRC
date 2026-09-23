@@ -1,57 +1,10 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement create/edit form (T076), mirroring
- * `ControlForm`'s/`RiskForm`'s conflict-handling convention exactly
- * (CLAUDE.md §18.12).
- *
- * ## Editable only in `PLANNING` (research.md D-3/D-13, quickstart.md §2 step 4)
- *
- * `PATCH /audits/{auditId}` answers `422` once the engagement has left
- * `PLANNING`. The detail view (`AuditEngagementDetailView`) never renders
- * this form in `mode="edit"` unless `engagement.status === 'PLANNING'` —
- * so the server is never asked for a transition it has already refused to
- * offer (CLAUDE.md §18.11: "não oferecer uma affordance de edição que o
- * servidor vai recusar"). This form still surfaces
- * `auditEngagements.form.editNotPlanningNotice` as a standing, proactive
- * reminder at the top of the edit form — not only as a reactive error —
- * because the fact itself ("this becomes permanently fixed the moment the
- * engagement starts") is useful to know WHILE still editable, not only
- * after the door has already closed.
- *
- * ## Lead auditor picker uses the PLAIN browse listing, never an
- * org-unit-scoped assignment listing
- *
- * Unlike `ControlForm`'s/`RiskForm`'s owner pickers, `leadAuditorUserId`
- * carries no organizational-assignment constraint server-side —
- * `CreateAuditEngagementUseCase.assertLeadAuditorAssignable` (apps/api)
- * only requires the chosen user to be active. See `../api.ts`'s own
- * reference-data section header for the full reasoning; this form's picker
- * therefore needs no cascading re-fetch keyed to the selected org unit.
- *
- * ## Conflict handling (ADR-013 equivalent)
- *
- * Identical to `ControlForm`/`RiskForm`: on a `409` nothing in the form is
- * reset — a banner explains the conflict and offers "ver versão atual",
- * "salvar mesmo assim" and "continuar editando", never a silent reload.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ErrorState, FormField, FormSection } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-
-import { auditEngagementsApi } from '../api';
-import { formatTimestamp } from '../date';
-
-import type {
-  AuditEngagement,
-  CreateAuditEngagementRequest,
-  OrgUnitNode,
-  UpdateAuditEngagementRequest,
-  UserRef,
-} from '../types';
-import type { ApiProblem } from '@/lib/api-client';
 
 import { UserPicker } from '@/components/directory/user-picker';
 import { feedback } from '@/components/shell/feedback-provider';
@@ -75,13 +28,22 @@ import {
   type AuditEngagementFormValues,
 } from '@/lib/validation/audit-engagement';
 
+import { auditEngagementsApi } from '../api';
+import { formatTimestamp } from '../date';
+
+import type {
+  AuditEngagement,
+  CreateAuditEngagementRequest,
+  OrgUnitNode,
+  UpdateAuditEngagementRequest,
+  UserRef,
+} from '../types';
+import type { ApiProblem } from '@/lib/api-client';
+
 export interface AuditEngagementFormProps {
   mode: 'create' | 'edit';
-  /** Required, and used as the initial values, when `mode === 'edit'`. */
   engagement?: AuditEngagement;
-  /** The `ETag` last read for `engagement` (ADR-013). Required when `mode === 'edit'`. */
   etag?: string;
-  /** Called after a successful create or update with the fresh record and its new `ETag`. */
   onSaved: (result: { engagement: AuditEngagement; etag: string }) => void;
   onCancel?: () => void;
 }
@@ -157,10 +119,6 @@ export function AuditEngagementForm({
     defaultValues: defaultValuesFor(engagement),
   });
 
-  // S-10: the lead auditor is now picked via server-side search
-  // (`UserPicker`), not a preloaded, bounded list — so its current LABEL is
-  // tracked separately, seeded from `engagement.leadAuditor` in edit mode
-  // (already carries its own `fullName`, never re-fetched).
   const [leadAuditor, setLeadAuditor] = useState<UserRef | undefined>(engagement?.leadAuditor);
 
   useEffect(() => {

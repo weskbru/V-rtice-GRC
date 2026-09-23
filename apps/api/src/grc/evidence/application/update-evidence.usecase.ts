@@ -1,19 +1,3 @@
-/**
- * T032/002-shared-grc-foundation, US1 — `UpdateEvidenceUseCase`
- * (`updateEvidence`). Field-by-field audit diff, mirroring
- * `modules/risk/application/update-risk.usecase.ts`'s own reasoning (see
- * that file's header for why the diff always compares against the
- * record's CURRENT value rather than blindly writing every supplied
- * field). No `version`/`If-Match` here — `Evidence` carries no optimistic-
- * concurrency column (data-model.md §2).
- *
- * `code`, `status`, `archivedAt`/`archivedByUserId` and the creation
- * metadata are not part of `UpdateEvidenceInput` at all — matching
- * `contracts/grc-foundation.openapi.yaml`'s `UpdateEvidenceRequest`, which
- * simply does not declare them (FR-062-style: not declaring a property IS
- * the rejection, enforced by the global `ValidationPipe`'s
- * `forbidNonWhitelisted`).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -74,8 +58,6 @@ export class UpdateEvidenceUseCase {
     }
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the evidence actually exists outside `scope`.
     const current = await this.evidenceRepository.findById(scope, input.evidenceId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -179,10 +161,6 @@ export class UpdateEvidenceUseCase {
       observation = input.observation;
     }
 
-    // Invariant E1 re-checked against the POST-merge values whenever either
-    // contributing field is part of this change set — a PATCH that clears
-    // the evidence's only form of substance must be rejected exactly like
-    // a create with neither present.
     if ('externalUrl' in changes || 'observation' in changes) {
       assertEvidenceHasSubstance({ externalUrl, observation });
     }

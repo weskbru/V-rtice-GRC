@@ -1,19 +1,3 @@
-/**
- * 007-implementation-remediation, Frente A, D-3 — matches
- * `contracts/risks.openapi.yaml`'s `UpdateRiskTreatmentActionRequest`:
- * every property optional (partial update), `additionalProperties: false`,
- * `minProperties: 1` (enforced in the controller — see
- * `treatment.controller.ts`'s `assertUpdateBodyNotEmpty`).
- *
- * `status` now validates against `ActionStatus` (D-1: `Action` is the sole
- * authority) — same four values as the retired `TreatmentActionStatus`,
- * confirmed identical in `schema.prisma`. `reopenReason` is new
- * (contracts/contract-changes.md §1.3): required when `status: OPEN`
- * reopens a `COMPLETED` action, enforced once in
- * `action.entity.ts#assertReopenReasonProvided` — this DTO only checks its
- * type. `treatmentDecisionId` is new too: sets or clears the link row's own
- * field, upserting the link row if the action has none yet (D-1/D-2).
- */
 import { IsDateString, IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

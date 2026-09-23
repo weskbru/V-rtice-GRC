@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Evidence create dialog (T036, 002-shared-grc-foundation, US1).
- *
- * Registers a new evidence record AND links it to the subject the panel is
- * embedded in, as one flow — SC-001's own target ("registra uma evidência
- * e a vincula a um risco em menos de dois minutos, sem sair do contexto do
- * risco"). A file, when the user wants one, is attached AFTER both steps
- * succeed (`POST /attachments`, `entityType: EVIDENCE`) — the only order
- * that works, since an attachment requires its parent to already exist
- * (see `schema.prisma`'s own `Evidence` section header). If the create
- * step fails, nothing else runs; if the link step fails after a
- * successful create, the evidence still exists (and is reported as such)
- * so the caller is never left wondering whether anything happened.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -68,11 +54,6 @@ const EVIDENCE_SOURCES: readonly EvidenceSource[] = [
 ];
 
 function todayDateOnly(): string {
-  // Local calendar date, never `Date#toISOString()`'s UTC date: in any
-  // timezone behind UTC, an evening `toISOString().slice(0, 10)` returns
-  // TOMORROW, so this field defaulted to a date that had not happened yet.
-  // Found on the rendered screen (CLAUDE.md §18.1) defaulting to 09/09
-  // on 08/09. Same rule as `features/*/date.ts`'s own `todayDateOnly`.
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -102,10 +83,6 @@ export function EvidenceCreateDialog({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { user: currentUser } = useAuth();
-  // S-10 — searched server-side (`UserPicker`), not a preloaded bounded list.
-  // The default owner is the current user in practice, so its label comes
-  // from the session with no fetch; any other default starts unlabeled
-  // until the user picks.
   const defaultOwner: UserRef | undefined =
     currentUser.id === defaultOwnerUserId
       ? { id: currentUser.id, fullName: currentUser.fullName, email: currentUser.email }
@@ -133,8 +110,6 @@ export function EvidenceCreateDialog({
     if (submitting) return;
     if (!next) {
       form.reset();
-      // The picker shows `owner`, not the form value: reset both, or a reopened
-      // dialog would display the previous pick while submitting the default.
       setOwner(defaultOwner);
       setFormError(null);
       setFile(null);
@@ -166,10 +141,6 @@ export function EvidenceCreateDialog({
           note: values.note || undefined,
         });
       } catch {
-        // The evidence itself was created successfully; only the link
-        // step failed (e.g. a transient error). Report it distinctly
-        // rather than a generic creation failure, and still hand the
-        // created record back — it exists and is visible elsewhere.
         setFormError(evidenceMessages.panel.linkError);
         onCreated(created);
         setSubmitting(false);
@@ -179,10 +150,7 @@ export function EvidenceCreateDialog({
       if (file) {
         try {
           await evidenceApi.uploadAttachment(created.id, file);
-        } catch {
-          // Same reasoning: the evidence and its link both succeeded.
-          // A failed attachment upload does not roll either back.
-        }
+        } catch {}
       }
 
       handleOpenChange(false);

@@ -1,43 +1,3 @@
-/**
- * 009-indicators-reports, Fase 3 (T031) + Fase 4 (T037) + Fase 8 (T068) —
- * `IndicatorController`: every one of `contracts/indicators.openapi.yaml`'s
- * eight operations. Fase 3/4 built `listIndicatorDefinitions`/
- * `createIndicatorDefinition`/`getIndicatorCurrentValue`/
- * `createIndicatorMeasurement`/`listIndicatorMeasurements`. T068 (this
- * change) adds the three that were missing —
- * `listIndicatorMetricKeys`/`getIndicatorDefinition`/
- * `updateIndicatorDefinition` — completing the contract in the SAME change
- * that adds `indicators.openapi.yaml` to `contract-coverage.spec.ts`'s own
- * `CONTRACT_SOURCES` (this task's own instruction: the contract joins the
- * gate alongside its last operation, never before).
- *
- * `listMetricKeys`/`getById` are declared BEFORE `update`'s `:definitionId`
- * route for the same static-before-dynamic reason
- * `FrameworkController.list`'s own comment documents — `metric-keys` is a
- * literal path segment, not a placeholder, so it must not be shadowed by
- * `:definitionId` matching it as an id.
- *
- * `getCurrentValue` carries only `@RequirePermission('indicator:view')` —
- * the SECOND permission FR-006 requires (the metric key's own
- * `sourcePermission`) is dynamic, decided by the catalog entry the path
- * segment resolves to, so it cannot be a static decorator; it is enforced
- * inside `GetIndicatorCurrentValueUseCase` itself (mirrors
- * `LinkIncidentRiskUseCase`'s own dynamic `risk:view` check via
- * `PermissionResolverService` directly, ADR-020 parts 4-5).
- *
- * `createMeasurement`/`listMeasurements` carry only
- * `@RequirePermission('indicator:edit')`/`@RequirePermission('indicator:view')`
- * respectively — the SECOND requirement research.md D-6 names (the
- * caller's resolved `ScopeFilter` must be `GLOBAL`) is likewise dynamic and
- * therefore enforced inside `CreateIndicatorMeasurementUseCase`/
- * `ListIndicatorMeasurementsUseCase` themselves, not by a decorator. No
- * `PATCH`/`PUT`/`DELETE` method exists on either measurement route,
- * anywhere in this class — SC-002's structural immutability guarantee
- * (data-model.md §2: "não existe operação que atualize uma linha desta
- * tabela"). `update` below is `IndicatorDefinition`'s OWN edit path —
- * a different table, explicitly editable (this file's own header, `update`
- * method doc comment).
- */
 import {
   Body,
   Controller,
@@ -149,9 +109,6 @@ export class IndicatorController {
     return toIndicatorDefinitionResponse(result.record, result.owner);
   }
 
-  /** `GET /indicators/metric-keys` (`listIndicatorMetricKeys`, T068) —
-   * declared BEFORE `getById`'s `:definitionId` route (this file's own
-   * header). */
   @RequirePermission('indicator:view')
   @Get('metric-keys')
   async listMetricKeys(): Promise<readonly IndicatorMetricCatalogEntryResponse[]> {
@@ -168,11 +125,6 @@ export class IndicatorController {
     return toIndicatorDefinitionResponse(result.record, result.owner);
   }
 
-  /** `PATCH /indicators/{definitionId}` (`updateIndicatorDefinition`, T068)
-   * — edits name/description/owner/threshold/isActive. `metricKey` has no
-   * field on `UpdateIndicatorDefinitionRequestDto` at all (that DTO's own
-   * header) — immutable, and rejected as an unknown property if a caller
-   * tries to send it (`forbidNonWhitelisted`). */
   @RequirePermission('indicator:edit')
   @Patch(':definitionId')
   async update(

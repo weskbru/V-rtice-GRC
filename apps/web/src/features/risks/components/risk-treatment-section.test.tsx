@@ -5,12 +5,6 @@ import { RiskTreatmentSection } from './risk-treatment-section';
 
 import type { RiskDetail, RiskTreatmentDecision } from '../types';
 
-/**
- * Component-mount evidence for T144 (`RiskTreatmentSection`, FR-071 to
- * FR-073). `../api` is mocked at the network boundary, matching
- * `assessment-history.test.tsx`'s own convention.
- */
-
 const { listTreatmentsMock, createTreatmentMock } = vi.hoisted(() => ({
   listTreatmentsMock: vi.fn(),
   createTreatmentMock: vi.fn(),
@@ -112,10 +106,6 @@ describe('RiskTreatmentSection', () => {
     expect(screen.queryByRole('button', { name: 'Registrar decisão' })).not.toBeInTheDocument();
   });
 
-  // 2026-09-17, Área 3 — the form is now a contextual action: gated behind
-  // "Registrar nova decisão", never permanently open. The supersession
-  // warning is still visible the instant the form itself is revealed, not
-  // only after a failed/attempted submit.
   it('warns that a new decision will supersede the current one BEFORE the user can submit (FR-073)', async () => {
     const risk: RiskDetail = { ...baseRisk, currentTreatment: decisionFixture({}) };
     render(<RiskTreatmentSection risk={risk} etag='"1"' canTreat onTreated={() => undefined} />);
@@ -158,15 +148,10 @@ describe('RiskTreatmentSection', () => {
       '"1"',
     );
     await waitFor(() => expect(onTreated).toHaveBeenCalledTimes(1));
-    // Estado primeiro -> ação quando solicitada: confirming returns the
-    // screen to its quiet read state, trigger visible again.
     expect(screen.queryByRole('button', { name: 'Registrar decisão' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Registrar nova decisão' })).toBeInTheDocument();
   });
 
-  // Área 3's explicit caution: a risk with NO treatment at all must never
-  // read as a mute empty state — the capability is evident right there,
-  // never hidden behind extra navigation.
   it('shows an evident "Registrar nova decisão" action inside the empty state itself, for a risk never treated', async () => {
     render(
       <RiskTreatmentSection risk={baseRisk} etag='"1"' canTreat onTreated={() => undefined} />,

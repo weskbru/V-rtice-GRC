@@ -1,18 +1,3 @@
-/**
- * 007-implementation-remediation, Frente A, D-1 a D-5 — the Action
- * convergence, exercised end to end against the real database. `Action`
- * (`grc/action`) is now the SOLE authority for a risk treatment action's
- * work-item fields; `risk_treatment_actions` is a pure link row. This file
- * REPLACES the previous coexistence-window suite (T046/T055,
- * `MirrorActionStatusFromOriginUseCase`/`MirrorActionFieldsFromOriginUseCase`,
- * both deleted) — it no longer has a mirror to test, and testing "the
- * mirror drifts by design" would be testing a defect this same migration
- * fixed (the 7ms `completedAt` drift the coordinator found and this
- * migration's own reconciliation step, `STEP 1B`, now closes).
- *
- * Byte-level inspection via raw Prisma reads, the same methodology
- * `risk-treatment-history.spec.ts` already establishes for this module.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -99,8 +84,6 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
       'Corrigir a lacuna identificada',
     );
 
-    // `created.action` IS the shared Action now (D-2) — no separate
-    // `TreatmentActionRecord` identity any more.
     expect(created.action.originType).toBe('RISK_TREATMENT');
     expect(created.action.originId).toBe(risk.id);
     expect(created.action.status).toBe('OPEN');
@@ -111,11 +94,6 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
     });
     expect(linkRow.riskId).toBe(risk.id);
 
-    // D-1/D-5 — two rows written, two distinct events. `action.created`
-    // identifies the ACTION; `risk.treatment_action_created` identifies
-    // the LINK ROW (coordinator review, 2026-09-11) — never the same id
-    // for both, or the entity-type column would mean two different things
-    // across time.
     const actionCreatedAudit = await ctx.prisma.auditEvent.findFirst({
       where: {
         entityId: created.action.id,
@@ -181,8 +159,6 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
     expect(completed.action.status).toBe('COMPLETED');
     expect(completed.action.completedAt).not.toBeNull();
 
-    // No reason supplied — must be rejected, never silently accepted the
-    // way the pre-convergence route used to (F-36).
     await expect(
       updateTreatmentActionUseCase.execute({
         actorUserId,
@@ -193,8 +169,6 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
       }),
     ).rejects.toThrow();
 
-    // With a reason, it succeeds, and ONLY the action.* event fires (D-5 —
-    // no more `risk.treatment_action_status_changed` duplicate).
     const beforeReopenAuditCount = await ctx.prisma.auditEvent.count({
       where: { entityId: created.action.id, entityType: AuditEntityType.ACTION },
     });
@@ -207,23 +181,9 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
       reopenReason: 'Reaberta para nova verificação.',
     });
     expect(reopened.action.status).toBe('OPEN');
-    // Coordinator correction, 007-implementation-remediation: this
-    // asserted `.toBeNull()` against `ActionRecord.completedAt`, but that
-    // field's own declared type
-    // (`grc/action/domain/ports/action-repository.port.ts`) is
-    // `Date | undefined`, never `Date | null` —
-    // `PrismaActionRepository`'s `toActionRecord` maps a NULL column to
-    // `undefined` on purpose (`row.completedAt ?? undefined`), the same
-    // convention every other optional field on this record uses. The
-    // assertion was checking the right FACT at the wrong LAYER. What
-    // actually matters — the persisted column and the wire response a
-    // caller receives — is checked explicitly below, at the layers where
-    // `null` is the real contract.
     expect(reopened.action.completedAt).toBeUndefined();
     expect(reopened.action.reopenReason).toBe('Reaberta para nova verificação.');
 
-    // The persisted column, read directly — not inferred from the
-    // use case's return value.
     const persisted = await ctx.prisma.action.findUniqueOrThrow({
       where: { id: created.action.id },
       select: { completedAt: true, completedByUserId: true },
@@ -231,12 +191,6 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
     expect(persisted.completedAt).toBeNull();
     expect(persisted.completedByUserId).toBeNull();
 
-    // The wire value a caller of `GET/PATCH /risks/{riskId}/treatment-actions`
-    // actually receives — `contracts/risks.openapi.yaml` declares
-    // `completedAt` nullable, so this is the layer where `null` (not
-    // `undefined`) is the real, contracted shape. Built through the SAME
-    // mapper the controller calls (`treatment.controller.ts`), not
-    // reconstructed by hand.
     const wireResponse = toTreatmentActionResponse(reopened.action, reopened.treatmentDecisionId);
     expect(wireResponse.completedAt).toBeNull();
 
@@ -294,12 +248,6 @@ describe('Risk treatment <-> shared Action convergence (007-implementation-remed
   });
 
   it('D-2: an Action created directly via the shared authority, with no link row, is a legitimate, distinct state', async () => {
-    // Regression guard for the exact defect the convergence exists to fix:
-    // an Action of origin RISK_TREATMENT with no risk_treatment_actions
-    // link row must not confuse any of the risk route's own read paths —
-    // it simply is not addressable BY the risk route (no riskId path can
-    // name it without a link), which is the correct, documented shape
-    // (D-2), not an error state.
     const { actorUserId, orgUnitId } = await setupActor();
     const risk = await createRiskUseCase.execute({
       actorUserId,

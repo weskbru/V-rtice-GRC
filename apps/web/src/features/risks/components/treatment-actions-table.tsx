@@ -1,99 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, "Planos de Ação" tab content (T145, US5, FR-074,
- * FR-074a, FR-074b, FR-075, ADR-015; lifecycle/edit/summary added in the
- * follow-up that gave the risk module a real Action-Plan surface).
- *
- * ## Where this table lives, and why it moved
- *
- * This used to render inside the "Tratamento" tab, alongside
- * `RiskTreatmentSection`. It now renders under "Planos de Ação"
- * (`risk-detail-view.tsx`) — the tab that used to show a bare "not yet
- * available" placeholder while THIS table, one tab over, was already doing
- * the real work. Two tables of the same rows in neighboring tabs would have
- * been the exact duplication CLAUDE.md §18.12/§19.6 exist to prevent; moving
- * this one File, rather than writing a second one, avoids it. "Tratamento"
- * keeps `RiskTreatmentSection` (the treatment DECISION) and now shows a
- * short pointer (`risks.treatment.actionsMovedNotice`) to where its actions
- * live, so a caller who remembers this table here never reads its absence
- * as data loss.
- *
- * ## Every operation goes through the RISK's own routes — ALL FOUR of them
- *
- * Lists, creates, edits AND transitions a treatment action all go through
- * the RISK's own routes (`GET`/`POST /risks/{riskId}/treatment-actions`,
- * `PATCH .../treatment-actions/{actionId}`) — never the generic `POST
- * /actions` `IncidentCorrectiveActions`/`ProblemCorrectiveActions` use, and
- * never the shared `POST /actions/{actionId}/transitions` either. A first
- * pass of this table DID route the lifecycle transition through that shared
- * endpoint — wrong: it requires `action:edit`, not `risk:treat`, which would
- * have made this whole tab's single `risk:treat` gate a lie the moment a
- * caller held one permission but not the other. `PATCH .../treatment-
- * actions/{actionId}` (`UpdateRiskTreatmentActionRequestDto`) already
- * accepts `status`/`reopenReason` for exactly this — the OLD `<Select>` this
- * table used to render already sent status changes this same way, before
- * this table grew the legal-transitions menu.
- *
- * This is NOT a parallel lifecycle path: `UpdateTreatmentActionUseCase`
- * delegates a `status` change straight to `grc/action`'s own
- * `TransitionActionUseCase` — the identical transition table, the identical
- * reopen-reason invariant, the identical `action.*` audit events (D-1, D-3,
- * D-5, `update-treatment-action.usecase.ts`'s own header). What the risk
- * route does on top, and what calling the shared endpoint directly would
- * have silently skipped: confirms the URL's `:riskId` genuinely is this
- * action's origin (never trusting "the actor has scope over some origin"),
- * and advances the RISK's own `version`, which is what the `ETag` this
- * table already threads through `onEtagChanged` actually reflects.
- *
- * The legal-transitions MENU itself is still derived from
- * `availableTransitions`/`actionStatusLabel`/`actionStatusBadgeVariant`
- * (`features/actions/status.ts`) — a real improvement over the old
- * free-choice `<Select>`, and kept. Only the call underneath changed.
- *
- * The reopen-with-reason flow reuses `ReopenActionDialog`
- * (`features/actions/components/`) — the same component every other origin
- * screen uses — passing its own `onConfirm` so the write goes through the
- * risk route above. It briefly did NOT: the dialog used to call
- * `actionsApi.transitionAction` internally with no way to redirect the
- * request, so this file carried a byte-for-byte copy of it. That copy could
- * not drift in WORDS (both read `lib/messages/actions.ts`) but could drift
- * in markup, focus order and ARIA, which is the half that actually breaks
- * quietly. The dialog now takes the write as a parameter, and the copy is
- * gone.
- *
- * `risk:treat` is this table's ONE gate for creating, editing AND
- * transitioning — never a second, generic permission concept bleeding in:
- * a caller who can see the risk (`risk:view`) but cannot treat it sees the
- * list read-only, with neither "Adicionar ação" nor any row-action menu at
- * all. As always (CLAUDE.md §18.9), this is advisory only — the server
- * independently re-checks `risk:treat` on every one of these four calls.
- *
- * ## `code` is not part of this wire shape
- *
- * `RiskTreatmentAction` (`contracts/risks.openapi.yaml`) carries no `code`
- * — unlike the generic `Action` the shared `/actions` endpoints return,
- * `TreatmentActionResponse`'s own mapper never populates one. The title
- * itself links to `/actions/{id}` instead (a route another workstream is
- * building concurrently; the link is never conditionally rendered on it
- * existing yet, exactly like `my-actions-columns.tsx`'s own
- * `/risks/{originId}` link).
- *
- * ## Overdue is ALWAYS the server's answer (ADR-015)
- *
- * `RiskTreatmentAction.overdue` is computed on the server, on read, from
- * `dueOn`/`status` — this component only ever displays `action.overdue` as
- * returned, both in the table and in `summary` below, and NEVER compares
- * `action.dueOn` against a client-side `Date` itself (ADR-006's clock
- * disagreement applied to dates instead). Overdue is conveyed by an
- * `Alert`-style row tint AND `StatusBadge`'s own icon + text ("Vencida") —
- * never colour alone (SC-012).
- *
- * `../date.ts`'s `formatDateOnly` is used for `dueOn` — never
- * `new Date(dueOn).toLocaleDateString()` directly, which parses a
- * date-only string as UTC and can render the previous day in a timezone
- * behind UTC.
- */
 import { FormField, StatusBadge } from '@pharos/design-system/components';
 import { Loader2, MoreHorizontal, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -147,23 +53,11 @@ const PAGE_SIZE = 20;
 
 export interface TreatmentActionsTableProps {
   riskId: string;
-  /** The risk's current `ETag` (ADR-013) — required by both `POST` and `PATCH` on this sub-resource. */
   etag: string;
   canTreat: boolean;
-  /** The current treatment decision's id, if any (US5, FR-074) — a new action is attached to it automatically. */
   currentTreatmentId: string | null;
-  /** `RiskDetail.treatmentActionSummary` — total/open/overdue counts, read
-   * from data the risk detail screen already loaded (no dedicated request
-   * for this table's own header). A snapshot as of the risk's last load:
-   * `onChanged` below asks the caller to re-fetch the risk after a local
-   * mutation, the same mechanism `RiskControlsSection` already uses, so it
-   * never drifts for long. */
   summary: TreatmentActionSummary;
-  /** Called with the fresh `ETag` after any mutation, so the caller (and any sibling section mutating the same risk) always uses the current version — mirrors `RiskCausesConsequences.onSaved`. */
   onEtagChanged: (etag: string) => void;
-  /** Called after create, edit or a lifecycle transition succeeds, so the
-   * caller can refresh the risk (and therefore `summary`) — mirrors
-   * `RiskControlsSection`'s own `onChanged`. */
   onChanged: () => void;
 }
 
@@ -215,10 +109,6 @@ export function TreatmentActionsTable({
 
   const [showForm, setShowForm] = useState(false);
   const [formValues, setFormValues] = useState<ActionFormValues>(emptyFormValues());
-  // S-10 — searched server-side now (`UserPicker`), never a preloaded
-  // bounded list. The create form has no existing action to seed a label
-  // from (starts unselected); the edit form seeds it from `action
-  // .responsible` itself (already carries `fullName`) in `openEdit` below.
   const [createResponsible, setCreateResponsible] = useState<UserRef | undefined>(undefined);
   const [editResponsible, setEditResponsible] = useState<UserRef | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
@@ -234,9 +124,6 @@ export function TreatmentActionsTable({
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
 
-  // The reopen-with-reason flow. `ReopenActionDialog` owns the form, the
-  // validation and the error display; this table owns only which row is
-  // pending and what the confirm button writes (see this file's header).
   const [pendingReopen, setPendingReopen] = useState<RiskTreatmentAction | null>(null);
 
   useEffect(() => {
@@ -371,13 +258,6 @@ export function TreatmentActionsTable({
     }
   }
 
-  /** Every non-reason transition (start/complete/cancel) — through the
-   * RISK's own `PATCH` route, `status` only. See this file's own header for
-   * why this is the risk's route and not the shared `POST /actions/{id}/
-   * transitions`: `UpdateTreatmentActionUseCase` delegates to the identical
-   * `TransitionActionUseCase` underneath, so the legality table and audit
-   * events are the SAME ones — this call additionally confirms `:riskId` is
-   * this action's real origin and advances the risk's own `version`. */
   async function applyTransition(
     action: RiskTreatmentAction,
     to: RiskTreatmentAction['status'],
@@ -404,19 +284,6 @@ export function TreatmentActionsTable({
     setPendingReopen(action);
   }
 
-  /** The ONE transition that needs a reason rather than a plain
-   * confirmation (`COMPLETED -> OPEN`, Invariant A2) — enforced
-   * authoritatively by the server (`action.entity.ts#assertReopenReasonProvided`,
-   * reached here via `UpdateTreatmentActionUseCase` -> `TransitionActionUseCase`,
-   * the SAME invariant `POST /actions/{id}/transitions` enforces). The
-   * dialog's own emptiness check is a courtesy that saves a round trip,
-   * never the actual gate (CLAUDE.md §18.9).
-   *
-   * Passed to `ReopenActionDialog` as its `onConfirm`: the dialog owns the
-   * form and the error surface, this owns the write and the row/ETag state
-   * the response carries. A 409 is re-thrown as the table's own conflict
-   * message so the reader sees the same wording a conflicting create or
-   * edit gives them, rather than the server's raw detail. */
   async function confirmReopen(reason: string): Promise<void> {
     if (!pendingReopen) {
       return;
@@ -493,23 +360,6 @@ export function TreatmentActionsTable({
                       key={action.id}
                       className={action.overdue ? 'bg-status-danger-bg/40' : undefined}
                     >
-                      {/*
-                        016-risk-detail-experience, D3 (2026-09-17) —
-                        `max-w-xs` alone caps the box but the shared
-                        `TableCell` primitive still defaults to
-                        `whitespace-nowrap`; a title longer than the cap
-                        does not wrap, it spills into "Responsável" (an
-                        overlap, not the table's own permitted horizontal
-                        scroll — §18.11's exception covers the table being
-                        wider than its container, not one cell painting over
-                        its neighbour). Pre-existing since 3b8c90a, latent
-                        until this phase's two-column `DetailLayout`
-                        (`aa50418`) narrowed the main content column to a
-                        fixed 320px aside's leftover width — `whitespace-
-                        normal` is the same wrap-within-a-cap fix already
-                        applied to `assessment-history.tsx`'s own long-text
-                        column (D2, same rodada).
-                      */}
                       <TableCell className="max-w-xs whitespace-normal">
                         <Link
                           href={`/actions/${action.id}`}
@@ -853,9 +703,6 @@ export function TreatmentActionsTable({
         </DialogContent>
       </Dialog>
 
-      {/* The same dialog every other origin screen opens, with this table's
-       * own write passed in — see this file's header for why the route
-       * differs while the rule does not. */}
       <ReopenActionDialog
         action={pendingReopen}
         onOpenChange={(open) => {

@@ -1,29 +1,3 @@
-/**
- * T015/004-compliance-management — the sole implementation of
- * `ControlEffectivenessPort` (`shared/grc-ports/control-effectiveness.port.ts`,
- * research.md D-9). `modules/controls` OWNS `controls`/`control_assessments`,
- * so this adapter is the one place in the platform allowed to query them on
- * behalf of another module — the same principle
- * `PrismaControlDirectoryAdapter` already establishes for identity/scope.
- *
- * ## One batched query, one call to the SAME calculator per control
- *
- * `WHERE control_id = ANY($1) AND attested_at IS NOT NULL` (research.md
- * D-9's own words) resolves every attested assessment for every requested
- * control in a single round-trip; rows are grouped in memory by
- * `controlId`, and `calculateControlEffectiveness`
- * (`domain/control-effectiveness.service.ts`, the SAME single calculator
- * `ControlRepository`/`control-effectiveness-query.ts` already use) is
- * invoked once per control — never a second, hand-rolled rule. A control
- * with zero attested assessments is not a distinct code path: an absent
- * key in the grouped map simply means `calculateControlEffectiveness([],
- * ...)`, which already returns `'NOT_ASSESSED'` (FR-013) with no special
- * casing needed here.
- *
- * `frequency` is read from `controls` in the SAME batched query's sibling
- * `findMany` (one extra round-trip, not N) — the calculator needs it to
- * decide `EXPIRED` (FR-014).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

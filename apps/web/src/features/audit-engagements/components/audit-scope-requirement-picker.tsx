@@ -1,15 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Requisito" scope variant's picker (T076, US1,
- * FR-005/FR-006, ADR-020). A cascading, three-step picker (framework, one
- * of its `PUBLISHED` versions, then one of that version's requirements) —
- * see `AuditScopeFrameworkVersionPicker`'s own doc comment for why this API
- * has no flatter listing to offer instead.
- *
- * Nothing here is pre-selected: every select starts empty, and "Adicionar
- * ao escopo" stays disabled until a requirement is actually chosen.
- */
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 

@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, read-only permission preview for the roles
- * table (T182, wave 4). Replaces a bare permission COUNT with the actual
- * identifiers, so a reader can tell WHAT a role grants without opening the
- * edit dialog — "a role is a set of permissions" should be legible from the
- * list itself, not only from a form. Collapsed to a handful of chips by
- * default (a 17-permission system role would otherwise dominate the row);
- * the full, resource-grouped list — mirroring `PermissionChecklist`'s own
- * grouping via the shared `groupPermissionsByResource` — expands inline on
- * request. Purely a read surface: no checkboxes, no mutation.
- */
 import { EmptyValue } from '@pharos/design-system/components';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -25,7 +14,6 @@ import type { Permission } from '../../types';
 export interface RolePermissionsSummaryProps {
   roleName: string;
   permissions: readonly Permission[];
-  /** Chips shown before collapsing behind "+N" — kept small so even a wide role does not dominate the row. */
   previewCount?: number;
 }
 
@@ -84,13 +72,6 @@ export function RolePermissionsSummary({
           id={panelId}
           role="group"
           aria-label={admin.roles.permissionsSummary.ariaLabel(roleName)}
-          // Capped and internally scrollable (mirrors `PermissionChecklist`'s
-          // own `max-h-72 overflow-y-auto` over the same data) — a role with
-          // many permissions (e.g. Platform Administrator) must not inflate
-          // this table row to the point that `DataTable`'s shared
-          // `align-middle` cell styling visibly floats every OTHER column's
-          // shorter content toward the row's vertical center (CLAUDE.md
-          // §18.11 — a table must read as structured on purpose).
           className="flex max-h-72 flex-col gap-3 overflow-y-auto rounded-md border border-border bg-card p-2.5"
         >
           {groups.map((group) => (

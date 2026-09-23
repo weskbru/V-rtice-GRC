@@ -9,33 +9,6 @@ import { LoadMoreButton } from '../timeline/load-more-button';
 
 import type { CommentThreadProps } from './types';
 
-/**
- * Platform-wide comment thread (T194, US9, FR-095, FR-098, FR-100, FR-102).
- * Renders an optional composer (only when `canComment`) followed by a
- * chronological, attributed list of comments — dumb by design: it never
- * fetches, paginates client-side, trims/validates the composer value beyond
- * "is there anything to submit", or invents copy the caller did not supply
- * (D-10). Today's one caller (`risk-comments-section.tsx`) owns the data,
- * the `/comments` request/response cycle and every word.
- *
- * ## A comment body is rendered as TEXT, never as markup
- *
- * `item.body` is interpolated as a plain JSX child (`{item.body}`), which
- * React always renders as an escaped text node — never through
- * `dangerouslySetInnerHTML`, and never through an HTML-parsing markdown
- * renderer. A comment is content typed by ANOTHER user and reflected back
- * to every other viewer of the same record; this is the stored-XSS defense
- * on the read side (the backend's `nosniff`/CSP headers protect the
- * attachment download path, not this one — a comment has no such
- * transport-level protection, so the rendering choice here is the entire
- * defense).
- *
- * ## Accessibility
- *
- * A real ordered list (`<ol role="list">` / `<li role="listitem">`),
- * restated explicitly for the same Safari/VoiceOver `list-style: none`
- * reason `ActivityHistory` documents.
- */
 export function CommentThread({
   items,
   labels,
@@ -122,8 +95,6 @@ export function CommentThread({
                 ) : null}
               </div>
 
-              {/* Plain text node — see this file's own doc comment on why a
-                  comment body is never rendered as markup. */}
               <p className="whitespace-pre-wrap text-sm text-foreground">{item.body}</p>
             </li>
           ))}

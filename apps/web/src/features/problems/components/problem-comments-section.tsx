@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem detail, Comments section (CLAUDE.md §19.10
- * remediation). Mirrors `RiskCommentsSection`/`IncidentCommentsSection`
- * exactly — see `RiskCommentsSection`'s own header for the full reasoning
- * this one deliberately does not repeat: `CommentableEntityType.PROBLEM`
- * was registered on the backend (`ProblemParentRecordAccessor`) with no
- * reachable interface until this file. Consumes `GET/POST /comments` and
- * `DELETE /comments/{commentId}`, scoped to this problem via
- * `entityType=PROBLEM&entityId={problemId}`
- * (`problemsApi.listComments`/`createComment`/`withdrawComment`,
- * ADR-008's entity-type registry). Renders through `CommentThread`
- * (`@pharos/design-system`) — a generic, domain-agnostic component; this
- * file supplies every word (D-10).
- */
 import { CommentThread, ConfirmDialog } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 

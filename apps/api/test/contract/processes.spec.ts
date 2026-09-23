@@ -1,38 +1,3 @@
-/**
- * T024,T025,T026,T027,T028/006-assets-processes, User Story 1 — contract
- * coverage for all six operations of `contracts/processes.openapi.yaml`
- * (`listProcessCatalog`, `createProcess`, `getProcess`, `updateProcess`,
- * `deactivateProcess`, `reactivateProcess`).
- *
- * Uses `buildContractTestApp` (`support/contract-app.ts`) — the REAL
- * `AppModule`, unmodified. Until T029 (Fase 4) this file used a dedicated
- * harness (`support/assets-processes-contract-app.ts`) because `GET
- * /assets`/`GET /processes` were declared on TWO controllers at once (the
- * retired `RegistryController`, `modules/risk`, and this module's own
- * `AssetController`/`ProcessController`) and `RiskModule` won route
- * dispatch by import order in the real `AppModule`. T029 removed
- * `RegistryController`'s two routes for good, so there is only one
- * handler per path again — the dedicated harness became redundant with
- * `buildContractTestApp` and was deleted, exactly as that harness's own
- * header anticipated for itself.
- *
- * ## Zero-permission caller on a single-record route: 403, not 404
- *
- * `contracts/processes.openapi.yaml`'s own `NotFound` response prose says a
- * caller lacking `process:view` ENTIRELY also collapses into the same 404 as
- * out-of-scope/nonexistent. The actual, already-shipped platform
- * architecture disagrees: `@RequirePermission('process:view')`
- * (`PermissionGuard`) runs BEFORE any use case and refuses with a flat 403
- * for a caller who holds NO permission at all, regardless of the specific
- * record — see that guard's own header ("this guard's decision depends
- * only on the caller's role-held permissions, never on any specific
- * record"). `test/contract/control-catalog.spec.ts` already encodes and
- * accepts this EXACT split for `control:view` (its own contract's prose
- * makes the identical "lacks control:view entirely" claim). This file
- * follows the same, already-established precedent rather than diverging
- * from it — reported as a contract/implementation discrepancy that
- * predates this fase, not fixed here.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -410,10 +375,6 @@ describe('Process catalog and record (006-assets-processes, User Story 1, operat
       const destinationUnit = await createOrgUnitFixture(prisma, {
         code: uniqueTestMarker('process-reassign-target'),
       });
-      // The actor's scope must cover BOTH the origin and the destination
-      // unit, or the reassignment itself would be refused by Invariant A2
-      // — unrelated to the fact under test here (A-4: existing links
-      // survive a transfer).
       await grantUnitScopeFixture(prisma, { user: fixture.user, orgUnitId: destinationUnit.id });
 
       const agent = request.agent(ctx.app.getHttpServer());
@@ -448,8 +409,6 @@ describe('Process catalog and record (006-assets-processes, User Story 1, operat
       expect(moveResponse.status).toBe(200);
       expect((moveResponse.body as ProcessDetailBody).orgUnit?.id).toBe(destinationUnit.id);
 
-      // The link created before the move remains visible, from both
-      // sides.
       const processDetail = await agent
         .get(`/api/v1/processes/${created.id}`)
         .set('Origin', appOrigin);
@@ -595,14 +554,11 @@ describe('Process catalog and record (006-assets-processes, User Story 1, operat
         .set('Origin', appOrigin);
       expect(deactivateResponse.status).toBe(200);
 
-      // Stays fully readable.
       const readAfterDeactivate = await agent
         .get(`/api/v1/processes/${process_.id}`)
         .set('Origin', appOrigin);
       expect(readAfterDeactivate.status).toBe(200);
 
-      // Stays visible in the EXISTING link, from both the process's own
-      // detail and the control's own relationship listing.
       expect((readAfterDeactivate.body as ProcessDetailBody).controls).toHaveLength(1);
       const existingLinkListing = await agent
         .get(`/api/v1/controls/${firstControlId}/processes`)
@@ -610,7 +566,6 @@ describe('Process catalog and record (006-assets-processes, User Story 1, operat
       expect(existingLinkListing.status).toBe(200);
       expect((existingLinkListing.body as unknown[]).length).toBe(1);
 
-      // Refused for a NEW link, to a DIFFERENT control.
       const secondControlResponse = await agent
         .post('/api/v1/controls')
         .set('Origin', appOrigin)
@@ -712,14 +667,6 @@ describe('Process catalog and record (006-assets-processes, User Story 1, operat
       expect(body.meta.total).toBe(0);
     });
 
-    // T033 (006-assets-processes, SC-003b) — the closure of "Vazamento 1":
-    // an actor scoped to unit A, listing WITHOUT any search filter (so a
-    // leak would surface unit B's row directly, not only via the previous
-    // test's exact-code search), sees unit A's process and NEVER unit B's
-    // — not in the returned page, not in `meta.total`, not across
-    // pagination (`meta.totalPages`). Before the cutover (T029),
-    // `RegistryController` applied no scope at all and this test fails
-    // against that code.
     it('T033: an actor scoped to unit A never receives unit B in the body, the total, or pagination', async () => {
       const unitA = await createOrgUnitFixture(ctx.app.get(PrismaService), {
         code: uniqueTestMarker('process-scope-a'),

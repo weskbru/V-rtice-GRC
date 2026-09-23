@@ -5,28 +5,6 @@ import { AssetContextAside } from './asset-context-aside';
 
 import type { AssetDetail } from '../../types';
 
-/**
- * Component-mount evidence for the contextual aside
- * (022-asset-detail-experience, Fase C). Rendered at the default (wide,
- * jsdom `matchMedia` stub) viewport, so every block is the plain,
- * always-expanded `<section>` — mirrors `control-context-aside.test.tsx`'s
- * own convention for not duplicating narrow-mode coverage here.
- *
- * Central assertions this suite exists to prove:
- *
- *   - no "Ações rápidas" heading EVER renders — `Asset`'s three
- *     relationship tabs are read-only by design, so this aside never builds
- *     a quick-action candidate list at all (this file's own header
- *     comment);
- *   - "Riscos"/"Controles" carry a REAL count (`AssetDetail.risks`/
- *     `.controls` arrive already embedded) — the "assimetria honesta" the
- *     coordinator asked for;
- *   - "Incidentes" carries a "Ver" hint and NO count, since it is not
- *     embedded in `AssetDetail` at all;
- *   - `aria-current` tracks `activeSectionId` for whichever of the three
- *     rows matches it.
- */
-
 const baseAsset: AssetDetail = {
   id: 'asset-1',
   code: 'AST-2026-0001',
@@ -67,9 +45,6 @@ describe('AssetContextAside', () => {
   it('shows "Ver" (never a count) for Incidentes — not embedded in AssetDetail', () => {
     render(<AssetContextAside asset={baseAsset} activeSectionId="overview" />);
 
-    // Accessible name concatenates label + hint with an explicit space —
-    // mirrors `ControlContextAside`'s/`RiskRelationshipsAside`'s own fix
-    // for the same JSX-whitespace defect class.
     const link = screen.getByRole('link', { name: 'Incidentes Ver' });
     expect(link).toHaveAttribute('href', '/assets/asset-1?section=incidents');
     expect(link.textContent).not.toMatch(/\d/);
@@ -89,10 +64,6 @@ describe('AssetContextAside', () => {
   });
 
   it('renders "Última atualização" formatted pt-BR, never "Invalid Date"', () => {
-    // No exact-string assertion on the formatted timestamp — mirrors
-    // `control-context-aside.test.tsx`'s own restraint: the LOCAL timezone
-    // of whatever machine runs this suite is not this test's business, only
-    // that the date renders validly.
     render(<AssetContextAside asset={baseAsset} activeSectionId="overview" />);
 
     expect(screen.getByRole('heading', { name: 'Última atualização' })).toBeInTheDocument();

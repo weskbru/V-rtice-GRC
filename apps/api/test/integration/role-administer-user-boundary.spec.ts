@@ -1,73 +1,3 @@
-/**
- * 2026-09-14 — `role:administer` does NOT imply `user:administer`, proved on
- * the SERVER, against real tables and the real guard chain.
- *
- * ## Why this file exists
- *
- * `specs/015-roles-permissions-surface/STATE.md` §16.1 item 1 says it
- * plainly: before this file, the non-implication was TRUE by implementation
- * and guarded by nothing on the server. Every existing guard lived on the
- * web side — `role-users-tab.test.tsx`, `role-admin-view.test.tsx` and one
- * Playwright scenario — and all three assert the rendered DOM of a client
- * that DECIDES not to call `/admin/users`. The nearest API test,
- * `test/contract/admin-permissions.spec.ts:182`, denies a caller holding
- * `risk:view`, which says nothing about a role administrator.
- *
- * So a "`role:administer` is super-administrator" shortcut in
- * `PermissionGuard` would have kept every one of those green. This file is
- * the one that goes red: it logs in an identity holding `role:administer`
- * and NOTHING else, and asserts both halves of the boundary at once.
- *
- * ## The sweep is exhaustive by construction, not by hand
- *
- * The denied half is not a hand-written list of routes that someone must
- * remember to extend. It is read from `apps/api/openapi.json` — the
- * committed, route-level reflection of what NestJS actually registered
- * (D-14, kept fresh by the `openapi:check` gate, and the same source
- * `information-disclosure.spec.ts` sweeps). Every operation whose path
- * begins with `/api/v1/admin/users` is exercised, so a bypass introduced on
- * ANY of them fails here, including one added after this file was written.
- *
- * ## The one operation that is reachable, and why it is not a bypass
- *
- * `PUT /admin/users/{userId}/roles` is gated by `role:administer` ON
- * PURPOSE — `admin.openapi.yaml` declares it under the `Roles` permission,
- * and `AdminUsersController`'s own header calls the narrowing deliberate:
- * assigning a role IS role administration, performed on a user. It is
- * therefore expected to answer 2xx here, and the assertion below pins it as
- * the SOLE exception: a second role-gated user operation, or the loss of
- * this one, both fail this test rather than passing unnoticed.
- *
- * ## Its response shape is now asserted too (F-73)
- *
- * When this file was written, that operation answered a full
- * `UserDetailResponse` — name, e-mail, job title, status, organizational
- * unit, roles and scope grants — which meant the ONE route a caller without
- * `user:administer` can reach handed over precisely the data FR-018/FR-020
- * exist to withhold. The header of this file recorded that as a fact it was
- * not this file's to change; F-73 changed it, deliberately, as a contract
- * decision (`admin.openapi.yaml`'s new `UserRoleAssignment` schema).
- *
- * The authorization did NOT move: this operation still requires
- * `role:administer`, and `GET /admin/users/{userId}` still requires
- * `user:administer` — both asserted below. What the test now also pins is
- * the RESPONSE: its EXACT key set, not a blacklist of forbidden names. A
- * key set is the stronger form, because it fails for a field nobody thought
- * to forbid — the way `UserDetailResponse` creeping back, in whole or in
- * part, would.
- *
- * One fact remains recorded rather than asserted: `GET /users` (the reduced
- * directory, `@NoPermissionRequired`) is available to EVERY authenticated
- * session by contract, so it is outside this boundary entirely and is not
- * swept.
- *
- * ## Test marker prefixes
- *
- * F-45/F-54: `uniqueTestMarker` appends a 36-character UUID, and a prefix of
- * exactly 2 or 6 characters yields a 43-character base64url-looking string
- * that `information-disclosure.spec.ts` reports as a leaked session token.
- * The prefixes here are 14 and 19 characters.
- */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -90,7 +20,6 @@ import { createLocalUserFixture } from './support/fixtures';
 const API_PREFIX = '/api/v1';
 const ADMIN_USERS_PREFIX = `${API_PREFIX}/admin/users`;
 
-/** The single `/admin/users**` operation the contract gates by `role:administer`. */
 const ROLE_GATED_USER_OPERATION = `PUT ${ADMIN_USERS_PREFIX}/{userId}/roles`;
 
 interface OpenApiDocument {
@@ -107,8 +36,6 @@ interface RegisteredOperation {
   readonly label: string;
 }
 
-/** Every registered operation under `/api/v1/admin/users`, read from the
- * reflected document rather than transcribed from the controllers. */
 function readAdminUserOperations(): readonly RegisteredOperation[] {
   const documentPath = path.resolve(__dirname, '../../openapi.json');
   const document = JSON.parse(readFileSync(documentPath, 'utf8')) as OpenApiDocument;
@@ -128,9 +55,6 @@ function readAdminUserOperations(): readonly RegisteredOperation[] {
   return operations;
 }
 
-/** Substitutes a fresh UUID for every `{param}` — the permission guard runs
- * BEFORE `ParseUUIDPipe` and the validation pipe, so a syntactically valid
- * but nonexistent id is enough to reach the decision under test. */
 function concretePath(templatePath: string): string {
   return templatePath.replace(/\{[^}]+\}/g, () => randomUUID());
 }
@@ -139,9 +63,7 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
   let ctx: ContractTestContext;
   let appOrigin: string;
   let prisma: PrismaService;
-  /** Holds `role:administer` and nothing else. */
   let roleAdminAgent: ReturnType<typeof request.agent>;
-  /** A real target for the one reachable operation (F-73). */
   let targetUserId: string;
   let targetUserEmail: string;
   let assignableRoleId: string;
@@ -151,8 +73,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
     appOrigin = ctx.app.get(AppConfigService).app.appOrigin;
     prisma = ctx.app.get(PrismaService);
 
-    // `risk:view` exists only so the role-administration happy path below has
-    // a real permission identifier to put into a role it creates.
     await createPermissionFixture(prisma, 'risk:view');
 
     const role = await createRoleWithPermissionsFixture(prisma, ['role:administer'], {
@@ -163,10 +83,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
     });
     await assignRoleFixture(prisma, { user: roleAdmin.user, role });
 
-    // The subject of the one reachable operation, carrying REAL personal
-    // data — a distinctive name, e-mail and job title. If the minimized
-    // response of F-73 is ever widened back out, the assertions below fail
-    // on this content, not on an empty shape that would leak nothing anyway.
     const target = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('roleadmin-target')}@example.test`,
       fullName: 'Alvo Confidencial da Fronteira',
@@ -192,11 +108,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
     await ctx.close();
   });
 
-  // -------------------------------------------------------------------
-  // The premise: the identity really does hold exactly one permission.
-  // Without this, a 403 sweep below could pass for the wrong reason.
-  // -------------------------------------------------------------------
-
   it('holds role:administer and does NOT hold user:administer', async () => {
     const permissions = await roleAdminAgent
       .get(`${API_PREFIX}/auth/session`)
@@ -208,10 +119,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
     expect(body.permissions).not.toContain('user:administer');
     expect(body.permissions).not.toContain('org_unit:administer');
   });
-
-  // -------------------------------------------------------------------
-  // Positive half — role administration works in full.
-  // -------------------------------------------------------------------
 
   it('reaches every role-administration route (2xx) with role:administer alone', async () => {
     const list = await roleAdminAgent.get(`${API_PREFIX}/admin/roles`).set('Origin', appOrigin);
@@ -255,15 +162,8 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
     expect(removed.status).toBe(204);
   });
 
-  // -------------------------------------------------------------------
-  // Negative half — the WHOLE user-administration surface, swept.
-  // -------------------------------------------------------------------
-
   it('sweeps a non-empty set of registered /admin/users operations (sanity check on the sweep itself)', () => {
     const operations = readAdminUserOperations();
-    // A sweep that found nothing would pass the test below vacuously. The
-    // floor is deliberately loose — this asserts the reader works, not how
-    // many routes the platform happens to have today.
     expect(operations.length).toBeGreaterThanOrEqual(8);
     expect(operations.map((operation) => operation.label)).toContain(ROLE_GATED_USER_OPERATION);
   });
@@ -278,10 +178,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
         .set('Origin', appOrigin)
         .send({});
 
-      // 403, never 400/404/422: the guard decides before the validation pipe,
-      // the handler and the repository, so "you may not" must be the answer
-      // even for an empty body and an id that does not exist. Any other
-      // status means the request got PAST the permission check.
       if (response.status === 403) {
         denied.push(operation.label);
       } else {
@@ -289,10 +185,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
       }
     }
 
-    // Named, not counted: a failure says WHICH operation opened up, and with
-    // what status. The `-> 400` is the validation pipe refusing the empty
-    // body this sweep sends — i.e. proof the request got past the guard,
-    // which for this one operation is what the contract says should happen.
     expect(reachable).toEqual([`${ROLE_GATED_USER_OPERATION} -> 400`]);
     expect(denied).toHaveLength(operations.length - 1);
   });
@@ -303,16 +195,8 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
       .set('Origin', appOrigin)
       .send({ roleIds: [] });
 
-    // 404 — `GetUserUseCase` refusing an id that does not exist. Reaching
-    // that code at all proves `role:administer` carried the request through
-    // `PermissionGuard`, deliberately, per `admin.openapi.yaml`.
     expect(response.status).toBe(404);
   });
-
-  // -------------------------------------------------------------------
-  // F-73 — the reachable operation still WORKS, and its response is
-  // minimized. Both halves, on the same request.
-  // -------------------------------------------------------------------
 
   it('assigns a role to a real user with role:administer alone, and answers ONLY {userId, roles} (F-73)', async () => {
     const response = await roleAdminAgent
@@ -320,8 +204,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
       .set('Origin', appOrigin)
       .send({ roleIds: [assignableRoleId] });
 
-    // Half one — the capability is intact. `role:administer` administers
-    // role assignment, and F-73 did not narrow that by one step.
     expect(response.status).toBe(200);
     const body = response.body as {
       readonly userId: string;
@@ -330,19 +212,11 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
     expect(body.userId).toBe(targetUserId);
     expect(body.roles.map((role) => role.id)).toEqual([assignableRoleId]);
 
-    // Half two — EXACT key set, not a blacklist. A blacklist of
-    // `email`/`jobTitle`/`primaryOrgUnit`/`scopeGrants` would pass happily
-    // for a field added later; this fails for ANY key that is not one of
-    // the two the contract's `UserRoleAssignment` declares, including every
-    // field of `UserDetail` and anything invented after today.
     expect(Object.keys(body).sort()).toEqual(['roles', 'userId']);
     for (const role of body.roles) {
       expect(Object.keys(role).sort()).toEqual(['id', 'name']);
     }
 
-    // The same statement in the form a human reads at a glance: the target's
-    // own personal data, which the server had in hand while answering, is
-    // nowhere in the bytes it sent.
     const serialized = JSON.stringify(body);
     expect(serialized).not.toContain(targetUserEmail);
     expect(serialized).not.toContain('Alvo Confidencial da Fronteira');
@@ -350,10 +224,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
   });
 
   it('still requires user:administer for the operations that DO return the administrative user record (F-73)', async () => {
-    // F-73 minimized one representation. It must not have moved the
-    // boundary itself: the routes that legitimately answer `UserDetail`
-    // remain closed to this identity, for the same target user it just
-    // successfully assigned a role to.
     const detail = await roleAdminAgent
       .get(`${ADMIN_USERS_PREFIX}/${targetUserId}`)
       .set('Origin', appOrigin);
@@ -393,8 +263,6 @@ describe('role:administer does NOT imply user:administer (015 FR-019, STATE §16
       .set('Origin', appOrigin);
     expect(detail.status).toBe(403);
 
-    // The refusals disclose nothing beyond "forbidden" — no e-mail, no name,
-    // no count, no statement about whether that user exists (FR-030).
     for (const response of [list, byRole, detail]) {
       const body = JSON.stringify(response.body);
       expect(body).not.toMatch(/@example\.test/);

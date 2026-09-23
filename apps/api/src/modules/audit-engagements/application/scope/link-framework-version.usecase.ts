@@ -1,19 +1,3 @@
-/**
- * T028/005-audit-findings, User Story 1 — `LinkAuditScopeToFrameworkVersionUseCase`
- * (`POST /audits/{auditId}/scope/framework-versions`,
- * `addFrameworkVersionToScope` operation, FR-005, FR-006, research.md D-2,
- * D-11). Requires `audit-engagement:scope` on the engagement (checked by
- * the future controller's `@RequirePermission`, out of this task's own
- * scope) AND `compliance:view` on the referenced framework version
- * (ADR-020 part 5, applied from this pair's first link — mirroring
- * `LinkRequirementToControlUseCase`'s own shape exactly).
- *
- * The version must be `PUBLISHED` — a `DRAFT` version, or one that does
- * not exist, is `422` naming `frameworkVersionId`, indistinguishable
- * (research.md D-2's own "regra adicional"). Permitted only while the
- * engagement is `PLANNING` (research.md D-3). No unlink operation exists
- * for this link (research.md D-12).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -61,12 +45,6 @@ export class LinkAuditScopeToFrameworkVersionUseCase {
 
     assertAuditEngagementEditable(auditEngagement.status);
 
-    // ADR-020 part 4 — checked BEFORE any write; a missing or unpublished
-    // version answers exactly as nonexistent (research.md D-2). ADR-020
-    // part 5 — `compliance:view` on the referenced side, folded into the
-    // SAME condition, mirroring `LinkRequirementToControlUseCase`'s own
-    // shape exactly (no orgUnit check: `FrameworkVersion` carries none,
-    // research.md D-11).
     const [frameworkVersion, canView] = await Promise.all([
       this.frameworkVersionDirectory.findById(input.frameworkVersionId),
       this.permissionResolver.hasPermission(input.actorUserId, 'compliance:view'),

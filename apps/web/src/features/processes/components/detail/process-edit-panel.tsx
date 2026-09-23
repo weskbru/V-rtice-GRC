@@ -2,12 +2,12 @@
 
 import { DetailPanel } from '@pharos/design-system/components';
 
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { processes } from '@/lib/messages/processes';
+
 import { ProcessForm } from '../process-form';
 
 import type { ProcessDetail } from '../../types';
-
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { processes } from '@/lib/messages/processes';
 
 export interface ProcessEditPanelProps {
   process: ProcessDetail;

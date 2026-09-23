@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, edit user profile dialog (T181, FR-021).
- * Roles, scope and activation status each have their own action/dialog so
- * every change is audited as a distinct, meaningful action (FR-032) —
- * mirrors the contract's own division of `PATCH /admin/users/{userId}`
- * from `.../status`, `.../roles` and `.../scope-grants`.
- */
 import { zodResolver } from '@hookform/resolvers/zod';
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
@@ -74,14 +67,6 @@ export function UserEditDialog({
     defaultValues: valuesFor(user),
   });
 
-  // No reset-on-open effect: the parent (`UserAdminView`) only mounts this
-  // component while `editingUser` is non-null, so a NEW target always means
-  // a fresh mount — `useForm`'s `defaultValues` above already reflects it.
-  // Resetting on CLOSE, not on open, is what other dialogs in this codebase
-  // do when they stay mounted across targets (`TransitionConfirmDialog`,
-  // `apps/web/src/features/risks/components/risk-lifecycle-actions.tsx`) —
-  // an effect that calls `setFormError` synchronously on `open` becoming
-  // true would trip `react-hooks/set-state-in-effect` for no benefit here.
   function handleOpenChange(next: boolean): void {
     if (submitting) return;
     if (!next) {

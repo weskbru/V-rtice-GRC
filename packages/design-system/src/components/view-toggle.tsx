@@ -8,16 +8,12 @@ import type { ComponentType, KeyboardEvent, SVGProps } from 'react';
 
 export interface ViewToggleOption<TValue extends string> {
   value: TValue;
-  /** Visible text. */
   label: string;
-  /** Optional leading icon (lucide-react component). */
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
-  /** Accessible name when it must be fuller than `label`, e.g. "Ver os riscos em cards". */
   accessibleLabel?: string;
 }
 
 export interface ViewToggleProps<TValue extends string> {
-  /** Accessible name for the group, e.g. "Modo de visualização". */
   label: string;
   options: readonly ViewToggleOption<TValue>[];
   value: TValue;
@@ -25,27 +21,6 @@ export interface ViewToggleProps<TValue extends string> {
   className?: string;
 }
 
-/**
- * Compact segmented control for switching how a list is presented (e.g.
- * Cards / Tabela). Pure presentation — it carries no domain knowledge of
- * what the options mean.
- *
- * Implements the ARIA APG "radio group" pattern (a single-choice segmented
- * control, not a toolbar of independent toggle buttons): the container is
- * `role="radiogroup"`, each segment is `role="radio"` with `aria-checked`,
- * and a roving `tabIndex` means Tab enters/leaves the group at the selected
- * segment while the arrow keys (plus Home/End) move the selection between
- * segments, wrapping at the ends — the standard keyboard model for this
- * widget. Selection is therefore programmatically determinable via
- * `aria-checked`, never only a visual difference, and the selected segment
- * is never identified by colour alone: it gets a filled background, a
- * heavier font weight and (when supplied) its icon together (CLAUDE.md
- * §18.8).
- *
- * `h-9` to match the sibling filter controls this sits next to on a
- * register screen's toolbar (`FilterBar`, `MultiSelectFilter`), which are
- * all `h-9` too.
- */
 export function ViewToggle<TValue extends string>({
   label,
   options,

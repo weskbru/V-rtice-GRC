@@ -1,38 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — `EngagementFindingsSection` (T077, 005-audit-findings, US2,
- * FR-007/FR-008). Consumed by the engagement detail view (owned by the
- * parallel agent building `app/(app)/audits/...` — see
- * `specs/005-audit-findings/tasks.md` T076/T079); this file only exports
- * the section itself, never a page or a route.
- *
- * Lists the findings THIS engagement produced (`GET /audits/{auditId}
- * /findings`) and offers recording a new one (`POST /audits/{auditId}
- * /findings`). Three distinguishable states — loading, genuinely-empty,
- * load-failure with retry (CLAUDE.md §18.11) — mirroring `EvidencePanel`'s/
- * `FindingsPanel`'s own established shape for a collaboration-style list
- * embedded in another entity's detail screen, kept intentionally simple
- * (a single generously-sized page, no further pagination UI) exactly like
- * those two panels already are.
- *
- * **FR-007 — communicated proactively, not only as a refusal**: recording a
- * finding is permitted only while the engagement is `IN_PROGRESS`.
- * `notInProgressNotice` is shown next to the (disabled) "Registrar achado"
- * action whenever it is not — the user understands the precondition
- * BEFORE attempting, never only from a `422` after the fact
- * (CLAUDE.md §18.11).
- *
- * `orgUnitId` is never rendered as a field anywhere in this flow — it is
- * derived server-side from the engagement's own organizational unit
- * (`EngagementFindingCreateDialog`'s own header comment).
- *
- * `canCreate`/`defaultOwnerUserId` are passed in by the caller — the
- * engagement detail view already resolves `finding:create` and the current
- * user's own id once, for its OWN lifecycle actions, and passes them down
- * here the same way `risk-detail-view.tsx` passes `canCreateFindings`/
- * `defaultOwnerUserId` into `FindingsPanel`.
- */
 import { EmptyState, ErrorState, StatusBadge } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -69,7 +36,6 @@ const STATUS_VARIANT: Record<FindingSummary['status'], 'info' | 'warning' | 'suc
     ARCHIVED: 'neutral',
   };
 
-/** `identifiedOn` is a `date`-only field — parsed as a local calendar date so it never off-by-ones in a timezone behind UTC (the same reasoning every other feature's own `date.ts` documents). */
 function formatDateOnly(value: string): string {
   const [year, month, day] = value.split('-');
   return year && month && day ? `${day}/${month}/${year}` : value;
@@ -78,7 +44,6 @@ function formatDateOnly(value: string): string {
 export interface EngagementFindingsSectionProps {
   engagementId: string;
   engagementStatus: AuditEngagementStatus;
-  /** `finding:create` — gates the "Registrar achado" action; the caller passes it, mirroring `FindingsPanelProps.canCreate`. */
   canCreate: boolean;
   defaultOwnerUserId: string;
 }
@@ -145,7 +110,6 @@ export function EngagementFindingsSection({
         ) : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {/* FR-007 — the precondition, stated before any attempt (CLAUDE.md §18.11). */}
         {canCreate && !canRecordNow ? (
           <p className="text-sm text-muted-foreground">
             {findingsFromEngagement.notInProgressNotice}

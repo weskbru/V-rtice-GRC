@@ -1,32 +1,11 @@
 'use client';
 
-/**
- * PharosGRC — the dashboard's hero band (`025-dashboard-composition`).
- *
- * Replaces the platform-wide `PageHeader` on THIS screen only — every other
- * screen keeps `PageHeader` unchanged (CLAUDE.md §18.10).
- *
- * ## Not a card
- *
- * No `bg-card`, no border, no shadow: this band shares the page canvas
- * (`--background`), so it reads as part of the page rather than a component
- * sitting on it.
- *
- * The decorative SVG spans the band; its own fades protect the text.
- * On narrower screens only the low-contrast atmosphere and hills remain.
- *
- * ## "Olá, {nome}" uses the real signed-in identity
- *
- * `useAuth().user.fullName`, first word only — this component must render
- * under `AppShell` (same requirement `useAuth()` already documents).
- */
 import { useAuth } from '@/lib/auth-context';
 import { dashboard } from '@/lib/messages/dashboard';
 
 import { DashboardHeroIllustration } from './dashboard-hero-illustration';
 import { DashboardToday } from './dashboard-today';
 
-/** First given name only — "Olá, Ada", never the full registered name. */
 function firstName(fullName: string): string {
   const [first] = fullName.trim().split(/\s+/);
   return first ?? fullName;

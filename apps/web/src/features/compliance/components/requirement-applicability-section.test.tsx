@@ -5,10 +5,6 @@ import { RequirementApplicabilitySection } from './requirement-applicability-sec
 
 import type { RequirementApplicability } from '../types';
 
-/**
- * Component-mount evidence for `RequirementApplicabilitySection` (US3,
- * FR-015, FR-016). `../api` is mocked at the network boundary.
- */
 const {
   listRequirementControlLinksMock,
   listRequirementApplicabilityDeclarationsMock,

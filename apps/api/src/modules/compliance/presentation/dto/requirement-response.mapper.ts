@@ -1,11 +1,3 @@
-/**
- * T030/004-compliance-management — maps `RequirementRecord`
- * (`domain/ports/requirement-repository.port.ts`) to the wire shape
- * `contracts/compliance.openapi.yaml`'s `Requirement` schema describes.
- * `applicability`/`complianceState` are always the freshly-derived values
- * `RequirementComplianceReaderService` computed — never a stored column
- * (FR-017, research.md D-8).
- */
 import type {
   RequirementApplicabilityRef,
   RequirementFrameworkVersionRef,
@@ -46,11 +38,6 @@ function toApplicabilityResponse(
     justification: ref.justification,
     declaredBy: ref.declaredBy,
     declaredAt: ref.declaredAt.toISOString(),
-    // Only the CURRENTLY ACTIVE declaration is ever embedded here
-    // (`RequirementRepositoryPort.findActiveApplicability`'s own
-    // contract: `revokedAt IS NULL`) — so `revokedBy`/`revokedAt` are
-    // always null on this projection, matching the contract's own
-    // "seu próprio revokedAt é sempre null quando embutido aqui".
     revokedBy: null,
     revokedAt: null,
   };

@@ -1,15 +1,3 @@
-/**
- * T050/002-shared-grc-foundation, US2 — `PrismaActionRepository`, the sole
- * implementation of `ActionRepositoryPort`. Extends `ActionScopedRepository`
- * (T013), which fixes `applyScope`/`withScope` to `orgUnitId` — every
- * scoped method below is compile-time required to thread the caller's
- * `ScopeFilter` through it (FR-031/FR-032), the same guarantee
- * `PrismaEvidenceRepository` gets from its own base.
- *
- * `findByIdUnscoped`/`mirrorTransition` deliberately bypass
- * `applyScope`/`withScope` — see the port's own doc comments for why (the
- * `RISK_TREATMENT` convergence's already-authorized internal caller).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -33,12 +21,6 @@ import type {
 } from '../domain/ports/action-repository.port';
 import type { ActionStatus, Prisma } from '@prisma/client';
 
-// Exported (007-implementation-remediation, Frente A) so
-// `modules/risk/infrastructure/risk-treatment-action-query.service.ts` can
-// build the exact same `ActionRecord` shape for a risk's treatment-action
-// listing (which reads `actions` directly by origin, D-7) without
-// duplicating this mapping — the ONE place an `Action` row becomes an
-// `ActionRecord`.
 export const ACTION_INCLUDE = {
   orgUnit: { select: { id: true, name: true } },
   responsibleUser: { select: { id: true, fullName: true } },
@@ -68,9 +50,6 @@ export function toActionRecord(row: ActionWithRelations): ActionRecord {
   };
 }
 
-/** Shared by `transition`/`mirrorTransition` below — both apply the exact
- * same set of columns via `updateMany` (which takes scalar FK fields
- * directly, not Prisma's relation `connect`/`disconnect` syntax). */
 function toTransitionUpdateManyData(
   changes: ActionTransitionChanges,
 ): Prisma.ActionUncheckedUpdateManyInput {
@@ -84,11 +63,6 @@ function toTransitionUpdateManyData(
   };
 }
 
-/** Shared by `update`/`mirrorFieldUpdate` — both apply the SAME field-edit
- * column set (`title`/`description`/`responsibleUserId`/`dueOn`), the
- * scoped, controller-facing write and the unscoped `RISK_TREATMENT`
- * convergence mirror (Fix 2) respectively. `undefined` means "leave
- * unchanged" per `UpdateActionChanges`'s own convention. */
 function toFieldUpdateManyData(
   changes: UpdateActionChanges,
 ): Prisma.ActionUncheckedUpdateManyInput {
@@ -180,8 +154,6 @@ export class PrismaActionRepository extends ActionScopedRepository implements Ac
     return this.findByIdUnscoped(id);
   }
 
-  /** Assurance fix (Fix 2) — the field-edit counterpart to `mirrorTransition`
-   * above; see `ActionRepositoryPort.mirrorFieldUpdate`'s own doc comment. */
   async mirrorFieldUpdate(
     id: string,
     changes: UpdateActionChanges,
@@ -209,18 +181,6 @@ export class PrismaActionRepository extends ActionScopedRepository implements Ac
     if (filter.orgUnitId !== undefined) where.orgUnitId = filter.orgUnitId;
     if (filter.dueBefore !== undefined) where.dueOn = { lt: filter.dueBefore };
 
-    // `status`/`statuses`/`overdue` are AND-combined, never one silently
-    // overriding the other (mirrors `risk-treatment-action.repository.ts
-    // #buildWhere`'s own documented reasoning: `status=COMPLETED&overdue=true`
-    // must return zero rows, not silently ignore one filter). Coordinator
-    // correction, 007-implementation-remediation, Frente A: this used to be
-    // its OWN local copy of `grc/shared/domain/overdue.service.ts`'s
-    // status set, with a comment saying the two "must" stay in sync —
-    // exactly the unenforced duplication that comment described rather
-    // than prevented. Now imported directly; there is nothing left to keep
-    // in sync by hand. `status` and `statuses` are mutually exclusive by
-    // convention (ActionListFilter's own doc comment); when both are
-    // absent, no status predicate is applied outside `overdue`.
     const requestedStatuses: readonly ActionStatus[] | undefined =
       filter.statuses ?? (filter.status !== undefined ? [filter.status] : undefined);
     if (filter.overdue) {
@@ -230,22 +190,9 @@ export class PrismaActionRepository extends ActionScopedRepository implements Ac
           ? { in: requestedStatuses.filter((s) => OVERDUE_ELIGIBLE_ACTION_STATUSES.includes(s)) }
           : { in: [...OVERDUE_ELIGIBLE_ACTION_STATUSES] };
     } else if (requestedStatuses !== undefined) {
-      // `{ in: [...] }` also covers the single-value case correctly in
-      // Prisma — avoids an indexed access TypeScript cannot narrow past
-      // `exactOptionalPropertyTypes` even after a length check.
       where.status = { in: [...requestedStatuses] };
     }
 
-    // Assurance fix (Fix 1) — `Action.orgUnitId`'s stale snapshot is never
-    // consulted here. `restriction` was built by `ListActionUseCase` from
-    // each relevant origin type's LIVE org unit (`ActionOriginAccessor
-    // .listOriginIdsInScope`); `UNRESTRICTED` (the actor's own scope is
-    // `GLOBAL`) applies no extra predicate at all, `RESTRICTED` becomes one
-    // `originType = X AND originId IN (...)` group per type, OR'd together.
-    // An empty `allowedOriginIdsByType` (no registered origin type was
-    // evaluated — e.g. every one returned zero ids) must match NOTHING, not
-    // "no filter" — `id: { in: [] }` says that explicitly rather than
-    // relying on Prisma's own empty-`OR`-array behaviour.
     let scopedWhere: Prisma.ActionWhereInput = where;
     if (restriction.kind === 'RESTRICTED') {
       const originGroups = [...restriction.allowedOriginIdsByType.entries()]
@@ -274,13 +221,6 @@ export class PrismaActionRepository extends ActionScopedRepository implements Ac
     };
   }
 
-  /**
-   * 009-indicators-reports, T026 — a single `COUNT(*)`, scoped by
-   * `Action.orgUnitId` via `this.applyScope` (`ActionScopedRepository`,
-   * the SAME base every other scoped method here uses), filtered on the
-   * SAME `OVERDUE_ELIGIBLE_ACTION_STATUSES` array `isActionOverdue`
-   * checks — never a second, hand-rolled "is this overdue" rule.
-   */
   async countOverdueInScope(scope: ScopeFilter, referenceDate: Date): Promise<number> {
     const where = this.applyScope(scope, {
       status: { in: [...OVERDUE_ELIGIBLE_ACTION_STATUSES] },
@@ -289,12 +229,6 @@ export class PrismaActionRepository extends ActionScopedRepository implements Ac
     return this.prisma.client.action.count({ where });
   }
 
-  /**
-   * `GET /dashboard/summary`'s `breakdowns.actions.byStatus` — one
-   * `GROUP BY status` query, scoped by `this.applyScope`, zero-filled for
-   * every `ActionStatus` afterward (a status with zero rows is never
-   * simply absent from Prisma's own `groupBy` result).
-   */
   async getStatusBreakdown(scope: ScopeFilter): Promise<Readonly<Record<ActionStatus, number>>> {
     const where = this.applyScope(scope, {});
     const rows = await this.prisma.client.action.groupBy({
@@ -315,13 +249,6 @@ export class PrismaActionRepository extends ActionScopedRepository implements Ac
     return byStatus;
   }
 
-  /**
-   * `GET /dashboard/summary`'s `breakdowns.actions.dueSoon` — the SAME
-   * `OVERDUE_ELIGIBLE_ACTION_STATUSES` filter `countOverdueInScope` uses
-   * above, with `dueOn` bounded by `[fromInclusive, toExclusive)` instead
-   * of `< referenceDate` — never a second "which statuses can still be
-   * due" rule.
-   */
   async countDueSoonInScope(
     scope: ScopeFilter,
     fromInclusive: Date,

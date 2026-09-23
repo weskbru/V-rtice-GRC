@@ -1,11 +1,3 @@
-/**
- * T192 — D-11 contract coverage for `/comments` (FR-095, FR-098, FR-100,
- * FR-030): for every operation, the endpoint's stated authorization rule
- * (including a caller WITHOUT the permission being refused, and a
- * zero-additional-permission caller succeeding where the contract states
- * "no additional permission"), an unauthenticated 401, and the success
- * response's declared shape.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -86,8 +78,6 @@ describe('/comments contract coverage (T192, D-11, FR-095, FR-098, FR-100)', () 
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('cm-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner for this file's /comments coverage — not
-    // the object of any assertion here.
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
     const risk = await ctx.app.get(CreateRiskUseCase).execute({
       actorUserId: setupUser.id,
@@ -98,9 +88,6 @@ describe('/comments contract coverage (T192, D-11, FR-095, FR-098, FR-100)', () 
     });
     riskId = risk.id;
 
-    // Viewer: risk:view only (zero comment-specific permission) — must
-    // still be able to LIST comments (no permission narrower than
-    // risk:view gates this route).
     const viewerRole = await createRoleWithPermissionsFixture(prisma, ['risk:view'], {
       name: `fixture-cm-viewer-role-${randomUUID()}`,
     });
@@ -111,7 +98,6 @@ describe('/comments contract coverage (T192, D-11, FR-095, FR-098, FR-100)', () 
     await assignRoleFixture(prisma, { user: viewer.user, role: viewerRole });
     await grantUnitScopeFixture(prisma, { user: viewer.user, orgUnitId: orgUnit.id });
 
-    // Creator: risk:view + comment:create.
     const creatorRole = await createRoleWithPermissionsFixture(
       prisma,
       ['risk:view', 'comment:create'],
@@ -124,7 +110,6 @@ describe('/comments contract coverage (T192, D-11, FR-095, FR-098, FR-100)', () 
     await assignRoleFixture(prisma, { user: creator.user, role: creatorRole });
     await grantUnitScopeFixture(prisma, { user: creator.user, orgUnitId: orgUnit.id });
 
-    // Deleter: risk:view + comment:delete (but NOT comment:create).
     const deleterRole = await createRoleWithPermissionsFixture(
       prisma,
       ['risk:view', 'comment:delete'],
@@ -201,7 +186,6 @@ describe('/comments contract coverage (T192, D-11, FR-095, FR-098, FR-100)', () 
       const created = response.body as CommentBody;
       expect(created.entityType).toBe('RISK');
       expect(created.entityId).toBe(riskId);
-      // Stored and returned RAW — never interpreted as markup (FR-095).
       expect(created.body).toBe(bodyText);
       expect(created.author.fullName).toBeTruthy();
       expect(created.createdAt).toBeTruthy();
@@ -263,12 +247,6 @@ describe('/comments contract coverage (T192, D-11, FR-095, FR-098, FR-100)', () 
       const listed = listResponse.body as CommentPageBody;
       expect(listed.data.some((c) => c.id === commentId)).toBe(false);
 
-      // Audit link and attribution are preserved (FR-102) — the withdrawal
-      // itself is audited, verified independently by
-      // test/integration/audit-transactional.spec.ts's general mechanism;
-      // here we assert only the API-visible contract: the comment is gone
-      // from reads, never a second delete succeeding (idempotency is NOT
-      // promised for comments/attachments, unlike notifications).
       const secondDelete = await deleterAgent
         .delete(`/api/v1/comments/${commentId}`)
         .set('Origin', appOrigin);

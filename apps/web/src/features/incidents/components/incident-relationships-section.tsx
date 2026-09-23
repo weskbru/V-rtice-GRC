@@ -1,117 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident detail, Risks/Assets/Processes relationship
- * sections (008-incidents-problems, US3), mirroring `FindingLinksSection`'s
- * self-fetching `RelationshipSubsection<TLink>` shape exactly (CLAUDE.md
- * §18.12) — one parameterized subsection instantiated three times, each in
- * its own `Card` (this detail view renders one section per `EntityTabs`
- * tab, unlike `FindingLinksSection`'s embedded, borderless layout inside an
- * already-bordered `<li>`).
- *
- * `IncidentDetail` does NOT embed `risks`/`assets`/`processes` the way
- * `RiskDetail` embeds `controls`/`processes`/`assets` — `incidents
- * .openapi.yaml` gives each relationship its own `GET
- * /incidents/{id}/{risks|assets|processes}` list endpoint and nothing on
- * `IncidentDetail` itself (`packages/api-types/src/generated/incidents.ts`).
- * Each subsection therefore fetches and owns its own list state, refreshing
- * itself after a link/unlink rather than depending on the parent detail
- * re-fetching (no `onChanged` prop crossing back up to the detail view).
- *
- * The picker is `SearchablePicker` (`@pharos/design-system`), never a plain
- * `Select` — per the coordinator's explicit instruction, it is now the only
- * correct way to offer a record in this codebase. Each of `RiskRef`/
- * `AssetRef`/`ProcessRef` names its display text differently in the
- * contract (`RiskRef.title` vs. `AssetRef.name`/`ProcessRef.name`) — the
- * `*OptionRef`/`*Ref` adapter functions below normalize all three into one
- * `{id, code, name}` shape, mirroring `finding-links-section.tsx`'s own
- * `riskRef`/`riskOptionRef` adapters exactly.
- *
- * Unlink withdraws (`unlinkedAt` stamped), never deletes — the current list
- * loses the row unless "mostrar vínculos desfeitos" is checked, in which
- * case it stays, visibly marked. Unlike `FindingRiskLink`, these link
- * responses carry no `unlinkedBy` (`packages/api-types/src/generated
- * /incidents.ts`'s own `IncidentRiskLinkResponse` — id/ref/linkedBy/
- * linkedAt/unlinkedAt only), so the withdrawn badge shows only the date.
- *
- * ## Progressive disclosure (018-incident-detail-experience, Fase 5)
- *
- * Measured before this change: the picker and "Vincular" sat permanently
- * open in all three sections — even in the empty and error states — with
- * "Mostrar vínculos desfeitos" floating above the data. The query read as a
- * form. `gateLinkBehindAction` (defaults to `false`, mirroring
- * `risk-controls-section.tsx`'s own identical prop and the exact reasoning
- * `b8b1f3f` recorded for Risk) fixes this without touching who can do what:
- * a caller with `canLink` sees an intent button ("Vincular risco"/"Vincular
- * ativo"/"Vincular processo", the SAME word `messages.pickerLabel` already
- * names) instead of the picker; clicking it reveals the SearchablePicker +
- * "Vincular" + a "Cancelar" escape hatch, exactly as risk-controls-
- * section's own `showLinker` does. All three families here pass
- * `gateLinkBehindAction` — unlike Risk, where only "Controles" got it and
- * "Processos e Ativos" was the coordinator's own explicit blast-radius
- * exception — because the measurement that triggered this rodada found the
- * SAME "always-open form" defect in all three of these sections at once.
- *
- * The empty state is never silent about the intent button: `b8b1f3f`'s own
- * reasoning applies unchanged — "a silent empty state is worse than an open
- * form" — so the trigger renders directly under the empty-state sentence,
- * not hidden behind yet another click.
- *
- * "Mostrar vínculos desfeitos" moved from the top of `CardContent` into the
- * header, via `CardAction` (`@/components/ui/card` — already exported,
- * unused elsewhere in this app before now) — a filter belongs beside the
- * title/description it qualifies, not stacked above the data it filters.
- * Still always reachable: it is the only way to see a withdrawn link, and
- * gating it behind the same intent action as the picker would make history
- * harder to reach for no benefit.
- *
- * ## C5 (Fase 5 review, measured with real volume) — "Desvincular" was
- * scrolling out of reach
- *
- * The coordinator provisioned 16 risks/15 assets/15 processes through the
- * real API and measured the table pushing its own "Vinculado em"/
- * "Desvincular" columns past the visible edge — 127px at 1440, 199px at
- * 1024 — with the 320px contextual aside (Fase 4) having already narrowed
- * the main column from 1120px to 726px. `Table`'s own `overflow-x-auto`
- * wrapper made the overflow scrollable rather than broken, but a control
- * that only reveals itself to someone who discovers an undocumented
- * horizontal scroll is not reachable in practice — the exact mechanism
- * `b8b1f3f` already fixed for Risk's own assessment history ("the change
- * column inherited whitespace-nowrap and forced one unbroken line, which
- * also pushed the rationale column out of sight entirely"). The entity
- * column keeps a floor (`min-w-40`, so a short name/code pair is never
- * crushed) but now also a ceiling (`max-w-56`); "Vinculado por" loses
- * `whitespace-nowrap` — a long display name (the coordinator's own example:
- * "Platform Administrator (recovery)") now wraps within `max-w-32` instead
- * of reserving its own unbroken width; the conditional "Desfeito" column
- * gets the same treatment. No column removed, nothing paginated — the same
- * constraint `b8b1f3f` and the coordinator both named explicitly.
- *
- * ## C1 (019-problem-detail-experience, Fase D review) — `table-fixed`
- * only from `sm` up
- *
- * `table-fixed`, added by a LATER commit than C5 above and applied at
- * every width, was never re-checked at 390 with real volume — C5's own
- * measurement covered only 1440/1024. The coordinator's Fase D review of
- * the sibling Problem screen provisioned 16 real rows and measured this
- * SAME component at 390: 33px of page overflow, "Desvincular" past the
- * visible edge, and — the part C5 never caught — text reading as
- * glued-together words ("Vinculado por"/"Vinculado em" running into each
- * other in the header, a date running into "Desvincular" in a cell,
- * titles breaking mid-word). At 390 four columns squeezed into ~244px
- * leaves roughly 48px each, which no real content fits into; `table-fixed`
- * forces that width regardless, where the pre-`table-fixed` `auto` layout
- * would have grown the table and let the reader scroll to it honestly.
- * This was a real, already-shipped defect on `main`, not something the
- * Problem rodada introduced — found because that rodada was about to
- * knowingly reproduce it. Fixed by scoping `table-fixed` to
- * `sm:table-fixed`: below `sm` the table reverts to `auto`, sizing columns
- * by content and scrolling horizontally within `Table`'s own
- * `overflow-x-auto`/`tabIndex={0}` wrapper (already keyboard-reachable,
- * D-15). The percentage `w-[*]` classes on `TableHead` stay unprefixed —
- * under `auto` layout they are merely a sizing hint, exactly as before
- * `table-fixed` existed here at all.
- */
 import { ConfirmDialog, SearchablePicker } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -205,7 +93,6 @@ interface RelationshipSubsectionProps<TLink extends RelationshipLink> {
   fetchRegistry: (q: string) => Promise<{ data: readonly RegistryOption[]; isPartial: boolean }>;
   onLink: (registryItemId: string) => Promise<void>;
   onUnlink: (linkId: string) => Promise<void>;
-  /** See this file's own `gateLinkBehindAction` doc comment above. Defaults to `false`. */
   gateLinkBehindAction?: boolean;
 }
 
@@ -364,16 +251,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            {/* `table-fixed` — C5's remaining measurement after the width
-                caps below still showed 6-105px of overflow at 1440/1024
-                with a genuinely long entity title: `max-w-*` on a `<td>`
-                is only a hint under the browser's default `table-layout:
-                auto` column-width algorithm, which still grows a column
-                to fit its longest unbroken content. Explicit percentage
-                widths on `TableHead`, combined with `table-fixed`, make
-                the table's own total width authoritative — a column
-                cannot grow past its assigned share regardless of content
-                length, so wrapping (not overflow) is the only outcome. */}
             <Table className="sm:table-fixed">
               <TableCaption className="sr-only">{messages.sectionTitle}</TableCaption>
               <TableHeader>
@@ -385,13 +262,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
                     <TableHead className="w-[16%]">{relationships.withdrawnBadge}</TableHead>
                   ) : null}
                   {canLink ? (
-                    // Fixed px, not a percentage: `Button`'s own base class
-                    // hardcodes `whitespace-nowrap` (shared component, not
-                    // touched here), so "Desvincular" always renders on one
-                    // line — a percentage narrower than its natural width
-                    // would overflow the cell regardless of the column's
-                    // assigned share. 112px comfortably fits the button at
-                    // every supported width.
                     <TableHead className="sr-only w-28">{messages.unlinkAction}</TableHead>
                   ) : null}
                 </TableRow>
@@ -540,7 +410,6 @@ export interface IncidentRelationshipsSectionProps {
   canLink: boolean;
 }
 
-/** `RiskRef` names its display text `title`, not `name` (`RiskRef` in `packages/api-types/src/generated/incidents.ts`) — normalized here, mirroring `finding-links-section.tsx`'s own `riskRef`/`riskOptionRef`. */
 function riskLinkRef(link: IncidentRiskLinkResponse): RegistryOption {
   return { id: link.risk.id, code: link.risk.code, name: link.risk.title };
 }

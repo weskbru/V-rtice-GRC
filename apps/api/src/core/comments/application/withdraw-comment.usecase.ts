@@ -1,8 +1,3 @@
-/**
- * T192 — `WithdrawCommentUseCase`: `DELETE /comments/{commentId}` (FR-100,
- * FR-102). Soft-deletes only — author, timestamp and the audit link are
- * preserved, never hard-deleted.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

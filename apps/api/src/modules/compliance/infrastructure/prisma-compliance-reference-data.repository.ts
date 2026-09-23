@@ -1,9 +1,3 @@
-/**
- * T020/004-compliance-management — sole implementation of
- * `ComplianceReferenceDataPort`. See that port's own header for why this
- * module keeps a minimal, independent copy of this one read rather than
- * depending on a shared cross-module capability.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

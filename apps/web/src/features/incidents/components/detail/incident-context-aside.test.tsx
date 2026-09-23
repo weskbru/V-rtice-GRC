@@ -5,26 +5,6 @@ import { IncidentContextAside } from './incident-context-aside';
 
 import type { IncidentDetail } from '../../types';
 
-/**
- * Component-mount evidence for the contextual aside
- * (018-incident-detail-experience, Fase 4). Rendered at the default (wide,
- * jsdom `matchMedia` stub) viewport, so every block is the plain,
- * always-expanded `<section>` — mirrors
- * `risk-context-aside.test.tsx`'s own convention for not duplicating
- * narrow-mode coverage here.
- *
- * Central assertions this suite exists to prove:
- *
- *   - every quick action is a real LINK (`role="link"`), never a button —
- *     the exact defect class `RiskRelationshipsAside` had to correct
- *     (`getByRole('button', …)` colliding with a section's own real
- *     button);
- *   - no relationship row ever shows a count — `IncidentDetail` carries
- *     none, and the aside must never fabricate one;
- *   - "Última atualização" renders only when `incident.updatedAt` is
- *     present, never "Invalid Date" for the optional field.
- */
-
 const baseIncident: IncidentDetail = {
   id: 'incident-1',
   code: 'INC-2026-0001',
@@ -74,7 +54,6 @@ describe('IncidentContextAside', () => {
       '/incidents/incident-1?section=comments',
     );
 
-    // None of these render as buttons.
     for (const name of [
       'Vincular risco',
       'Vincular ativo',
@@ -116,14 +95,11 @@ describe('IncidentContextAside', () => {
     );
 
     for (const label of ['Riscos', 'Ativos', 'Processos', 'Problemas']) {
-      // Accessible name concatenates label + hint with an explicit space —
-      // see this component's own doc comment ("Riscos8").
       const link = screen.getByRole('link', { name: `${label} Ver` });
       expect(link).toHaveAttribute(
         'href',
         expect.stringContaining('/incidents/incident-1?section='),
       );
-      // Never a digit anywhere in the visible row text.
       expect(link.textContent).not.toMatch(/\d/);
     }
 

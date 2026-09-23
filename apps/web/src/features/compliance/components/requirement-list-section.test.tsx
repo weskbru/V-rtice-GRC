@@ -5,12 +5,6 @@ import { RequirementListSection } from './requirement-list-section';
 
 import type { Requirement } from '../types';
 
-/**
- * Component-mount evidence for `RequirementListSection` (US1/US3, operation
- * 10) — the real, server-fetched requirement listing that replaces the
- * session-scoped `RequirementSessionPanel` workaround. `../api` is mocked at
- * the network boundary.
- */
 const { listRequirementsMock, createRequirementMock } = vi.hoisted(() => ({
   listRequirementsMock: vi.fn(),
   createRequirementMock: vi.fn(),

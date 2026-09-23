@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, organizational scope grants (T183, FR-025a,
- * FR-025b, FR-028). Picking a user (by name/e-mail search, `GET /users`)
- * shows and manages THEIR grants — the contract has no reverse lookup
- * ("who has scope on this unit"), only `GET /admin/users/{userId}/scope-
- * grants`, so this is the shape the real API supports. A new `UNIT` grant
- * defaults to whichever unit is selected in the tree; `GLOBAL` needs none.
- * A grant/revoke takes effect on the user's NEXT request, not immediately
- * for an already-open session (FR-028) — stated plainly, matching the
- * roles screen's identical notice.
- */
 import { ConfirmDialog, EmptyValue } from '@pharos/design-system/components';
 import { Building2, Loader2, Search, ShieldMinus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -66,23 +55,6 @@ export function ScopeGrantsPanel({
   const [pendingRevoke, setPendingRevoke] = useState<OrgScopeGrant | null>(null);
   const [revoking, setRevoking] = useState(false);
 
-  // Adjusted DURING rendering, not in an effect (React's own recommended
-  // alternative for "reset this state when a prop changes" — see
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-
-  // state-when-a-prop-changes): a `useEffect` calling `setUnitId`
-  // synchronously would trip `react-hooks/set-state-in-effect` for a case
-  // that does not need an effect at all. `unitId` still stays independently
-  // editable afterward (the "Unidade" select below can override it) —
-  // only a genuine change in which TREE node is selected snaps it back.
-  //
-  // Both sides of the comparison are normalized to `string` (never
-  // `undefined`/`null`) — comparing `selectedUnit?.id` (which is `undefined`
-  // when nothing is selected) against a `useState` default of `null`
-  // produces `undefined !== null`, which is ALWAYS true and re-triggers the
-  // `setState` calls on every single render, regardless of whether the
-  // resolved id actually changed. React's own "too many re-renders" guard
-  // caught exactly this while writing `admin-access.spec.ts` (T175) — a
-  // real bug found and fixed by evidence, not by inspection alone.
   const resolvedUnitId = selectedUnit?.id ?? '';
   const [syncedUnitId, setSyncedUnitId] = useState(resolvedUnitId);
   if (resolvedUnitId !== syncedUnitId) {
@@ -93,16 +65,10 @@ export function ScopeGrantsPanel({
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length < 2) {
-      // Nothing to clear via `setState` here: the results list below is
-      // gated on `query.trim().length >= 2` in the JSX itself, so a leftover
-      // `results` value from a previous, longer query is never rendered.
       return;
     }
     let cancelled = false;
     const handle = setTimeout(() => {
-      // Inside the timer callback, not the effect's own synchronous
-      // execution — same reasoning `.then()`/`.catch()` callbacks elsewhere
-      // in this file rely on (`react-hooks/set-state-in-effect`).
       setSearching(true);
       adminApi
         .searchDirectoryUsers(trimmed)
@@ -122,19 +88,12 @@ export function ScopeGrantsPanel({
     };
   }, [query]);
 
-  // `loadingGrants` is derived from "the last RESOLVED grants key doesn't
-  // match the one this render calls for" — see `UserAdminView`'s identical
-  // pattern and doc comment (`react-hooks/set-state-in-effect`).
   const grantsKey = `${selectedUser?.id ?? ''}|${reloadToken}`;
   const [resolvedGrantsKey, setResolvedGrantsKey] = useState<string | null>(null);
   const loadingGrants = selectedUser !== null && resolvedGrantsKey !== grantsKey;
 
   useEffect(() => {
     if (!selectedUser) {
-      // Nothing to clear via `setState` here: the grants table below only
-      // renders while `selectedUser` is truthy, so a leftover `grants` value
-      // from a previously selected user is never rendered while this branch
-      // is the current one.
       return;
     }
     let cancelled = false;
@@ -201,7 +160,6 @@ export function ScopeGrantsPanel({
         <p className="text-sm text-muted-foreground">
           {admin.organization.scopeGrants.description}
         </p>
-        {/* Ties this panel back to the tree's own selection state (task brief: the tree and the grant panel must read as one connected surface, not two independent widgets) — a new `UNIT` grant below defaults to exactly this unit. */}
         {selectedUnit ? (
           <span className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1 text-xs font-medium text-foreground">
             <Building2 aria-hidden="true" className="size-3.5 text-muted-foreground" />
@@ -332,7 +290,6 @@ export function ScopeGrantsPanel({
                       {new Date(grant.grantedAt).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="text-right">
-                      {/* Revoking a grant is reversible (it can be re-granted) but immediately narrows what this user can see — the "sensitive" tier, carried here through the same warning tone as every other security-relevant-but-non-destructive action in Administration (CLAUDE.md §18.11). */}
                       <Button
                         variant="ghost"
                         size="sm"

@@ -1,13 +1,3 @@
-/**
- * 008-incidents-problems, US3 (data-model.md §6, research.md D-13 to
- * D-15) — `ProblemIncidentLinkRepositoryPort`. Unlike
- * `IncidentProblemLinkReadPort` (read-only, from the Incident side), THIS
- * port owns the full write path — `modules/problems` is the sole writer
- * of `problem_incident_links`.
- *
- * `infrastructure/prisma-problem-incident-link.repository.ts` is the sole
- * implementation, wired in `problems.module.ts`.
- */
 import type { ProblemIncidentLinkRecord } from '../problem-incident-link.entity';
 
 export abstract class ProblemIncidentLinkRepositoryPort {
@@ -27,7 +17,6 @@ export abstract class ProblemIncidentLinkRepositoryPort {
     linkId: string,
   ): Promise<ProblemIncidentLinkRecord | undefined>;
 
-  /** Ends the link WITHOUT deleting the row. */
   abstract unlink(
     linkId: string,
     unlinkedByUserId: string,

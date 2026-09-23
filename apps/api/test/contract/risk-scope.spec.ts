@@ -1,19 +1,3 @@
-/**
- * T101 — organizational scope on the register and on direct risk retrieval
- * (US3 AS6, FR-025, FR-090, FR-030, SC-015).
- *
- * Two independently scoped actors, one risk inside actor A's scope and
- * outside actor B's:
- *
- *   1. Actor A's register lists it; actor B's register does not, and
- *      actor B's `meta.total` does not count it either (not merely
- *      hidden from the page — genuinely excluded from the count).
- *   2. Actor A can `GET /risks/{id}` it (200); actor B cannot (404).
- *   3. The 404 actor B receives is BYTE-FOR-BYTE identical (status, title,
- *      type, detail) whether the id names a real, out-of-scope risk or a
- *      randomly generated id that names no risk at all — the refusal must
- *      not disclose which case occurred (FR-030).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -108,12 +92,6 @@ describe('Organizational scope on the register and on direct retrieval (T101, FR
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('risk-scope-owner')}@example.test`,
     });
-    // F-CV-2: `owner` is a SEPARATE fixture from the two restricted actors
-    // this file exists to test (`agentInScope`/`agentOutOfScope`, both
-    // `risk:view`-only, each scoped to exactly one unit) — it only seeds
-    // the risk those two probe, and is never itself the subject of an
-    // assertion. Made eligible for the risk's OWN unit only; the two
-    // restricted actors' permission/scope are untouched (Case B).
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnitInScope.id });
     const risk = await ctx.app.get(CreateRiskUseCase).execute({
       actorUserId: creator.id,
@@ -145,7 +123,6 @@ describe('Organizational scope on the register and on direct retrieval (T101, FR
     expect(outOfScopeResponse.status).toBe(200);
     const outOfScopeBody = outOfScopeResponse.body as RegisterPageBody;
     expect(outOfScopeBody.data.some((row) => row.id === riskId)).toBe(false);
-    // Excluded from the COUNT too, not merely off the current page.
     expect(outOfScopeBody.meta.total).toBe(0);
   });
 
@@ -192,19 +169,9 @@ describe('Organizational scope on the register and on direct retrieval (T101, FR
     expect(nonexistentBody.status).toBe(outOfScopeBody.status);
     expect(nonexistentBody.title).toBe(outOfScopeBody.title);
     expect(nonexistentBody.type).toBe(outOfScopeBody.type);
-    // `detail` embeds the id the CALLER THEMSELF supplied in the URL —
-    // comparing the two strings for equality would be the wrong check
-    // (they necessarily differ, since `riskId` and `nonexistentId` differ)
-    // and would not even be the right thing to require: echoing back an id
-    // the client already typed discloses nothing new. What FR-030 actually
-    // requires is that BOTH refusals follow the exact same template with
-    // no extra, distinguishing content — proven by matching each against
-    // the identical pattern, parameterized only by the id already known to
-    // the caller.
     expect(outOfScopeBody.detail).toBe(`Risco ${riskId} não foi encontrado(a).`);
     expect(nonexistentBody.detail).toBe(`Risco ${nonexistentId} não foi encontrado(a).`);
 
-    // FR-107: no internal detail leaks through either refusal.
     const raw = JSON.stringify(outOfScopeResponse.body);
     expect(raw).not.toMatch(/stack/i);
     expect(raw).not.toMatch(/prisma/i);

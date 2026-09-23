@@ -1,10 +1,3 @@
-/**
- * T190 — `WithdrawAttachmentUseCase`: `DELETE /attachments/{attachmentId}`
- * (FR-100, FR-102). Soft-deletes only — attribution and the audit link are
- * preserved, never hard-deleted; the underlying stored bytes are never
- * touched (`FileStorageProvider.delete` is reserved for a future
- * retention/purge tool — see that port's header).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -42,8 +35,6 @@ export class WithdrawAttachmentUseCase {
 
     const actorLabel = await this.actorDirectory.findActorLabel(input.actorUserId);
     if (!actorLabel) {
-      // Defensive only: `SessionGuard` already proved this user has a live
-      // session, so the actor row existing is expected.
       throw new UnauthorizedDomainError();
     }
 
@@ -53,8 +44,6 @@ export class WithdrawAttachmentUseCase {
         input.actorUserId,
       );
       if (!withdrawn) {
-        // Raced with a concurrent withdrawal between the read above and
-        // this write — same non-disclosing refusal as "never existed".
         throw new NotFoundDomainError(ATTACHMENT_ENTITY_LABEL, input.attachmentId);
       }
 

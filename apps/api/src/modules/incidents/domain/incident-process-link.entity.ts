@@ -1,9 +1,3 @@
-/**
- * 008-incidents-problems, US3 (spec.md FR-013, data-model.md §2) — domain
- * shape for `IncidentProcessLink`. Sibling of
- * `incident-risk-link.entity.ts`, same reasoning, against `Process`
- * instead of `Risk`.
- */
 export interface IncidentProcessLinkProcessRef {
   readonly id: string;
   readonly code: string;

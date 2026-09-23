@@ -1,40 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report catalog column definitions (009-indicators-reports, T061), mirroring
- * `features/incidents/components/incident-register-columns.tsx` (CLAUDE.md §18.12).
- *
- * Every column has `enableSorting: false` — `listReportDefinitions` declares no `sort` parameter
- * at all (`contracts/reports.openapi.yaml`), unlike `GET /incidents`.
- *
- * The row-actions column takes `onRun` as a parameter (mirrors `features/actions/components/
- * my-actions-columns.tsx`'s own `BuildMyActionsColumnsOptions` shape) rather than a bare `Link` —
- * there is no `GET /reports/{reportId}` to route a detail page to (`ReportController`'s own header
- * comment: that operation is declared in the contract but deliberately not implemented), so
- * "Executar" opens `ReportRunDialog` with the row's own already-loaded `ReportDefinition` instead
- * of navigating anywhere.
- *
- * ## Código folds into the Nome cell, rather than a column of its own
- *
- * Unlike Risks/Assets/Processes, `code` here is never a link target (no detail route exists — see
- * above), so the family's usual "narrow leading code column, wide title column" split has nothing
- * to anchor the code column ON: it would just be inert text competing with the name for attention.
- * `code` instead renders as a small caption ABOVE `name` inside ONE cell — the coordinator's
- * "code as a small line above/beside the name" option — which both reads as a single identified
- * row (code, then what it's called) and returns the freed column budget to Descrição, the field
- * that actually needs it. Screen readers still get both strings, in that order, as one cell's text
- * content; nothing here removes `code` from the accessible tree, only from the header row.
- *
- * ## Métricas: the count is always visible, the metric names are a keyboard/AT-reachable disclosure
- *
- * `reports.register.metricCountLabel` renders the compact "N indicadores" text every row shows.
- * When there is at least one, that text sits inside a `PopoverTrigger` button — Radix's own
- * `aria-haspopup`/`aria-expanded` wiring makes it operable by keyboard (Enter/Space to open,
- * Escape to close) and announced by a screen reader exactly like any other disclosure, never a
- * hover-only affordance (CLAUDE.md §18.8). Its content lists each metric's real pt-BR label from
- * `indicators.metricKeyLabels` — the owning catalog (`lib/messages/indicators.ts`'s own header) —
- * reused here, never re-declared.
- */
 import { StatusBadge } from '@pharos/design-system/components';
 import { ChevronDown, Play } from 'lucide-react';
 

@@ -1,15 +1,3 @@
-/**
- * 008-incidents-problems, US1 — `PrismaIncidentRepository`, the sole
- * implementation of `IncidentRepositoryPort`. Extends
- * `IncidentScopedRepository`, which fixes `applyScope`/`withScope` to
- * `orgUnitId` — every scoped method below is compile-time required to
- * thread the caller's `ScopeFilter` through it (spec.md FR-014/FR-022).
- * Mirrors `grc/finding/infrastructure/prisma-finding.repository.ts`'s
- * shape closely, adapted to `Incident`'s single-`transition` method
- * (mirroring `PrismaActionRepository.transition` instead of `Finding`'s
- * `close`/`reopen`/`archive` split — see `IncidentRepositoryPort`'s own
- * header for why).
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -82,9 +70,6 @@ export class PrismaIncidentRepository
     return row ? this.toIncidentRecord(row) : undefined;
   }
 
-  /** F-38 — see `IncidentRepositoryPort.findOrgUnitIdUnscoped`'s doc
-   * comment. One extra indexed-by-PK `SELECT`, paid only by a caller that
-   * already knows a scoped lookup just returned nothing. */
   async findOrgUnitIdUnscoped(id: string): Promise<string | undefined> {
     return this.resolveOrganizationalUnitIgnoringScope(() =>
       this.prisma.client.incident.findUnique({ where: { id }, select: { orgUnitId: true } }),

@@ -1,15 +1,3 @@
-/**
- * T056/004-compliance-management — maps
- * `RequirementApplicabilityDeclarationRecord` to the wire shape
- * `contracts/compliance.openapi.yaml`'s
- * `RequirementApplicabilityDeclaration` schema describes. Unlike the
- * embedded projection on `Requirement.applicability`
- * (`requirement-response.mapper.ts`, always the active declaration, so
- * `revokedAt`/`revokedBy` are always null there), this mapper serves the
- * full listing/creation responses, where a declaration MAY already be
- * revoked (research.md D-7's own "retorna toda declaração, vigente e
- * revogada").
- */
 import type {
   RequirementApplicabilityDeclarationRecord,
   RequirementApplicabilityUserRef,

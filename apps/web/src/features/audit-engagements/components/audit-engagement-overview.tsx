@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement detail, overview tab (T076).
- *
- * Read-only presentation of the engagement's descriptive and lifecycle
- * facts — `ReadOnlyField` throughout (CLAUDE.md §18: "Read-only values
- * must not look editable"). Editing happens through `AuditEngagementForm`
- * in `mode="edit"`, swapped in by the detail view, never inline here — and
- * only while `status === 'PLANNING'` (research.md D-3/D-13). A `COMPLETED`
- * or `CANCELLED` engagement renders through this exact same component,
- * never a degraded or opaque view (FR-004) — every fact stays fully
- * legible regardless of status.
- */
 import {
   Building2,
   CalendarClock,
@@ -21,13 +9,13 @@ import {
   User,
 } from 'lucide-react';
 
-import { formatDateOnly, formatTimestampDate } from '../date';
-
-import type { AuditEngagement } from '../types';
-
 import { DetailField } from '@/components/detail/detail-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { auditEngagements } from '@/lib/messages/audit-engagements';
+
+import { formatDateOnly, formatTimestampDate } from '../date';
+
+import type { AuditEngagement } from '../types';
 
 export interface AuditEngagementOverviewProps {
   engagement: AuditEngagement;

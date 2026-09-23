@@ -3,11 +3,6 @@ import { Redis } from 'ioredis';
 
 import type { CacheProvider } from './cache-provider';
 
-/**
- * `ioredis`-backed `CacheProvider` (T017), selected by `CacheModule` when
- * `REDIS_URL` is set. See cache-provider.ts for the port contract and D-2
- * for why this is never the authoritative store for anything.
- */
 export class RedisCacheProvider implements CacheProvider, OnModuleDestroy {
   readonly kind = 'redis' as const;
 
@@ -16,10 +11,6 @@ export class RedisCacheProvider implements CacheProvider, OnModuleDestroy {
 
   constructor(redisUrl: string) {
     this.redis = new Redis(redisUrl, {
-      // Fail fast rather than buffering commands indefinitely against a
-      // Redis instance that never comes up — a cache outage must never hang
-      // a request; callers see an error and the application falls back to
-      // its authoritative source (PostgreSQL) instead.
       maxRetriesPerRequest: 2,
       lazyConnect: false,
     });
@@ -55,9 +46,6 @@ export class RedisCacheProvider implements CacheProvider, OnModuleDestroy {
     let cursor = '0';
 
     do {
-      // SCAN rather than KEYS: KEYS blocks the single-threaded Redis server
-      // for the duration of a full keyspace scan, which is unacceptable on
-      // a shared cache used for every authenticated request.
       const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
       cursor = nextCursor;
 

@@ -6,15 +6,6 @@ import { ProblemEditPanel } from './problem-edit-panel';
 import type { ProblemDetail } from '../../types';
 import type { ProblemFormProps } from '../problem-form';
 
-/**
- * Component-mount evidence for `ProblemEditPanel`
- * (019-problem-detail-experience, Fase C) — mirrors `IncidentEditPanel`'s
- * own shape. `../problem-form` is mocked at the module boundary: this
- * suite's job is to prove the PANEL wires the right props and chrome, not
- * to re-exercise `ProblemForm` itself (untouched, and out of this rodada's
- * scope).
- */
-
 vi.mock('../problem-form', () => ({
   ProblemForm: (props: ProblemFormProps) => (
     <div data-testid="problem-form-mock">

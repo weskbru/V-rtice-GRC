@@ -1,8 +1,3 @@
-/**
- * 008-incidents-problems, US3 — domain shape for `ProblemRiskLink`.
- * Mirrors `modules/incidents/domain/incident-risk-link.entity.ts` exactly
- * — see that file's header for the account this one does not repeat.
- */
 export interface ProblemRiskLinkRiskRef {
   readonly id: string;
   readonly code: string;

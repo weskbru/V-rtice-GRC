@@ -1,18 +1,8 @@
-/**
- * T105/007-implementation-remediation Frente A, D-7 — unit coverage for
- * `isOverdueReview`, the one predicate left in
- * `modules/risk/domain/risk-overdue.ts`. `isOverdueTreatmentAction` was
- * REMOVED (D-7: `Action` is the sole authority for a risk treatment
- * action's status/due date now, D-1) — its equivalent coverage lives in
- * `test/unit/grc-overdue.spec.ts` against
- * `grc/shared/domain/overdue.service.ts#isActionOverdue`, the ONE shared
- * predicate that replaced it.
- */
 import { describe, expect, it } from 'vitest';
 
 import { isOverdueReview } from '../../src/modules/risk/domain/risk-overdue';
 
-const TODAY = new Date(Date.UTC(2026, 5, 15)); // 2026-06-15
+const TODAY = new Date(Date.UTC(2026, 5, 15));
 const PAST = new Date(Date.UTC(2026, 5, 14));
 const FUTURE = new Date(Date.UTC(2026, 5, 16));
 

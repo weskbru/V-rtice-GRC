@@ -1,27 +1,3 @@
-/**
- * 009-indicators-reports, Fase 5 (T039-T042) — unit coverage for the
- * threshold-breach notification `CreateIndicatorMeasurementUseCase` now
- * produces (spec.md FR-017/FR-019, research.md D-7, CLAUDE.md §19.10).
- *
- * Every port is a hand-rolled fake (`as unknown as <Port>`), the same
- * convention `run-report.usecase.spec.ts`/`indicator-calculation-service.
- * spec.ts` already use — no NestJS test module, no database. The
- * database-backed proof that a NOTIFICATION ROW is actually written
- * belongs to `test/integration/indicator-measurement-notifications.spec.ts`
- * (T039/T040); this file's job is the WIRING: does the use case call
- * `NotificationService.notify` exactly when `breached` is `true`, with the
- * right recipient, deep link and message — and never otherwise.
- *
- * The fake `IndicatorCalculationService.calculate` below does not
- * hand-compute `breached` as a literal `true`/`false` per test case; it
- * calls the REAL `evaluateThresholdBreach` (T013, already exhaustively
- * unit-tested on its own) against whatever `definition`/`value` this
- * file's test supplies — the same call the real service makes internally.
- * This is what lets the four-comparator/equality-boundary tests below
- * exercise genuine comparator arithmetic through this use case's own
- * code path, without silently duplicating (or diverging from)
- * `indicator-threshold.spec.ts`'s own coverage.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { CreateIndicatorMeasurementUseCase } from '../../src/modules/indicators/application/create-indicator-measurement.usecase';
@@ -95,10 +71,6 @@ function buildUseCase(options: {
     findUser: vi.fn().mockResolvedValue(ACTOR),
   } as unknown as IndicatorReferenceDataPort;
 
-  // Mirrors `IndicatorCalculationService.calculate`'s own FR-016 shape
-  // (`indicator-calculation.service.ts`'s own header): evaluate the REAL
-  // threshold function against whatever definition was resolved, in the
-  // same call that produces the value.
   const calculate = vi
     .fn()
     .mockImplementation((input: { definition: IndicatorDefinitionRecord | undefined }) =>
@@ -169,9 +141,6 @@ describe('CreateIndicatorMeasurementUseCase — threshold-breach notification (T
 
     expect(result.record.breached).toBe(false);
     expect(notify).not.toHaveBeenCalled();
-    // Forwarded as `undefined`, never a fabricated definition — this is
-    // what makes `evaluateThresholdBreach`'s own "no threshold configured"
-    // branch (comparator === null) the path actually taken.
     expect(calculate).toHaveBeenCalledWith(expect.objectContaining({ definition: undefined }));
   });
 

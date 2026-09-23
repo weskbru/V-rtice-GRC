@@ -1,13 +1,3 @@
-/**
- * T048/004-compliance-management, User Story 3 — proves all five
- * `RequirementComplianceState` values (data-model.md §7, research.md D-8)
- * are reachable through REAL DATA via the actual application services,
- * each by its OWN distinct path — not the pure-function combinations
- * `requirement-compliance.spec.ts` (T048's own unit half) already covers,
- * but the real read path (`GetRequirementUseCase` ->
- * `RequirementComplianceReaderService` -> `ControlDirectoryPort`/
- * `ControlEffectivenessPort`, research.md D-9) end to end.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -73,8 +63,6 @@ describe('RequirementComplianceState — all five values reachable through real 
       email: `${uniqueTestMarker('compliance-state-actor')}@example.test`,
       primaryOrgUnitId: orgUnitId,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `compliance:map`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       [
@@ -126,9 +114,6 @@ describe('RequirementComplianceState — all five values reachable through real 
     });
   }
 
-  /** A SECOND, distinct actor decides attestation — segregation of duties
-   * (Fase 2, D-3) is not this test's own concern, but the mechanism still
-   * requires two different users. */
   async function attestControl(
     orgUnitId: string,
     controlId: string,
@@ -226,7 +211,6 @@ describe('RequirementComplianceState — all five values reachable through real 
     });
     await attestControl(orgUnit.id, activeControl.id, actor.id, 'EFFECTIVE');
 
-    // Retire the control AFTER it was linked and attested effective.
     await ctx.prisma.client.control.update({
       where: { id: activeControl.id },
       data: { status: 'RETIRED', isActive: false },

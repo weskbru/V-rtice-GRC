@@ -5,14 +5,6 @@ import { FrameworkCard } from './framework-card';
 
 import type { Framework } from '../types';
 
-/**
- * Component-mount evidence for the register's card view (CLAUDE.md §18),
- * mirroring `control-card.test.tsx`'s fixture shape. `Framework` carries no
- * lifecycle status of its own (only its `FrameworkVersion`s do) — these
- * tests pin that the card renders description and origin (the two real
- * fields this domain adds beyond code/name/updatedAt), and never a status
- * badge that does not exist at this level.
- */
 const baseFramework: Framework = {
   id: 'framework-1',
   code: 'FRM-2026-0001',
@@ -74,8 +66,6 @@ describe('FrameworkCard', () => {
   it('never renders a status badge — Framework carries no lifecycle status of its own', () => {
     render(<FrameworkCard framework={baseFramework} />);
 
-    // Only `FrameworkVersion` has a status (Rascunho/Publicada); a framework
-    // register card must never invent one at this level.
     expect(screen.queryByText('Rascunho')).not.toBeInTheDocument();
     expect(screen.queryByText('Publicada')).not.toBeInTheDocument();
   });

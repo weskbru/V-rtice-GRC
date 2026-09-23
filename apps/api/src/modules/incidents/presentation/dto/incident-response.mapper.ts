@@ -1,12 +1,3 @@
-/**
- * 008-incidents-problems, US1 — maps `IncidentRecord`
- * (`domain/ports/incident-repository.port.ts`) to the wire shape
- * `contracts/incidents.openapi.yaml`'s `IncidentDetail` schema describes
- * (a superset of `IncidentSummary` — this mapper always returns the full
- * detail shape, mirroring `toFindingResponse`'s own single-mapper
- * discipline: ONE function is the only place a domain object becomes this
- * DTO, ADR-009).
- */
 import type { IncidentRecord, UserRefRecord } from '../../domain/ports/incident-repository.port';
 import type { IncidentSeverity, IncidentStatus } from '@prisma/client';
 

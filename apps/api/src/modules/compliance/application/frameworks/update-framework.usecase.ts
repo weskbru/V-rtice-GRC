@@ -1,10 +1,3 @@
-/**
- * T021/004-compliance-management — `UpdateFrameworkUseCase`: partial
- * business-content update with per-field audit (`PATCH
- * /frameworks/{frameworkId}`, `updateFramework` operation) and
- * optimistic-lock conflict detection (ADR-013). No organizational scope
- * anywhere (research.md D-2).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -27,7 +20,6 @@ import type { FrameworkOrigin } from '@prisma/client';
 export interface UpdateFrameworkInput {
   readonly actorUserId: string;
   readonly frameworkId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
   readonly name?: string | undefined;
   readonly description?: string | undefined;
@@ -102,9 +94,6 @@ export class UpdateFrameworkUseCase {
         );
       }
 
-      // Only audit when something actually changed — an idempotent PATCH
-      // re-submitting the current values still succeeds (200), but leaves
-      // no misleading "nothing changed" audit row.
       if (Object.keys(newValues).length > 0) {
         await this.auditRecorder.record({
           action: 'framework.updated',

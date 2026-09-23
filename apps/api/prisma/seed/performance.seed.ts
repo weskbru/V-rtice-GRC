@@ -1,135 +1,3 @@
-/**
- * T200 — the 50,000-risk performance fixture (SC-004, plan.md's
- * performance budgets, T201/T197's dashboard aggregates).
- *
- * ## Explicitly invoked, never part of the normal seed
- *
- * This file is NOT imported by `prisma/seed/index.ts` and never runs as
- * part of `prisma db seed` / `pnpm --filter @pharos/api run db:seed`. It is
- * its own script, run directly:
- *
- * ```bash
- * pnpm --filter @pharos/api run db:seed:performance            # seed 50,000 risks
- * pnpm --filter @pharos/api run db:seed:performance -- --count=5000  # a smaller run
- * pnpm --filter @pharos/api run db:seed:performance -- --reset  # remove the fixture
- * ```
- *
- * Bootstraps the same minimal Nest application context `prisma/seed/index.ts`
- * uses (`AppConfigModule` + `PrismaModule`) so this script connects with the
- * SAME restricted `pharos_app` role (ADR-005) the running application uses
- * — never a bare `new PrismaClient()` reading `process.env` directly.
- *
- * ## Clearly labelled and reversible
- *
- * Every row this script creates is tagged so it can be found and removed
- * independently of any other data in the database:
- *
- * - `risks.code` always starts with `PERF-` (never `RSK-…`, the real
- *   `formatRiskCode` prefix — `domain/risk-code.ts` — so a performance-
- *   fixture risk can never be mistaken for a genuine one, and the two id
- *   spaces never collide).
- * - `organizational_units.code` starts with `PERF-OU-`.
- * - `users.email` starts with `perf-` (`@example.test`, the same
- *   non-routable test domain `test/integration/support/fixtures.ts` uses).
- * - `risk_categories`/`risk_types`/`risk_origins.code` start with
- *   `PERF-CAT-`/`PERF-TYPE-`/`PERF-ORIGIN-`.
- *
- * `--reset` deletes every row carrying one of these markers, in FK-safe
- * order (`cleanupPerformanceFixture` below). Running the fixture, then
- * `--reset`, leaves the database exactly as it was found (verified in the
- * implementation report by comparing `information_schema`-reported row
- * counts across every table this script touches, before and after) — see
- * "Why treatment decisions and approvals are NOT part of this fixture"
- * below for the one architectural reason this is achievable at all.
- *
- * ## Idempotent
- *
- * Before creating anything, this script counts existing `PERF-`-coded
- * risks. If that count already meets or exceeds the requested `--count`,
- * it does nothing and exits — running it twice with the same `--count`
- * produces IDENTICAL row counts on every table it touches (verified by
- * hand: run once, record counts; run again; counts unchanged). It does not
- * attempt to "top up" a partial run to a different count — a mismatched
- * existing count is reported and the script refuses to guess whether that
- * is a smaller prior run or a partially-failed one; `--reset` first, then
- * reseed, is the supported path for changing `--count`.
- *
- * ## Realistic, not uniform (T200's own instruction)
- *
- * Risks are distributed across 21 organizational units with a Zipf-like
- * skew (a few units carry far more risk than most — the shape a real
- * portfolio has, not a flat 50,000/21 split), across 5 categories/2
- * types/4 origins with fixed uneven weights, and across all 8
- * `RiskStatus` values with weights reflecting a real register (most risks
- * sit in `ASSESSED`/`UNDER_TREATMENT`, few in `DRAFT`/`ARCHIVED`).
- * Probability/impact factors are independently randomized per risk
- * (uniform over the 1-5 scale), with residual deliberately biased lower
- * than inherent (treatment is assumed to reduce exposure, not leave it
- * unchanged) — this alone produces a non-uniform level distribution
- * without hand-tuning level weights directly.
- *
- * Every risk from `ASSESSED` onward gets exactly one real `RiskAssessment`
- * row backing its stored `inherentScore`/`residualScore` (never a score
- * with no assessment behind it); a 40% sample of `UNDER_TREATMENT`-or-later
- * risks additionally get 1-2 `RiskTreatmentAction` rows, weighted so a
- * meaningful share (computed, not hand-set — see `ACTION_STATUS_WEIGHTS`)
- * are overdue.
- *
- * ## Why treatment decisions and approvals are NOT part of this fixture
- * (found empirically, not assumed)
- *
- * `risk_treatment_decisions` and `approvals` both carry a database-level
- * `BEFORE UPDATE OR DELETE` trigger (`risk_treatment_decisions_prevent_
- * overwrite` / `approvals_prevent_overwrite`,
- * `20260905160100_risk_treatment_and_relationships_baseline` /
- * `20260905170100_risk_lifecycle_and_approvals_baseline`) that
- * unconditionally rejects `DELETE` — for EVERY role, including
- * `pharos_owner`, since a trigger fires regardless of who issues the
- * statement (unlike a `GRANT`/`REVOKE`, which only affects one role). This
- * is deliberate, correct architecture (ADR-007's whole point: a recorded
- * treatment decision or a decided approval is a historical fact of an
- * audited GRC platform, not a row a later process gets to erase) — but it
- * has a direct consequence for a REMOVABLE fixture: `risks.risk_id ->
- * risk_treatment_decisions`/`... -> risk_assessments` are `ON DELETE
- * RESTRICT`, so a risk with either child row present can never be deleted
- * either, and `approvals.entity_id` (deliberately no FK, ADR-008) would be
- * left permanently orphaned if its parent risk were deleted regardless.
- * Confirmed by hand: the first real `--reset` run against a small batch
- * failed outright with `risk_treatment_decisions is append-only: DELETE is
- * not permitted`, the moment any decision row existed.
- *
- * Populating either table here would therefore make a real fraction of
- * this "disposable, explicitly-invoked, removable" fixture PERMANENTLY
- * stuck in the database — the opposite of what T200 asks for. Rather than
- * quietly accepting partial, silent irreversibility, this fixture simply
- * never writes to either table: `risk_treatment_actions` (genuinely
- * mutable, no append-only enforcement) is what the register's
- * `overdueTreatment` filter and the dashboard's overdue-actions/
- * treatment-actions tiles actually read, so the "treatment actions, some
- * overdue" half of T200's own instruction is still fully exercised at
- * scale; the "treatment decisions and approvals" half is not, and
- * `test/contract/dashboard.spec.ts`'s own small, real, fully-decided
- * approval fixtures already cover that endpoint's correctness — this file
- * exists for volume/performance, not for being the only place that
- * behavior is exercised at all. Reported as a scope reduction, not hidden.
- *
- * ## One further deliberate simplification
- *
- * `risks.current_assessment_id`/`current_treatment_id`/`pending_approval_id`
- * are left `NULL` even for risks that DO have a real assessment row backing
- * them. Verified by reading the actual consumers before making this call:
- * `RiskQueryService` (the register) and `DashboardQueryService` (this
- * phase's dashboard, `infrastructure/dashboard-query.service.ts`) both read
- * `risks.status`/`residual_level`/`next_review_on` and the child tables
- * (`risk_treatment_actions`) DIRECTLY — neither ever joins through these
- * pointers — and `RiskHistoryQueryService` queries every source table by
- * `riskId` directly, never through them either. The three areas this
- * fixture exists to exercise (register filters, dashboard aggregates,
- * history query) are therefore unaffected. What WOULD be affected — `GET
- * /risks/{id}`'s `currentAssessment` section showing `null` for a
- * performance-fixture risk that actually has an assessment — is out of
- * this task's scope and is called out here rather than silently shipped.
- */
 import { randomUUID } from 'node:crypto';
 
 import { Module } from '@nestjs/common';
@@ -184,8 +52,6 @@ const ORIGIN_DEFINITIONS = [
   { code: `${ORIGIN_MARKER}4`, name: 'Eventos Externos (fixture)', weight: 15 },
 ];
 
-/** Realistic register shape: most risks sit mid-lifecycle, few are brand
- * new or fully archived (T200's "not uniform" instruction). */
 const STATUS_WEIGHTS: readonly { status: RiskStatus; weight: number }[] = [
   { status: RiskStatus.DRAFT, weight: 5 },
   { status: RiskStatus.IDENTIFIED, weight: 8 },
@@ -197,8 +63,6 @@ const STATUS_WEIGHTS: readonly { status: RiskStatus; weight: number }[] = [
   { status: RiskStatus.ARCHIVED, weight: 3 },
 ];
 
-/** Every status from `ASSESSED` onward carries a real score (ADR-006's
- * transition table requires an assessment to reach `ASSESSED` at all). */
 const ASSESSED_OR_LATER: ReadonlySet<RiskStatus> = new Set([
   RiskStatus.ASSESSED,
   RiskStatus.UNDER_TREATMENT,
@@ -208,10 +72,6 @@ const ASSESSED_OR_LATER: ReadonlySet<RiskStatus> = new Set([
   RiskStatus.ARCHIVED,
 ]);
 
-/** `ASSESSED -> UNDER_TREATMENT` requires "treatment decision exists"
- * (ADR-006) — every status reachable only via that transition therefore
- * gets exactly one decision, matching the real lifecycle rule rather than
- * inventing an inconsistent fixture. */
 const UNDER_TREATMENT_OR_LATER: ReadonlySet<RiskStatus> = new Set([
   RiskStatus.UNDER_TREATMENT,
   RiskStatus.UNDER_REVIEW,
@@ -227,11 +87,6 @@ const ACTION_STATUS_WEIGHTS: readonly { status: ActionStatus; weight: number }[]
   { status: ActionStatus.CANCELLED, weight: 10 },
 ];
 
-/** Sample rate of `UNDER_TREATMENT_OR_LATER` risks that additionally get
- * treatment actions (not every risk under treatment needs one modeled
- * action for the fixture's purpose — a 100% rate would roughly double the
- * total row count for no additional coverage of anything this task
- * measures). */
 const TREATMENT_ACTION_SAMPLE_RATE = 0.4;
 
 interface CliOptions {
@@ -277,15 +132,6 @@ function addDays(date: Date, days: number): Date {
   return copy;
 }
 
-/**
- * `methodology.schema.ts`'s `RiskLevelValue` (T122's OWN domain type,
- * `RiskScoringService.score()`'s return shape) is a deliberately
- * Prisma-free plain string union — see that file's header for why. Its
- * member names are kept string-identical to `@prisma/client`'s `RiskLevel`
- * enum by hand, so a bracket lookup by name is the correct, narrow
- * conversion at this infrastructure boundary — the only place this script
- * crosses from the pure domain value to the column type.
- */
 function toPrismaRiskLevel(value: RiskLevelValue): RiskLevel;
 function toPrismaRiskLevel(value: RiskLevelValue | null): RiskLevel | null;
 function toPrismaRiskLevel(value: RiskLevelValue | null): RiskLevel | null {
@@ -313,7 +159,6 @@ function buildOrgUnitPlan(): { root: OrgUnitPlan; children: OrgUnitPlan[] } {
     (_unused, index) => ({
       id: randomUUID(),
       code: `${ORG_UNIT_MARKER}${String(index + 1).padStart(3, '0')}`,
-      // Zipf-like skew: unit #1 carries far more risk than unit #20.
       weight: 1 / (index + 1),
     }),
   );
@@ -502,13 +347,6 @@ function buildRiskPlans(
     let nextReviewOn: Date | null = null;
 
     if (ASSESSED_OR_LATER.has(status)) {
-      // Indices into the METHODOLOGY'S OWN configured scales (never a
-      // hardcoded 1-5 range) — a developer's active methodology may not
-      // use contiguous integer scale points, so every factor picked here
-      // is guaranteed to be a real scale member `RiskScoringService.score`
-      // accepts, and "residual trends lower than inherent" is expressed as
-      // a lower SCALE INDEX, ascending order being how every methodology
-      // scale is authored (`methodology.schema.ts`'s own validation).
       const probabilityIndex = randomInt(0, methodology.probabilityScale.length - 1);
       const impactIndex = randomInt(0, methodology.impactScale.length - 1);
       inherentProbability = methodology.probabilityScale[probabilityIndex]!.value;
@@ -520,17 +358,6 @@ function buildRiskPlans(
       inherentScore = inherentResult.score;
       inherentLevel = inherentResult.level;
 
-      // Treatment is assumed to reduce exposure — residual factors trend
-      // lower than inherent, never higher (T200's "biased lower" design).
-      // A modest, single-step-at-most reduction per dimension: subtracting
-      // up to 2 steps from an already-uniform 0-4 index (tried first,
-      // measured against the real 50,000-row fixture) collapsed the
-      // residual distribution to almost nothing but LOW — every
-      // `byResidualLevel` bucket except LOW and a handful of HIGH sat at
-      // zero, which is exactly the uniform, unbelievable shape T200 warns
-      // against, just moved to a different axis. `randomInt(0, 1)` keeps a
-      // believable MEDIUM/HIGH/CRITICAL presence in the residual
-      // distribution while still trending it below inherent.
       const residualProbabilityIndex = Math.max(0, probabilityIndex - randomInt(0, 1));
       const residualImpactIndex = Math.max(0, impactIndex - randomInt(0, 1));
       residualProbability = methodology.probabilityScale[residualProbabilityIndex]!.value;
@@ -634,20 +461,6 @@ async function insertRisks(
       await client.riskAssessment.createMany({ data: assessmentRows, skipDuplicates: true });
     }
 
-    // `risk_treatment_decisions` and `approvals` are DELIBERATELY never
-    // populated by this fixture — see the file header's "Why treatment
-    // decisions and approvals are NOT part of this fixture" section.
-    //
-    // 007-implementation-remediation, Frente A, D-1/FR-009 — every
-    // `UNDER_TREATMENT_OR_LATER` risk still gets real treatment-action
-    // work, but `Action` (`grc/action`) is now the SOLE authority for it
-    // (title/description/responsible/dueOn/status/completedAt); this
-    // fixture writes `actions` directly (a genuinely mutable table, no
-    // append-only enforcement) plus the reduced `risk_treatment_actions`
-    // LINK row — never the retired six columns on the link table, which no
-    // longer exist. This is what the register's `overdueTreatment` filter
-    // and the dashboard's overdue-actions/treatment-actions tiles now
-    // read (research.md D-7).
     const treatmentEligible = batch.filter((plan) => UNDER_TREATMENT_OR_LATER.has(plan.status));
     const today = new Date();
     interface PendingAction {
@@ -719,15 +532,6 @@ async function insertRisks(
   }
 }
 
-/**
- * 007-implementation-remediation, Frente A — reserves `count` sequential
- * codes for `year` from the shared `grc_code_sequences` table (the SAME
- * allocator `EntityCodeGeneratorPort` uses one row at a time,
- * `grc/shared/domain/entity-code.service.ts`), in ONE round trip rather
- * than `count` — this is a bulk seed script, not a request handler. Same
- * range-reservation shape as the Action-convergence migration's own
- * backfill (`prisma/migrations/20260911000000_.../migration.sql`).
- */
 async function nextActionCodes(
   client: PrismaClient,
   year: number,
@@ -753,27 +557,12 @@ async function nextActionCodes(
   );
 }
 
-/**
- * FK-safe deletion order: every pointer FROM a risk (its lifecycle
- * transitions, its treatment actions/decisions, its assessments) is
- * deleted before the risks themselves, and self-referencing chains
- * (`riskTreatmentDecision.supersededById`, `riskAssessment.previousAssessmentId`)
- * are removed by deleting every row for the marked risks in one statement
- * (safe — see `dashboard-query.service.ts`'s sibling reasoning on
- * statement-level constraint checking) rather than walking each chain.
- * `risks.current_assessment_id`/`current_treatment_id`/`pending_approval_id`
- * are left `NULL` by this fixture (see file header), so there is no
- * pointer on the `risks` row itself to clear first.
- */
 async function cleanupPerformanceFixture(client: PrismaClient): Promise<void> {
   const riskIdRows = await client.$queryRaw<{ id: string }[]>(
     Prisma.sql`SELECT id FROM risks WHERE code LIKE ${`${RISK_CODE_MARKER}%`}`,
   );
   const riskIds = riskIdRows.map((row) => row.id);
 
-  // `risk_treatment_decisions` and `approvals` are NOT deleted here because
-  // this fixture never inserts into either (see the file header) — there is
-  // nothing of this fixture's own to remove from those two tables.
   for (const idBatch of chunk(riskIds, BATCH_SIZE)) {
     await client.$executeRaw(Prisma.sql`
       DELETE FROM risk_treatment_actions WHERE risk_id = ANY(${idBatch}::uuid[])

@@ -1,8 +1,3 @@
-/**
- * T028/003-controls-management, User Story 2 — `ListControlAssessmentsUseCase`.
- * `GET /controls/{controlId}/assessments` (`listControlAssessments`
- * operation). Requires `control:view` and scope.
- */
 import { Injectable } from '@nestjs/common';
 
 import { ControlAssessmentRepositoryPort } from '../../domain/ports/control-assessment-repository.port';

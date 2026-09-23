@@ -1,20 +1,3 @@
-/**
- * T180 — `AdminUsersController`: every `/admin/users[/{userId}[/**]]`
- * route except `scope-grants` (`core/organizations`'s
- * `AdminUserScopeGrantsController` — the data it manages belongs to that
- * capability; see that controller's file header) —
- * `contracts/admin.openapi.yaml`'s `Users` tag plus the `roles`
- * sub-resource (`Roles`-permission-gated, per the contract).
- *
- * `PUT /admin/users/{userId}/roles` requires `role:administer`, not
- * `user:administer` — deliberately narrower than the rest of this
- * controller, applied per-handler via `@RequirePermission`. Because of
- * that, and only for that route, the response is the minimized
- * `UserRoleAssignmentResponse` and not `UserDetailResponse` (F-73): the
- * authorization stays as it is, the representation does not disclose the
- * administrative user record. Every other handler here already requires
- * `user:administer`, so `UserDetailResponse` is appropriate for them.
- */
 import {
   BadRequestException,
   Body,
@@ -215,11 +198,6 @@ export class AdminUsersController {
     @Param('userId', new ParseUUIDPipe()) userId: string,
     @Body() body: ReplaceUserRolesRequestDto,
   ): Promise<UserRoleAssignmentResponse> {
-    // `RoleAdminService.replaceUserRoles` operates on `UserRole` directly
-    // and has no independent way to distinguish "user does not exist"
-    // from "user exists with zero roles" — this controller confirms the
-    // 404 first (`GetUserUseCase`, same capability as the route's own
-    // resource).
     await this.getUser.execute(userId);
 
     await this.roleAdmin.replaceUserRoles({
@@ -229,26 +207,10 @@ export class AdminUsersController {
     });
 
     const updated = await this.getUser.execute(userId);
-    // F-73: minimized on the way out, NOT `toUserDetailResponse`. This is
-    // the one handler in this controller a caller without `user:administer`
-    // can reach — see the mapper's own header for the full argument.
     return toUserRoleAssignmentResponse(updated);
   }
 }
 
-/**
- * Named after `RiskController`'s identical-in-intent
- * `assertUpdateBodyNotEmpty`, but NOT copying its `Object.keys(body).length
- * === 0` check: under this project's `target: ES2023` (default
- * `useDefineForClassFields: true`), `class-transformer`'s `plainToInstance`
- * defines every declared class field on the instance — as `undefined` when
- * the client omitted it — so an actually-empty `{}` request body still
- * yields an instance whose `Object.keys(...)` lists all four properties,
- * and this check would never fire (verified directly: `plainToInstance
- * (UpdateUserRequestDto, {})` produces `['email', 'fullName', 'jobTitle',
- * 'primaryOrgUnitId']`). Checking for at least one DEFINED value is what
- * `minProperties: 1` actually requires here.
- */
 function assertUpdateBodyNotEmpty(body: UpdateUserRequestDto): void {
   const hasAnyField = Object.values(body).some((value) => value !== undefined);
   if (!hasAnyField) {

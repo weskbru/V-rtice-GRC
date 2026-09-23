@@ -1,25 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — "Mover para remediação" action (T077, 005-audit-findings,
- * US2, FR-009, research.md D-10).
- *
- * `OPEN -> IN_REMEDIATION`, the first — and, before this phase, the ONLY
- * missing — direct transition on `Finding` (see `finding-close-dialog.tsx`'s
- * own Invariant references for the rest of the lifecycle). Modeled on
- * `control-lifecycle-actions.tsx`'s own confirm-then-apply shape, but much
- * smaller: this is a single, unconditional edge with no destination choice
- * and no `If-Match` (`Finding` carries no optimistic-concurrency field,
- * `findings/api.ts`'s own header comment), so no lifecycle-state fetch is
- * needed first — the caller already knows the current `status` and renders
- * this action only when it is `OPEN`.
- *
- * `startRemediation`'s response is the reduced `FindingSummary` shape, not
- * `Finding` (`types.ts`'s own header comment on why the two are distinct,
- * deliberately not type-compatible) — so, on success, this component
- * re-reads the canonical `Finding` via `getFinding` rather than attempting
- * to reshape the summary into the fuller type the caller's list holds.
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { ArrowRightCircle } from 'lucide-react';
 import { useState } from 'react';
@@ -40,7 +20,6 @@ export interface FindingRemediationActionProps {
   onRemediated: (finding: Finding) => void;
 }
 
-/** Renders nothing unless `finding.status` is `OPEN` — the one status this edge legally starts from (research.md D-10). */
 export function FindingRemediationAction({
   finding,
   onRemediated,

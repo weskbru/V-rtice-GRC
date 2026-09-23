@@ -1,47 +1,7 @@
-/**
- * Structural guard against F-63 (`docs/deferred-findings.md`) parte 1 being
- * reintroduced: a permission's `description` is **product prose shown to a
- * customer's administrator** — CLAUDE.md §11.1 — never the raw technical
- * `identifier` and never a citation of this repository's own internal
- * specification artefacts (`spec.md`, `data-model.md`, `research.md`,
- * `FR-nnn`, `D-nn`, …).
- *
- * Mirrors `seeded-role-description-content.spec.ts`'s own guard for F-32 —
- * same three structural rules, same non-vacuity discipline (a detector that
- * matches nothing protects nothing) — checked here against
- * `getAllPermissionDefinitions()` instead of `SYSTEM_ROLE_DEFINITIONS`, so a
- * permission added by any future module is covered the day it is added,
- * never a hand-copied list.
- *
- * ## Where this text actually renders
- *
- * The role detail dialog, the permission list shown while creating or
- * editing a role, and the user's own role dialog (F-63's own three named
- * surfaces) — none of them is a frontend catalogue entry, so no frontend
- * gate could ever catch English leaking in here; only a guard on the
- * SOURCE of the text can.
- *
- * ## A fourth rule this file adds beyond F-32's three
- *
- * F-32 never needed a language check — its violations were EITHER already
- * pt-BR prose citing spec artefacts, OR raw identifiers, never English
- * prose outright. F-63 parte 1's actual defect was 74 descriptions written
- * in English from the start. `ENGLISH_TELLS` is a conservative, best-effort
- * detector (a handful of English function words essentially never used in
- * pt-BR technical prose) — it does not prove a string IS pt-BR, only that it
- * is not OBVIOUSLY English; false negatives are possible for a very short
- * description with no function word at all, but every description in the
- * catalogue today is a full sentence, so this has real reach.
- */
 import { describe, expect, it } from 'vitest';
 
 import { getAllPermissionDefinitions } from '../../src/permission-catalogue';
 
-/** Same shape as `seeded-role-description-content.spec.ts`'s own
- * `SPEC_ARTEFACT_PATTERNS` — kept as a local copy rather than a shared
- * import: the two guards protect different source data (permissions vs.
- * roles) that happen to be checked the same way, not a single mechanism
- * that should be refactored into one just because the regexes match. */
 const SPEC_ARTEFACT_PATTERNS: readonly { readonly label: string; readonly pattern: RegExp }[] = [
   { label: 'a spec-kit artefact filename', pattern: /\b\w+[-\w]*\.md\b/i },
   {
@@ -57,27 +17,12 @@ const SPEC_ARTEFACT_PATTERNS: readonly { readonly label: string; readonly patter
   { label: 'a document section sign', pattern: /§/ },
 ];
 
-/** Every permission identifier the REAL catalogue declares — never a
- * hand-copied list, for the same reason F-32's guard reads
- * `getAllPermissionDefinitions()` rather than enumerating identifiers by
- * hand. */
 const ALL_PERMISSION_IDENTIFIERS: readonly string[] = getAllPermissionDefinitions().map(
   (definition) => definition.identifier,
 );
 
-/** Catches an identifier-shaped token even if the catalogue does not (yet)
- * declare it — a permission renamed tomorrow would otherwise slip past the
- * catalogue check. No whitespace around the colon, so ordinary pt-BR prose
- * with a colon ("plataforma: usuários") is not a match. */
 const IDENTIFIER_SHAPED_TOKEN = /\b[a-z][a-z-]*:[a-z][a-z-]*\b/;
 
-/**
- * Conservative English tells: whole-word matches for function words that
- * are essentially never legitimate pt-BR technical prose. Deliberately
- * narrow (a handful of high-confidence words, not a full stopword list) to
- * keep the false-positive rate low against real pt-BR sentences that
- * happen to contain a loanword or a proper noun.
- */
 const ENGLISH_TELLS: readonly RegExp[] = [
   /\bthe\b/i,
   /\bwithin\b/i,
@@ -88,9 +33,6 @@ const ENGLISH_TELLS: readonly RegExp[] = [
   /\ban? [a-z]+ing\b/i,
 ];
 
-/** The three structural detectors plus the language tell, as one predicate
- * — mirrors `seeded-role-description-content.spec.ts`'s own
- * `findContentViolations` shape. */
 function findContentViolations(description: string): string[] {
   const violations: string[] = [];
 
@@ -149,10 +91,6 @@ describe('Permission descriptions are pt-BR product prose, never English or an i
 });
 
 describe('The F-63 parte 1 guard is not vacuously true', () => {
-  /** The actual pre-translation strings this catalogue carried, quoted
-   * verbatim from `docs/deferred-findings.md` F-63 and the source files
-   * before this fix — the same non-vacuity discipline F-32's own guard
-   * establishes: a detector that never rejects anything protects nothing. */
   const PRE_TRANSLATION_VIOLATIONS: readonly { readonly label: string; readonly text: string }[] = [
     {
       label: 'risk:view (plain English prose)',

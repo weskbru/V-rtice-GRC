@@ -1,18 +1,3 @@
-/**
- * T173 — a role permission change applies to the affected user's NEXT
- * request, without re-authentication (FR-028, ADR-003). Proved end to end
- * through the real HTTP surface and the real `PermissionGuard` — not by
- * asserting `permissionsVersion` incremented, which would only prove the
- * counter moved, not that the guard actually re-evaluates against it.
- *
- * Uses `buildContractTestApp` (the full `AppModule`, exactly as `main.ts`
- * wires it) — the same harness `test/contract/**` uses — because proving
- * this requires the real guard chain (`SessionGuard` -> `PermissionGuard`),
- * which a partial Nest testing module does not assemble. Placed under
- * `test/integration/` per the task sheet; nothing about the harness itself
- * is integration-specific versus contract-specific (see both vitest
- * project configs, which differ only in their `include` glob).
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -56,11 +41,6 @@ describe('Permission-version invalidation applies on the next request (T173, FR-
     const orgUnit = await createOrgUnitFixture(prisma, {
       code: uniqueTestMarker('perm-org'),
     });
-    // A separate actor to attribute the role-admin mutation to — never the
-    // subject user, and never required to hold any permission itself:
-    // this call goes straight through `RoleAdminService`, bypassing
-    // `PermissionGuard` entirely (the mutation is not the thing under
-    // test; the SUBJECT's next request through the real guard is).
     const platformActor = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('pi-actor')}@example.test`,
     });
@@ -82,23 +62,15 @@ describe('Permission-version invalidation applies on the next request (T173, FR-
       .send({ email: fixture.user.email, password: fixture.rawPassword });
     expect(loginResponse.status).toBe(200);
 
-    // Before: the permission is genuinely effective.
     const beforeResponse = await agent.get('/api/v1/admin/org-units').set('Origin', appOrigin);
     expect(beforeResponse.status).toBe(200);
 
-    // The role's permission set is replaced with an empty set —
-    // `RoleAdminService.update` bumps `permissionsVersion` as part of this
-    // write (see that service's file header).
     await roleAdmin.update({
       actorUserId: platformActor.id,
       roleId: role.id,
       permissionIdentifiers: [],
     });
 
-    // After: the EXACT SAME session cookie, no new login, immediately
-    // refused — this is the "next request" FR-028 requires, proved through
-    // the real `SessionGuard` -> `PermissionGuard` chain, not a bare
-    // service-level assertion.
     const afterResponse = await agent.get('/api/v1/admin/org-units').set('Origin', appOrigin);
     expect(afterResponse.status).toBe(403);
     expect(afterResponse.headers['content-type']).toContain('application/problem+json');

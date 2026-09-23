@@ -7,16 +7,6 @@ import { ActionAuditSection } from './action-audit-section';
 
 import type { AuditEvent } from '../types';
 
-/**
- * `ActionAuditSection` mounted directly (not through a Radix tab click —
- * `action-detail-view.test.tsx`'s own header explains why: Radix's `Tabs`
- * trigger does not respond to a plain `fireEvent.click` in jsdom the way a
- * real pointer interaction does, and `risk-detail-view.test.tsx` documents
- * the same limitation for its own audit tab). Mirrors this component's own
- * doc comment: a `404` (endpoint not live yet) is a DISTINCT case from
- * `empty` (endpoint live, genuinely no events).
- */
-
 const { listActionAuditEventsMock } = vi.hoisted(() => ({ listActionAuditEventsMock: vi.fn() }));
 
 vi.mock('../api', () => ({
@@ -76,16 +66,6 @@ describe('ActionAuditSection', () => {
     expect(screen.getByText('Título novo')).toBeInTheDocument();
   });
 
-  /**
-   * The creation event — the first entry of EVERY trail — carries two keys
-   * no edit event ever does (`create-action.usecase.ts`'s own `newValues`).
-   * They had no pt-BR label, so that first entry read half in Portuguese
-   * and half in English (CLAUDE.md §11.1). Nothing failed; it was only
-   * visible on screen, and only once the endpoint served a real trail.
-   *
-   * The VALUES stay as the server wrote them — `FINDING` is an enum value,
-   * which §11.1 keeps in English on purpose. Only the labels are interface.
-   */
   it('labels the creation event´s origin fields in pt-BR, values untouched', async () => {
     listActionAuditEventsMock.mockResolvedValueOnce({
       data: [

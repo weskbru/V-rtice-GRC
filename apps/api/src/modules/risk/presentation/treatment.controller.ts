@@ -1,9 +1,3 @@
-/**
- * T143 — `TreatmentController`: `GET`/`POST /risks/{riskId}/treatments`,
- * `GET`/`POST /risks/{riskId}/treatment-actions` and
- * `PATCH /risks/{riskId}/treatment-actions/{actionId}` per
- * `contracts/risks.openapi.yaml`'s "Risk Treatment" operations.
- */
 import {
   BadRequestException,
   Body,
@@ -80,8 +74,6 @@ export class TreatmentController {
     private readonly treatmentActionQuery: RiskTreatmentActionQueryPort,
   ) {}
 
-  /** `risk:view` + scope — same "read the parent risk first, purely to
-   * authorize" pattern as `AssessmentController.list`. */
   @RequirePermission('risk:view')
   @Get('treatments')
   async listTreatments(
@@ -112,8 +104,6 @@ export class TreatmentController {
     return { data: page.items, meta: toPageMeta(page) };
   }
 
-  /** `risk:treat` + scope; `RecordTreatmentUseCase` performs the scoped
-   * read/write itself (FR-025). */
   @RequirePermission('risk:treat')
   @Post('treatments')
   @HttpCode(HttpStatus.CREATED)
@@ -139,7 +129,6 @@ export class TreatmentController {
     response.set('Location', `${request.originalUrl.replace(/\/$/, '')}/${decision.id}`);
     response.set('ETag', formatETag(risk.version));
 
-    // A brand-new decision has no outstanding actions of its own yet.
     return toTreatmentDecisionResponse(decision, false);
   }
 
@@ -152,9 +141,6 @@ export class TreatmentController {
   ): Promise<TreatmentActionPageResponse> {
     await this.getRiskUseCase.execute({ actorUserId: session.userId, riskId });
 
-    // D-2/D-7 — reads `actions` directly, by origin, INCLUDING an `Action`
-    // with no link row (the three previously-invisible actions this
-    // convergence exists to surface).
     const { items, total } = await this.treatmentActionQuery.listByRisk(
       riskId,
       { status: query.status, overdue: query.overdue },
@@ -254,8 +240,6 @@ function toPageMeta(page: {
   };
 }
 
-/** `UpdateRiskTreatmentActionRequest`'s `minProperties: 1` — same mechanism
- * as `risk.controller.ts`'s `assertUpdateBodyNotEmpty` for `UpdateRiskRequestDto`. */
 function assertUpdateBodyNotEmpty(body: UpdateRiskTreatmentActionRequestDto): void {
   if (Object.keys(body).length === 0) {
     throw new BadRequestException({

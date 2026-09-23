@@ -1,12 +1,3 @@
-/**
- * 009-indicators-reports, Fase 4 (T035/T036) —
- * `PrismaIndicatorMeasurementRepository`: the sole Prisma-backed
- * implementation of `IndicatorMeasurementRepositoryPort`. No `ScopeFilter`
- * anywhere (that port's own header) — every method reads/writes
- * `indicator_measurements` unconditionally, gated only by the caller-level
- * `ScopeFilter.kind === 'GLOBAL'` check the use cases perform before
- * calling this class at all.
- */
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
@@ -30,12 +21,6 @@ export class PrismaIndicatorMeasurementRepository implements IndicatorMeasuremen
       data: {
         metricKey: input.metricKey,
         value: input.value,
-        // A `Json?` column needs the explicit `Prisma.JsonNull` sentinel
-        // to persist SQL `NULL` — passing bare `null` would instead be
-        // interpreted as "leave this field out of the write" by Prisma's
-        // JSON handling (the same distinction
-        // `prisma-audit-event-writer.ts` already documents for
-        // `previousValues`/`newValues`).
         valueByBucket:
           input.valueByBucket === null
             ? Prisma.JsonNull
@@ -53,10 +38,6 @@ export class PrismaIndicatorMeasurementRepository implements IndicatorMeasuremen
     const [rows, total] = await Promise.all([
       this.prisma.client.indicatorMeasurement.findMany({
         where,
-        // Chronological, oldest first (this port's own header;
-        // `contracts/indicators.openapi.yaml`'s `listIndicatorMeasurements`
-        // description) — the same column data-model.md §2's
-        // `@@index([metricKey, computedAt])` covers.
         orderBy: { computedAt: 'asc' },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,

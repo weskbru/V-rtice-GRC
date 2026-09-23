@@ -1,35 +1,3 @@
-/**
- * 009-indicators-reports, Fase 6 (T046, US4) — real, exercised coverage
- * (not a stub, CLAUDE.md §19.10) for `ActionOriginType.INDICATOR`,
- * registered against `ActionOriginResolverPort` by
- * `IndicatorActionOriginAccessor` (`indicator-action-origin-accessor.ts`).
- * Mirrors `incident-problem-action-origin.spec.ts`'s exact shape (see that
- * file's header for the four proofs it already establishes for
- * INCIDENT/PROBLEM), with ONE deliberate divergence this file exists to
- * prove:
- *
- *   `IndicatorDefinition` is organization-wide (research.md D-8, spec.md
- *   FR-021) — unlike INCIDENT/PROBLEM, a caller whose organizational scope
- *   does NOT cover the indicator owner's unit still creates/reads/lists an
- *   `Action` of this origin successfully, as long as they hold
- *   `indicator:view`/`indicator:edit`. This file's second `it` block is the
- *   photo-negative of `incident-problem-action-origin.spec.ts`'s own
- *   out-of-scope refusal test.
- *
- * Also proves US4's own "no separate lifecycle" requirement (CLAUDE.md
- * §19.6): an `Action` of origin `INDICATOR` transitions through the exact
- * same `TransitionActionUseCase`/transition table as any other `Action` —
- * no indicator-specific status, no bespoke completion rule.
- *
- * Finally, proves the enum growth
- * (`20260912000000_action_origin_type_add_indicator`) only became legal
- * once this registration genuinely exists
- * (`test/unit/action-model-convergence-guard.spec.ts`, confirmed failing
- * without it by direct removal-and-revert experiment — see this task's own
- * report, not restated as an automated test here: the guard itself already
- * is that automated test, run against the registration this file exercises
- * for real).
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -56,18 +24,6 @@ import { buildIntegrationTestingModule, type IntegrationTestContext } from './su
 import type { PermissionIdentifier } from '../../src/core/authorization/domain/permissions';
 import type { IndicatorMetricKey } from '@prisma/client';
 
-/**
- * `metric_key` is `UNIQUE` on `indicator_definitions`, and this suite
- * shares one real database across every integration spec file
- * (`vitest.integration.config.ts`: `fileParallelism: false`, no per-file
- * reset). `indicator-measurements.spec.ts`/
- * `indicator-measurement-notifications.spec.ts` already own
- * `ASSET_INACTIVE_COUNT`/`CONTROL_INACTIVE_COUNT`/`PROCESS_INACTIVE_COUNT`
- * for their own fixtures — this list deliberately avoids those three, and
- * probes each candidate for an existing row (rather than assuming the
- * first is free) so this file does not itself become a fourth silent
- * collision the next agent has to debug.
- */
 const CANDIDATE_METRIC_KEYS: readonly IndicatorMetricKey[] = [
   'AUDIT_ENGAGEMENT_OPEN_COUNT',
   'RISK_TOTAL_BY_LEVEL',
@@ -113,10 +69,6 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     return actor;
   }
 
-  /** Picks the first metric key in `CANDIDATE_METRIC_KEYS` with no
-   * `IndicatorDefinition` row yet, and creates one owned by `ownerId` —
-   * this file's own header explains why this probes rather than assumes.
-   */
   async function setupIndicatorDefinition(ownerId: string, createdByUserId: string) {
     for (const metricKey of CANDIDATE_METRIC_KEYS) {
       const existing = await ctx.prisma.client.indicatorDefinition.findUnique({
@@ -167,12 +119,8 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     expect(action.originType).toBe('INDICATOR');
     expect(action.originId).toBe(definition.id);
     expect(originLabel).toContain(definition.code);
-    // `Action.orgUnitId` (NOT NULL) was stamped from the DEFINITION
-    // OWNER's own current unit (research.md D-8 — the indicator itself has
-    // none) — this class's own header, not a value the caller supplied.
     expect(action.orgUnit.id).toBe(ownerOrgUnit.id);
 
-    // Appears in the shared work list, identified by its origin.
     const byOrigin = await listActionUseCase.execute({
       actorUserId: actor.id,
       page: 1,
@@ -182,8 +130,6 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     });
     expect(byOrigin.items.map((item) => item.id)).toContain(action.id);
 
-    // "Minhas ações" — filtered by responsibleUserId, the same shared
-    // register every other origin type already uses (SC-002).
     const mine = await listActionUseCase.execute({
       actorUserId: actor.id,
       page: 1,
@@ -200,13 +146,6 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     const owner = await setupActor(ownerOrgUnit.id, ['indicator:view']);
     const definition = await setupIndicatorDefinition(owner.id, owner.id);
 
-    // Deliberately a DIFFERENT unit than the indicator owner's — an
-    // INCIDENT/PROBLEM-origin Action would refuse this caller
-    // (`incident-problem-action-origin.spec.ts`'s own out-of-scope test).
-    // An INDICATOR-origin one must not: FR-021's "toda IndicatorDefinition
-    // [é] visível a qualquer chamador com indicator:view", reflected in
-    // `IndicatorActionOriginAccessor#resolveOriginScope`/
-    // `#listOriginIdsInScope` never checking containment at all.
     const unrelatedOrgUnit = await createOrgUnitFixture(ctx.prisma, {
       code: uniqueTestMarker('iao-unrelated-org'),
     });
@@ -227,17 +166,10 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     });
     expect(action.originType).toBe('INDICATOR');
 
-    // Reads it back — the origin-scope re-check
-    // (`assertActionOriginInScope`) must not refuse this caller either.
     await expect(
       getActionUseCase.execute({ actorUserId: caller.id, actionId: action.id }),
     ).resolves.toMatchObject({ id: action.id });
 
-    // And a SECOND caller, scoped to yet another, still-different unit,
-    // can see it too via the list restriction
-    // (`ListActionUseCase#resolveOriginScopeRestriction` ->
-    // `listOriginIdsInScope`) — proving the org-wide behaviour is not an
-    // accident of the first caller's own grant.
     const thirdOrgUnit = await createOrgUnitFixture(ctx.prisma, {
       code: uniqueTestMarker('iao-third-org'),
     });
@@ -294,10 +226,6 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     });
     expect(action.status).toBe('OPEN');
 
-    // OPEN -> COMPLETED directly is illegal for EVERY Action, regardless
-    // of origin (data-model.md §4's own diagram) — the SAME
-    // `ValidationDomainError` any other origin type's Action would throw,
-    // never a bespoke indicator rule.
     await expect(
       transitionActionUseCase.execute({
         actorUserId: actor.id,
@@ -306,7 +234,6 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
       }),
     ).rejects.toThrow(ValidationDomainError);
 
-    // The legal path: OPEN -> IN_PROGRESS -> COMPLETED.
     const inProgress = await transitionActionUseCase.execute({
       actorUserId: actor.id,
       actionId: action.id,
@@ -322,8 +249,6 @@ describe('009-indicators-reports — INDICATOR action origin, genuinely exercise
     expect(completed.status).toBe('COMPLETED');
     expect(completed.completedByUserId).toBe(actor.id);
 
-    // Reopening (COMPLETED -> OPEN) requires a reason — Invariant A2,
-    // generic to every Action.
     await expect(
       transitionActionUseCase.execute({ actorUserId: actor.id, actionId: action.id, to: 'OPEN' }),
     ).rejects.toThrow(ValidationDomainError);

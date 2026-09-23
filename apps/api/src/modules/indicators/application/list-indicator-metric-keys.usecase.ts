@@ -1,17 +1,3 @@
-/**
- * 009-indicators-reports, Fase 8 (T068 prep) — `ListIndicatorMetricKeysUseCase`
- * (`listIndicatorMetricKeys`, `GET /indicators/metric-keys`). Requires only
- * `indicator:view` — unlike `GetIndicatorCurrentValueUseCase`, there is no
- * dynamic second permission here: this operation reads the CATALOG itself
- * (`INDICATOR_METRIC_CATALOG`, `domain/indicator-metric-catalog.ts`), never
- * a source domain's own data (`contracts/indicators.openapi.yaml`'s own
- * `listIndicatorMetricKeys` description: "Every key in the response exists
- * regardless of whether an `IndicatorDefinition` has been created for it").
- *
- * No `ScopeFilter` (research.md D-8) — `hasDefinition` reads
- * `IndicatorDefinitionRepositoryPort.listConfiguredMetricKeys()`, itself
- * unscoped for the same reason every other read on this table is.
- */
 import { Injectable } from '@nestjs/common';
 
 import { USER_MESSAGES } from '../../../shared/messages/user-messages';

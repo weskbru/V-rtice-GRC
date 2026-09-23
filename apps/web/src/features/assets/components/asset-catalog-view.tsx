@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — asset catalog screen (T046), mirroring
- * `AuditEngagementCatalogView`'s/`ControlCatalogView`'s overall
- * orchestration (CLAUDE.md §18.12): summary indicators, filter bar, results
- * bar, cards-or-table, shared pagination — reused rather than reinvented
- * for Assets. No quick-view side panel, matching the audit engagement
- * register (this catalog's own message strings carry no `quickView`-shaped
- * text either).
- *
- * Never fetches more than the current page — never sorts, filters or
- * paginates client-side (SC-008 equivalent).
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -22,6 +10,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { assets } from '@/lib/messages/assets';
+import { common } from '@/lib/messages/common';
 
 import { assetsApi } from '../api';
 import {
@@ -38,12 +32,6 @@ import { AssetRegisterSummary } from './asset-register-summary';
 import type { AssetCatalogView as CatalogViewMode } from '../hooks/use-asset-catalog-state';
 import type { AssetListSortField, AssetSummary } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { assets } from '@/lib/messages/assets';
-import { common } from '@/lib/messages/common';
 
 const VIEW_OPTIONS = [
   {
@@ -203,8 +191,6 @@ export function AssetCatalogView(): React.JSX.Element {
         onClearFilters={clearFilters}
       />
 
-      {/* One strip for every decision about HOW the matched records are
-          shown — ordering and Cards/Tabela. */}
       <ResultsToolbar
         count={assets.register.results.count(total)}
         isLoading={loading}

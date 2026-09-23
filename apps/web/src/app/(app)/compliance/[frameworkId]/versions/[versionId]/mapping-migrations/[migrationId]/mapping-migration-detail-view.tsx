@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — one mapping migration's full per-requirement detail (US2,
- * SC-004: "conferir o que foi transportado"). Immutable once recorded —
- * this screen is read-only, mirroring the contract's own "no update or
- * delete operation for a migration record".
- */
 import { EmptyState, ErrorState, LoadingState } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 

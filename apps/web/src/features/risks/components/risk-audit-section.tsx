@@ -1,56 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Audit section (T171, US7, FR-033 to FR-037).
- *
- * Consumes `GET /risks/{riskId}/audit-events` — the raw, append-only audit
- * trail for the risk and its child records. Requires `risk:view` (already
- * needed to reach this screen) **and** `audit:view`.
- *
- * ## Hidden — not disabled, not errored — without `audit:view`
- *
- * This component is never mounted for a caller without `audit:view` in the
- * first place: `RiskDetailView` passes `visible={canViewAudit}` on the
- * "Auditoria" `EntityTab`, exactly like it already gates every other
- * permission-sensitive tab, and `EntityTabs` (`@pharos/design-system`)
- * omits an invisible tab from BOTH the tab list and the mounted content
- * (never renders it disabled — a disabled control would itself disclose
- * that the section exists, FR-030). So the ONLY way this component's own
- * `useEffect` ever runs is that the caller's own permission snapshot
- * already said `audit:view` is present — the same advisory-only mirror
- * every other permission check in this app uses (`usePermissions()`'s own
- * module doc comment).
- *
- * ## Handling a `403` gracefully anyway
- *
- * That client-side snapshot can be stale (a permission revoked seconds ago,
- * before the next `GET /auth/session` refresh) — the server re-checks
- * `audit:view` independently and unconditionally on every request
- * (ADR-003), and this section's own fetch can therefore still come back
- * `403` even though the tab rendered. This is handled explicitly, not left
- * to fall into the generic `loadError` path: a `403` renders
- * `risks.audit.forbidden`'s own title/description via `ErrorState`
- * (through `AuditTimeline`'s `error` prop) instead of the generic "could
- * not load" message, so a caller in this narrow, transient situation is
- * told the true reason rather than a misleading "try again" prompt. Every
- * OTHER failure (network error, 5xx, an out-of-scope/nonexistent risk
- * surfacing as 404) still falls into the generic `loadError` message.
- *
- * ## Making a changed field readable (product owner UAT finding)
- *
- * A raw `{ categoryId: null → "01a071be-…" }` diff is data, not an audit
- * trail a person can read — this section additionally loads the same
- * reference data `RiskForm` loads (categories/types/origins/org units/
- * users) and hands `risks.audit.buildValueResolver` the result, so
- * `AuditTimeline` renders "Categoria: Não registrado → <nome real>" instead
- * of a database column name and a UUID (`buildAuditValueResolver`'s own doc
- * comment in `@/lib/messages/risks` has the full resolution rules,
- * including what an unresolvable id shows and why). This fetch is
- * independent of, and never blocks or fails, the audit-events fetch below —
- * `timelineLabels`' `resolveFieldValue` is simply `undefined` until it
- * resolves, during which a changed field still renders its pt-BR label with
- * the raw value, exactly like an id this catalog has no lookup for at all.
- */
 import { AuditTimeline } from '@pharos/design-system/components';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -98,14 +47,6 @@ export function RiskAuditSection({ riskId }: RiskAuditSectionProps): React.JSX.E
   const [resolvedRiskId, setResolvedRiskId] = useState<string | null>(null);
   const loading = resolvedRiskId !== riskId;
 
-  // Reference data (categories/types/origins/org units/users) — the same
-  // lookups `RiskForm` already loads to populate its own selects — used
-  // ONLY to resolve a changed field's id to the name this app already
-  // displays for it (e.g. `categoryId` -> the category's own name), never
-  // to gate rendering: a failure here is swallowed and simply leaves ids
-  // unresolved (raw, but still labelled and still visible) rather than
-  // breaking the audit tab itself, which has its own, independent error
-  // handling for the audit events fetch below.
   const [referenceData, setReferenceData] = useState<AuditReferenceData | null>(null);
 
   useEffect(() => {
@@ -115,19 +56,6 @@ export function RiskAuditSection({ riskId }: RiskAuditSectionProps): React.JSX.E
       risksApi.listTypes(),
       risksApi.listOrigins(),
       risksApi.listOrgUnits(),
-      // Not a picker — a one-off, unsearched id→name lookup TABLE for
-      // whatever user ids appear as changed values in this risk's own
-      // audit history (S-10, `risksApi.searchUsers`'s own doc comment).
-      // `GET /users` has no id-based lookup and no unbounded listing
-      // (`list-directory-users-query.dto.ts` caps `pageSize` at 100) — this
-      // was already a bounded resolver before this fix (previously
-      // `pageSize=100`, unsearched); requesting the same maximum page here
-      // preserves exactly that pre-existing resolution rate rather than
-      // narrowing it to a picker's smaller per-keystroke page, and does not
-      // invent a second, id-based endpoint this contract does not offer. A
-      // user id outside this page still renders unresolved (raw, but still
-      // labelled) — the same graceful degradation this section already
-      // documents above for a failed fetch.
       risksApi.searchUsers('', undefined, 100),
     ])
       .then(
@@ -142,9 +70,7 @@ export function RiskAuditSection({ riskId }: RiskAuditSectionProps): React.JSX.E
           setReferenceData({ categories, types, origins, orgUnits, users: usersPage.data });
         },
       )
-      .catch(() => {
-        // Deliberately silent — see the state's own doc comment above.
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -172,10 +98,6 @@ export function RiskAuditSection({ riskId }: RiskAuditSectionProps): React.JSX.E
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        // A `403` here means the server's OWN `audit:view` check refused —
-        // see this file's own doc comment for why the tab could still be
-        // mounted when that happens. Every other failure keeps the generic
-        // message.
         if (error instanceof ApiError && error.problem.status === 403) {
           setErrorProblem(risks.audit.forbidden);
         } else {

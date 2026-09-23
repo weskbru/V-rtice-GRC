@@ -1,10 +1,3 @@
-/**
- * T056/004-compliance-management, User Story 3 —
- * `RequirementApplicabilityController`:
- * `listRequirementApplicabilityDeclarations`,
- * `declareRequirementNotApplicable`,
- * `revokeRequirementApplicabilityDeclaration` (operations 17-19).
- */
 import {
   Body,
   Controller,

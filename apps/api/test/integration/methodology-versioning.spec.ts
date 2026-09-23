@@ -1,28 +1,3 @@
-/**
- * T117 — FR-068: a methodology version change does NOT retroactively alter
- * the stored results of historical assessments. This is the test that
- * matters most for audit defensibility (per the dispatch brief): an
- * assessment's `methodologyVersionId` pins interpretation permanently, so a
- * later matrix/band change can never rescore it.
- *
- * Proof structure:
- *   1. Assess a risk under methodology version V1 (5x5 product matrix,
- *      standard LOW/MEDIUM/HIGH/CRITICAL bands) — factors (5,5) score 25,
- *      level CRITICAL.
- *   2. Publish version V2 under the SAME (active) methodology with a
- *      DELIBERATELY different matrix/bands — every score 1-25 maps to
- *      LOW.
- *   3. Assert the ORIGINAL assessment row's stored `inherentScore`/
- *      `inherentLevel`/`residualScore`/`residualLevel` are BYTE-FOR-BYTE
- *      unchanged (still 25/CRITICAL), and its `methodologyVersionId` still
- *      points at V1 — never silently repointed to V2.
- *   4. Assert a NEW assessment created after V2 is published, scored with
- *      the IDENTICAL factors (5,5), now yields LOW — proving V2 is
- *      genuinely active and interpretation genuinely changed prospectively,
- *      which is exactly the contrast that makes step 3 meaningful (this is
- *      not "nothing changed", it's "the OLD record specifically did not
- *      change while the RULES did").
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -90,10 +65,8 @@ describe('Methodology versioning does not rescore history (T117, FR-068, SC-007)
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('methodology-versioning-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // V1: standard 5x5 product matrix, LOW/MEDIUM/HIGH/CRITICAL bands.
     const { version: v1 } = await createMethodologyVersionFixture(ctx.prisma, actor.id);
 
     const risk = await createRiskUseCase.execute({
@@ -121,9 +94,6 @@ describe('Methodology versioning does not rescore history (T117, FR-068, SC-007)
     expect(assessment.residualLevel).toBe('CRITICAL');
     expect(assessment.methodologyVersion.id).toBe(v1.id);
 
-    // --- Publish V2 under the SAME methodology, with a matrix that maps
-    // EVERY attainable score to LOW — the most extreme possible contrast
-    // with V1's CRITICAL result for the same (5,5) factors. -----------------
     const flatMatrix = SCALE_1_TO_5.flatMap((p) =>
       SCALE_1_TO_5.map((i) => ({
         probability: p.value,
@@ -143,7 +113,6 @@ describe('Methodology versioning does not rescore history (T117, FR-068, SC-007)
     expect(v2.id).not.toBe(v1.id);
     expect(v2.versionNumber).toBe(v1.versionNumber + 1);
 
-    // --- The core assertion: V1's assessment is UNTOUCHED -------------------
     const storedAssessment: RiskAssessment =
       await ctx.prisma.client.riskAssessment.findUniqueOrThrow({ where: { id: assessment.id } });
     expect(storedAssessment.methodologyVersionId).toBe(v1.id);
@@ -152,18 +121,10 @@ describe('Methodology versioning does not rescore history (T117, FR-068, SC-007)
     expect(storedAssessment.residualScore).toBe(25);
     expect(storedAssessment.residualLevel).toBe('CRITICAL');
 
-    // The risk's own denormalized levels (set at assessment time from V1)
-    // are equally untouched by V2's publication — nothing rescans/rewrites
-    // `risks` when a new methodology version is published.
     const storedRisk = await ctx.prisma.client.risk.findUniqueOrThrow({ where: { id: risk.id } });
     expect(storedRisk.inherentLevel).toBe('CRITICAL');
     expect(storedRisk.residualLevel).toBe('CRITICAL');
 
-    // --- Prospective contrast: a NEW assessment, same factors, now scores
-    // under V2 and gets a genuinely different result — proving V2 is
-    // actually active and the platform's rules truly changed, which is
-    // what makes the untouched V1 record above meaningful rather than
-    // coincidental. ----------------------------------------------------------
     const { assessment: secondAssessment } = await createAssessmentUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -180,15 +141,12 @@ describe('Methodology versioning does not rescore history (T117, FR-068, SC-007)
     expect(secondAssessment.inherentLevel).toBe('LOW');
     expect(secondAssessment.residualLevel).toBe('LOW');
 
-    // The FIRST assessment is STILL untouched after the second is recorded.
     const storedAssessmentAfterSecond = await ctx.prisma.client.riskAssessment.findUniqueOrThrow({
       where: { id: assessment.id },
     });
     expect(storedAssessmentAfterSecond.inherentLevel).toBe('CRITICAL');
     expect(storedAssessmentAfterSecond.methodologyVersionId).toBe(v1.id);
 
-    // --- A stale, no-longer-active version supplied explicitly is refused
-    // with 422, never silently rescored (US4 AS5, FR-068). --------------------
     await expect(
       createAssessmentUseCase.execute({
         actorUserId: actor.id,

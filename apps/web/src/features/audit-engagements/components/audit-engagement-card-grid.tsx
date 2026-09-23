@@ -1,24 +1,13 @@
 'use client';
 
-/**
- * The grid frame — list semantics, responsive columns and the
- * loading/error/empty contract — is the shared `CardGrid`; what stays
- * here is which card to render and a skeleton shaped like it.
- *
- * PharosGRC — audit engagement catalog card view, the grid of
- * `AuditEngagementCard`s (T076, CLAUDE.md §18.12 — mirrors
- * `ControlCardGrid`/`RiskCardGrid`, minus the quick-view "compact" mode
- * neither this register offers — see `AuditEngagementCard`'s own doc
- * comment for why).
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { auditEngagements } from '@/lib/messages/audit-engagements';
 
 import { AuditEngagementCard } from './audit-engagement-card';
 
 import type { AuditEngagement } from '../types';
-
-import { Skeleton } from '@/components/ui/skeleton';
-import { auditEngagements } from '@/lib/messages/audit-engagements';
 
 export interface AuditEngagementCardGridProps {
   engagements: readonly AuditEngagement[];

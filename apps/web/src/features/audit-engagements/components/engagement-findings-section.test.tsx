@@ -6,18 +6,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { EngagementFindingsSection } from './engagement-findings-section';
 
-/**
- * Component-mount evidence for T077 (`EngagementFindingsSection`,
- * 005-audit-findings, US2, FR-007/FR-008). `../api` is mocked at the
- * network boundary, mirroring `findings-panel.test.tsx`'s own pattern.
- *
- * `AuthProvider` is required now (S-10): `EngagementFindingCreateDialog`
- * reads `useAuth().user` unconditionally — even while its own `open` prop
- * is `false` — to seed the owner picker's initial label with the current
- * user, with no extra request, for the common self-assign default. The
- * fixture's own `user.id` ('user-1') matches `BASE_PROPS.defaultOwnerUserId`.
- */
-
 const { listEngagementFindingsMock } = vi.hoisted(() => ({
   listEngagementFindingsMock: vi.fn(),
 }));
@@ -26,11 +14,6 @@ vi.mock('../api', () => ({
   auditEngagementsApi: { listEngagementFindings: listEngagementFindingsMock },
 }));
 
-// `EngagementFindingCreateDialog` pulls in `findingsApi.searchUsers` for its
-// owner picker — mocked here purely so opening the dialog never throws;
-// this file does not exercise the create flow itself (a multi-select form
-// with no established RTL interaction pattern anywhere else in this
-// codebase yet — `finding-create-dialog.tsx` has no dedicated test either).
 vi.mock('@/features/findings/api', () => ({
   findingsApi: { searchUsers: vi.fn().mockResolvedValue({ data: [], isPartial: false }) },
 }));
@@ -67,7 +50,6 @@ const BASE_PROPS = {
   defaultOwnerUserId: 'user-1',
 };
 
-/** `buildTestSession()`'s own `user.id` is `'user-1'`, matching `BASE_PROPS.defaultOwnerUserId` — see this file's own header. */
 function renderSection(
   props: Partial<React.ComponentProps<typeof EngagementFindingsSection>> = {},
 ): ReturnType<typeof render> {

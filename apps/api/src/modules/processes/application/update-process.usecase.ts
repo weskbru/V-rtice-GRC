@@ -1,7 +1,3 @@
-/**
- * T020/006-assets-processes — `UpdateProcessUseCase`: identical in shape to
- * `modules/assets/application/update-asset.usecase.ts` (FR-020).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

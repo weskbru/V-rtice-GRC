@@ -1,9 +1,3 @@
-/**
- * T023/003-controls-management — maps `ControlLifecycleState`
- * (`application/lifecycle/get-control-lifecycle.usecase.ts`) to
- * `contracts/controls.openapi.yaml`'s `ControlLifecycleState` wire shape.
- * The ONE place this aggregate becomes a response body (ADR-009).
- */
 import type {
   AvailableControlTransition,
   ControlLifecycleState,

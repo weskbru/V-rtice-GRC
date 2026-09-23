@@ -1,26 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Escopo" tab of an engagement's detail screen (T076,
- * US1, FR-005/FR-006, ADR-020). Loading, genuinely-empty and
- * failed-to-load are three distinguishable states with a retry (CLAUDE.md
- * §18.11) — never a silent empty list.
- *
- * Three scope variants (framework version, requirement, control),
- * presented as tabs — each an EXPLICIT decision by the auditor, never a
- * pre-checked suggestion (the same spirit as Phase 3's
- * `mapping-migration-panel.tsx`): every picker starts with nothing
- * selected, and adding one item never implies or pre-fills another.
- *
- * Two domain facts are surfaced honestly rather than worked around:
- *
- *   - scope is only alterable while `PLANNING` (`notPlanningNotice`) — the
- *     picker tabs are not rendered at all once the engagement has started,
- *     rather than rendered and then rejected by the server;
- *   - a scope entry, once added, can never be removed (research.md D-12) —
- *     `noRemovalNotice` is shown plainly instead of rendering a remove
- *     button that cannot work.
- */
 import {
   EmptyState,
   ErrorState,
@@ -56,7 +35,6 @@ export interface AuditScopeSectionProps {
   auditId: string;
   engagementStatus: AuditEngagementStatus;
   canManageScope: boolean;
-  /** Called after a successful add — the engagement's own lifecycle card (its "no scope yet" precondition notice) is otherwise left stale. */
   onChanged?: () => void;
 }
 

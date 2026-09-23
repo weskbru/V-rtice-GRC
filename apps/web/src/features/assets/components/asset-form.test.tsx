@@ -7,13 +7,6 @@ import { AssetForm } from './asset-form';
 
 import type { AssetDetail } from '../types';
 
-/**
- * Component-mount evidence for T048 (`AssetForm`) — most importantly that
- * organizational unit is unmistakably required (invariant A1, FR-004) and
- * that description, being optional, never blocks submission.
- *
- * `../api` (`assetsApi`) is mocked at the network boundary.
- */
 const { pushMock, backMock, createAssetMock, updateAssetMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   backMock: vi.fn(),
@@ -114,18 +107,6 @@ describe('AssetForm', () => {
     expect(screen.getByRole('combobox', { name: /Unidade organizacional/ })).toBeInTheDocument();
   });
 
-  /**
-   * Mirrors `control-form.test.tsx`'s own identical pair — added here
-   * PREEMPTIVELY (022-asset-detail-experience Fase C), before
-   * `AssetEditPanel` could ever ship the same defect F-79
-   * (`docs/deferred-findings.md`) found in `ControlForm`: "Cancelar"
-   * defaults to `navigate.back()` when no `onCancel` is supplied (the
-   * register's own `/assets/new` page, unchanged), and a caller composing
-   * this form inside something that is NOT itself a navigation
-   * (`AssetEditPanel`'s own overlay `Sheet`) supplies `onCancel` instead,
-   * which fires INSTEAD of `navigate.back()`. Both paths are proven here so
-   * neither can silently regress into the other.
-   */
   it('"Cancelar" calls navigate.back() when no onCancel is supplied — the default, unchanged for /assets/new', () => {
     render(<AssetForm mode="create" onSaved={vi.fn()} />);
 

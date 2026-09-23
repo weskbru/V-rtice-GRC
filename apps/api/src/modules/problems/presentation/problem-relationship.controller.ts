@@ -1,21 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `ProblemRelationshipController`:
- * `GET`/`POST /problems/{problemId}/risks`,
- * `DELETE /problems/{problemId}/risks/{linkId}`, and the same three
- * shapes for `/incidents` — the fifth link, the N:M pair Problem owns the
- * write path for (`specs/008-incidents-problems/contracts/problems.openapi.yaml`'s
- * "Problem Relationships" operations). Mirrors
- * `grc/finding/presentation/finding-relationship.controller.ts` exactly: a
- * separate controller file from the CRUD/lifecycle `ProblemController`,
- * `200` (not `204`) with the withdrawn link body on unlink — `Problem` has
- * no `version` column to echo via `ETag`.
- *
- * All five routes are gated by `problem:link` (contract's own "Requires
- * `problem:link`..." wording on every write route); the four GET list
- * routes reuse `problem:view`, the same convention
- * `FindingRelationshipController` establishes for its own list routes —
- * the contract states no override for them.
- */
 import {
   Body,
   Controller,
@@ -64,10 +46,6 @@ export class ProblemRelationshipController {
     private readonly unlinkProblemIncidentUseCase: UnlinkProblemIncidentUseCase,
   ) {}
 
-  // ---------------------------------------------------------------------
-  // Risks
-  // ---------------------------------------------------------------------
-
   @RequirePermission('problem:view')
   @Get('risks')
   async listRiskLinks(
@@ -114,10 +92,6 @@ export class ProblemRelationshipController {
     });
     return toProblemRiskLinkResponse(unlinked);
   }
-
-  // ---------------------------------------------------------------------
-  // Incidents (the N:M pair — Problem owns the write path, D-13 to D-15)
-  // ---------------------------------------------------------------------
 
   @RequirePermission('problem:view')
   @Get('incidents')

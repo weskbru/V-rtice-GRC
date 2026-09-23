@@ -35,11 +35,6 @@ describe('DashboardQuickActions', () => {
     expect(screen.queryByRole('link', { name: 'Ver indicadores' })).not.toBeInTheDocument();
   });
 
-  /**
-   * A read-only caller must not see an empty "Ações rápidas" section where
-   * the shortcuts would have been — that reads as a broken region, not as
-   * "nothing for you to start here".
-   */
   it('renders nothing at all — heading included — when no shortcut is available', () => {
     const { container } = renderWith(['risk:view']);
 

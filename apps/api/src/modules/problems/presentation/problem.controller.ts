@@ -1,27 +1,3 @@
-/**
- * 008-incidents-problems, US2 — `ProblemController`:
- * `contracts/problems.openapi.yaml`'s `/problems` and
- * `/problems/{problemId}[/transitions]` paths (`listProblems`,
- * `createProblem`, `getProblem`, `updateProblem`, `transitionProblem`).
- * Every route carries an explicit authorization decision — either
- * `@RequirePermission` or, for `transition` below, `@NoPermissionRequired()`
- * — there is no route on this controller left undecorated, and no
- * `DELETE` route exists (a problem is cancelled or closed, never
- * physically deleted).
- *
- * `POST /transitions` is `@NoPermissionRequired()`, not
- * `@RequirePermission(...)` — mirrors `control-lifecycle.controller.ts`'s
- * identical reasoning: `PermissionGuard` fails CLOSED when a route carries
- * neither decorator (confirmed empirically: every transition request
- * answered 403 before this was added), and a single route serving every
- * `(from, to)` pair cannot carry one static permission — the real check
- * happens one layer down, in `TransitionProblemUseCase`, against
- * `problem-lifecycle.ts`'s own table.
- *
- * Link routes (`/problems/{problemId}/risks`, `/problems/{problemId}
- * /incidents`) belong to a separate controller, owned by the front
- * building US3's relationship work — not this file.
- */
 import {
   BadRequestException,
   Body,
@@ -164,16 +140,6 @@ export class ProblemController {
     return toProblemDetailResponse(updated);
   }
 
-  /**
-   * The sole writer of `status` (data-model.md §4) — permission is
-   * checked INSIDE `TransitionProblemUseCase` against
-   * `problem-lifecycle.ts`'s own table, not by a static
-   * `@RequirePermission` here, mirroring
-   * `control-lifecycle.controller.ts`'s identical reasoning (every legal
-   * `(from, to)` pair happens to name the same `problem:transition`
-   * permission today, but the table — not this decorator — is the source
-   * of truth).
-   */
   @NoPermissionRequired()
   @Post(':problemId/transitions')
   @HttpCode(HttpStatus.OK)
@@ -195,9 +161,6 @@ export class ProblemController {
   }
 }
 
-/** `UpdateProblemRequest`'s `minProperties: 1` — controller-level check,
- * mirroring `finding.controller.ts#assertUpdateBodyNotEmpty`'s own
- * documented reasoning. */
 function assertUpdateBodyNotEmpty(body: UpdateProblemRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

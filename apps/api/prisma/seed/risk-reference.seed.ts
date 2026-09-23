@@ -1,59 +1,3 @@
-/**
- * T085 — initial `RiskCategory`/`RiskType`/`RiskOrigin` reference data
- * (data-model.md §7: "Organization-configurable reference tables ...
- * referenced from `Risk` with `ON DELETE RESTRICT`").
- *
- * ## Why these specific values
- *
- * Unlike `RiskStatus`/`RiskLevel` (closed platform enums whose exact values
- * `spec.md`/`data-model.md` spell out), data-model.md §7 describes
- * `RiskCategory`/`RiskType`/`RiskOrigin` only by SHAPE ("id, code (unique),
- * name, description, sortOrder, isActive") and states they are
- * "organization-configurable" — it does not enumerate starting values. This
- * seed supplies a defensible, industry-conventional starting set so the
- * risk register is usable immediately after a fresh install, exactly as
- * `platform.seed.ts` seeds system roles the spec names but not, say, a
- * starting organizational unit tree beyond the root. Every row here is
- * ordinary data, not platform logic: an organization can rename, deactivate
- * or add to these later through a reference-data administration screen (a
- * future task) without any code or migration change, because `isActive`
- * (deactivate, never delete — matching `RESTRICT`) and `sortOrder` already
- * exist for exactly that purpose.
- *
- *   - **Categories**: the five named directly in this task's own
- *     instructions (Operacional, Financeiro, Estratégico, Conformidade,
- *     Tecnológico) — the standard top-level GRC risk classification axis.
- *   - **Types**: Interno / Externo — whether the risk's driving factor sits
- *     inside or outside the organization's own control, a distinction
- *     orthogonal to category (a Financeiro risk can be internal — a costing
- *     error — or external — a currency shock).
- *   - **Origins**: Pessoas / Processos / Sistemas e Tecnologia / Eventos
- *     Externos — the classic COSO ERM / Basel operational-risk causal
- *     sources, describing WHERE a risk's cause originates rather than what
- *     domain it affects (category) or whether it is internal/external
- *     (type).
- *
- * `code` values are stable, English, upper-snake-case identifiers (D-8:
- * "everything that is a technical identifier ... stays in English") —
- * never renamed even if `name` is retranslated or edited later. `name`/
- * `description` are pt-BR interface content (D-8).
- *
- * ## Idempotency
- *
- * Every row is upserted on its natural unique key (`code`), exactly like
- * `platform.seed.ts`'s `Permission`/`Role`/`OrganizationalUnit` upserts —
- * safe to run on every deploy, converges `name`/`description`/`sortOrder`
- * to the definitions below without duplicating rows, and never touches
- * `isActive` on an existing row (a re-run must not silently reactivate a
- * category an administrator deliberately deactivated).
- *
- * ## No audit trail for this seed (same reasoning as `platform.seed.ts`)
- *
- * Seeded before any request context exists; there is no real actor to
- * attribute a "category created" event to. See `platform.seed.ts`'s own
- * "Why seed operations do NOT write to audit_event" section — the same
- * reasoning applies verbatim and is not repeated here.
- */
 import type { PrismaClient } from '@prisma/client';
 
 interface ReferenceDataDefinition {
@@ -151,14 +95,6 @@ export interface RiskReferenceSeedResult {
   readonly originCount: number;
 }
 
-/**
- * `prisma` follows the same convention as `seedPlatform`: the seed opens its
- * own transaction directly against the raw `PrismaClient` handed over by
- * `prisma/seed/index.ts`, rather than through `PrismaService`'s
- * `AsyncLocalStorage`-based `runInTransaction` — there is no `AuditRecorder`
- * call here that needs to join an ambient transaction implicitly (see the
- * file header's "No audit trail for this seed").
- */
 export async function seedRiskReferenceData(
   prisma: PrismaClient,
 ): Promise<RiskReferenceSeedResult> {
@@ -172,9 +108,6 @@ export async function seedRiskReferenceData(
           description: definition.description,
           sortOrder: definition.sortOrder,
         },
-        // `isActive` is deliberately absent from `update` — see the file
-        // header's "Idempotency" section: a re-run must never silently
-        // reactivate a row an administrator deactivated.
         update: {
           name: definition.name,
           description: definition.description,

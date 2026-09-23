@@ -1,35 +1,3 @@
-/**
- * T069/002-shared-grc-foundation, US3 — `PrismaFindingRepository`, the
- * sole implementation of `FindingRepositoryPort`. Extends
- * `FindingScopedRepository` (T013), which fixes `applyScope`/`withScope`
- * to `orgUnitId` — every scoped method below is compile-time required to
- * thread the caller's `ScopeFilter` through it (FR-031/FR-032).
- *
- * ## Reading `actions`/`evidence_links` directly — not a boundary violation
- *
- * `openActionCount`, `evidenceCount` and
- * `findCompletedLinkedActionResponsibles` all query the `actions`/
- * `evidence_links` tables directly via the SAME `PrismaService` client
- * this repository already holds. This is NOT `grc/finding` depending on
- * `grc/action`'s or `grc/evidence`'s domain ports — no import of either
- * capability's `*.repository.port.ts` appears anywhere in this file. It is
- * exactly the same kind of "infrastructure layer reads a sibling table it
- * does not own the domain meaning of" access
- * `EvidenceLinkVisibilityService`'s own header describes as the accepted
- * cost of `R-001`'s no-FK design: since `Action.originId`/
- * `EvidenceLink.subjectId` carry no foreign key at all (grc's own
- * capabilities cannot reference each other by FK any more than they can
- * reference `modules/**`), the ONLY way to answer "how many actions/how
- * much evidence does THIS finding have" is a plain `WHERE originType =
- * 'FINDING' AND originId = :id` / `WHERE subjectType = 'FINDING' AND
- * subjectId = :id` query against the shared table — there is no port to
- * put this behind that would not simply be this same query relocated.
- * `eslint-plugin-boundaries` (ADR-016) enforces the FOUR real rules (core
- * -> grc forbidden, grc -> modules forbidden, and the two inward-layering
- * rules) at the TypeScript-import level; a `Prisma.action.count(...)` call
- * against the platform's one shared database is not a TypeScript import of
- * `grc/action/**` at all.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -56,29 +24,6 @@ const FINDING_INCLUDE = {
 
 type FindingWithRelations = Prisma.FindingGetPayload<{ include: typeof FINDING_INCLUDE }>;
 
-/** `Action` statuses that count toward `Finding.openActionCount`
- * (contracts/grc-foundation.openapi.yaml).
- *
- * Coordinator correction, 007-implementation-remediation, Frente A: this
- * used to be its OWN local literal, documented as "the same pair" as
- * `grc/shared/domain/overdue.service.ts`'s overdue-eligible set rather than
- * imported from it — exactly the "twin nobody forces to agree" shape the
- * front's consolidation exists to remove. On inspection this is genuinely
- * the SAME set, not a coincidence: `OVERDUE_ELIGIBLE_ACTION_STATUSES` is,
- * by that file's own header, precisely the complement of `Action`'s two
- * TERMINAL statuses (`COMPLETED`, `CANCELLED` — data-model.md §4's
- * transition table) — i.e. "not yet finished". `openActionCount` counts
- * "how many of this finding's linked actions are not yet finished", the
- * IDENTICAL question the overdue rule's status half asks, before that rule
- * ALSO requires a past due date. So this is not a second rule that
- * happens to match today; it is the same "still open" concept, consumed
- * two different ways (bare count here, `AND dueOn < today` there) — this
- * alias exists only to keep this file's own call sites reading a locally
- * meaningful name, never to fork the value. If a future status is ever
- * non-terminal but deliberately excluded from OVERDUE eligibility, that
- * would be the moment this alias needs to become its own array again —
- * make that split here, deliberately, rather than letting this comment go
- * stale. */
 const OPEN_ACTION_STATUSES: readonly ActionStatus[] = OVERDUE_ELIGIBLE_ACTION_STATUSES;
 
 @Injectable()
@@ -104,8 +49,6 @@ export class PrismaFindingRepository
         priority: input.priority,
         ownerUserId: input.ownerUserId,
         identifiedOn: input.identifiedOn,
-        // T089/005-audit-findings — `undefined` (the manual path's own
-        // default) becomes `null`, never a foreign key to a nonexistent row.
         auditEngagementId: input.auditEngagementId ?? null,
       },
       include: FINDING_INCLUDE,
@@ -120,17 +63,12 @@ export class PrismaFindingRepository
     return row ? this.toFindingRecord(row) : undefined;
   }
 
-  /** F-38 — see `FindingRepositoryPort.findOrgUnitIdUnscoped`'s doc
-   * comment. One extra indexed-by-PK `SELECT`, paid only by a caller that
-   * already knows a scoped lookup just returned nothing. */
   async findOrgUnitIdUnscoped(id: string): Promise<string | undefined> {
     return this.resolveOrganizationalUnitIgnoringScope(() =>
       this.prisma.client.finding.findUnique({ where: { id }, select: { orgUnitId: true } }),
     );
   }
 
-  /** Backs `FindingActionOriginAccessor.listOriginIdsInScope` (Fix 1) — a
-   * single scoped query, ids only, no relations loaded. */
   async listIdsInScope(scope: ScopeFilter): Promise<readonly string[]> {
     const rows = await this.withScope(scope, {}, (where) =>
       this.prisma.client.finding.findMany({ where, select: { id: true } }),
@@ -201,8 +139,6 @@ export class PrismaFindingRepository
     return this.findById(scope, id);
   }
 
-  /** T047/005-audit-findings — see `FindingRepositoryPort.startRemediation`'s
-   * own doc comment: only `status` changes, coming from `OPEN`. */
   async startRemediation(scope: ScopeFilter, id: string): Promise<FindingRecord | undefined> {
     const result = await this.withScope(scope, { id }, (where) =>
       this.prisma.client.finding.updateMany({
@@ -252,22 +188,9 @@ export class PrismaFindingRepository
     if (filter.severity !== undefined) where.severity = filter.severity;
     if (filter.ownerUserId !== undefined) where.ownerUserId = filter.ownerUserId;
     if (filter.orgUnitId !== undefined) where.orgUnitId = filter.orgUnitId;
-    // T043/005-audit-findings — `listAuditEngagementFindings`'s own filter
-    // (`ListAuditEngagementFindingsUseCase`, `modules/audit-engagements`).
     if (filter.auditEngagementId !== undefined) where.auditEngagementId = filter.auditEngagementId;
 
     if (filter.withoutRemediation) {
-      // SC-010's "achados sem remediação": OPEN findings with no `Action`
-      // at all pointing back at them. Two indexed queries rather than one
-      // raw `NOT EXISTS` — first the (small, indexed-on-`originType`)
-      // set of every `originId` an ACTION has ever named for `FINDING`,
-      // then `id NOT IN (...)` on `findings` itself. `status` here is
-      // ALWAYS `OPEN` regardless of `filter.status` — the contract's own
-      // description ("Open findings with no linked action") makes
-      // `withoutRemediation` and `status` express the SAME axis, so the
-      // two are combined with AND rather than one silently overriding the
-      // other, matching `PrismaActionRepository.list`'s own documented
-      // "never one filter silently overriding another" convention.
       const originsWithActions = await this.prisma.client.action.findMany({
         where: { originType: 'FINDING' },
         select: { originId: true },
@@ -334,8 +257,6 @@ export class PrismaFindingRepository
       closureJustification: row.closureJustification ?? undefined,
       archivedAt: row.archivedAt ?? undefined,
       archivedByUserId: row.archivedByUserId ?? undefined,
-      // T089/005-audit-findings — see `FindingRecord.auditEngagementId`'s
-      // own doc comment.
       auditEngagementId: row.auditEngagementId ?? undefined,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

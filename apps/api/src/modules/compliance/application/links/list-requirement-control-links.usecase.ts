@@ -1,9 +1,3 @@
-/**
- * T033/004-compliance-management, User Story 2 —
- * `ListRequirementControlLinksUseCase`. `GET
- * /requirements/{requirementId}/controls` (`listRequirementControlLinks`
- * operation).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

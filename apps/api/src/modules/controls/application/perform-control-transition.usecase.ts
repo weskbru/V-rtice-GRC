@@ -1,30 +1,3 @@
-/**
- * T020/003-controls-management — `PerformControlTransitionUseCase`
- * (`POST /controls/{controlId}/transitions`, `transitionControl`
- * operation, D-6, FR-004, FR-005, FR-006, ADR-013). Mirrors
- * `modules/risk/application/perform-transition.usecase.ts`'s structure —
- * see that file's header for the full "why permission is checked here, not
- * by a static `@RequirePermission`" reasoning this one does not repeat
- * (Controls' own table names a DIFFERENT permission per `(from, to)` pair
- * too: `control:edit` for the three non-terminal transitions,
- * `control:administer` for entry into `RETIRED`).
- *
- * ## Semantic audit actions — never a generic `control.updated`
- *
- * `control.activated` (entering `ACTIVE`, from either `DRAFT` or
- * `SUSPENDED`), `control.suspended` (`ACTIVE -> SUSPENDED`),
- * `control.retired` (entering `RETIRED`, from any of the three other
- * states) — one action name per TARGET state, never a single
- * `control.transitioned` that would flatten the three into one
- * indistinguishable event (this task's own non-negotiable instruction).
- *
- * ## `isActive` — the single sync point, applied here
- *
- * `isActiveForControlStatus` (`domain/control.entity.ts`, T019) computes
- * what `controls.is_active` must be for `input.toStatus` — this is the
- * ONLY call site in the write path that ever sets `is_active`; no other
- * operation in this module touches it (data-model.md §1).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -63,7 +36,6 @@ const AUDIT_ACTION_BY_TARGET: Readonly<Partial<Record<ControlStatus, string>>> =
 export interface PerformControlTransitionInput {
   readonly actorUserId: string;
   readonly controlId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
   readonly toStatus: ControlStatus;
   readonly justification?: string | undefined;
@@ -148,14 +120,6 @@ export class PerformControlTransitionUseCase {
         {
           status: input.toStatus,
           isActive,
-          // Retirement metadata is stamped exactly when the control is
-          // becoming inactive — `isActive` is already the ONE authoritative
-          // answer to which target status this is (`isActiveForControlStatus`,
-          // T019's single sync point), so this reuses that boolean instead
-          // of a second, independent comparison against the target status
-          // literal (which `control-lifecycle.spec.ts`'s own
-          // single-write-point guard would otherwise flag as a second place
-          // deriving the same fact).
           ...(!isActive
             ? {
                 retiredAt: new Date(),

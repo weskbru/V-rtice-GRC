@@ -1,11 +1,3 @@
-/**
- * Adapts `AppLogger` to Nest's `LoggerService` interface so framework
- * bootstrap/lifecycle messages (normally printed by Nest's own `Logger`)
- * flow through the same structured pino output and redaction as the rest
- * of the application (ADR-012). Wired in `main.ts` via
- * `NestFactory.create(AppModule, { bufferLogs: true })` +
- * `app.useLogger(app.get(NestLoggerAdapter))`.
- */
 import { Injectable, type LoggerService } from '@nestjs/common';
 
 import { AppLogger } from './app-logger.service';

@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control assessment attestation decision dialog (T048, US2,
- * FR-016 to FR-020, D-3).
- *
- * One dialog for both outcomes (approve/reject), mirroring
- * `ApprovalDecisionDialog` (Risk) — same shared structure, differing only
- * in verb, emphasis and whether a justification is expected (on rejection).
- *
- * Both segregation-of-duties rules (C1: not the assessor; C2: not the
- * control's owner) are enforced server-side, independently, and both are
- * named in the refusal's `detail` when violated — this dialog never
- * pre-validates either client-side; it renders the server's own pt-BR
- * message verbatim on refusal (`problem.detail`), exactly like
- * `ApprovalDecisionDialog`'s own doc comment explains.
- */
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';

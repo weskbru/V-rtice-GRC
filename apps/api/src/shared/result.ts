@@ -1,22 +1,3 @@
-/**
- * Shared kernel — `Result` type (T020).
- *
- * A minimal discriminated union for operations where returning a failure as
- * a value (rather than throwing) reads more clearly at the call site —
- * typically pure domain functions consumed in a loop or a validation
- * pipeline, such as `RiskScoringService` (ADR-006) or password-policy
- * checks, where a caller wants to collect/branch on the outcome rather than
- * unwind the stack.
- *
- * This does not replace `DomainError` (domain-error.ts): application
- * services still throw a `DomainError` at the use-case boundary so the
- * global exception filter (T021) has a single, consistent place to map
- * failures to HTTP responses. `Result` is for composing pure logic
- * underneath that boundary. Use whichever reads more clearly; do not wrap
- * every function in a `Result` reflexively (constitution §2: no premature
- * abstraction).
- */
-
 export interface Ok<T> {
   readonly ok: true;
   readonly value: T;

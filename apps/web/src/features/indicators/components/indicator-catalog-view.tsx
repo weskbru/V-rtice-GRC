@@ -1,46 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the redesigned `/indicators` first screen: a "central de
- * indicadores de GRC" (indicators-round, S1 ownership, coordinator
- * PLAN.md §2/§3).
- *
- * Replaces the PREVIOUS static 11-card grid (`s3-baseline.md`'s own
- * baseline capture measured 11 independent `GET /indicators/{key}/current`
- * requests on load, 22 under React StrictMode, colliding with the global
- * rate limiter — F-59) with ONE composition over S2's `useIndicatorOverview`
- * (`../overview/use-indicator-overview.ts`), which fires exactly two
- * requests: `GET /dashboard/summary` (the batch source for all 11 current
- * values, PLAN.md §1) and `GET /indicators` (definitions, for threshold/
- * description text only).
- *
- * ## Composition, not calculation
- *
- * This file reads `item.shape`/`item.reading.kind` to decide WHICH already-
- * built card to render — it never computes a value, a domain, a threshold,
- * or a navigation link itself (CLAUDE.md §19.7): every fact rendered here
- * was already produced by S2's `buildIndicatorOverviewItems`
- * (`../overview/indicator-overview-model.ts`).
- *
- * ## Two sections, split by SHAPE — never by availability
- *
- * "Composição por nível e severidade" (the four `BY_BUCKET` keys) and
- * "Contagens e percentuais" (the seven `SINGLE_VALUE` keys) are fixed by the
- * closed catalog's own `shape` field, not by whether a caller can currently
- * read each key — an unavailable `BY_BUCKET` key still renders in the
- * distribution section (as `IndicatorUnavailableItemCard`), never migrates
- * to the other section. This is also what fixes the baseline's own measured
- * row-stretch defect (`s3-baseline.md` §4/§6): a tall `BY_BUCKET` card no
- * longer shares a CSS grid row with three short `SINGLE_VALUE` cards.
- *
- * ## The one per-card scope exception
- *
- * `COMPLIANCE_PERCENTAGE` is the only `ORGANIZATION_WIDE` key
- * (`s1-backend-domain.md` Q15) — its card gets a `scopeNote` ONLY when the
- * caller's OWN resolved scope (`useAuth().scope.global`) is not already
- * global, so the context band's single scope statement is never silently
- * wrong for this one card.
- */
 import { useAuth } from '@/lib/auth-context';
 import { indicators } from '@/lib/messages/indicators';
 
@@ -63,17 +22,6 @@ import { useIndicatorOverview } from '../overview/use-indicator-overview';
 
 import type { IndicatorOverviewItem, IndicatorReading } from '../overview/indicator-overview-model';
 
-/**
- * Narrows a `SINGLE_VALUE` item's reading for `IndicatorSingleValueCard`.
- * Only ever called for an item whose `reading.kind` the caller already
- * confirmed is NOT `'no-permission'` (`renderSingleValueItem`'s own branch
- * above it) — `'buckets'` is additionally structurally unreachable for a
- * `SINGLE_VALUE` shape (every such key's provider only ever produces
- * `'single'`/`'no-data'`, `s1-backend-domain.md` Q9), but the TYPE does not
- * encode either correlation. Falling back to `'no-data'` for anything else
- * — rather than an unchecked cast — keeps this branch crash-free if either
- * invariant is ever violated, instead of rendering a wrong number.
- */
 function toSingleCardReading(
   reading: IndicatorReading,
 ): Extract<IndicatorReading, { kind: 'single' } | { kind: 'no-data' }> {
@@ -181,10 +129,6 @@ export function IndicatorCatalogView(): React.JSX.Element {
     query: filterState.query,
     domain: filterState.domain,
   });
-  // Sidebar order, not catalog/key order — see `sortByIndicatorDomainOrder`'s
-  // own header: the same order the domain filter chips themselves use
-  // (`buildIndicatorDomainCounts` above), so a card's position in its
-  // section never disagrees with the chip row above it.
   const distributionItems = sortByIndicatorDomainOrder(
     filteredItems.filter((item) => item.shape === 'BY_BUCKET'),
   );

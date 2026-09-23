@@ -1,9 +1,3 @@
-/**
- * Compact attention metric. Icon, left edge and faint wash share the same
- * contextual family; the visible title and context describe the condition.
- * Zero/undefined remain neutral; undefined renders as no data, never as zero.
- * Text, destinations, figure size, wrapping and touch targets remain unchanged.
- */
 import { ArrowRight } from 'lucide-react';
 
 import { Link } from '@/components/navigation/link';
@@ -20,16 +14,12 @@ import type { LucideIcon } from 'lucide-react';
 export interface DashboardStatCardProps {
   title: string;
   icon: LucideIcon;
-  /** Contextual family shared by icon, wash and left edge — the only colour prop this card has. */
   contextTone: DashboardTone;
-  /** `undefined` means the source reported no data — rendered distinctly from `0`. */
   value: number | undefined;
-  /** Short line under the number that says what it counts. May wrap to two lines. */
   contextLabel: string;
   link?: { path: string; label: string };
 }
 
-/** The left accent stripe's border colour — full class strings spelled out, never interpolated. */
 const TONE_STRIPE_CLASSES: Readonly<Record<DashboardTone, string>> = {
   teal: 'border-l-tint-teal-fg',
   blue: 'border-l-tint-blue-fg',

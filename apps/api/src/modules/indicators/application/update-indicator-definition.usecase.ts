@@ -1,33 +1,3 @@
-/**
- * 009-indicators-reports, Fase 8 (T068 prep) — `UpdateIndicatorDefinitionUseCase`
- * (`updateIndicatorDefinition`, `PATCH /indicators/{definitionId}`). No
- * `ScopeFilter`/optimistic lock (research.md D-8, `IndicatorDefinition` has
- * no `version` column — see `contracts/indicators.openapi.yaml`'s own
- * `UpdateIndicatorDefinitionRequest`, which declares no `minProperties`
- * either, unlike `UpdateFrameworkRequest`/`UpdateControlRequest`). Mirrors
- * `modules/assets/application/update-asset.usecase.ts`'s field-by-field
- * diff shape — see that file's header for the audit-only-when-changed
- * reasoning this one does not repeat.
- *
- * `metricKey` is NOT part of `UpdateIndicatorDefinitionInput` at all —
- * matching `contracts/indicators.openapi.yaml`'s `UpdateIndicatorDefinitionRequest`,
- * which simply does not declare it, and the global `ValidationPipe`'s
- * `forbidNonWhitelisted` rejects a caller who tries anyway
- * (`update-indicator-definition-request.dto.ts`'s own header).
- *
- * ## Invariant T1 on the FINAL, post-merge pair — not on the raw PATCH body
- *
- * `assertIndicatorThresholdInvariant` (the SAME function
- * `CreateIndicatorDefinitionUseCase` uses — CLAUDE.md §19.7, this task's
- * own instruction) is called once, against the pair this record WOULD have
- * after applying whichever of `thresholdComparator`/`thresholdValue` the
- * caller supplied — untouched fields fall back to the CURRENT persisted
- * value, never to `null` — so a caller that PATCHes only `name` cannot
- * accidentally trip this invariant over a threshold it never mentioned,
- * and a caller that PATCHes just one threshold field against an already-
- * configured threshold is still checked against the resulting pair
- * correctly.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -85,8 +55,6 @@ export class UpdateIndicatorDefinitionUseCase {
       throw new NotFoundDomainError(USER_MESSAGES.indicators.entityLabel, input.definitionId);
     }
 
-    // Invariant T1 (data-model.md §1), on the FINAL pair — see this file's
-    // own header.
     const finalThresholdComparator =
       input.thresholdComparator !== undefined
         ? input.thresholdComparator

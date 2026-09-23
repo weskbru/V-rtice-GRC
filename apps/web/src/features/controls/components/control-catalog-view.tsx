@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control catalog screen (T045), mirroring
- * `risk-register-view.tsx` (CLAUDE.md §18.12): the same
- * summary/filters/results-bar/cards-or-table/pagination
- * orchestration, reused rather than reinvented for Controls.
- *
- * Never fetches more than the current page (SC-008 — the catalog must
- * render in under 2 seconds against 50,000 controls) and never sorts,
- * filters or paginates client-side.
- *
- * Selecting a card navigates straight to the full record at
- * `/controls/{id}` — there is no intermediate quick-view panel (mirrors
- * `risk-register-view.tsx`'s own removal of the same mechanism). The grid
- * uses the full width available to it.
- */
 import {
   ColumnVisibilityMenu,
   DataTable,
@@ -27,6 +12,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { common } from '@/lib/messages/common';
+import { controls } from '@/lib/messages/controls';
 
 import { controlsApi } from '../api';
 import { CATALOG_PAGE_SIZE_OPTIONS, useCatalogState } from '../hooks/use-catalog-state';
@@ -51,12 +42,6 @@ import type {
   ControlType,
 } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { common } from '@/lib/messages/common';
-import { controls } from '@/lib/messages/controls';
 
 const VIEW_OPTIONS = [
   {
@@ -251,9 +236,6 @@ export function ControlCatalogView(): React.JSX.Element {
         onOrgUnitIdChange={setOrgUnitId}
         ownerUserId={state.ownerUserId}
         onOwnerUserIdChange={setOwnerUserId}
-        // S-10 — resolves an active owner filter chip's label with no
-        // extra request when that owner also owns a currently loaded row
-        // (the common case: usually why the filter matched anything).
         knownOwners={
           new Map(rows.flatMap((row) => (row.owner ? [[row.owner.id, row.owner] as const] : [])))
         }
@@ -264,9 +246,6 @@ export function ControlCatalogView(): React.JSX.Element {
         onClearFilters={clearFilters}
       />
 
-      {/* One strip for every decision about HOW the matched controls are
-          shown — ordering, cards or table, and (in the table) which
-          columns. */}
       <ResultsToolbar
         count={controls.register.results.count(total)}
         isLoading={loading}

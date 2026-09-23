@@ -1,13 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — profile page (T075, FR-009).
- *
- * Fetches the caller's own profile from the dedicated `GET /auth/me`
- * endpoint (rather than reusing the snapshot already in `AuthContext`) so
- * this screen reflects the current server state independently of when the
- * session was last refreshed.
- */
 import {
   ErrorState,
   LoadingState,
@@ -22,10 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ApiError, apiClient } from '@/lib/api-client';
 import { common } from '@/lib/messages/common';
 import { profile as profileMessages } from '@/lib/messages/profile';
-// The single point of translation for a role's name (ADR-022). This screen
-// used to carry its OWN map — `profile.identity.roleLabels`, six of the twelve
-// seeded roles — which is how six roles rendered in English here while
-// Administração rendered all twelve in pt-BR.
 import { roleDisplayName } from '@/lib/role-display-name';
 
 import { ChangePasswordForm } from './change-password-form';

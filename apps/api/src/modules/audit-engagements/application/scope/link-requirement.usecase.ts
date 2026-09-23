@@ -1,13 +1,3 @@
-/**
- * T029/005-audit-findings, User Story 1 — `LinkAuditScopeToRequirementUseCase`
- * (`POST /audits/{auditId}/scope/requirements`, `addRequirementToScope`
- * operation). Same shape as `LinkAuditScopeToFrameworkVersionUseCase` —
- * see that file's header for the ADR-020 parts 4/5 reasoning this one does
- * not repeat — checked against the requirement's OWN parent version's
- * `PUBLISHED` status (`RequirementDirectoryEntry.frameworkVersionStatus`,
- * transitively, research.md D-2/D-11), never a second round trip through
- * `FrameworkVersionDirectoryPort`.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

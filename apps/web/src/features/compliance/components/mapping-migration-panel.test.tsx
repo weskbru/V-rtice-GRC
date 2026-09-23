@@ -5,11 +5,6 @@ import { MappingMigrationPanel } from './mapping-migration-panel';
 
 import type { MappingMigrationSummary } from '../types';
 
-/**
- * Component-mount evidence for `MappingMigrationPanel` (US2, FR-012 to
- * FR-014). `../api` is mocked at the network boundary — the wizard itself
- * (`MappingMigrationDialog`) has its own test file.
- */
 const { listMappingMigrationsMock, listFrameworkVersionsMock } = vi.hoisted(() => ({
   listMappingMigrationsMock: vi.fn(),
   listFrameworkVersionsMock: vi.fn(),

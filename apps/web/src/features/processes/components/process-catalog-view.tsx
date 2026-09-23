@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — process catalog screen (T046), mirroring
- * `AuditEngagementCatalogView`'s/`ControlCatalogView`'s overall
- * orchestration (CLAUDE.md §18.12): summary indicators, filter bar, results
- * bar, cards-or-table, shared pagination — reused rather than reinvented
- * for Processes. No quick-view side panel, matching the audit engagement
- * register (this catalog's own message strings carry no `quickView`-shaped
- * text either).
- *
- * Never fetches more than the current page — never sorts, filters or
- * paginates client-side (SC-008 equivalent).
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -22,6 +10,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { common } from '@/lib/messages/common';
+import { processes } from '@/lib/messages/processes';
 
 import { processesApi } from '../api';
 import {
@@ -38,12 +32,6 @@ import { ProcessRegisterSummary } from './process-register-summary';
 import type { ProcessCatalogView as CatalogViewMode } from '../hooks/use-process-catalog-state';
 import type { ProcessListSortField, ProcessSummary } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { common } from '@/lib/messages/common';
-import { processes } from '@/lib/messages/processes';
 
 const VIEW_OPTIONS = [
   {
@@ -203,8 +191,6 @@ export function ProcessCatalogView(): React.JSX.Element {
         onClearFilters={clearFilters}
       />
 
-      {/* One strip for every decision about HOW the matched records are
-          shown — ordering and Cards/Tabela. */}
       <ResultsToolbar
         count={processes.register.results.count(total)}
         isLoading={loading}

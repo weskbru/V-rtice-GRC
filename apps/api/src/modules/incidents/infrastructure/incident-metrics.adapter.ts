@@ -1,13 +1,3 @@
-/**
- * 009-indicators-reports, T027 — the sole implementation of
- * `IncidentMetricsPort` (`shared/grc-ports/incident-metrics.port.ts`).
- * Delegates to `PrismaIncidentRepository.list` — the SAME catalog query
- * `GET /incidents` already runs — once per `IncidentSeverity` value (each
- * call's own `status` filter narrowed to `OPEN_INCIDENT_STATUSES`,
- * `pageSize: 1`), reading only each page's own `total`. Four small,
- * indexed calls, run in parallel — never a fifth, hand-rolled aggregate
- * query.
- */
 import { Injectable } from '@nestjs/common';
 
 import { IncidentMetricsPort } from '../../../shared/grc-ports/incident-metrics.port';
@@ -59,13 +49,6 @@ export class IncidentMetricsAdapter implements IncidentMetricsPort {
     );
   }
 
-  /**
-   * `GET /dashboard/summary`'s `breakdowns.incidents.byStatus` — the SAME
-   * pattern as `getOpenCountBySeverity` above (one `list` call per value,
-   * `pageSize: 1`, reading only `total`), but over all five
-   * `IncidentStatus` values with no `status` filter restricting to the
-   * open subset.
-   */
   async getCountByStatus(scope: ScopeFilter): Promise<Readonly<Record<IncidentStatus, number>>> {
     const counts = await Promise.all(
       INCIDENT_STATUSES.map((status) =>

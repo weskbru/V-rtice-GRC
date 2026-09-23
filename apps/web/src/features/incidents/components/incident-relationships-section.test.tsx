@@ -13,22 +13,6 @@ import type {
   IncidentRiskLinkResponse,
 } from '../types';
 
-/**
- * Component-mount evidence for the incident detail's Risks/Assets/
- * Processes relationship sections (018-incident-detail-experience, Fase 5
- * — progressive disclosure). `../api` is mocked at the network boundary.
- *
- * Central assertions, mirroring `risk-controls-section.test.tsx`'s own
- * `gateLinkBehindAction` coverage:
- *
- *   - the picker is absent until the caller clicks the intent button, and
- *     appears immediately after;
- *   - the empty state is never silent — the intent trigger renders directly
- *     under the empty-state sentence, for a caller who can link;
- *   - "Mostrar vínculos desfeitos" stays reachable in the header regardless
- *     of whether the picker is open.
- */
-
 const { listRiskLinksMock, listRiskOptionsMock, linkRiskMock, unlinkRiskMock } = vi.hoisted(() => ({
   listRiskLinksMock: vi.fn(),
   listRiskOptionsMock: vi.fn(),

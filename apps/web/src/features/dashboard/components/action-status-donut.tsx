@@ -1,36 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — action plans by status, as a donut with a legend.
- *
- * ## Why a donut here, and not for risks by status
- *
- * A donut is honest for part-to-whole at a glance with few segments. Actions
- * have four statuses, so the ring reads immediately. Risks have eight, several
- * of them usually zero; eight slices blur, so that chart stays a labelled bar
- * list (`RiskStatusChart`).
- *
- * ## Reading it without the colours
- *
- * The legend names every status with its exact count, always — including the
- * zeros, which have no arc to show — and the total sits in the centre. The
- * ring is the glance; the legend is the reading; `ChartDataTable` is the
- * screen-reader twin. Segments are separated by a 2px gap in the card colour
- * rather than an outline.
- *
- * ## Out of the tab order
- *
- * Recharts gives every `Pie` `tabindex="0"` by default. Inside the
- * `aria-hidden` ring that is a keyboard stop on something a screen reader
- * cannot see (axe `aria-hidden-focus`, caught by the dashboard scan), so both
- * pies set `rootTabIndex={-1}`: the legend and the data table already carry
- * every value.
- *
- * ## Zero total
- *
- * A scope with no actions renders a muted full ring with "0" in the centre —
- * visibly a real empty state, not a chart that failed to draw.
- */
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 import { actions } from '@/lib/messages/actions';
@@ -83,11 +52,6 @@ export function ActionStatusDonut({ byStatus }: ActionStatusDonutProps): React.J
   const drawn = slices.filter((slice) => slice.count > 0);
 
   return (
-    // Side by side only when THIS card is wide enough, not the viewport: the
-    // card sits in a three-column row at 1280px and a two-column row at
-    // 1024px, and a viewport breakpoint put the ring beside a legend squeezed
-    // to "Ab…", "Em an…" in both. A container query keys the layout to the
-    // space the legend actually gets.
     <div className="@container">
       <div className="flex flex-col items-center gap-5 @min-[19rem]:flex-row">
         <div aria-hidden="true" className="relative size-36 shrink-0">

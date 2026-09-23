@@ -1,8 +1,3 @@
-/**
- * T045/004-compliance-management, User Story 3 —
- * `RequirementApplicabilityRepository`: the sole Prisma-backed
- * implementation of `RequirementApplicabilityRepositoryPort`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

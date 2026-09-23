@@ -1,10 +1,3 @@
-/**
- * T073/002-shared-grc-foundation, US3 — matches `GET /findings`'s query
- * parameters (`contracts/grc-foundation.openapi.yaml`'s `listFindings`
- * operation) exactly. Follows `ListActionQueryDto`'s own established
- * pattern for the page/pageSize pair and boolean-from-querystring
- * coercion.
- */
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
@@ -21,23 +14,6 @@ const FINDING_STATUS_VALUES: readonly FindingStatus[] = [
 
 const FINDING_SEVERITY_VALUES: readonly FindingSeverity[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-/**
- * Reads `obj[key]` — the UNTOUCHED raw query value — never the `value`
- * argument.
- *
- * The global `ValidationPipe` runs with `enableImplicitConversion: true`,
- * which coerces a field reflected as `boolean` via `Boolean(rawString)`
- * BEFORE any `@Transform` runs. `Boolean('false')` is a non-empty string,
- * so it is already `true` by the time a `@Transform(({ value }) => ...)`
- * receives it: an explicit `?flag=false` was silently read as `true`.
- *
- * Reproduced directly against this exact `class-transformer` version
- * before the fix (`plainToInstance(Dto, { flag: 'false' },
- * { enableImplicitConversion: true })` yielded `true`) and after it
- * (yields `false`). `apps/api/test/unit/query-boolean-coercion.spec.ts`
- * holds that reproduction for every DTO sharing this shape, so the pattern
- * cannot come back one file at a time — it was present in seven of them.
- */
 function toBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
   const raw = obj[key];
   if (typeof raw === 'boolean') return raw;

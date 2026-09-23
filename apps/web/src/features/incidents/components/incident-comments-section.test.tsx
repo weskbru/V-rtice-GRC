@@ -5,13 +5,6 @@ import { IncidentCommentsSection } from './incident-comments-section';
 
 import type { Comment } from '@/features/risks/types';
 
-/**
- * Component-mount evidence for `IncidentCommentsSection` (CLAUDE.md
- * §19.10 remediation), mirroring `risk-comments-section.test.tsx` exactly
- * — `../api` is mocked at the network boundary; the stored-XSS rendering
- * guarantee is covered once by `CommentThread`'s own tests.
- */
-
 const { listCommentsMock, createCommentMock, withdrawCommentMock } = vi.hoisted(() => ({
   listCommentsMock: vi.fn(),
   createCommentMock: vi.fn(),

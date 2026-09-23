@@ -1,8 +1,3 @@
-/**
- * T192 — `CreateCommentUseCase`: `POST /comments` (FR-095, FR-098, FR-100).
- * The author and timestamp come from the session and the database clock —
- * never from the request body (FR-095).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

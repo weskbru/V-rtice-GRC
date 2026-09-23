@@ -1,116 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Problem↔Risk and Problem↔Incident link management
- * (008-incidents-problems, US3, ADR-020; progressive disclosure and
- * volume-safe tables added in 019-problem-detail-experience, Fase D).
- *
- * Mirrors `features/incidents/components/incident-relationships-section.tsx`'s
- * own anatomy exactly (CLAUDE.md §18.12 — Incidents already replicated the
- * `risk-controls-section.tsx` pattern this rodada asked Problems to adopt
- * too), which itself mirrors `features/findings/components/finding-links-
- * section.tsx`'s own `RelationshipSubsection<TLink>` shape: a local,
- * unexported generic (NOT imported from `features/findings`/`features/
- * incidents` — CLAUDE.md §2, §4, business modules must not depend directly
- * on each other) rendering two independent sections — Riscos and
- * Incidentes — each its own `Card`, its own list, its own `SearchablePicker`
- * (Front H — never a plain `<Select>` for a link target, whose registry can
- * be arbitrarily large) and its own withdraw confirmation.
- *
- * **"Desvincular" is never "excluir".** Withdrawing calls `DELETE
- * /problems/{problemId}/{risks|incidents}/{linkId}` at the HTTP level, but
- * the server answers `200` with the link body, `unlinkedAt` stamped — the
- * row is preserved forever. Every string shown here says "desvincular"/
- * "vínculo desfeito", never "excluir".
- *
- * **Problem owns the WRITE side of Problem↔Incident** (research.md D-14):
- * `problemsApi.linkToIncident`/`.unlinkFromIncident` are the only write
- * path for that table — this section is the one place a user can create
- * or withdraw that link, unlike the read-only mirror an Incident detail
- * screen would show.
- *
- * ## Progressive disclosure (Fase D)
- *
- * Measured before this change: the picker and "Vincular" sat permanently
- * open in both sections — even in the empty and error states — with
- * "Incluir vínculos desfeitos" floating above the data, exactly the same
- * "query that reads as a form" defect `incident-relationships-section.tsx`
- * fixed in 018's own Fase 5. `gateLinkBehindAction` (defaults to `false`,
- * same prop and same reasoning as that file and `risk-controls-section
- * .tsx` before it) fixes this without touching who can do what: a caller
- * with `canLink` sees an intent button ("Vincular risco"/"Vincular
- * incidente", the SAME word `messages.pickerLabel` already names) instead
- * of the picker; clicking it reveals the `SearchablePicker` + "Vincular" +
- * a "Cancelar" escape hatch. Both `ProblemRiskLinksSection` and
- * `ProblemIncidentLinksSection` pass it — the measurement that triggered
- * this rodada found the same always-open form in both.
- *
- * The empty state is never silent about the intent button: the trigger
- * renders directly under the empty-state sentence, not hidden behind yet
- * another click. "Incluir vínculos desfeitos" moved into the header via
- * `CardAction` — a filter belongs beside the title/description it
- * qualifies, not stacked above the data it filters — and stays reachable
- * regardless of whether the picker is open: it is the only way to see a
- * withdrawn link, and gating it behind the same intent action as the
- * picker would make history harder to reach for no benefit.
- *
- * ## Volume-safe tables (Fase D)
- *
- * With the Fase C aside in place, the main column narrows from ~1120px to
- * ~726px at 1440 — the exact condition that pushed "Vinculado em"/
- * "Desvincular" off-screen in Incidents (127px overflow at 1440, 199px at
- * 1024, C5 of 018's own Fase 5 review). Same fix: `table-fixed` with
- * explicit percentage widths on `TableHead` (the browser's default
- * `table-layout: auto` only treats `max-w-*` on a `<td>` as a hint, still
- * growing a column to fit its longest unbroken content) and dropping
- * `whitespace-nowrap` from the entity/"Vinculado por"/"Desfeito" columns —
- * a long display name (e.g. "Platform Administrator (recovery)") wraps
- * within its column instead of reserving its own unbroken width. No column
- * removed, nothing paginated. The Incidentes subsection carries one column
- * Incidents' own three sections never had (`extraColumn`, the linked
- * incident's own status) — its own width share is carved out of the entity
- * column's share rather than added on top, keeping the same total.
- *
- * ## `table-fixed` only from `sm` up (C1, coordinator review, found in
- * BOTH modules at once)
- *
- * `Table className="table-fixed"`, applied at every width, measured 33px of
- * page overflow at 390 with 16 real rows: four columns squeezed into
- * ~244px leaves each one ~48px, which no real content fits into. The
- * visible result was worse than the pre-Fase-D defect it replaced — column
- * headers ("Vinculado por"/"Vinculado em") and cell text ("18/09/2026" run
- * into "Desvincular") read as glued-together words, and titles broke
- * mid-word ("reembols o", "informaçã o") — text crossing its own box
- * boundary despite visible space between boxes, the exact class of defect
- * `b8b1f3f` already described for Risk. The coordinator measured the
- * SAME defect already live on `main` in `IncidentRelationshipsSection`
- * (018, merged before this width discipline existed at all) — 33px
- * overflow there too, so this is a real, pre-existing bug this rodada
- * inherited and is now closing in both places, not a regression introduced
- * here. Fixed by scoping `table-fixed` to `sm:table-fixed`: below `sm` the
- * table reverts to the browser's default `table-layout: auto`, sizing
- * columns by content and scrolling horizontally within `Table`'s own
- * `overflow-x-auto`/`tabIndex={0}` wrapper (already keyboard-reachable,
- * D-15) — honest horizontal scroll, never overlapping text. The percentage
- * `w-[*]` classes on `TableHead` stay unprefixed: under `auto` layout they
- * are merely a sizing hint, exactly as they were before `table-fixed`
- * existed in this file at all, so they cost nothing extra below `sm`.
- *
- * ## No manual `<h2>` any more (a deliberate change, not an oversight)
- *
- * Before this phase, this section rendered its own `<h2>` explicitly, with
- * a header comment explaining why: `EntityHeader` renders the page's only
- * `<h1>`, and nothing else on the (then headerless) screen provided a
- * `<h2>`, so this component's own title had to be one to avoid axe's
- * `heading-order` rule (skipping straight to a lower level). Since Fase C,
- * `ProblemContextAside`'s three blocks each render a REAL `<h2>` of their
- * own — the same fix `IncidentContextAside` already proved (018, Fase 4).
- * `CardTitle` (`@/components/ui/card`) is a plain `<div>`, not a heading
- * element, so switching to it here introduces no heading of any level —
- * neither a skip nor a duplicate. This mirrors `IncidentRelationshipsSection`
- * exactly, which has used `CardTitle` this way since 018 with a
- * `0`-violation axe scan.
- */
 import { ConfirmDialog, SearchablePicker, StatusBadge } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -153,14 +42,6 @@ import type { ReactNode } from 'react';
 
 const { relationships } = problems;
 
-/** A local, minimal copy of the linked incident's own status label/colour
- * — declared here rather than imported from `features/incidents/status.ts`
- * (CLAUDE.md §2, §4: business modules do not depend on each other's
- * code). Shown for information only (research.md D-15: this link never
- * gates, and never inspects, either record's lifecycle to decide
- * anything), so a plain, independent label map is enough — it never needs
- * to match `IncidentController`'s own transition table, only to name each
- * of the five possible values honestly. */
 const LINKED_INCIDENT_STATUS_LABEL: Record<IncidentStatusRef, string> = {
   OPEN: 'Aberto',
   IN_PROGRESS: 'Em andamento',
@@ -213,11 +94,6 @@ interface RelationshipLink {
   readonly id: string;
   readonly linkedBy: { readonly fullName: string };
   readonly linkedAt: string;
-  /** `string | null | undefined` — the generated `ProblemRiskLinkResponse`/
-   * `ProblemIncidentLinkResponse` mark `unlinkedAt` nullable but NOT
-   * required, so a fresh (never-withdrawn) link's own generated type omits
-   * it rather than guaranteeing `null`. Every read below treats "absent"
-   * and "explicitly null" identically (never withdrawn). */
   readonly unlinkedAt?: string | null;
 }
 
@@ -228,16 +104,11 @@ interface RelationshipSubsectionProps<TLink extends RelationshipLink> {
   idSuffix: string;
   canLink: boolean;
   getRef: (link: TLink) => RegistryOption;
-  /** Optional extra column rendered right after the entity column — used
-   * by the Incidentes subsection to show the linked incident's OWN
-   * lifecycle status (a fact this section never edits or gates on,
-   * research.md D-15 — it is shown, never acted on). */
   extraColumn?: { readonly header: string; readonly render: (link: TLink) => ReactNode };
   fetchLinks: (includeWithdrawn: boolean) => Promise<readonly TLink[]>;
   fetchRegistry: (q: string) => Promise<{ data: readonly RegistryOption[]; isPartial: boolean }>;
   onLink: (registryItemId: string) => Promise<void>;
   onUnlink: (linkId: string) => Promise<void>;
-  /** See this file's own "Progressive disclosure" doc comment above. Defaults to `false`. */
   gateLinkBehindAction?: boolean;
 }
 
@@ -360,15 +231,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
     }
   }
 
-  // The entity column's own width share makes room for `extraColumn` (the
-  // Incidentes subsection's linked-status badge) when present, rather than
-  // adding a sixth column's width on top of Incident's own four-column
-  // total — see this file's own header comment. `extraColumnWidthClass`
-  // mirrors `incident-problem-links-section.tsx`'s own `w-[20%]` for the
-  // exact same shape of column (a `StatusBadge` whose longest real label,
-  // "Em andamento", overflowed a narrower 14% column into "Vinculado por"
-  // — measured directly at 1440 with real linked-incident volume, not
-  // assumed from the shorter labels tried first).
   const entityWidthClass = extraColumn ? 'w-[24%]' : 'w-[34%]';
   const linkedByWidthClass = extraColumn ? 'w-[18%]' : 'w-[20%]';
   const linkedAtWidthClass = extraColumn ? 'w-[12%]' : 'w-[14%]';
@@ -428,13 +290,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
                     </TableHead>
                   ) : null}
                   {canLink ? (
-                    // Fixed px, not a percentage: `Button`'s own base class
-                    // hardcodes `whitespace-nowrap` (shared component, not
-                    // touched here), so "Desvincular" always renders on one
-                    // line — a percentage narrower than its natural width
-                    // would overflow the cell regardless of the column's
-                    // assigned share. 112px comfortably fits the button at
-                    // every supported width.
                     <TableHead className="sr-only w-28">{messages.unlinkAction}</TableHead>
                   ) : null}
                 </TableRow>
@@ -589,14 +444,9 @@ function incidentRef(link: ProblemIncidentLinkResponse): RegistryOption {
 
 export interface ProblemLinkedSectionProps {
   problemId: string;
-  /** `problem:link` — this component does not combine it with any status
-   * gate: unlike `FindingLinksSection`'s archived-finding restriction, the
-   * contract states no client-invented restriction here (a problem in any
-   * status may still gain or lose a Risk/Incident link). */
   canLinkPermission: boolean;
 }
 
-/** Risco subsection — its own detail tab, mirroring `AssetLinkedRisksSection`'s own single-relationship-per-tab shape. */
 export function ProblemRiskLinksSection({
   problemId,
   canLinkPermission,
@@ -627,7 +477,6 @@ export function ProblemRiskLinksSection({
   );
 }
 
-/** Incidente subsection — Problem's own WRITE side of the shared many-to-many (research.md D-14). */
 export function ProblemIncidentLinksSection({
   problemId,
   canLinkPermission,

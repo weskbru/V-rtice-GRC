@@ -1,26 +1,3 @@
-/**
- * T023/003-controls-management — `ControlController`: the catalog and
- * record operations of `contracts/controls.openapi.yaml`
- * (`listControlCatalog`, `createControl`, `getControl`, `updateControl` —
- * operations 1-4 of 6). Mirrors `modules/risk/presentation/risk.controller.ts`'s
- * structure exactly — see that file's header for the `formatETag`/
- * `parseIfMatchHeader`/`assertUpdateBodyNotEmpty` reasoning this one does
- * not repeat. Re-declared locally rather than imported from
- * `modules/risk` (ADR-011/SC-007: no business module imports another).
- *
- * ## `GET /controls` — ownership transferred from Risk's `RegistryController`
- *
- * This route previously lived on `modules/risk/presentation/registry.controller.ts`
- * as `listControls` (`risk:view`, the Fase 1 minimal-registry shape). This
- * task's Task A carries out the handover the Fase 1 schema comment itself
- * anticipated ("a future module can take ownership without migrating risk
- * data") — see this task's report for the full account, including why
- * `ControlSummary` is a superset of the old `RegistryItem` shape (same
- * field names for `id`/`code`/`name`/`description`/`isActive`) so
- * `apps/web/src/features/risks/api.ts`'s `listControlRegistry` keeps
- * working unchanged against the SAME query parameters it already sends
- * (`pageSize`, `q`).
- */
 import {
   BadRequestException,
   Body,
@@ -78,19 +55,6 @@ export class ControlController {
     private readonly listControlsUseCase: ListControlsUseCase,
   ) {}
 
-  /**
-   * `listControlCatalog` (US1, `contracts/controls.openapi.yaml`). Declared
-   * BEFORE `findById`'s `:controlId` route in this file for the same
-   * reason `RiskController.list` documents: Nest dispatches `/controls` and
-   * `/controls/:controlId` unambiguously regardless of declaration order.
-   *
-   * Every item carries `effectiveness`, computed fresh on this read
-   * (`control-effectiveness.service.ts`'s own header, D-2/§19.7 — no
-   * stored column exists for it at all) and never tied to that item's
-   * `version`. `Cache-Control: no-store` here for the identical reason
-   * `findById` documents in full below: no cache may be given grounds to
-   * replay a stale page of this catalog.
-   */
   @RequirePermission('control:view')
   @Get()
   async list(
@@ -153,50 +117,6 @@ export class ControlController {
     return toControlDetailResponse(record);
   }
 
-  /**
-   * `getControl`. Deliberately carries NO `ETag` — the fix for the same
-   * class of defect confirmed on `RequirementController.findById`
-   * (`apps/api/src/modules/compliance/presentation/requirement.controller.ts`,
-   * see that method's doc comment for the full account this one does not
-   * repeat).
-   *
-   * `effectiveness` has NO stored column at all
-   * (`control-effectiveness.service.ts`'s own header, D-2/§19.7) — it is
-   * calculated fresh on every read from attested `ControlAssessment` rows
-   * and the current clock, and is NOT reflected in `record.version`, which
-   * only advances when the control's OWN columns are edited via `PATCH
-   * /controls/{id}` or a lifecycle transition. Attesting an assessment can
-   * change `effectiveness` without touching `version`; worse, a control's
-   * `effectiveness` can flip to `EXPIRED` from the passage of time ALONE,
-   * with no write to the database at all — no version-bump scheme could
-   * ever make an `ETag` a valid freshness validator for this field, even in
-   * principle.
-   *
-   * As on `RequirementController.findById`, `Cache-Control: no-store` alone
-   * would not be sufficient while an `ETag` remained: Express's built-in
-   * `res.send()` decides `if (req.fresh) this.status(304)` purely from the
-   * request's conditional headers against whatever `ETag` THIS response
-   * carries, never from this response's own `Cache-Control` (see
-   * `node_modules/express/lib/response.js` and the `fresh` package it
-   * calls). Not calling `response.set('ETag', ...)` here is not enough BY
-   * ITSELF, either — Express auto-generates its own weak, content-hash
-   * `ETag` for any JSON response left unset, and while that one IS honest
-   * (it hashes the whole body, so it moves with `effectiveness`), the
-   * frontend's `resolveEtag` below cannot distinguish it from a real
-   * version and would echo it into the next `If-Match`, breaking every
-   * such `PATCH` with 400 `ifMatchInvalid`. `main.ts` disables Express's
-   * auto-`ETag` globally for exactly this reason (`app.set('etag',
-   * false)`) — this response carries no `ETag` at all, not merely one
-   * this handler chose not to set. `Cache-Control: no-store` is kept
-   * anyway so no cache stores this representation to revalidate against in
-   * the first place.
-   *
-   * The frontend already tolerates a GET with no `ETag`:
-   * `apps/web/src/features/controls/api.ts`'s `resolveEtag(etag,
-   * data.version)` falls back to the body's own `version` for the
-   * `If-Match` a subsequent `PATCH /controls/{id}` needs — that PATCH's
-   * concurrency token is entirely unaffected.
-   */
   @RequirePermission('control:view')
   @Get(':controlId')
   async findById(
@@ -245,17 +165,10 @@ export class ControlController {
   }
 }
 
-/** Exported for reuse by `control-lifecycle.controller.ts` — every
- * control-mutating endpoint formats/parses `ETag`/`If-Match` identically
- * (ADR-013), so this is the one place either does it, mirroring
- * `risk.controller.ts`'s own `formatETag`. */
 export function formatETag(version: number): string {
   return `"${String(version)}"`;
 }
 
-/** Exported for reuse by `control-lifecycle.controller.ts` — see
- * `formatETag`'s doc comment above, and `risk.controller.ts`'s own
- * `parseIfMatchHeader` for the full `400`/`409` split this mirrors. */
 export function parseIfMatchHeader(headerValue: string | undefined): number {
   if (headerValue === undefined || headerValue.trim().length === 0) {
     throw new BadRequestException({
@@ -277,11 +190,6 @@ export function parseIfMatchHeader(headerValue: string | undefined): number {
   return version;
 }
 
-/** `UpdateControlRequest`'s `minProperties: 1` — see
- * `UpdateControlRequestDto`'s header and `RiskController
- * .assertUpdateBodyNotEmpty`'s own doc comment for why this is a
- * controller-level check (the `plainToInstance` own-property caveat) with
- * no dedicated validator class. */
 function assertUpdateBodyNotEmpty(body: UpdateControlRequestDto): void {
   if (!Object.values(body).some((value) => value !== undefined)) {
     throw new BadRequestException({

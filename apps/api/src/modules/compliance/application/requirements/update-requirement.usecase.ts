@@ -1,27 +1,3 @@
-/**
- * T027/004-compliance-management — `UpdateRequirementUseCase` (`PATCH
- * /requirements/{requirementId}`, `updateRequirement` operation, FR-004).
- * Permitted only while the parent version is `DRAFT`; refused with `422`
- * once `PUBLISHED` — enforced both here AND by the
- * `requirements_immutable_after_publish` database trigger (research.md
- * D-4, T006), which is the actual guarantee, not this check.
- *
- * ## FR-004's second half: "a tentativa é auditada"
- *
- * Unlike an ordinary validation refusal (which throws without writing
- * anything), FR-004 and US1 AS2 explicitly require that a REFUSED edit
- * attempt itself lands in the audit trail ("a alteração é recusada e a
- * trilha registra a tentativa"). `AuditRecorder.record(...)` only writes
- * inside an ambient transaction (ADR-005) — this use case opens ONE via
- * `TransactionRunnerPort.run(...)` for exactly that single audit insert,
- * lets it commit, and only THEN throws `ValidationDomainError` from
- * outside that closure — mirroring the "short-lived, audit-only
- * transaction" pattern `AuditPermissionDenialRecorder`'s own header
- * documents for the identical structural problem (a refusal that must
- * survive the very error it accompanies). A transaction that also threw
- * the domain error from inside it would roll back its own audit insert,
- * which is exactly the outcome FR-004 forbids.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 
@@ -45,7 +21,6 @@ import type { RequirementRecord } from '../../domain/ports/requirement-repositor
 export interface UpdateRequirementInput {
   readonly actorUserId: string;
   readonly requirementId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
   readonly externalRef?: string | undefined;
   readonly title?: string | undefined;
@@ -150,9 +125,6 @@ export class UpdateRequirementUseCase {
     return { ...row, ...derived };
   }
 
-  /** FR-004's own "a tentativa é auditada" — see this file's header for
-   * why this is a separate, already-committed transaction rather than a
-   * write inside the one the caller's refusal would otherwise roll back. */
   private async auditRefusedAttempt(
     input: UpdateRequirementInput,
     current: { readonly externalRef: string; readonly title: string; readonly description: string },

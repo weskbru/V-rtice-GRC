@@ -1,36 +1,3 @@
-/**
- * T011/T043/T056/004-compliance-management — `ComplianceModule`, this
- * module's own composition root. Sits directly under
- * `src/modules/compliance/`, outside the `domain`/`application`/
- * `infrastructure`/`presentation` folders the boundary lint rules
- * classify — exactly like `controls.module.ts`/`risk.module.ts`, and for
- * the same reason: this is the one place allowed to bind a domain port to
- * its infrastructure implementation (ADR-011).
- *
- * ## What this module owns
- *
- * The normative library (Fase 3, User Story 1, operations 1-9/11/13), the
- * requirement-control mapping and its migration (Fase 4, User Story 2,
- * operations 14-16/21-23), and applicability/compliance state (Fase 5,
- * User Story 3, operations 10/12/17-20) — the whole 23-operation contract.
- *
- * `OrganizationsModule` is imported here (not `@Global()`, unlike
- * `ControlDirectoryModule`/`ControlEffectivenessModule` below) because
- * `LinkRequirementToControlUseCase` is this module's own FIRST consumer of
- * `ScopeResolverService` — ADR-020 part 4, finally exercised: the control
- * referenced by a new `RequirementControlLink` must lie inside the actor's
- * scope before the write, exactly as `modules/risk`'s own
- * `LinkControlUseCase` already established for the identical port.
- *
- * `ControlDirectoryModule`/`ControlEffectivenessModule` (both `@Global()`)
- * are NOT imported here even though `RequirementComplianceReaderService`/
- * `LinkRequirementToControlUseCase` depend on both ports — they are
- * registered globally by `ControlsModule`'s own composition root
- * (`controls.module.ts`), and `AppModule` imports `ControlsModule` before
- * `ComplianceModule` (see `app.module.ts`), so both bindings are already
- * live in the same application-wide injector by the time this module's
- * providers resolve.
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../core/audit/audit.module';
@@ -100,20 +67,7 @@ import { RequirementController } from './presentation/requirement.controller';
     AuditModule,
     AuthorizationModule,
     OrganizationsModule,
-    // 005-audit-findings, T016 — `ComplianceDirectoryModule` (`@Global()`)
-    // binds `FrameworkVersionDirectoryPort`/`RequirementDirectoryPort` to
-    // this module's own adapters, the mirror of `ControlsModule` importing
-    // `ControlDirectoryModule`: lets `modules/audit-engagements`'s scope
-    // use cases inject both ports without either module importing the
-    // other (ADR-020 part 3, research.md D-11).
     ComplianceDirectoryModule,
-    // 009-indicators-reports, T021 — `ComplianceSummaryModule` binds
-    // `ComplianceSummaryPort` to a self-contained adapter, letting
-    // `modules/indicators`'s Compliance provider compute
-    // `COMPLIANCE_PERCENTAGE`. `IndicatorsModule` imports
-    // `ComplianceSummaryModule` directly rather than `ComplianceModule`
-    // itself (see `compliance-summary.module.ts`'s own header for why it
-    // is no longer `@Global()`).
     ComplianceSummaryModule,
   ],
   controllers: [

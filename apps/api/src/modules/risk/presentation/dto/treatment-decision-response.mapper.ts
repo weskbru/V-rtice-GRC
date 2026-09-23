@@ -1,8 +1,3 @@
-/**
- * T143 — maps `TreatmentDecisionRecord` (`domain/ports/risk-treatment-decision-repository.port.ts`)
- * to `contracts/risks.openapi.yaml`'s `RiskTreatmentDecision` wire shape.
- * The ONE place a treatment decision becomes a response body (ADR-009).
- */
 import { todayDateOnlyUtc } from '../../../../grc/shared/domain/overdue.service';
 
 import type { UserRefResponse } from './risk-response.mapper';
@@ -20,12 +15,6 @@ export interface TreatmentDecisionResponse {
   readonly deadlineOverdue: boolean;
 }
 
-/**
- * FR-075 — "the deadline has passed with outstanding actions". `hasOutstandingActions`
- * is precomputed by the caller via `RiskTreatmentActionRepositoryPort.
- * findDecisionIdsWithOutstandingActions` for the WHOLE page in one query
- * (never one query per decision — CLAUDE.md's N+1 pitfall).
- */
 export function toTreatmentDecisionResponse(
   record: TreatmentDecisionRecord,
   hasOutstandingActions: boolean,

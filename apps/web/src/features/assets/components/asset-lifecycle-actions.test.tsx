@@ -5,16 +5,6 @@ import { AssetLifecycleActions } from './asset-lifecycle-actions';
 
 import type { AssetDetail } from '../types';
 
-/**
- * Component-mount evidence for T049 (`AssetLifecycleActions`, US1, FR-005,
- * FR-006, FR-012). `../api` (`assetsApi`) is mocked at the network
- * boundary.
- *
- * The most important assertion here is not "the button works" — it is that
- * the confirmation itself, not only a toast afterward, states that
- * deactivation is not deletion (CLAUDE.md §18.11, FR-012): the record stays
- * readable and stays visible in existing links.
- */
 const { deactivateAssetMock, reactivateAssetMock } = vi.hoisted(() => ({
   deactivateAssetMock: vi.fn(),
   reactivateAssetMock: vi.fn(),

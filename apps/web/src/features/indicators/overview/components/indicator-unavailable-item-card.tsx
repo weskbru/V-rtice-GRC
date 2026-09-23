@@ -1,32 +1,3 @@
-/**
- * PharosGRC — the shared "nothing to show" card for the redesigned
- * `/indicators` first screen (indicators-round, S1 ownership, coordinator
- * PLAN.md §2 step 6).
- *
- * Two distinct reasons, two distinct messages — never conflated, and never a
- * bare `0` for either (CLAUDE.md §18.11):
- *
- *   - `'no-permission'` — `GET /dashboard/summary` OMITTED this key entirely
- *     because the caller lacks the source domain's own read permission
- *     (`s1-backend-domain.md` Q15's own "different shape" finding — this
- *     screen renders the omission as an honest, compact card rather than
- *     pretending the key does not exist). Used in BOTH sections.
- *   - `'no-data'` — the key is READABLE but its `BY_BUCKET` source returned
- *     no `valueByBucket` at all. Kept distinct from `SINGLE_VALUE`'s own
- *     inline "Sem dados calculados" treatment (`IndicatorSingleValueCard`'s
- *     own header) because a `SINGLE_VALUE` no-data reading is common enough
- *     (`COMPLIANCE_PERCENTAGE` before any framework is published) to deserve
- *     prime placement inside its normal card, while a `BY_BUCKET` no-data
- *     reading is, per the backend investigation, not something the platform
- *     is expected to ever actually produce (every `BY_BUCKET` provider
- *     zero-fills, `s1-backend-domain.md` Q9) — this shared card is the
- *     defensive fallback for that theoretical case, never exercised by
- *     today's catalog in practice.
- *
- * `variant` only changes internal padding/min-height so a card sits
- * comfortably beside its section's own normal cards — never a second visual
- * language (CLAUDE.md §18.12).
- */
 import { CircleDashed, EyeOff } from 'lucide-react';
 
 import { Link } from '@/components/navigation/link';

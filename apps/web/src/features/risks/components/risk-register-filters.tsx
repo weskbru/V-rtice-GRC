@@ -1,40 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk register filter toolbar (T110, FR-088, FR-089, ADR-006).
- *
- * Composes the shared register chrome — `FilterBar` in its collapsible
- * disposition, `MultiSelectFilter`, `UserMultiSelectFilter` and the platform
- * chip builders — with the risk-specific filter definitions this register
- * needs: status, risk level, category, organizational unit, owner and the
- * two overdue flags.
- *
- * ## What is deliberately NOT here any more
- *
- * - **The risk-level basis (residual/inherent)**: it changes how a level is
- *   labelled, never which risks match, so it belongs with the ordering and
- *   the Cards/Tabela toggle in the search trailing slot — not among controls that
- *   narrow a result set, and not in the chip row.
- * - **The column menu**: it governs table columns, which is a presentation
- *   decision, and it sits in the search trailing slot beside the view toggle
- *   rather than inside the filter surface.
- *
- * ## Collapsed by default, but never opaque
- *
- * Eight filter controls permanently on screen pushed the first risk card
- * past 70% of a 900px viewport. They now live behind the "Filtros" button,
- * which states how many are applied, while the active-filter chips stay
- * visible underneath the search box: what is hidden is the machinery, never
- * the state. The chip list is built from the same fields
- * `useRegisterState`'s own `activeFilterCount` counts, so the button's badge
- * and the chips can never disagree.
- *
- * Reference data (categories, organizational units) is fetched once on
- * mount, deliberately NOT shared with `RiskForm`'s own loading: the register
- * needs `{ id, name }` pairs for filter options, while the form's needs
- * (validation, disabled states, required-ness) are a different shape of
- * problem.
- */
 import {
   FilterBar,
   MultiSelectFilter,
@@ -56,9 +21,6 @@ import type { OrgUnitNode, ReferenceDataItem, RiskLevel, RiskStatus, UserRef } f
 import type { ActiveFilterChip } from '@pharos/design-system/components';
 import type { ReactNode } from 'react';
 
-// `risks.statusLabels`/`risks.riskLevelLabels` are exhaustive `Record`s
-// keyed on the app's own unions (F-1) — indexing by a valid member can never
-// miss, so no `?? value` fallback is needed here.
 const STATUS_OPTIONS: readonly MultiSelectFilterOption[] = (
   Object.keys(risks.statusLabels) as RiskStatus[]
 ).map((value) => ({ value, label: risks.statusLabels[value] }));
@@ -84,10 +46,6 @@ export interface RiskRegisterFiltersProps {
   onOrgUnitIdChange: (values: readonly string[]) => void;
   ownerUserId: readonly string[];
   onOwnerUserIdChange: (values: readonly string[]) => void;
-  /** S-10 — labels for already-selected owner ids the caller already knows
-   * about (e.g. from the currently loaded page of risks), so a filter
-   * value persisted in the URL still shows a name even when this
-   * component's own search has not (yet) returned that user. */
   knownOwners?: ReadonlyMap<string, UserRef>;
   overdueReview: boolean | undefined;
   onOverdueReviewChange: (value: boolean | undefined) => void;
@@ -96,7 +54,6 @@ export interface RiskRegisterFiltersProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }
@@ -126,10 +83,6 @@ export function RiskRegisterFilters({
 }: RiskRegisterFiltersProps): React.JSX.Element {
   const [referenceData, setReferenceData] = useState<RegisterReferenceData | null>(null);
   const [loadingReferenceData, setLoadingReferenceData] = useState(true);
-  // Loading/loaded-empty/failed are kept as three DISTINCT states — never
-  // collapsed into a silent empty option list on failure (this screen used
-  // to `catch {}` and fall back to empty filter options, indistinguishable
-  // from "this org genuinely has no categories/units yet").
   const [referenceDataError, setReferenceDataError] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -174,8 +127,6 @@ export function RiskRegisterFilters({
     referenceData?.categories.map((item) => ({ value: item.id, label: item.name })) ?? [];
   const orgUnitOptions: readonly MultiSelectFilterOption[] =
     referenceData?.orgUnits.map((unit) => ({ value: unit.id, label: unit.name })) ?? [];
-  // S-10 — owner chip labels resolve from `knownOwners` (no bounded,
-  // unsearched full list) — see that prop's own doc comment.
   const ownerOptions: readonly MultiSelectFilterOption[] = ownerUserId.map((id) => ({
     value: id,
     label: knownOwners?.get(id)?.fullName ?? id,

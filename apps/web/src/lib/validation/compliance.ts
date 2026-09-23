@@ -2,25 +2,6 @@ import { z } from 'zod';
 
 import { compliance } from '../messages/compliance';
 
-/**
- * Client-side shape/presence validation for the Compliance forms
- * (004-compliance-management, US1). Mirrors `CreateFrameworkRequest`/
- * `UpdateFrameworkRequest`, `CreateFrameworkVersionRequest`/
- * `UpdateFrameworkVersionRequest` and `CreateRequirementRequest`/
- * `UpdateRequirementRequest` in `contracts/compliance.openapi.yaml` on shape
- * only — full business validation (e.g. a duplicate version `label`, FR-002)
- * happens exclusively on the server and arrives as a 422 field error,
- * exactly like `lib/validation/control.ts`'s own convention.
- */
-
-/**
- * `origin` is a plain, non-empty string here — not `z.enum` — so the form's
- * "nothing selected yet" state (`''`, before the Radix `Select` has a value)
- * has a representable default; `FrameworkForm` narrows it to
- * `FrameworkOrigin` only when building the request body, mirroring
- * `ControlForm`'s own `toNullable`/cast convention for its enum-valued
- * selects.
- */
 export const frameworkFormSchema = z.object({
   name: z
     .string()

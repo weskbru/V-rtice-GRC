@@ -1,11 +1,3 @@
-/**
- * T022/006-assets-processes — maps `AssetRecord`/`AssetSummaryRecord`
- * (`domain/ports/asset-repository.port.ts`) to the wire shapes
- * `contracts/assets.openapi.yaml`'s `AssetSummary`/`AssetDetail` describe.
- * This is the ONLY place an `Asset` becomes a response body — no Prisma
- * model, and no domain record either, is ever returned directly from
- * `AssetController` (ADR-009).
- */
 import type {
   AssetLinkedControlRecord,
   AssetLinkedRiskRecord,

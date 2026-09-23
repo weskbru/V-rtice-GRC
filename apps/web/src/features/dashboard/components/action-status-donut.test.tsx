@@ -3,12 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { ActionStatusDonut } from './action-status-donut';
 
-/**
- * The ring itself is SVG that jsdom cannot lay out (Recharts measures a
- * zero-size container here), so these assertions target the two channels a
- * reader actually depends on when colour is not enough: the visible legend,
- * which names every status with its count, and the screen-reader table.
- */
 describe('ActionStatusDonut', () => {
   it('lists every status with its exact count in the table, including zeros', () => {
     render(

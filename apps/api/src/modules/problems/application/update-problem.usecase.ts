@@ -1,18 +1,3 @@
-/**
- * 008-incidents-problems, US2 — `UpdateProblemUseCase`: partial
- * business-content update with per-field audit (`PATCH
- * /problems/{problemId}`, `updateProblem` operation). Mirrors
- * `modules/controls/application/update-control.usecase.ts`'s structure —
- * see that file's header for the transaction-boundary reasoning this one
- * does not repeat.
- *
- * No optimistic lock (`Problem` carries no `version` column,
- * data-model.md §1) and no `orgUnitId`/lifecycle-status gate — neither
- * `UpdateProblemRequest` nor spec.md restricts this operation by the
- * problem's current status the way `Risk`'s
- * `assertBusinessContentEditable` does; a considered omission, mirroring
- * `UpdateControlUseCase`'s own identical reasoning for Controls.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -113,10 +98,6 @@ export class UpdateProblemUseCase {
         throw new NotFoundDomainError(USER_MESSAGES.problems.entityLabel, input.problemId);
       }
 
-      // Only audit when something actually changed — an idempotent PATCH
-      // re-submitting the current values still succeeds (200), but leaves
-      // no misleading "nothing changed" audit row (mirrors
-      // `UpdateControlUseCase`'s identical discipline).
       if (Object.keys(newValues).length > 0) {
         await this.auditRecorder.record({
           action: 'problem.updated',

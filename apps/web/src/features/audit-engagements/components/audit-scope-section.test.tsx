@@ -5,14 +5,6 @@ import { AuditScopeSection } from './audit-scope-section';
 
 import type { AuditScopeEntry } from '../types';
 
-/**
- * Component-mount evidence for T076 (`AuditScopeSection`, US1, FR-005/
- * FR-006, ADR-020, research.md D-12). `../api` is mocked at the network
- * boundary. Loading, genuinely-empty and failed-to-load must stay three
- * distinguishable states (CLAUDE.md §18.11); the "não é possível remover"
- * reality and the "só editável em planejamento" rule must each be surfaced
- * honestly rather than worked around with a disabled button.
- */
 const { listScopeMock } = vi.hoisted(() => ({ listScopeMock: vi.fn() }));
 
 vi.mock('../api', () => ({
@@ -93,8 +85,6 @@ describe('AuditScopeSection', () => {
     expect(
       screen.getByText(/Não é possível remover um item do escopo depois de adicionado/),
     ).toBeInTheDocument();
-    // No remove control is ever rendered — the notice above is the only
-    // honest response to research.md D-12, never a disabled/broken button.
     expect(screen.queryByRole('button', { name: /[Rr]emover/ })).not.toBeInTheDocument();
   });
 

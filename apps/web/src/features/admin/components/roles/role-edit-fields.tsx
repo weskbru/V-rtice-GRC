@@ -1,60 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, the role form rendered inside a panel:
- * editing an existing role (015-roles-permissions-surface FR-027 to FR-032,
- * T042/T043/T044) and composing a new one (Fase 1 de "Novo papel").
- *
- * Editing happens where reading happened — same panel, same visual
- * language, no modal over a modal (FR-027) — and creating now happens in
- * that same panel too, through THIS component rather than through a second
- * form that would have drifted from it (CLAUDE.md §19.4). `role` is the
- * role being edited, or `null` while a new one is being composed; the only
- * differences between the two are which summary sits at the foot of the
- * form and whether anything can be locked at all.
- *
- * The form's own submit/cancel controls live in the panel's fixed footer
- * and reach this `<form>` through its `id`, so the primary action is never
- * scrolled below the fold on a role with the whole catalogue in it.
- *
- * ## A system role is legible and locked, with the reason written
- *
- * Not merely disabled: a greyed control tells the user that something is
- * refused, never why. All THREE fields — name, description and the
- * permission tree — are rendered read-only with `locked.nameReason`,
- * `locked.descriptionReason` and `locked.permissionsReason` in words beside
- * them, under one `locked.platformOwnedNotice` at the top (FR-031, F-68).
- *
- * The description joined the other two on 2026-09-14 (F-68): the platform
- * seed reconciles it on every run, so accepting an edit here gave the field
- * two writers and left the audit trail asserting a state the database did
- * not keep. With nothing writable, the panel around this form offers no save
- * control for a system role at all — this is a definition sheet, not an
- * edit form, and `RoleDetailPanel` labels it accordingly.
- *
- * A role being CREATED can never be in this state — the API forces
- * `isSystem: false` — so nothing here suggests it could.
- *
- * ## The module checkbox is tri-state, in shape as well as in words
- *
- * `Checkbox` gained `indeterminate` for this (015 R-007): "all of this
- * module" and "some of it" must not look the same. The glyph differs in
- * SHAPE (a minus, not a check) and Radix reports `aria-checked="mixed"`;
- * `meta` on the group states the same thing in text — "3 de 9
- * selecionadas" — so the distinction survives greyscale (NFR-004).
- *
- * ## Search narrows what is SHOWN, never what a module toggle means
- *
- * The search box is `PermissionChecklist`'s behaviour, migrated when the
- * create dialog that owned it was replaced by the create panel: it matches
- * the pt-BR verb, resource and module names as well as the raw identifier
- * and the English catalogue description (F-63), which is the only reason
- * typing "Testar" finds `control:test`. What it does NOT do is change the
- * meaning of "Selecionar todas as permissões de Riscos": that control is
- * built from the module's full identifier list, filtered or not, and a
- * notice says so. A module toggle that silently selected only what happened
- * to be on screen would be a trap, not a filter.
- */
 import { DisclosureGroup, FormField } from '@pharos/design-system/components';
 import { Info, Lock, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -77,15 +22,12 @@ import type { UseRoleEditorResult } from './use-role-editor';
 import type { Role } from '../../types';
 
 export interface RoleEditFieldsProps {
-  /** The role being edited, or `null` while a new one is composed. */
   role: Role | null;
   editor: UseRoleEditorResult;
-  /** The `<form>`'s id — the panel footer's submit button targets it with `form={formId}`. */
   formId: string;
   onSubmit: () => void;
 }
 
-/** FR-031 — the reason a field is locked, written out next to it rather than left to be inferred from a disabled control. */
 function LockedReason({ reason }: { reason: string }): React.JSX.Element {
   return (
     <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
@@ -95,7 +37,6 @@ function LockedReason({ reason }: { reason: string }): React.JSX.Element {
   );
 }
 
-/** FR-029 — what this save will change, before it is made. */
 function PendingChanges({
   editor,
   role,
@@ -113,13 +54,6 @@ function PendingChanges({
         <p className="text-xs text-muted-foreground">{messages.none}</p>
       ) : (
         <div className="flex flex-col gap-2 text-xs leading-5 text-muted-foreground">
-          {/*
-           * Both sides RAW, never the pt-BR label of ADR-022: this line is a
-           * diff of the value that will be written to `Role.name`, and only a
-           * custom role — whose stored name and label are the same string —
-           * can ever reach it. Translating the "from" side would claim a
-           * rename the request does not make.
-           */}
           {pending.nameChanged ? <p>{messages.nameChanged(role.name, editor.name)}</p> : null}
           {pending.descriptionChanged ? <p>{messages.descriptionChanged}</p> : null}
           {pending.added.length > 0 ? (
@@ -152,7 +86,6 @@ function PendingChanges({
           ) : null}
         </div>
       )}
-      {/* FR-030 — a permission change reaches each affected user on their NEXT request; nobody has to sign in again, and nobody's open session keeps the old set forever. */}
       <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
         <Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
         <span>{admin.roles.form.effectNotice}</span>
@@ -174,13 +107,11 @@ export function RoleEditFields({
   const [query, setQuery] = useState('');
   const [openAreas, setOpenAreas] = useState<ReadonlySet<PermissionArea>>(new Set());
 
-  /** Every module of the tree, whatever the search — the source of truth for what a module toggle covers. */
   const allAreas = useMemo(
     () => groupPermissionsByArea(editor.treePermissions),
     [editor.treePermissions],
   );
 
-  /** What the search leaves visible. Equal to `allAreas` while the box is empty. */
   const visibleAreas = useMemo(
     () => groupPermissionsByArea(filterPermissionsByQuery(editor.treePermissions, query)),
     [editor.treePermissions, query],
@@ -198,13 +129,6 @@ export function RoleEditFields({
   const searching = query.trim() !== '';
   const allOpen = visibleAreas.length > 0 && visibleAreas.every((area) => openAreas.has(area.area));
 
-  /**
-   * Searching opens the modules that matched, rather than forcing them open
-   * for as long as the box has text in it: forced-open groups still report
-   * `aria-expanded="true"` after a click that was supposed to collapse them,
-   * which is a control that lies. Seeding the same state the toggles own
-   * keeps them genuinely collapsible mid-search.
-   */
   function handleQueryChange(next: string): void {
     setQuery(next);
     if (next.trim() === '') {
@@ -258,12 +182,6 @@ export function RoleEditFields({
         </p>
       ) : null}
 
-      {/*
-       * What a role IS, and what a created role always is, said once at the
-       * top of the form rather than discovered after the fact. The kind
-       * notice is a fact of the server (`isSystem: false` is forced), not a
-       * choice being offered.
-       */}
       {editor.isCreating ? (
         <div className="flex flex-col gap-1.5 rounded-md border border-border bg-muted/40 px-3 py-2.5">
           <p className="text-xs leading-5 text-foreground">{admin.roles.create.intro}</p>
@@ -271,9 +189,6 @@ export function RoleEditFields({
         </div>
       ) : null}
 
-      {/* `required` marks a field the USER must fill. On a locked sheet the
-          user fills nothing, so the marker would be a demand with no
-          addressee (§18.11). */}
       <FormField
         label={messages.fields.name.label}
         required={!locked}
@@ -281,15 +196,6 @@ export function RoleEditFields({
       >
         {(field) => (
           <div className="flex flex-col gap-1.5">
-            {/*
-             * `readOnly`, never `disabled`, for a system role's name.
-             * FR-031 asks for the field to be LEGIBLE and locked, and the
-             * platform's `Input` dims a disabled control to
-             * `opacity-50` — measured on screen, the stored name became the
-             * faintest text in the panel. `readOnly` keeps full contrast,
-             * keeps the field in the tab order, and is announced as
-             * read-only rather than simply skipped.
-             */}
             <Input
               {...field}
               value={editor.name}
@@ -310,13 +216,6 @@ export function RoleEditFields({
       >
         {(field) => (
           <div className="flex flex-col gap-1.5">
-            {/*
-             * `readOnly`, never `disabled` — the same reasoning as the name
-             * field above, and the same reason it was corrected there: a
-             * disabled control is dimmed to `opacity-50`, and the seeded
-             * description is the longest text in this panel. F-68 locked it;
-             * it must stay legible while locked.
-             */}
             <Textarea
               {...field}
               rows={3}
@@ -370,14 +269,6 @@ export function RoleEditFields({
                   aria-hidden="true"
                   className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
                 />
-                {/*
-                 * `type="text"`, not `type="search"`. Measured on screen:
-                 * a search input paints the browser's OWN clear affordance
-                 * inside it, so the field showed TWO Xs side by side — one
-                 * the platform's, one Chromium's, with different behaviour
-                 * and no label. The visible one is ours, which is the one
-                 * that carries a pt-BR accessible name.
-                 */}
                 <Input
                   type="text"
                   aria-label={tree.searchLabel}
@@ -415,7 +306,6 @@ export function RoleEditFields({
                 <p className="text-xs text-muted-foreground tabular-nums">
                   {tree.searchResultCount(visiblePermissionCount, editor.treePermissions.length)}
                 </p>
-                {/* The module toggle keeps meaning "every permission of this module", search or no search. */}
                 <p className="text-xs leading-5 text-muted-foreground">{tree.filteredNotice}</p>
               </div>
             ) : null}
@@ -431,9 +321,6 @@ export function RoleEditFields({
             const visible = visibleByArea.get(area.area);
             if (!visible) return null;
 
-            // Built from the WHOLE module, never from what the search left
-            // on screen: "todas as permissões de Riscos" must mean all of
-            // them.
             const identifiers = area.resources.flatMap((resource) =>
               resource.permissions.map((permission) => permission.identifier),
             );
@@ -458,12 +345,6 @@ export function RoleEditFields({
                 key={area.area}
                 className="flex items-start gap-2 rounded-lg border border-border bg-card pl-3"
               >
-                {/*
-                 * Outside the disclosure's toggle button on purpose: a
-                 * checkbox nested inside a `<button>` is not operable and
-                 * not valid. The two controls sit side by side — one selects
-                 * the module, the other reveals what is in it.
-                 */}
                 <Checkbox
                   className="mt-3 shrink-0"
                   checked={checkedState}
@@ -521,11 +402,6 @@ export function RoleEditFields({
         </div>
       </section>
 
-      {/*
-       * A locked role gets neither summary: "Alterações pendentes: nenhuma"
-       * over a form where nothing CAN pend is noise, and the effect notice
-       * under it describes a permission change this sheet cannot make (F-68).
-       */}
       {locked ? null : role === null ? (
         <RoleCompositionSummary editor={editor} />
       ) : (

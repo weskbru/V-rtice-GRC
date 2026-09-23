@@ -1,23 +1,3 @@
-/**
- * 008-incidents-problems, US3 — the SOURCE-side existence+scope check
- * shared by all three `Incident -> {Risk,Asset,Process}` link use cases
- * (`link-incident-risk.usecase.ts`, `link-incident-asset.usecase.ts`,
- * `link-incident-process.usecase.ts`) and the read-only
- * `list-incident-problem-links.usecase.ts`.
- *
- * `modules/incidents` has no full `IncidentRepositoryPort` yet (the
- * incident lifecycle is a concurrent, separate workstream — data-model.md
- * §1), so this goes through `IncidentDirectoryPort.findById` instead of a
- * scoped repository lookup — the exact read
- * `IncidentActionOriginAccessor.resolveScopedLookup`
- * (`application/incident-action-origin-accessor.ts`) already performs for
- * the identical reason. `IncidentDirectoryPort.findById` is inherently
- * UNSCOPED (it returns the entry regardless of the caller's scope), so the
- * already-fetched entry doubles as the "resolve actual org unit" callback
- * `OrgScopeEnforcerService.assertExistingRecordAccessible` (F-38) needs,
- * with no second round-trip and no separate unscoped lookup method
- * required.
- */
 import { AuditEntityType } from '@prisma/client';
 
 import { isOrgUnitWithinScope } from '../../../../grc/shared/domain/org-scope';

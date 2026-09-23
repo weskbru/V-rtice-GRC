@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, activate/deactivate an organizational unit
- * (T183, FR-060). An active descendant blocks deactivation — the server's
- * 422 is surfaced intelligibly rather than as a generic failure.
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Power, ShieldOff } from 'lucide-react';
 import { useState } from 'react';

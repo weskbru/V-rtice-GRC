@@ -1,10 +1,3 @@
-/**
- * T193 — `MarkNotificationReadUseCase`: `POST /notifications/{id}/read`
- * (FR-101, FR-030). A notification addressed to a DIFFERENT user is
- * answered with `NotFoundDomainError`, never `ForbiddenDomainError` — its
- * existence must not be disclosed to anyone but its recipient. Idempotent:
- * marking an already-read notification read again still succeeds.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';

@@ -1,20 +1,3 @@
-/**
- * 009-indicators-reports, Fase 7 (T056) — the same `ReportDefinition`
- * executed by two callers scoped to two DIFFERENT organizational units.
- * Proves, against real seeded data (never a mock of `IndicatorCalculationPort`),
- * that a report is never stored (spec.md FR-027): every run recomputes each
- * referenced metric under the CALLER's own scope, exactly as
- * `GET /indicators/{metricKey}/current` already does for a single
- * indicator (`indicator-current-value-organizational-scope.spec.ts`'s own
- * convention, applied here across a whole report).
- *
- * `CONTROL_INACTIVE_COUNT` (`ORGANIZATIONAL_UNIT`) must differ between the
- * two callers — each sees only their own unit's controls.
- * `COMPLIANCE_PERCENTAGE` (the one `ORGANIZATION_WIDE` key, research.md
- * D-8) must be IDENTICAL for both — `Requirement`/`FrameworkVersion` carry
- * no organizational-unit column at all, so no caller's scope can ever
- * change it.
- */
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 import { CacheModule } from '../../src/infrastructure/cache/cache.module';
@@ -77,9 +60,6 @@ describe('RunReportUseCase — organizational-scope parity across two callers (T
     const actorA = await createUnitScopedActor('report-scope-actor-a', unitA);
     const actorB = await createUnitScopedActor('report-scope-actor-b', unitB);
 
-    // unitA: two non-ACTIVE controls. unitB: one. Genuinely different
-    // counts, never both zero (which would pass even with the scope filter
-    // deleted).
     await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('ctl-scope-a1'),
@@ -105,13 +85,6 @@ describe('RunReportUseCase — organizational-scope parity across two callers (T
       },
     });
 
-    // Compliance fixture — a framework, a PUBLISHED version, one
-    // requirement, one ACTIVE control (owned by unitA, deliberately —
-    // COMPLIANCE_PERCENTAGE carries no org-unit predicate of its own to
-    // filter by) proven EFFECTIVE by an attested assessment, and the link
-    // between them — enough for `calculateRequirementComplianceState` to
-    // reach `COMPLIANT` (100%), a genuinely non-zero, non-trivial
-    // percentage identical for BOTH callers regardless of their own unit.
     const framework = await ctx.prisma.client.framework.create({
       data: {
         code: uniqueTestMarker('fmk-report-scope'),
@@ -201,19 +174,6 @@ describe('RunReportUseCase — organizational-scope parity across two callers (T
     expect(complianceItemB.available).toBe(true);
     expect(complianceItemA.scopeApplicability).toBe('ORGANIZATION_WIDE');
     expect(complianceItemB.scopeApplicability).toBe('ORGANIZATION_WIDE');
-    // NOT asserted as exactly 100: `test/integration/support/global-setup.ts`
-    // resets mutable tables ONCE per whole `pnpm test:integration` run, not
-    // per file (that file's own header) — `requirements`/`controls` accrue
-    // rows from every OTHER integration spec file that runs earlier in the
-    // same invocation (compliance-summary/mapping-migration specs among
-    // them), so this file's own single COMPLIANT requirement is not
-    // guaranteed to be the only one in the aggregate by the time this test
-    // runs. The property this test (and research.md D-8) actually asserts
-    // is sameness across callers — a real, non-trivial percentage (proven
-    // finite and non-zero below) computed identically regardless of the
-    // caller's own organizational scope, exactly because
-    // `Requirement`/`FrameworkVersion` carry no unit column for either
-    // caller's scope to filter by.
     expect(Number.isFinite(complianceItemA.value)).toBe(true);
     expect(complianceItemA.value).toBeGreaterThan(0);
     expect(complianceItemA.value).toBe(complianceItemB.value);

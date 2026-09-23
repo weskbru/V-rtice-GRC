@@ -1,16 +1,3 @@
-/**
- * T033/005-audit-findings, User Story 1 — `CompleteAuditEngagementUseCase`
- * (`POST /audits/{auditId}/complete`, `completeAuditEngagement` operation).
- * `IN_PROGRESS -> COMPLETED`, terminal (research.md D-3). A completed
- * engagement never accepts a new finding again (FR-004) — enforced by
- * `assertAuditEngagementAcceptsFindings` (`audit-engagement.entity.ts`),
- * consumed by `grc/finding`'s own `CreateFindingFromEngagementUseCase`
- * (Fase 4, out of this task's own scope) — this use case itself needs no
- * further check for that rule. Optimistic-lock conflict detection
- * (research.md D-18). Audited with previous/new `status`
- * (`audit_engagement.completed`). Remains integrally readable afterward
- * (FR-004) — `GetAuditEngagementUseCase` applies no status-based gate.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -32,7 +19,6 @@ import type { AuditEngagementRecord } from '../domain/ports/audit-engagement-rep
 export interface CompleteAuditEngagementInput {
   readonly actorUserId: string;
   readonly auditEngagementId: string;
-  /** From the `If-Match` header (research.md D-18). */
   readonly expectedVersion: number;
 }
 

@@ -2,13 +2,13 @@
 
 import { CalendarClock, CalendarPlus, FileText, Landmark } from 'lucide-react';
 
-import { formatTimestampDate } from '../date';
-
-import type { Framework } from '../types';
-
 import { DetailField } from '@/components/detail/detail-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { compliance } from '@/lib/messages/compliance';
+
+import { formatTimestampDate } from '../date';
+
+import type { Framework } from '../types';
 
 export interface FrameworkOverviewProps {
   framework: Framework;

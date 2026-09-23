@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident register empty states (008-incidents-problems,
- * US1), mirroring `AssetRegisterEmpty`/`ProblemRegisterEmpty` exactly
- * (CLAUDE.md §18.12) — two genuinely different situations ("nothing has
- * ever been registered" vs. "the current filters match nothing"), never
- * collapsed into one generic message.
- */
 import { EmptyState } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

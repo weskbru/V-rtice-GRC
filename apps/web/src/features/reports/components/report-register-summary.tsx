@@ -1,34 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report catalog compact summary row (CLAUDE.md §18.5, §19.7), mirroring
- * `AssetRegisterSummary`'s own shape and reasoning.
- *
- * `GET /dashboard/summary` publishes no `reports` block (`features/dashboard/types.ts`'s own
- * `DashboardBreakdowns` has none) — so unlike `RiskRegisterSummary`/`ActionRegisterSummary`/
- * `ProblemRegisterSummary`, this strip cannot read one aggregate call. Each figure instead reads
- * `meta.total` of the SAME `GET /reports` catalog query the register itself uses
- * (`reportsApi.listDefinitions`, `pageSize: 1`), exactly filtered the way the card's own link
- * filters the register — one calculator, the server's own filtered count, never a client-side
- * recount of rows (CLAUDE.md §19.7).
- *
- * Only TWO requests, not `AssetRegisterSummary`'s three: "Inativos" is `total - ativos`, computed
- * here rather than fetched with a separate `isActive=false` query. That subtraction is exact —
- * `isActive` is a plain boolean column (`report-definition.entity.ts`), so there is no third state
- * a report definition can be in, unlike a multi-value status enum where a derived count could
- * silently drift from the real one. A third request would cost a round trip to confirm what the
- * first two already prove.
- *
- * Every other candidate figure failed this bar and does not ship. "Indicadores em uso" (the union
- * of `metricKeys` across every definition) would need every row fetched and aggregated client-side
- * — a second calculator, cost proportional to data, exactly what CLAUDE.md §19.7 forbids.
- * "Relatórios recentes" has no server-side recency filter or sort at all
- * (`listReportDefinitions` declares neither `sort` nor a date parameter,
- * `report-register-columns.tsx`'s own header) — there is no real query to link a card to.
- *
- * A failure degrades to one quiet message in place of the row — it must never hide or block the
- * catalog underneath it.
- */
 import { SummaryStatCard } from '@pharos/design-system/components';
 import { CheckCircle2, Layers, MinusCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -65,8 +36,6 @@ async function loadCounts(): Promise<SummaryCounts> {
   return {
     total: total.meta.total,
     active: active.meta.total,
-    // Exact, not estimated — see this module's own header for why a third
-    // `isActive=false` request would be redundant for a boolean field.
     inactive: total.meta.total - active.meta.total,
   };
 }

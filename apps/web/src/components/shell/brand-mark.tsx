@@ -1,10 +1,7 @@
-/** Pharos symbol supplied by the user, resized from the original transparent asset. */
 import { cn } from '@/lib/utils';
 
 export interface BrandMarkProps {
-  /** Tailwind size class for the outer tile (e.g. `size-8`). */
   tileClassName: string;
-  /** Tailwind size class for the mark itself (e.g. `size-5`). */
   markClassName: string;
   className?: string;
 }

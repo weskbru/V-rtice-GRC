@@ -1,18 +1,3 @@
-/**
- * T016/005-audit-findings — the composition-root wiring ADR-020 part 3
- * calls for: binds `FrameworkVersionDirectoryPort`/`RequirementDirectoryPort`
- * to their Prisma adapters and makes both bindings reachable from
- * `modules/audit-engagements`'s own injector, WITHOUT either module
- * importing the other (FR-017, SC-008). Mirrors
- * `modules/controls/control-directory.module.ts` exactly — see that file's
- * header for the full "why its own tiny `@Global()` module" reasoning this
- * one does not repeat.
- *
- * `ComplianceModule` imports this module directly; the application's
- * composition root (`app.module.ts`) already imports `ComplianceModule`, so
- * both bindings are live before `modules/audit-engagements`'s own providers
- * ever resolve either port.
- */
 import { Global, Module } from '@nestjs/common';
 
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';

@@ -1,12 +1,3 @@
-/**
- * T032/005-audit-findings, User Story 1 — `StartAuditEngagementUseCase`
- * (`POST /audits/{auditId}/start`, `startAuditEngagement` operation,
- * FR-002, FR-003). `PLANNING -> IN_PROGRESS` (research.md D-3). Refused
- * with `422` when the engagement has no scope link of any of the three
- * kinds (FR-003) — `COUNT(*)` across all three scope tables, summed, must
- * be greater than zero. Optimistic-lock conflict detection (research.md
- * D-18). Audited with previous/new `status` (`audit_engagement.started`).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -32,7 +23,6 @@ import type { AuditEngagementRecord } from '../domain/ports/audit-engagement-rep
 export interface StartAuditEngagementInput {
   readonly actorUserId: string;
   readonly auditEngagementId: string;
-  /** From the `If-Match` header (research.md D-18). */
   readonly expectedVersion: number;
 }
 

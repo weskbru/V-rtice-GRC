@@ -1,12 +1,3 @@
-/**
- * 008-incidents-problems, US1 — matches
- * `contracts/incidents.openapi.yaml`'s `CreateIncidentRequest` exactly.
- * `additionalProperties: false` (the global `ValidationPipe`'s
- * `forbidNonWhitelisted`) means this class is also where a caller cannot
- * smuggle `code`/`status`/any resolution or cancellation field past
- * creation — not declaring them here IS the rejection (mirrors
- * `CreateFindingRequestDto`'s own documented shape).
- */
 import { IsDateString, IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

@@ -1,32 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `RoleAdminView`, the roles and permissions
- * surface (015-roles-permissions-surface).
- *
- * `../../api` is mocked at the network boundary and permission gating goes
- * through the real `usePermissions`/`AuthProvider` stack with
- * `buildTestSession`, mirroring the established convention
- * (`report-catalog-view.test.tsx`, `permissions.test.tsx`).
- *
- * Three of these tests are security regressions, not UI checks, and each
- * fails if its protection is removed:
- *
- * - `role:administer` WITHOUT `user:administer` must produce no personal
- *   data at all — and, more strongly, no REQUEST for any (FR-018 to FR-020,
- *   SC-006). Asserting only "the e-mail is not on screen" would pass
- *   against an implementation that fetched the roster and hid it with CSS;
- *   asserting the request was never made is what closes that.
- * - a SYSTEM role's `PATCH` carries `description` and nothing else
- *   (FR-031). Sending `name` or `permissionIdentifiers`, even unchanged, is
- *   a 422 from the server — the defect
- *   `specs/012-admin-roles-screen/STATE.md` §3.1 measured and fixed, and a
- *   forbidden regression here.
- * - the number of requests on load is constant in the number of roles
- *   (SC-007, NFR-006).
- */
-
 const {
   listRolesMock,
   getRolesSummaryMock,
@@ -47,10 +21,6 @@ const {
   navigation: { search: '', listeners: new Set<() => void>() },
 }));
 
-// A working stand-in for the App Router's query string: `useSearchParams`
-// subscribes to it, and `router.replace` writes it and notifies. Without
-// the notification the filter controls would appear inert in tests for a
-// reason that has nothing to do with the screen.
 vi.mock('next/navigation', async () => {
   const { useSyncExternalStore } = await import('react');
   const subscribe = (onStoreChange: () => void): (() => void) => {
@@ -124,12 +94,6 @@ function resolveRoles(roles: readonly Role[]): void {
   });
 }
 
-/**
- * Radix's `Tabs` selects on `mousedown` (and on focus, in its default
- * automatic activation mode) — never on a bare `click`, which `fireEvent`
- * dispatches on its own. A test that only clicks would assert against the
- * tab that was already open and pass for the wrong reason.
- */
 function selectTab(container: HTMLElement, name: string): void {
   const tab = within(container).getByRole('tab', { name });
   fireEvent.mouseDown(tab, { button: 0 });
@@ -165,8 +129,6 @@ describe('RoleAdminView — indicators', () => {
       totalRoles: 12,
       systemRoles: 9,
       customRoles: 3,
-      // Deliberately unequal to anything derivable from the one loaded role:
-      // this figure is `COUNT(DISTINCT user_id)` and has no other source.
       usersWithRoles: 7,
     });
 
@@ -204,7 +166,6 @@ describe('RoleAdminView — indicators', () => {
       screen.getByRole('button', { name: /Mostrar somente os papéis do sistema/ }),
     ).toHaveAttribute('aria-pressed', 'true');
 
-    // FR-003 — "Usuários com papéis" is not a filter and must not be a control.
     expect(screen.queryByRole('button', { name: /Usuários com papéis/ })).not.toBeInTheDocument();
   });
 
@@ -257,12 +218,6 @@ describe('RoleAdminView — list', () => {
     expect(screen.getAllByRole('button', { name: 'Limpar filtros' }).length).toBeGreaterThan(0);
   });
 
-  /**
-   * The results strip, in the shape every register uses: the count on the
-   * left with `role="status"`, and the ordering control beside it — NOT
-   * behind the "Filtros" disclosure, because ordering reorders and never
-   * hides a role, and the badge on that button does not count it.
-   */
   it('reports the result count and offers the ordering outside the filters disclosure', async () => {
     resolveRoles([
       role({ id: 'r1', name: 'Papel de sistema', isSystem: true }),
@@ -274,7 +229,6 @@ describe('RoleAdminView — list', () => {
     await screen.findByText('Papel personalizado');
     expect(screen.getByRole('status')).toHaveTextContent('2 papéis');
 
-    // The filters panel is closed, and the ordering is reachable anyway.
     const filtersToggle = screen.getByRole('button', { name: /^Filtros/ });
     expect(filtersToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('combobox', { name: 'Ordenar por' })).toBeInTheDocument();
@@ -293,8 +247,6 @@ describe('RoleAdminView — list', () => {
     await screen.findByText('Papel de sistema');
     expect(screen.getByRole('status')).toHaveTextContent('1 de 2 papéis');
 
-    // The chip is visible with the panel shut — what is hidden is the
-    // machinery, never the state.
     const chips = screen.getByRole('group', { name: 'Filtros ativos' });
     expect(within(chips).getByText('Tipo: Sistema')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Filtros/ })).toHaveAccessibleName(/1/);
@@ -318,10 +270,6 @@ describe('RoleAdminView — list', () => {
       .map((button) => button.textContent ?? '');
     expect(namesAsc[0]).toContain('Alfa');
 
-    // Radix `Select` cannot be driven by `fireEvent` in jsdom (it needs
-    // pointer capture), so the ordering is exercised through the same URL
-    // parameter the control writes — which is the state itself, not a
-    // stand-in for it.
     navigation.search = 'sort=permissions%3Adesc';
     for (const listener of navigation.listeners) listener();
 
@@ -368,7 +316,6 @@ describe('RoleAdminView — detail panel', () => {
 
     const panel = await screen.findByRole('complementary', { name: 'Detalhes do papel' });
     expect(within(panel).getByText(target.description)).toBeInTheDocument();
-    // The three counts of FR-011: 3 permissions, 4 users, 2 modules.
     expect(within(panel).getByText('3')).toBeInTheDocument();
     expect(within(panel).getByText('4')).toBeInTheDocument();
     expect(within(panel).getByText('2')).toBeInTheDocument();
@@ -424,8 +371,6 @@ describe('RoleAdminView — detail panel', () => {
 describe('RoleAdminView — Users tab and its permission boundary', () => {
   it('never requests nor renders personal data without user:administer (FR-018/FR-020, SC-006)', async () => {
     resolveRoles([role({ id: 'r1', assignedUserCount: 3 })]);
-    // Would leak a name, an e-mail, a job title and a unit if it were ever
-    // called. It must not be.
     listUsersMock.mockResolvedValue({
       data: [
         {
@@ -455,7 +400,6 @@ describe('RoleAdminView — Users tab and its permission boundary', () => {
     expect(await within(panel).findByText('Relação de pessoas indisponível')).toBeInTheDocument();
     expect(within(panel).getByText('3 pessoas têm este papel')).toBeInTheDocument();
 
-    // The aggregate count is legitimate; everything below is not.
     expect(listUsersMock).not.toHaveBeenCalled();
     const markup = document.body.innerHTML;
     expect(markup).not.toContain('Ana Pereira');
@@ -497,8 +441,6 @@ describe('RoleAdminView — Users tab and its permission boundary', () => {
 
     expect(await within(panel).findByText('Ana Pereira')).toBeInTheDocument();
     expect(within(panel).getByText('ana.pereira@example.local')).toBeInTheDocument();
-    // FR-025 — the other role is provenance of access, never inheritance.
-    // ADR-022 — and it is named in pt-BR here, exactly as in the list.
     expect(within(panel).getByText('Líder de Auditoria')).toBeInTheDocument();
     expect(panel.textContent ?? '').not.toMatch(/herdad/i);
 
@@ -508,17 +450,6 @@ describe('RoleAdminView — Users tab and its permission boundary', () => {
 });
 
 describe('RoleAdminView — editing', () => {
-  /**
-   * F-68 — this test used to be "sends ONLY the description when saving a
-   * system role", which is the behaviour the finding condemned: the seed
-   * reconciles `description` on every run, so the product wrote a field it
-   * did not own and the audit trail recorded an edit the database did not
-   * keep. It is replaced by a STRICTLY STRONGER claim — the screen offers no
-   * save for a system role and issues no `PATCH` at all — which subsumes the
-   * old one (a request that is never made cannot carry the wrong body) and
-   * also subsumes `012 §3.1`, the defect where the unchanged permission set
-   * travelled along and made every save fail.
-   */
   it('offers NO save for a system role and never PATCHes one (F-68, FR-031)', async () => {
     const systemRole = role({
       id: 'r1',
@@ -531,10 +462,6 @@ describe('RoleAdminView — editing', () => {
 
     renderView({ permissions: ['role:administer'] });
 
-    // ADR-022 — the card is opened by the pt-BR label, because that is what
-    // the card prints. The role's stored `name` is still 'Platform
-    // Administrator', and the request asserted at the end of this test proves
-    // the stored value is what travels to the server.
     fireEvent.click(
       await screen.findByRole('button', {
         name: /Abrir detalhes do papel Administrador da Plataforma/,
@@ -542,8 +469,6 @@ describe('RoleAdminView — editing', () => {
     );
     const panel = await screen.findByRole('complementary', { name: 'Detalhes do papel' });
 
-    // There is no "Editar papel" for a system role — nothing about it is
-    // editable, so the panel must not offer the word.
     expect(within(panel).queryByRole('button', { name: 'Editar papel' })).not.toBeInTheDocument();
     expect(
       within(panel).getByText(
@@ -553,39 +478,27 @@ describe('RoleAdminView — editing', () => {
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Ver definição' }));
 
-    // The locked name field shows the STORED name, never the label: it is the
-    // value a save would have carried, and a system role's is unchangeable.
     expect(within(panel).getByLabelText(/^Nome/)).toHaveValue('Platform Administrator');
 
-    // The reason is written out, not merely enforced by a dimmed control.
     expect(
       await within(panel).findByText('Papel do sistema: o nome não pode ser alterado.'),
     ).toBeInTheDocument();
-    // Read-only rather than disabled: FR-031 asks for a LEGIBLE locked
-    // field, and a disabled input is dimmed and dropped from the tab order.
     expect(within(panel).getByLabelText(/^Nome/)).toHaveAttribute('readonly');
     expect(within(panel).getByLabelText(/^Descrição/)).toHaveAttribute('readonly');
 
-    // No save control exists in this state, under any of its labels.
     expect(
       within(panel).queryByRole('button', { name: 'Salvar alterações' }),
     ).not.toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: 'Salvando…' })).not.toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Voltar' })).toBeInTheDocument();
 
-    // Editing the description programmatically — which `fireEvent.change`
-    // does whatever `readOnly` says — still produces no request, because
-    // there is nothing to press and the hook refuses a locked target anyway.
     fireEvent.change(within(panel).getByLabelText(/^Descrição/), {
       target: { value: 'Nova descrição.' },
     });
     expect(updateRoleMock).not.toHaveBeenCalled();
 
-    // No permission catalogue request either: a system role cannot change
-    // its permissions, so fetching the catalogue would buy nothing.
     expect(listPermissionsMock).not.toHaveBeenCalled();
 
-    // "Voltar" leaves the sheet and persists nothing.
     fireEvent.click(within(panel).getByRole('button', { name: 'Voltar' }));
     await waitFor(() =>
       expect(within(panel).getByRole('button', { name: 'Ver definição' })).toBeInTheDocument(),
@@ -618,7 +531,6 @@ describe('RoleAdminView — editing', () => {
     const moduleToggle = await within(panel).findByRole('checkbox', {
       name: 'Selecionar todas as permissões de Riscos',
     });
-    // One of two selected: partial, and said in words as well as in shape.
     expect(moduleToggle).toHaveAttribute('aria-checked', 'mixed');
     expect(within(panel).getByText('1 de 2 selecionadas')).toBeInTheDocument();
 
@@ -654,8 +566,6 @@ describe('RoleAdminView — editing', () => {
     });
     fireEvent.click(within(panel).getByRole('button', { name: 'Cancelar' }));
 
-    // A discarded edit is confirmed first, because the change is not
-    // recoverable once dropped.
     fireEvent.click(await screen.findByRole('button', { name: 'Descartar alterações' }));
 
     await waitFor(() =>
@@ -665,14 +575,6 @@ describe('RoleAdminView — editing', () => {
   });
 });
 
-/**
- * Creating a role (Fase 1 de "Novo papel"). What the retired
- * `RoleCreateDialog` did from a modal, the screen now does in the same panel
- * it reads and edits in — so the assertions below are about the SCREEN's
- * part of that: which panel is open, what the catalogue costs, and where the
- * user lands afterwards. The form itself is guarded in
- * `role-create-panel.test.tsx`.
- */
 describe('RoleAdminView — creating a role', () => {
   it('opens the create panel from "Novo papel", and only then asks for the catalogue', async () => {
     resolveRoles([role()]);
@@ -681,7 +583,6 @@ describe('RoleAdminView — creating a role', () => {
     renderView({ permissions: ['role:administer'] });
     await screen.findByText('Analista de Riscos');
 
-    // Nothing is fetched for a screen nobody is composing on (SC-007).
     expect(listPermissionsMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('complementary', { name: 'Novo papel' })).not.toBeInTheDocument();
 
@@ -745,7 +646,6 @@ describe('RoleAdminView — creating a role', () => {
       }),
     );
 
-    // The listing answers with the new role on the reload the save triggers.
     resolveRoles([role({ id: 'r1' }), created]);
     fireEvent.click(within(panel).getByRole('button', { name: 'Criar papel' }));
 
@@ -756,7 +656,6 @@ describe('RoleAdminView — creating a role', () => {
       permissionIdentifiers: ['risk:view'],
     });
 
-    // Composition is over, and the panel is now READING what was created.
     await waitFor(() =>
       expect(screen.queryByRole('complementary', { name: 'Novo papel' })).not.toBeInTheDocument(),
     );

@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — requirement (clause) detail screen (US2/US3, ADR-017),
- * mirroring `FrameworkVersionDetailView`'s/`ControlDetailView`'s own
- * `EntityHeader` + `EntityTabs` structure (CLAUDE.md §18.12). A 404 renders
- * identically whether the requirement does not exist, does not belong to
- * this version, or the caller lacks `compliance:view`.
- *
- * The compliance state badge is shown as icon + text + colour (never colour
- * alone, CLAUDE.md §18.8) with its one-line explanation alongside it — the
- * distinction an external auditor asks about (`NOT_MET` vs `NOT_PROVEN`) is
- * never left to the badge alone to carry.
- */
 import {
   EmptyState,
   EntityHeader,

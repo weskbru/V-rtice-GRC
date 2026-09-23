@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Controle" scope variant's picker (T076, US1, FR-005,
- * ADR-020). Mirrors `RequirementControlsSection`'s own control picker
- * exactly (`features/compliance/components`), since both read the same
- * `GET /controls` catalog. The actual scope-link attempt is still
- * re-checked server-side against the control's own status and the
- * caller's organizational scope (ADR-020, FR-022) — this picker
- * pre-filters only what is already in this engagement's scope, never
- * status or organizational unit.
- *
- * Front H (D-17/research.md): searches the real catalog server-side as
- * the user types, via `SearchablePicker` — this endpoint always accepted
- * `q`; only this picker never sent it past the first, unsearched load.
- */
 import { SearchablePicker } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useState } from 'react';

@@ -1,14 +1,3 @@
-/**
- * T031/002-shared-grc-foundation, US1 — the sole implementation of
- * `EvidenceReferenceDataPort`. Deliberate direct `PrismaService` queries
- * against `organizational_units`/`users`, mirroring
- * `modules/risk/infrastructure/prisma-risk-reference-data.repository.ts`
- * exactly — see that file's header for why reading these shared tables
- * directly (rather than depending on Identity/Organizations' own ports,
- * shaped for authentication/scope-resolution, not "does this id exist and
- * is it active") is consistent, established precedent, not a new
- * privilege.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

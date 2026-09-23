@@ -1,12 +1,3 @@
-/**
- * T032/002-shared-grc-foundation, US1 — `ArchiveEvidenceUseCase`
- * (`archiveEvidence`, FR-009). Never a physical delete: sets `status`,
- * `archivedAt`, `archivedByUserId`. All historical `EvidenceLink` rows are
- * left completely untouched by this use case — that IS the SC-004
- * guarantee ("100% dos vínculos anteriores permanecem consultáveis"),
- * achieved by this use case simply never touching `evidence_links` at all,
- * not by any special-case "preserve links" logic.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -48,8 +39,6 @@ export class ArchiveEvidenceUseCase {
     }
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the evidence actually exists outside `scope`.
     const current = await this.evidenceRepository.findById(scope, input.evidenceId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

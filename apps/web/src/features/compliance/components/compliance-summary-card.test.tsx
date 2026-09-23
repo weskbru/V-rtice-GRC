@@ -5,10 +5,6 @@ import { ComplianceSummaryCard } from './compliance-summary-card';
 
 import type { ComplianceSummary } from '../types';
 
-/**
- * Component-mount evidence for `ComplianceSummaryCard` (US3, FR-020).
- * `../api` is mocked at the network boundary.
- */
 const { getFrameworkVersionComplianceSummaryMock } = vi.hoisted(() => ({
   getFrameworkVersionComplianceSummaryMock: vi.fn(),
 }));

@@ -1,26 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report register screen (009-indicators-reports, T061, US5), mirroring
- * `IncidentCatalogView`'s overall orchestration (CLAUDE.md §18.12): collapsible filter bar,
- * `ResultsToolbar`, table, shared pagination, a dialog for the one row action this register has
- * ("Executar" — no separate detail route exists, `ReportRunDialog`'s own header explains why).
- *
- * No Cards/Tabela toggle and no card grid here (unlike Risks/Controls/Assets/Processes/Audit): a
- * report definition is configuration someone maintains, not a record someone browses visually, so
- * forcing a card view here would be homogenisation rather than convergence — the table stays the
- * one view, deliberately.
- *
- * The summary strip (`ReportRegisterSummary`) DOES ship, unlike the earlier round that shipped
- * none: `dashboardApi.getSummary()`'s `breakdowns` (`features/dashboard/types.ts`) still has no
- * `reports` block, but the three figures it shows are real SERVER counts
- * (`reportsApi.listDefinitions({ pageSize: 1, ... })`'s own `meta.total`, two requests plus one
- * exact subtraction), not a client-side recount of the current page — see that component's own
- * header for the full reasoning and for what was considered and rejected.
- *
- * Never fetches more than the current page, never sorts/filters/paginates client-side (same
- * discipline as every other register in this product).
- */
 import { DataTable, ResultsToolbar, type SortingState } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
 
@@ -130,11 +109,6 @@ export function ReportCatalogView(): React.JSX.Element {
         onClearFilters={clearFilters}
       />
 
-      {/* No children: this register has nothing to decide about HOW the matched rows are
-          shown — no ordering (`listReportDefinitions` declares no `sort` parameter) and no
-          Cards/Tabela toggle (this catalog's own header comment explains why cards do not
-          apply here). The count is still worth its own row, exactly as every other converged
-          register in this product. */}
       <ResultsToolbar
         count={reports.register.results.count(total)}
         isLoading={loading}
@@ -149,10 +123,6 @@ export function ReportCatalogView(): React.JSX.Element {
         onSortingChange={() => undefined}
         pageIndex={state.page - 1}
         pageSize={state.pageSize}
-        // This catalog's own page sizes (20/50/100), not `DataTable`'s
-        // default (25/50/100): the hook's default page size is 20, which the
-        // default list does not contain, so the page-size control rendered a
-        // value that was not among its own options.
         pageSizeOptions={REPORT_CATALOG_PAGE_SIZE_OPTIONS}
         totalRows={total}
         onPageIndexChange={(index) => setPage(index + 1)}

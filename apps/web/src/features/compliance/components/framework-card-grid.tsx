@@ -1,21 +1,13 @@
 'use client';
 
-/**
- * The grid frame — list semantics, responsive columns and the
- * loading/error/empty contract — is the shared `CardGrid`; what stays
- * here is which card to render and a skeleton shaped like it.
- *
- * PharosGRC — framework register card view, the grid of `FrameworkCard`s
- * (US1, CLAUDE.md §18.12 — mirrors `AssetCardGrid`/`AuditEngagementCardGrid`).
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { compliance } from '@/lib/messages/compliance';
 
 import { FrameworkCard } from './framework-card';
 
 import type { Framework } from '../types';
-
-import { Skeleton } from '@/components/ui/skeleton';
-import { compliance } from '@/lib/messages/compliance';
 
 export interface FrameworkCardGridProps {
   frameworks: readonly Framework[];

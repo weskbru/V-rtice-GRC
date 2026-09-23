@@ -1,8 +1,3 @@
-/**
- * T134 — FR-076: control link and unlink are audited, and unlinking
- * withdraws the link (stamping `unlinkedAt`/`unlinkedByUserId`) rather than
- * deleting the row — history is retained.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -58,8 +53,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
       email: `${uniqueTestMarker('control-link-actor')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `risk:treat`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['risk:create', 'risk:treat', 'control:view'],
@@ -72,14 +65,8 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // F-46 (ADR-020 part 4) — the control must be within `actor`'s
-    // organizational scope, or the new scope check refuses the link. This
-    // fixture used to omit `orgUnitId` (defaulting to `null`, visible only
-    // under `GLOBAL` scope) and still succeeded, because the check that
-    // would have refused it did not exist yet.
     const control = await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control'),
@@ -97,7 +84,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
       ownerUserId: owner.id,
     });
 
-    // --- Link -----------------------------------------------------------
     const { link, risk: riskAfterLink } = await linkControlUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -117,7 +103,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
     expect(linkAuditEvents[0]!.action).toBe('risk.control_linked');
     expect(linkAuditEvents[0]!.newValues).toMatchObject({ riskId: risk.id, controlId: control.id });
 
-    // --- Unlink -----------------------------------------------------------
     const riskAfterUnlink = await unlinkControlUseCase.execute({
       actorUserId: actor.id,
       riskId: risk.id,
@@ -126,7 +111,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
     });
     expect(riskAfterUnlink.version).toBe(2);
 
-    // The link row is WITHDRAWN, not deleted — history is retained.
     const linkRow: RiskControlLink = await ctx.prisma.client.riskControlLink.findUniqueOrThrow({
       where: { id: link.id },
     });
@@ -135,7 +119,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
     expect(linkRow.controlId).toBe(control.id);
     expect(linkRow.unlinkedAt).not.toBeNull();
     expect(linkRow.unlinkedByUserId).toBe(actor.id);
-    // The original link facts are untouched by the withdrawal.
     expect(linkRow.linkedByUserId).toBe(actor.id);
 
     const unlinkAuditEvents = await ctx.prisma.client.auditEvent.findMany({
@@ -151,8 +134,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
       controlId: control.id,
     });
 
-    // Both audit rows for this link are retained together — a complete
-    // history, never overwritten.
     const allAuditEvents = await ctx.prisma.client.auditEvent.findMany({
       where: { entityType: AuditEntityType.RISK_CONTROL_LINK, entityId: link.id },
       orderBy: { occurredAt: 'asc' },
@@ -171,8 +152,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
       email: `${uniqueTestMarker('control-relink-actor')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `risk:treat`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['risk:create', 'risk:treat', 'control:view'],
@@ -185,10 +164,7 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-relink-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
-    // F-46 (ADR-020 part 4) — must be within `actor`'s scope, same reason
-    // as the fixture above.
     const control = await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control-relink'),
@@ -236,17 +212,6 @@ describe('Risk control link/unlink history and audit (T134, FR-076, FR-102)', ()
   });
 });
 
-/**
- * T012/003-controls-management (research.md D-4) — `LinkControlUseCase`
- * now resolves the control through `ControlDirectoryPort`
- * (`PrismaControlRegistryRepository.findById`, T011) instead of reading
- * `prisma.client.control` directly. A refactor that "changes nothing" is
- * exactly the one that goes unnoticed when it breaks — this proves the
- * refusal these two scenarios have always produced (a control that does
- * not exist, and a control that exists but is not active) is IDENTICAL
- * after the swap: same error type, same user-facing message, same
- * "nothing written" outcome.
- */
 describe('Risk control link — refusal is unchanged after the ControlDirectoryPort refactor (T011, research.md D-4)', () => {
   let ctx: IntegrationTestContext;
   let createRiskUseCase: CreateRiskUseCase;
@@ -272,8 +237,6 @@ describe('Risk control link — refusal is unchanged after the ControlDirectoryP
       email: `${uniqueTestMarker('control-link-refusal-actor')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `risk:treat`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['risk:create', 'risk:treat', 'control:view'],
@@ -286,7 +249,6 @@ describe('Risk control link — refusal is unchanged after the ControlDirectoryP
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-refusal-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
     const risk = await createRiskUseCase.execute({
@@ -329,8 +291,6 @@ describe('Risk control link — refusal is unchanged after the ControlDirectoryP
       email: `${uniqueTestMarker('control-link-inactive-actor')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // ADR-020 part 5 — linking a control now also requires `control:view`
-    // on the referenced control, not only `risk:treat`.
     const role = await createRoleWithPermissionsFixture(
       ctx.prisma,
       ['risk:create', 'risk:treat', 'control:view'],
@@ -343,12 +303,8 @@ describe('Risk control link — refusal is unchanged after the ControlDirectoryP
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-inactive-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // F-46 (ADR-020 part 4) — kept WITHIN `actor`'s scope so this test
-    // isolates the "inactive" axis alone, not conflated with "out of
-    // scope" (that axis has its own dedicated test in this file).
     const inactiveControl = await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control-inactive'),
@@ -382,17 +338,6 @@ describe('Risk control link — refusal is unchanged after the ControlDirectoryP
   });
 });
 
-/**
- * ADR-020 part 5, both halves (`docs/architecture/decisions.md`) — closing
- * the gap where only `risk:treat` (the registering side) was ever enforced
- * and `control:view` (the referenced side) was not. `LinkControlUseCase`
- * now folds a missing `control:view` into the SAME refusal a nonexistent
- * control already produces (`ValidationDomainError`/
- * `USER_MESSAGES.risk.treatment.controlNotFound`) — proven here the same
- * way `requirement-control-link.spec.ts` proves the equivalent for
- * Compliance -> Control: identical error, nothing written, and the
- * positive case (both permissions held) genuinely succeeds.
- */
 describe('Risk control link — control:view is required on the referenced control (ADR-020 part 5)', () => {
   let ctx: IntegrationTestContext;
   let createRiskUseCase: CreateRiskUseCase;
@@ -418,9 +363,6 @@ describe('Risk control link — control:view is required on the referenced contr
       email: `${uniqueTestMarker('control-link-noview-actor')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // Deliberately WITHOUT control:view — this is the fixture shape the
-    // seeded `Compliance Manager` role shipped with (Task 2 of this same
-    // change), reproduced here for the Risk -> Control pair.
     const role = await createRoleWithPermissionsFixture(ctx.prisma, ['risk:create', 'risk:treat'], {
       name: `fixture-control-link-noview-role-${randomUUID()}`,
     });
@@ -429,13 +371,8 @@ describe('Risk control link — control:view is required on the referenced contr
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-noview-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // F-46 (ADR-020 part 4) — kept WITHIN `actor`'s scope so this test
-    // isolates the `control:view` axis alone: the refusal below must come
-    // from the missing permission, not be conflated with an out-of-scope
-    // control (that axis has its own dedicated test in this file).
     const control = await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control-noview'),
@@ -517,11 +454,8 @@ describe('Risk control link — control:view is required on the referenced contr
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-bothperm-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // F-46 (ADR-020 part 4) — within `actor`'s scope, or this "succeeds"
-    // test would now be refused by the new scope check.
     const control = await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control-bothperm'),
@@ -550,19 +484,6 @@ describe('Risk control link — control:view is required on the referenced contr
   });
 });
 
-/**
- * F-46 (`docs/deferred-findings.md`) / ADR-020 part 4 — closing the gap
- * where `LinkControlUseCase` resolved the referenced control through
- * `ControlRegistryPort.findById` with NO organizational-scope predicate at
- * all: an actor scoped to unit A could link a risk in unit A to a control
- * belonging to a DIFFERENT unit B, and `GET /risks/{riskId}/controls`
- * would then hand that actor B's control id/code/name — a scope leak
- * (a valid identifier is information). `LinkControlUseCase` now folds an
- * out-of-scope control into the SAME refusal a nonexistent control already
- * produces, proven here the same way
- * `test/integration/requirement-control-link.spec.ts` proves the
- * equivalent for Compliance -> Control.
- */
 describe('Risk control link — organizational scope is enforced on the referenced control (ADR-020 part 4, F-46)', () => {
   let ctx: IntegrationTestContext;
   let createRiskUseCase: CreateRiskUseCase;
@@ -606,7 +527,6 @@ describe('Risk control link — organizational scope is enforced on the referenc
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-scope-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
     const outOfScopeControl = await ctx.prisma.client.control.create({
@@ -626,8 +546,6 @@ describe('Risk control link — organizational scope is enforced on the referenc
       ownerUserId: owner.id,
     });
 
-    // Checked BEFORE the write, not after — the row count is asserted
-    // before AND after the rejected attempt, not merely after it.
     const countBefore = await ctx.prisma.client.riskControlLink.count({
       where: { riskId: risk.id },
     });
@@ -682,12 +600,8 @@ describe('Risk control link — organizational scope is enforced on the referenc
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-scope-null-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // Deliberately no `orgUnitId` — defaults to `null`, visible only to a
-    // `GLOBAL`-scoped actor (this file's header, matching the Compliance
-    // module's own null-handling).
     const unscopedControl = await ctx.prisma.client.control.create({
       data: {
         code: uniqueTestMarker('control-null-org'),
@@ -731,7 +645,6 @@ describe('Risk control link — organizational scope is enforced on the referenc
     const owner = await createUserFixture(ctx.prisma, {
       email: `${uniqueTestMarker('control-link-scope-ok-owner')}@example.test`,
     });
-    // F-CV-2: precondition owner — not the object of any assertion here.
     await makeRiskAssignmentVisible(ctx.prisma, { user: owner, orgUnitId: orgUnit.id });
 
     const inScopeControl = await ctx.prisma.client.control.create({

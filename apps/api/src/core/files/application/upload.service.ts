@@ -1,33 +1,3 @@
-/**
- * T189 — `UploadService`: upload validation (type allow-list, magic-byte
- * sniffing, size limit, checksum) and storage (FR-097, FR-098, FR-100,
- * ADR-010).
- *
- * ## Order of operations, and why nothing is stored on a rejected upload
- *
- * 1. Resolve the PARENT record's accessibility (`entity-registry.ts`) —
- *    permission and organizational scope, combined, throwing
- *    `NotFoundDomainError` on refusal (FR-098, FR-030). Done FIRST so an
- *    upload to a parent the caller cannot see is refused before any
- *    validation work is spent on the file itself.
- * 2. Validate the DECLARED content type against the configured allow-list.
- * 3. Sniff the actual bytes (`domain/magic-bytes.ts`) and require it to
- *    equal the declared type exactly.
- * 4. Defensive size re-check — `AttachmentController`'s `FileInterceptor`
- *    already enforces `ATTACHMENT_MAX_SIZE_BYTES` via multer's own
- *    `limits.fileSize` (surfacing as `413` before this service is ever
- *    reached for a genuinely oversized upload), so reaching this branch
- *    with an oversized buffer should be unreachable in practice; kept as a
- *    second, independent boundary rather than trusting a single check
- *    (CLAUDE.md §12).
- *
- * Every one of 2-4 throws BEFORE `FileStorageProvider.put(...)` is ever
- * called — the storage write and the database row are the LAST two things
- * this method does, in that order, only once every validation has passed.
- * There is no code path that writes bytes to disk and then discovers a
- * validation failure, and no code path that creates the database row
- * before the bytes are safely stored.
- */
 import { Inject, Injectable } from '@nestjs/common';
 import { AttachableEntityType, AuditEntityType } from '@prisma/client';
 
@@ -81,9 +51,6 @@ export class UploadService {
       ]);
     }
 
-    // Defensive only — see file header. `AttachmentController`'s multer
-    // configuration already refuses a genuinely oversized upload with 413
-    // before this service is ever invoked.
     if (input.content.length > maxSizeBytes) {
       throw new Error(
         'UploadService received a buffer larger than ATTACHMENT_MAX_SIZE_BYTES; the multer ' +
@@ -91,14 +58,6 @@ export class UploadService {
       );
     }
 
-    // F-26 fix (research.md D-12/D-R12): `parentAccess.organizationalUnitId`
-    // is already resolved server-side, above, before any validation ran —
-    // no new resolution, no new trust boundary. Partitions the storage key
-    // by scope so identical content in different organizational units is
-    // never deduplicated into one shared object (the cross-scope existence
-    // oracle F-26 measured); `undefined` here gets its own explicit
-    // `unscoped` bucket in `LocalDiskStorageProvider`, never the legacy
-    // prefix and never another caller's scoped bucket.
     const stored = await this.fileStorage.put(input.content, parentAccess.organizationalUnitId);
 
     return this.transactionRunner.run(async () => {

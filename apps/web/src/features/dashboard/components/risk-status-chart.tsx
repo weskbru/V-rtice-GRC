@@ -1,37 +1,3 @@
-/**
- * PharosGRC — dashboard risk-status distribution (T198, FR-049, FR-091,
- * SC-012).
- *
- * Renders `Dashboard.risks.byStatus` exactly as returned by `GET /dashboard`
- * — the eight lifecycle counts are never summed, filtered or recomputed
- * here (ADR-006, Constitution VI). Colour reuses `riskStatusBadgeVariant`
- * (`@/features/risks/status`), the same mapping the register's `StatusBadge`
- * already uses for `RiskStatus`, so this view and the register never
- * disagree about what a status "looks like".
- *
- * ## Why this is a horizontal bar list, not a Recharts bar chart (wave 3)
- *
- * The previous version was a vertical Recharts bar chart with eight
- * category labels rotated -30° along the x-axis — rejected outright by the
- * phase brief regardless of the data, and doubly wrong for this particular
- * distribution: in production data one lifecycle stage (`DRAFT`/"Rascunho")
- * dominates and the other seven sit near zero next to it, so a chart whose
- * y-axis has to span the tallest bar leaves most rows visually
- * indistinguishable from empty. A risk manager reading this tile is asking
- * "how many risks are at each stage, and which stages barely have any" —
- * a ranked list answers that directly: every label reads horizontally
- * (no rotation, no diagonal text to decode), every row — including a
- * genuine zero — gets equal vertical space and its own visible numeral, and
- * the relative bar length still shows the skew at a glance.
- *
- * This is deliberately a real, visible `<table>`, not an `aria-hidden`
- * decorative chart with a separate hidden text mirror (contrast
- * `risk-level-chart.tsx`/`treatment-actions-chart.tsx`, which stay Recharts
- * and so still need `ChartDataTable`): every label and count here is normal
- * accessible text; only the proportional bar fill is `aria-hidden`
- * decoration alongside it, so colour is a third signal on top of the
- * already-legible label and numeral (§18.8) — never the only one.
- */
 import { dashboard } from '@/lib/messages/dashboard';
 import { risks } from '@/lib/messages/risks';
 

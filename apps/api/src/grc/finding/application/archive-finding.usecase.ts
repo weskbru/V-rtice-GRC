@@ -1,17 +1,3 @@
-/**
- * T071a/002-shared-grc-foundation, US3 — `ArchiveFindingUseCase`
- * (`archiveFinding`, FR-027, Invariant F4). `finding:administer`.
- *
- * **Invariant F4**: only a `CLOSED` finding may be archived —
- * `assertLegalFindingTransition(current.status, 'ARCHIVED')` rejects
- * every status but `CLOSED` (`ARCHIVED` appears in no other status's
- * target set in `finding.entity.ts`'s transition table), so archiving can
- * never become a shortcut past closure and its segregation-of-duties rule
- * (F2) — an `OPEN`/`IN_REMEDIATION` finding answers `422`, the
- * adversarial case this task requires. Never deletes: linked evidence and
- * actions stay queryable exactly like `ArchiveEvidenceUseCase`'s own
- * guarantee.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -50,8 +36,6 @@ export class ArchiveFindingUseCase {
     }
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the finding actually exists outside `scope`.
     const current = await this.findingRepository.findById(scope, input.findingId);
     if (!current) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

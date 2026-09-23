@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework register screen (US1), joining the shared
- * exploration frame (CLAUDE.md §18.12): `PageHeader` (in `page.tsx`) →
- * collapsible `FilterBar` (search + "Filtros N" + chips) → `ResultsToolbar`
- * (count + `SortSelect` + `ViewToggle`) → `CardGrid`/`DataTable` →
- * `PaginationFooter` — the same composition `AssetCatalogView`/
- * `ControlCatalogView` already use. No KPI strip: see `compliance.register`'s
- * own header comment (`lib/messages/compliance.ts`) for why a
- * requirement-level breakdown does not belong on a framework list. No
- * quick-view side panel either.
- *
- * Loading, genuinely-empty and failed-to-load stay three distinguishable
- * states, with a retry on failure (never a silent empty list) — unchanged
- * from before this register joined the shared frame.
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -25,6 +10,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { common } from '@/lib/messages/common';
+import { compliance } from '@/lib/messages/compliance';
 
 import { complianceApi } from '../api';
 import {
@@ -40,12 +31,6 @@ import { FrameworkRegisterFilters } from './framework-register-filters';
 import type { FrameworkListView as CatalogViewMode } from '../hooks/use-framework-list-state';
 import type { Framework, FrameworkListSortField } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { common } from '@/lib/messages/common';
-import { compliance } from '@/lib/messages/compliance';
 
 const VIEW_OPTIONS = [
   {

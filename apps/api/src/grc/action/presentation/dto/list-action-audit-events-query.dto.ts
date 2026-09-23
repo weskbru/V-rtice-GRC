@@ -1,15 +1,3 @@
-/**
- * `GET /actions/{actionId}/audit-events`'s query parameters
- * (`contracts/grc-foundation.openapi.yaml`'s `listActionAuditEvents`
- * operation): `page`, `pageSize`, `action`, `actorUserId`, `occurredFrom`,
- * `occurredTo`. Field-for-field the same shape as
- * `modules/risk/presentation/dto/list-risk-audit-events-query.dto.ts`'s
- * `ListRiskAuditEventsQueryDto` — that file's own precedent, not a new
- * design (D-12, CLAUDE.md §19.4 "reutilizar antes de criar"). Inlines
- * `page`/`pageSize` rather than extending a shared base DTO, matching
- * `ListActionQueryDto`'s own established convention in this module (Action
- * has no `PageQueryDto` base the way `modules/risk` does).
- */
 import { Type } from 'class-transformer';
 import {
   IsDateString,

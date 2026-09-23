@@ -1,24 +1,3 @@
-/**
- * T031 — proves `AuditRecorder` writes inside the CALLER's transaction
- * (ADR-005), against a real Nest application and real PostgreSQL:
- *
- *   - a business change and its audit entry commit together;
- *   - when the surrounding transaction rolls back, the audit entry is
- *     ABSENT too — this is the assertion that actually proves ADR-005
- *     (the happy-path commit case alone would pass even for a
- *     fire-and-forget/best-effort audit implementation; only the rollback
- *     case rules that out).
- *   - calling `AuditRecorder.record(...)` with no ambient transaction at
- *     all fails loudly instead of writing a standalone, unaudited-by-
- *     rollback row.
- *
- * Each test exercises the REAL `PrismaService.runInTransaction` and the
- * REAL `PrismaAuditEventWriter` (via Nest DI, `support/test-app.ts`) —
- * nothing here is mocked. A `User` row is used as the "business change"
- * because it is the only table already in the schema this phase may
- * write to; the mechanism being proven (one transaction, two writes) is
- * identical for any future entity type.
- */
 import { randomUUID } from 'node:crypto';
 
 import { AuditEntityType } from '@prisma/client';
@@ -114,11 +93,6 @@ describe('AuditRecorder — transactional coupling (ADR-005, T031)', () => {
               data: { jobTitle: attemptedJobTitle },
             });
 
-            // The audit call itself succeeds and issues its INSERT here —
-            // proving this case is not merely "the audit call was never
-            // reached". The failure that rolls everything back happens
-            // strictly AFTER it, exactly like a downstream business rule
-            // failing later in the same use case.
             await auditRecorder.record({
               action: 'user.job_title_changed',
               entityType: AuditEntityType.USER,
@@ -145,9 +119,6 @@ describe('AuditRecorder — transactional coupling (ADR-005, T031)', () => {
       },
     });
 
-    // The audit INSERT that ran inside the rolled-back transaction left no
-    // trace at all — not "marked failed", not "present but orphaned":
-    // absent, exactly as if it had never been issued.
     expect(auditRows).toHaveLength(0);
   });
 

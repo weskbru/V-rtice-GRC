@@ -1,8 +1,3 @@
-/**
- * T180/D-11 — `/admin/users/{userId}/scope-grants[/**]`: success-shape and
- * business-rule coverage for an administrator holding `user:administer`.
- * 403/401 are covered exhaustively elsewhere.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -182,8 +177,6 @@ describe('Admin organizational scope grant administration (T180, US8)', () => {
       .send({ scopeType: 'UNIT', orgUnitId: orgUnit.id });
     const grantId = (created.body as { id: string }).id;
 
-    // The grant belongs to `target`, not `otherUser` — must 404, not
-    // silently succeed against the wrong owner.
     const wrongOwner = await agent
       .delete(`/api/v1/admin/users/${otherUser.id}/scope-grants/${grantId}`)
       .set('Origin', appOrigin);

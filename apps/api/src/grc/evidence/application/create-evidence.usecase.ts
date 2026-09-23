@@ -1,41 +1,3 @@
-/**
- * T032/002-shared-grc-foundation, US1 — `CreateEvidenceUseCase` (FR-001 to
- * FR-006, FR-010, ADR-005). Mirrors
- * `modules/risk/application/create-risk.usecase.ts`'s shape closely — see
- * that file's header for the transaction-boundary reasoning this one does
- * not repeat.
- *
- * ## Order of checks
- *
- * 1. `orgUnitId` must exist, be active, and lie within the caller's
- *    authorized scope (FR-003/FR-031) — `422`, not `404` (no existing
- *    record's existence could be disclosed at creation time). Assurance
- *    fix (confirmed breach): a nonexistent `orgUnitId` and one that exists
- *    but is outside the caller's scope used to throw two DIFFERENT
- *    messages, letting a scope-limited caller probe for the existence of
- *    an organizational unit — exactly what this endpoint's own contract
- *    promises never happens ("Answered as not-found so the response
- *    cannot confirm existence", `grc-foundation.openapi.yaml`). Both
- *    branches now throw the identical `orgUnitNotFound` message. This is
- *    NOT the same convention `CreateRiskUseCase` uses (it deliberately
- *    keeps the two messages distinct, per its OWN contract, which makes no
- *    such promise) — the two are allowed to differ because they answer to
- *    different contracts, not because one of them is inconsistent.
- * 2. `ownerUserId` must exist and be active (FR-004 referential integrity).
- * 3. Invariant E1 — at least one of `externalUrl`/`observation` (FR-002,
- *    revised; see `evidence.entity.ts`'s own comment for why `fileId` does
- *    not participate).
- * 4. Invariant E2 — `validUntil` not before `collectedOn`.
- *
- * ## Code year
- *
- * `EVD-{year}-{sequence}`'s year is the creation year (server clock, UTC),
- * not `collectedOn`'s year — identical reasoning to
- * `CreateRiskUseCase`'s own interpretive decision (FR-005 deliberately
- * keeps `collectedOn` a business-supplied, possibly backdated field; tying
- * the immutable code to it would let a caller choose which year's sequence
- * a code lands in).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -157,9 +119,6 @@ export class CreateEvidenceUseCase {
     scope: Awaited<ReturnType<ScopeResolverService['resolveScope']>>,
     orgUnitId: string,
   ): Promise<void> {
-    // Assurance fix — see this file's own header: existence and scope
-    // failures are indistinguishable to the caller, both in status (422)
-    // and in message (`orgUnitNotFound`), never `orgUnitOutOfScope`.
     const orgUnit = await this.referenceData.findOrgUnit(orgUnitId);
     if (!orgUnit?.isActive || !isOrgUnitWithinScope(scope, orgUnitId)) {
       throw new ValidationDomainError(USER_MESSAGES.evidence.orgUnitNotFound, [

@@ -1,11 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `ReportCatalogView` (009-indicators-reports, T061) — loading,
- * populated, empty and error states, mirroring the harness `use-report-catalog-state.test.ts`
- * already establishes for mocking `next/navigation`.
- */
 const { replaceMock, listDefinitionsMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
   listDefinitionsMock: vi.fn(),
@@ -109,13 +104,10 @@ describe('ReportCatalogView', () => {
     });
 
     renderView();
-    await screen.findByText('0 relatórios'); // wait for the load to resolve
+    await screen.findByText('0 relatórios');
 
-    // The Situação `<select>` is not on screen until the disclosure is opened...
     expect(screen.queryByLabelText('Situação')).not.toBeInTheDocument();
 
-    // ...but the applied filter is still visible as a chip, and the toggle button states how
-    // many filter fields are behind it — CLAUDE.md §18.11 ("Filtros ativos são visíveis?").
     const toggle = screen.getByRole('button', { name: /Filtros/ });
     expect(toggle).toHaveTextContent('1');
     expect(screen.getByText('Situação: Ativo')).toBeInTheDocument();

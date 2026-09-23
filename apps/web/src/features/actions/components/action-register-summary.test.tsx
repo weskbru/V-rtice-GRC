@@ -5,17 +5,6 @@ import { ActionRegisterSummary } from './action-register-summary';
 
 import type { DashboardSummaryResponse } from '@/features/dashboard/types';
 
-/**
- * Component-mount evidence for `ActionRegisterSummary` (CLAUDE.md §19.7) —
- * `@/features/dashboard/api` is mocked at the network boundary, mirroring
- * `risk-register-summary.test.tsx`'s own approach.
- *
- * The permission-gated-by-omission contract is the behaviour most worth
- * pinning down here: a caller without `action:view` never sees `breakdowns
- * .actions` on the wire, and this component must then render NO strip at
- * all — not a row of zeros, which would be a lie about what that caller can
- * see.
- */
 const { getSummaryMock } = vi.hoisted(() => ({ getSummaryMock: vi.fn() }));
 
 vi.mock('@/features/dashboard/api', () => ({

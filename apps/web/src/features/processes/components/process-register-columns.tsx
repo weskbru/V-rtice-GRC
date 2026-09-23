@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — process catalog column definitions (T046), mirroring
- * `features/audit-engagements/components/audit-engagement-register-
- * columns.tsx` (CLAUDE.md §18.12).
- *
- * `enableSorting` is `false` on every column whose field is absent from
- * `GET /processes`'s `sort` enum (`code, name, updatedAt`) — `orgUnit` and
- * `situation` are shown but never offered as a sortable column header.
- *
- * Situation pairs an icon with its colour and text label (`StatusBadge`,
- * CLAUDE.md §18.8) — never colour alone (FR-019).
- */
 import { StatusBadge } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

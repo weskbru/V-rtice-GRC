@@ -1,10 +1,3 @@
-/**
- * T180/D-11 — `/admin/org-units[/**]`: success-shape and business-rule
- * coverage for an administrator holding `org_unit:administer`. 403/401 are
- * covered exhaustively elsewhere. Materialized-path/cycle mechanics are
- * proved by `test/integration/org-reparent.spec.ts` (T174) — this file
- * focuses on the HTTP surface.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -190,7 +183,6 @@ describe('Admin organizational unit administration (T180, US8)', () => {
     expect(childDeactivation.status).toBe(200);
     expect(childDeactivation.body).toMatchObject({ status: 'INACTIVE' });
 
-    // With the descendant deactivated, the parent can now be too.
     const parentDeactivationRetry = await agent
       .put(`/api/v1/admin/org-units/${parentId}/status`)
       .set('Origin', appOrigin)

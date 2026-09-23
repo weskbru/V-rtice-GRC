@@ -1,20 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem register screen (008-incidents-problems, US2),
- * brought into the shared register family (CLAUDE.md §18.12): the same
- * summary/filters/results-bar/cards-or-table/pagination orchestration
- * `RiskRegisterView`/`ControlCatalogView` already use, reused rather than
- * reinvented for Problems.
- *
- * `GET /problems` has no card-vs-table axis of its own — Cards is simply
- * this family's primary presentation (CLAUDE.md §18), with the table kept
- * for dense comparison of many records at once, exactly like every other
- * register.
- *
- * Never fetches more than the current page — never sorts, filters or
- * paginates client-side.
- */
 import {
   DataTable,
   PageSizeSelect,
@@ -25,6 +10,12 @@ import {
 } from '@pharos/design-system/components';
 import { LayoutGrid, Rows3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SortSelect } from '@/components/register/sort-select';
+import { Button } from '@/components/ui/button';
+import { ApiError } from '@/lib/api-client';
+import { common } from '@/lib/messages/common';
+import { problems } from '@/lib/messages/problems';
 
 import { problemsApi } from '../api';
 import {
@@ -42,12 +33,6 @@ import type { ProblemRegisterView } from '../hooks/use-problem-register-state';
 import type { ProblemSortField } from '../hooks/use-problem-register-state';
 import type { ProblemSummary } from '../types';
 import type { ErrorStateProblem } from '@pharos/design-system/components';
-
-import { SortSelect } from '@/components/register/sort-select';
-import { Button } from '@/components/ui/button';
-import { ApiError } from '@/lib/api-client';
-import { common } from '@/lib/messages/common';
-import { problems } from '@/lib/messages/problems';
 
 const VIEW_OPTIONS = [
   {

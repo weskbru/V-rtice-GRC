@@ -1,18 +1,3 @@
-/**
- * The sole implementation of `RiskControlLinkReadPort`
- * (`shared/grc-ports/risk-control-link-read.port.ts`, ADR-020 part 3).
- * `modules/risk` OWNS the `risk_control_links` table (and `risks`), so this
- * adapter is the one place in the platform allowed to query them on behalf
- * of another module — the mirror image of
- * `modules/controls/infrastructure/control-directory.adapter.ts` for the
- * opposite direction.
- *
- * Previously lived inside `modules/controls` (reading these two tables
- * directly from outside their owning module) — see the port's own header
- * for why. Moving the query here is a pure relocation: the Prisma
- * `where`/`include`/`orderBy` shape and the resulting
- * `RiskControlLinkReadRecord` are unchanged.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

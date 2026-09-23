@@ -1,10 +1,3 @@
-/**
- * `ScopeCachePort` implementation, forwarding to the real `CacheProvider`
- * (T039, ADR-004, D-2). Lives in `core/organizations/infrastructure`
- * because `CacheProvider` (`infrastructure/cache/cache-provider.ts`) is the
- * top-level `infrastructure` element, which only `core-infrastructure`/
- * `core-presentation` may import under the ADR-011 boundary rules.
- */
 import { Inject, Injectable } from '@nestjs/common';
 
 import { CACHE_PROVIDER, type CacheProvider } from '../../../infrastructure/cache/cache-provider';

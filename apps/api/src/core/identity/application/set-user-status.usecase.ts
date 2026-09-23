@@ -1,26 +1,3 @@
-/**
- * T176 — `PUT /admin/users/{userId}/status` (`contracts/admin.openapi.yaml`,
- * FR-011, FR-017). Setting `INACTIVE` prevents further authentication and
- * revokes every session the user holds (reason `USER_DEACTIVATED`) inside
- * the same transaction as the status change — a deactivated user with a
- * live session is still an active user, so the two must be atomic.
- *
- * A caller may not deactivate their own account (`422`) — checked BEFORE
- * any database read, since it depends only on the two ids already in hand.
- *
- * Reuses `SessionService.revokeAllForUser` (`core/sessions`) rather than
- * `AuthUseCasesPort.deactivateUser` (`core/identity`'s own pre-existing
- * deactivation path, `AuthOrchestrator`): that port only ever sets
- * `INACTIVE` and has no reactivation branch, no self-deactivation guard and
- * no `reason` — this use case is the genuinely more capable administrative
- * surface `AuthUseCasesPort.deactivateUser`'s own doc comment anticipated
- * ("a future admin-facing endpoint will call exactly this same port
- * method" turned out not to hold once reactivation and `reason` entered
- * the contract; that pre-existing method is left as-is for whatever
- * non-administrative caller still needs a bare deactivation, per D-12-style
- * "the task sheet's assumption did not survive contact with the full
- * contract").
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType, AuditOutcome, SessionRevocationReason } from '@prisma/client';
 
@@ -76,8 +53,6 @@ export class SetUserStatusUseCase {
     await this.transactionRunner.run(async () => {
       const previousStatus = await this.userDirectory.setStatus(command.userId, command.status);
       if (previousStatus === undefined) {
-        // Defensive only — `existing` was just confirmed above, inside the
-        // same request (users are never hard-deleted, FR-102).
         throw new NotFoundDomainError(USER_ENTITY_LABEL, command.userId);
       }
 
@@ -95,8 +70,6 @@ export class SetUserStatusUseCase {
       });
 
       if (command.status === 'INACTIVE') {
-        // FR-017: revoked atomically with the status change — a
-        // deactivated user with a live session is still an active user.
         await this.sessionService.revokeAllForUser(
           command.userId,
           SessionRevocationReason.USER_DEACTIVATED,

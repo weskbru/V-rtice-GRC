@@ -1,20 +1,3 @@
-/**
- * `ListActionAuditEventsUseCase` (`GET /actions/{actionId}/audit-events`,
- * `contracts/grc-foundation.openapi.yaml`'s `listActionAuditEvents`
- * operation), exercised end to end against the real database — mirrors
- * `test/integration/risk-action-convergence.spec.ts`'s own methodology
- * (real Nest testing module, real Postgres, no HTTP layer).
- *
- * Proves the trail assembled by `AuditQueryService`/`PrismaAuditEventReader`
- * — read from the REAL repository, not a mock — contains every event a
- * shared `Action` produces across its lifecycle: creation
- * (`action.created`), a field edit (`action.updated`) and a lifecycle
- * transition (`action.started`), all recorded under the SAME
- * `AuditEntityType.ACTION` / `entityId = action.id` reference
- * (`create-action.usecase.ts`/`update-action.usecase.ts`/
- * `transition-action.usecase.ts`, all verified by direct reading before
- * this file was written).
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -148,15 +131,9 @@ describe('Action audit trail (GET /actions/{actionId}/audit-events), exercised a
     expect(actionsSeen).toContain('action.created');
     expect(actionsSeen).toContain('action.updated');
     expect(actionsSeen).toContain('action.started');
-    // Every event in THIS action's own trail is keyed to the same entity —
-    // never a mix of ACTION and, say, RISK_TREATMENT_ACTION rows (this
-    // endpoint is the shared Action's own trail, not a merge of every route
-    // that can touch its origin — see the use case's own header).
     expect(page.items.every((item) => item.entityType === 'ACTION')).toBe(true);
     expect(page.items.every((item) => item.entityId === actionId)).toBe(true);
 
-    // Newest first (ADR-009's own pagination convention) — the transition
-    // (last write) must not sort after the creation (first write).
     const occurredAtByAction = new Map(page.items.map((item) => [item.action, item.occurredAt]));
     expect(occurredAtByAction.get('action.started')!.getTime()).toBeGreaterThanOrEqual(
       occurredAtByAction.get('action.created')!.getTime(),
@@ -203,9 +180,6 @@ describe('Action audit trail (GET /actions/{actionId}/audit-events), exercised a
 
   it('a caller holding action:view but not audit:view is refused with ForbiddenDomainError', async () => {
     const { actionId, orgUnitId } = await setupRiskBackedAction();
-    // SAME org unit as the action's own origin — this proves the 403 gate
-    // (missing `audit:view`) is reached at all, which requires the actor to
-    // first clear the `action:view` + origin-scope gate above it.
     const viewerId = await setupActor(['action:view'], orgUnitId);
 
     await expect(

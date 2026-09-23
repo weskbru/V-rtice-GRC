@@ -9,16 +9,6 @@ import { FindingCorrectiveActions } from './finding-corrective-actions';
 import type { UserRef } from '../types';
 import type { Action } from '@/features/actions/types';
 
-/**
- * Component-mount evidence for the finding side of the missing corrective-
- * action affordance (audit-findings follow-up, 2026-09-12) — mirrors
- * `incident-corrective-actions.test.tsx`/`problem-corrective-actions.test
- * .tsx` closely, with `originType: 'FINDING'` and permissions supplied via
- * `AuthProvider`/`buildTestSession` (this component reads them itself via
- * `usePermissions()` — see its own header for why) rather than as plain
- * boolean props.
- */
-
 const { listActionsMock, createActionMock, transitionActionMock } = vi.hoisted(() => ({
   listActionsMock: vi.fn(),
   createActionMock: vi.fn(),
@@ -177,13 +167,6 @@ describe('FindingCorrectiveActions', () => {
     });
   });
 
-  /**
-   * The finding row above this section shows `openActionCount`, derived on
-   * the server from the `actions` table. Creating an action here changes it.
-   * Rendered verification caught the row still reporting "2 ações em aberto"
-   * after a third was created — a dead number replaced by a wrong one, in
-   * the very surface built to make that number lead somewhere.
-   */
   it('tells its host to re-read the finding after creating an action, so the open count cannot go stale', async () => {
     listActionsMock.mockResolvedValue({ items: [], page: 1, pageSize: 20, total: 0 });
     createActionMock.mockResolvedValue(actionFixture({ title: 'Nova ação de remediação' }));

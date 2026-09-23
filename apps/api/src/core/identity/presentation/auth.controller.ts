@@ -1,24 +1,3 @@
-/**
- * T067 — `AuthController`. Matches `auth.openapi.yaml` exactly (see this
- * task's report for the one documented gap: CSRF's 403 branch is not
- * listed on `POST /auth/login` in the contract, but ADR-002 requires the
- * Origin/Referer check on every state-changing request without exception —
- * `CsrfMiddleware`, T065, applies it there too).
- *
- * Read-only endpoints (`GET /auth/session`, `GET /auth/me`) call
- * `UserDirectoryPort`/`PermissionResolverService`/`ScopeResolverService`
- * directly — no transaction, no audit event, so no need to go through
- * `AuthUseCasesPort`. Every WRITE (`login`, `logout`,
- * `POST /auth/me/password`) goes through `AuthUseCasesPort`, which alone
- * may open the atomic write+audit transaction (see that port's header).
- *
- * S-01 (audit A6-F01): `logout`/`getCurrentSession`/`getOwnProfile`/
- * `changeOwnPassword` carry `@AllowedDuringMandatoryPasswordChange()` — the
- * exact, minimal set of routes a user whose password change is pending
- * needs to reach the password-change screen and act on it. Every other
- * authenticated route in the platform is refused by
- * `MandatoryPasswordChangeGuard` while that flag is set.
- */
 import {
   Body,
   Controller,

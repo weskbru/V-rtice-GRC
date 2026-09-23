@@ -5,18 +5,6 @@ import { UserAdminFilters } from './user-admin-filters';
 
 import type { UserAdminFiltersProps } from './user-admin-filters';
 
-/**
- * PharosGRC — Administration, users filter toolbar composition.
- *
- * Regression coverage for a real defect a rendered check found: the search
- * term reached the URL and the "Filtros N" badge counted it correctly, but
- * the CHIP ROW never rendered a chip for it — `activeFilterChips` was built
- * from `singleValueChip` alone, with no `searchChip`. A caller who typed a
- * search term and then opened the collapsed panel had no way to see — or
- * remove — that filter without clearing everything. Reverting the fix (the
- * missing `searchChip(...)` entry) makes the first test below fail.
- */
-
 const { listRolesMock } = vi.hoisted(() => ({ listRolesMock: vi.fn() }));
 
 vi.mock('../../api', () => ({

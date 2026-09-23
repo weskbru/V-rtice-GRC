@@ -1,23 +1,3 @@
-/**
- * Maps `DashboardSummaryOutput`
- * (`application/get-dashboard-summary.usecase.ts`) to
- * `contracts/platform.openapi.yaml`'s `DashboardSummary` wire shape. The
- * ONE place a dashboard summary aggregate becomes a response body
- * (ADR-009), mirroring `modules/risk/presentation/dto/
- * dashboard-response.mapper.ts`'s own role for `GET /dashboard`.
- *
- * `value`/`valueByBucket` are copied through AS-IS, including `undefined`
- * — `JSON.stringify` (Nest's default serializer) drops an `undefined`
- * property entirely rather than emitting `null` or `0`, which is exactly
- * the "omitted, not zeroed" distinction the contract requires (see the
- * use case's own header and `contracts/platform.openapi.yaml`'s
- * `getDashboardSummary` description).
- *
- * `breakdowns`' six blocks follow the identical convention: a block the
- * caller lacks permission for is `undefined` on the use case's own output
- * already, and is copied through as-is here — never coerced to `null` or
- * to an empty-but-present object.
- */
 import type {
   DashboardSummaryActionsBreakdown,
   DashboardSummaryBreakdownsOutput,

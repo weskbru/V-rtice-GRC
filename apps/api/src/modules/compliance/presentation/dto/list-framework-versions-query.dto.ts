@@ -1,9 +1,3 @@
-/**
- * T030/004-compliance-management — matches `GET
- * /frameworks/{frameworkId}/versions`'s query parameters exactly
- * (`contracts/compliance.openapi.yaml`'s `listFrameworkVersions`
- * operation).
- */
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 

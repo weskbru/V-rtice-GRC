@@ -1,21 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident register filter toolbar (008-incidents-problems,
- * US1), joining the shared exploration frame (CLAUDE.md §18.12): the same
- * collapsible `FilterBar` + chip row + `ReferenceDataError` composition
- * `AssetRegisterFilters`/`AuditEngagementRegisterFilters` already use.
- *
- * Two `MultiSelectFilter`s for the closed enums (`status[]`, `severity[]`,
- * both `style: form, explode: true`) plus one single-value `Select` for
- * `orgUnitId` — this contract's own `listIncidents` operation accepts
- * exactly one organizational unit per request, never an array (matching
- * `AssetRegisterFilters`'s own `orgUnitId` shape, not `RiskRegisterFilters`'s
- * multi-select one). Reference data (organizational units) is fetched once
- * on mount, the same "loading / loaded-empty / failed are three
- * distinguishable states, never a silently empty option list" discipline
- * every other register's filter toolbar already applies.
- */
 import {
   FilterBar,
   MultiSelectFilter,
@@ -23,12 +7,6 @@ import {
   type MultiSelectFilterOption,
 } from '@pharos/design-system/components';
 import { useEffect, useState } from 'react';
-
-import { incidentsApi } from '../api';
-
-import type { IncidentSeverity, IncidentStatus } from '../types';
-import type { OrgUnitNode } from '@/features/risks/types';
-import type { ReactNode } from 'react';
 
 import { ReferenceDataError } from '@/components/register/reference-data-error';
 import {
@@ -41,6 +19,12 @@ import {
 import { common } from '@/lib/messages/common';
 import { incidents } from '@/lib/messages/incidents';
 import { multiSelectChip, searchChip, singleValueChip } from '@/lib/register/filter-chips';
+
+import { incidentsApi } from '../api';
+
+import type { IncidentSeverity, IncidentStatus } from '../types';
+import type { OrgUnitNode } from '@/features/risks/types';
+import type { ReactNode } from 'react';
 
 const ALL_VALUE = '__all__';
 
@@ -63,7 +47,6 @@ export interface IncidentRegisterFiltersProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }

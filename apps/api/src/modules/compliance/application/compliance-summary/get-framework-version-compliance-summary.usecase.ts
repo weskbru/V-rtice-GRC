@@ -1,27 +1,3 @@
-/**
- * T054/004-compliance-management, User Story 3 —
- * `GetFrameworkVersionComplianceSummaryUseCase`. `GET
- * /frameworks/{frameworkId}/versions/{versionId}/compliance-summary`
- * (`getFrameworkVersionComplianceSummary` operation, FR-020, research.md
- * D-8/D-10).
- *
- * ## One calculator, aggregated — never a second rule
- *
- * `RequirementComplianceReaderService.deriveForMany` (D-8's single
- * calculator, batched per D-10) computes every requirement's own
- * `complianceState` first; this use case does nothing but TALLY that
- * already-computed value into `counts`, plus the two headline numbers.
- * `counts.notApplicable` and the other four buckets are simply how many
- * requirements landed in each of the five states `calculateRequirementComplianceState`
- * can ever return — there is no extra "is this one applicable" filter
- * step, because `NOT_APPLICABLE` and the other four states are already
- * mutually exclusive by construction (D-8's own branches).
- *
- * `applicableRequirementCount = totalRequirements - counts.notApplicable`
- * and `compliancePercentage = counts.compliant / applicableRequirementCount
- * * 100`, `null` when that denominator is zero (FR-020's own "nada a
- * medir ainda" — never `0`, which would assert zero compliance, nor `100`).
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

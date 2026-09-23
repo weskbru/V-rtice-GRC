@@ -1,8 +1,3 @@
-/**
- * T153/T157 — the sole implementation of `ApprovalRepositoryPort`. No scope
- * predicate anywhere in this file — same "the caller already authorized
- * the parent risk" reasoning as `RiskTreatmentDecisionRepository`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -73,16 +68,6 @@ export class ApprovalRepository implements ApprovalRepositoryPort {
     return rows.map(toRecord);
   }
 
-  /**
-   * FR-029b — the ONLY `UPDATE` this repository ever issues against this
-   * table, and the ONLY one the `approvals_append_only` trigger
-   * (`20260905170100_risk_lifecycle_and_approvals_baseline`) will accept:
-   * setting exactly `status`/`decided_by_user_id`/`decided_at`/
-   * `justification` on a row whose `status` is currently `PENDING`. Any
-   * other shape of `UPDATE` against this table — from this repository or
-   * anywhere else — is rejected at the database level, not merely by
-   * convention.
-   */
   async decide(input: DecideApprovalInput): Promise<ApprovalRecord> {
     const updated = await this.prisma.client.approval.update({
       where: { id: input.id },

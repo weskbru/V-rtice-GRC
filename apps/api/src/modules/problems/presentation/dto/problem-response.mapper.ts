@@ -1,11 +1,3 @@
-/**
- * 008-incidents-problems, US2 — maps `ProblemRecord`
- * (`domain/ports/problem-repository.port.ts`) to the wire shape
- * `contracts/problems.openapi.yaml`'s `ProblemSummary`/`ProblemDetail`
- * describe. This is the ONLY place a `Problem` becomes a response body —
- * no Prisma model, and no `ProblemRecord` either, is ever returned
- * directly from `ProblemController` (ADR-009).
- */
 import type { ProblemRecord } from '../../domain/ports/problem-repository.port';
 import type { ProblemSeverity, ProblemStatus } from '@prisma/client';
 

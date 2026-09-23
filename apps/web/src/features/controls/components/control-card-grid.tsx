@@ -1,21 +1,13 @@
 'use client';
 
-/**
- * PharosGRC — control catalog card view (CLAUDE.md §18.12).
- *
- * The grid frame — list semantics, responsive columns, the
- * loading/error/empty contract — is the shared `CardGrid`. What stays here
- * is the part that is about controls: which card to render, and a skeleton
- * shaped like that card.
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
+
+import { Skeleton } from '@/components/ui/skeleton';
+import { controls } from '@/lib/messages/controls';
 
 import { ControlCard } from './control-card';
 
 import type { ControlSummary } from '../types';
-
-import { Skeleton } from '@/components/ui/skeleton';
-import { controls } from '@/lib/messages/controls';
 
 export interface ControlCardGridProps {
   controls: readonly ControlSummary[];

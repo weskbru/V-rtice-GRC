@@ -1,14 +1,3 @@
-/**
- * T053/002-shared-grc-foundation, US2 — maps `ActionWithDerived`
- * (`application/get-action.usecase.ts`) to the wire shape
- * `contracts/grc-foundation.openapi.yaml`'s `Action` schema describes. ONE
- * mapper is the only place a domain object becomes this DTO (ADR-009),
- * mirroring `evidence-response.mapper.ts`'s discipline.
- *
- * `overdue` and `originLabel` are both computed/resolved upstream (by
- * `GetActionUseCase`/`ListActionUseCase`) — this mapper only shapes what it
- * is given, never re-derives either.
- */
 import type { ActionWithDerived } from '../../application/get-action.usecase';
 import type { ActionOriginType, ActionStatus } from '@prisma/client';
 

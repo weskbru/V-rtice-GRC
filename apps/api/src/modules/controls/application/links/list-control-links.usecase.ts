@@ -1,11 +1,3 @@
-/**
- * T037-T038/003-controls-management, User Story 3 —
- * `ListControlProcessLinksUseCase`/`ListControlAssetLinksUseCase`/
- * `ListControlRiskLinksUseCase`. `GET
- * /controls/{controlId}/processes|assets|risks`. All three require
- * `control:view` and scope, resolved identically via
- * `ControlAccessResolver` before reading the requested link table.
- */
 import { Injectable } from '@nestjs/common';
 
 import { RiskControlLinkReadPort } from '../../../../shared/grc-ports/risk-control-link-read.port';
@@ -50,9 +42,6 @@ export class ListControlAssetLinksUseCase {
   }
 }
 
-/** T038, FR-021 — read-only: reads the existing `RiskControlLink`,
- * creates/removes nothing (that remains exclusively
- * `POST`/`DELETE /risks/{riskId}/controls` on the Risk side). */
 @Injectable()
 export class ListControlRiskLinksUseCase {
   constructor(

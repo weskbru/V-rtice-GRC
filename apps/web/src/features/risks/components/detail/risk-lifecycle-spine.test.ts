@@ -4,22 +4,6 @@ import { buildRiskLifecycleSpine, resolveRiskLifecycleSpineNode } from './risk-l
 
 import type { AvailableRiskTransition, RiskStatus } from '../../types';
 
-/**
- * Pure-logic evidence for the lifecycle spine derivation
- * (016-risk-detail-experience §4.6, F-CV-3).
- *
- * F-CV-3 replaced a client-side "necessary prefix" GUESS (DRAFT/IDENTIFIED/
- * ASSESSED always traversed once the risk has moved past them, plus one
- * hand-written CLOSED-when-ARCHIVED exception) with the server's own
- * `traversedStatuses` — derived from this risk's real, append-only
- * transition history. These tests exercise the CALLER-supplied set
- * directly; they no longer assert an inference rule, because there is no
- * inference left to assert. The set below (`traversed`) mirrors what
- * `buildRiskLifecycleSpine`/`resolveRiskLifecycleSpineNode` receive as their
- * own parameter — this file constructs it exactly like `lifecycle.
- * traversedStatuses` from `GET /risks/{riskId}/lifecycle` would.
- */
-
 function traversedSet(...statuses: readonly RiskStatus[]): ReadonlySet<RiskStatus> {
   return new Set(statuses);
 }
@@ -44,13 +28,6 @@ describe('resolveRiskLifecycleSpineNode', () => {
     }
   });
 
-  /**
-   * The exact defect report (F-CV-3): a risk that visited UNDER_TREATMENT
-   * on its way to ARCHIVED must still show UNDER_TREATMENT as traversed —
-   * the OLD prefix rule could never represent this (UNDER_TREATMENT was
-   * hard-coded to NEVER be traversed, on the theory that real paths always
-   * skip it, which is false for a risk whose real path did not).
-   */
   it("marks UNDER_TREATMENT/UNDER_REVIEW/ACCEPTED as traversed when the server's own history says so, even from CLOSED or ARCHIVED", () => {
     const traversed = traversedSet(
       'DRAFT',
@@ -69,9 +46,6 @@ describe('resolveRiskLifecycleSpineNode', () => {
   });
 
   it('does NOT mark a status as traversed when it is absent from traversedStatuses, even if a prefix guess would have said so', () => {
-    // A risk that went straight DRAFT -> IDENTIFIED -> ASSESSED -> ACCEPTED
-    // never visited UNDER_TREATMENT — the server's own set omits it, and
-    // this must not be inferred back in.
     const traversed = traversedSet('DRAFT', 'IDENTIFIED', 'ASSESSED', 'ACCEPTED');
     const node = resolveRiskLifecycleSpineNode('UNDER_TREATMENT', 'ACCEPTED', [], traversed);
     expect(node.state).not.toBe('traversed');
@@ -142,7 +116,6 @@ describe('buildRiskLifecycleSpine', () => {
     expect(stateOf('UNDER_REVIEW')).toBe('traversed');
     expect(stateOf('CLOSED')).toBe('traversed');
     expect(stateOf('ARCHIVED')).toBe('current');
-    // ACCEPTED was never visited on this risk's own path.
     expect(stateOf('ACCEPTED')).not.toBe('traversed');
   });
 });

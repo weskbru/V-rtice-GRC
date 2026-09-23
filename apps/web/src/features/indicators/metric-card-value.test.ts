@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-/**
- * Unit evidence for `buildAvailableMetricCardValue`/`buildUnavailableMetricCardValue`
- * (T060) — the single place that maps a metric's shape (`SINGLE_VALUE` vs.
- * `BY_BUCKET`) and failure reason onto `MetricCard`'s value prop. This is
- * exactly the "mapeamento de forma de métrica para o cartão certo" the
- * phase's own test requirement names.
- */
 import {
   buildAvailableMetricCardValue,
   buildUnavailableMetricCardValue,
@@ -75,11 +68,6 @@ describe('buildAvailableMetricCardValue', () => {
 });
 
 describe('metricScopeLabel', () => {
-  // S-07 (A4-F01): the metric's OWN `scopeApplicability` decides the label for an
-  // `ORGANIZATION_WIDE` metric (COMPLIANCE_PERCENTAGE today) — never the caller's scope alone.
-  // Before the fix this function took only `callerScopeIsGlobal` and this exact case ("UNIT" caller,
-  // "ORGANIZATION_WIDE" metric) returned "Escopo: Sua unidade organizacional", which is wrong: the
-  // value shown is always computed for the whole organization regardless of who asks.
   it('labels an ORGANIZATION_WIDE metric "Organização inteira" even for a UNIT-scoped caller', () => {
     expect(metricScopeLabel('ORGANIZATION_WIDE', false)).toBe('Escopo: Organização inteira');
   });
@@ -89,10 +77,6 @@ describe('metricScopeLabel', () => {
   });
 
   it("falls back to the caller's own scope for an ORGANIZATIONAL_UNIT metric", () => {
-    // Plural/count-free wording, never "Sua unidade organizacional" (singular) — a caller's
-    // resolved `orgUnitIds` can hold more than one id (several grants, or one grant expanded to
-    // its descendants, FR-025b), so the label names the category, not a cardinality it cannot
-    // verify. See `indicators.register.scopeLabel`'s own doc comment for the full evidence.
     expect(metricScopeLabel('ORGANIZATIONAL_UNIT', false)).toBe(
       'Escopo: Unidades organizacionais do seu escopo',
     );

@@ -1,34 +1,3 @@
-/**
- * T142 — `LinkAssetUseCase`/`UnlinkAssetUseCase` (FR-053, FR-076, FR-025c,
- * FR-084, ADR-005, ADR-013, ADR-008). `POST`/`DELETE /risks/{riskId}/assets[/{linkId}]`
- * (`contracts/risks.openapi.yaml`'s `linkAssetToRisk`/`unlinkAssetFromRisk`).
- * Gated by `risk:edit`, not `risk:treat` — see `process-link.usecase.ts`,
- * which this mirrors exactly, replacing "process" with "asset".
- *
- * ## T034/006-assets-processes — "Vazamento 2" closed (ADR-020 parts 4/5)
- *
- * Until this fix, the referenced asset was resolved through
- * `AssetRegistryPort.findById` — a lookup that never carried `orgUnitId` at
- * all — so an actor scoped to unit A could link a risk in unit A to an
- * asset belonging to unit B: `GET /risks/{riskId}/assets` would then hand
- * that caller an out-of-scope asset's id, code and name, exactly the
- * disclosure ADR-020 part 4 exists to prevent, and exactly the gap F-46
- * closed for `LinkControlUseCase` (`control-link.usecase.ts`, same
- * directory) and left open here (spec §"Contexto medido").
- *
- * The fix mirrors `LinkControlUseCase` exactly: this file now resolves the
- * asset through `AssetDirectoryPort` (`shared/grc-ports/`, not
- * `AssetRegistryPort`, which never exposed scope and is left bound/unused
- * in `risk.module.ts` rather than deleted — a broader cleanup out of this
- * fix's own scope) and reuses the same `isOrgUnitWithinScope` predicate
- * every other cross-module link check in this codebase shares. An asset
- * with `orgUnitId === null` is visible only to a caller with `GLOBAL`
- * scope, matching `LinkControlUseCase`'s own null-handling. ADR-020 part
- * 5 — creating the link also now requires `asset:view` on the referenced
- * asset, not only `risk:edit`; both conditions are folded into the SAME
- * `ValidationDomainError`, never a branch that could disclose which one
- * failed.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -88,8 +57,6 @@ export class LinkAssetUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the risk actually exists outside `scope`.
     const currentRisk = await this.riskRepository.findById(scope, input.riskId);
     if (!currentRisk) {
       return this.scopeEnforcer.assertExistingRecordAccessible(
@@ -105,19 +72,10 @@ export class LinkAssetUseCase {
     }
     assertBusinessContentEditable(currentRisk.status);
 
-    // ADR-020 part 4 (FR-010, FR-011) - an asset outside the actor's
-    // organizational scope answers exactly as a nonexistent one. ADR-020
-    // part 5 - an asset that does not exist/is inactive and one the actor
-    // lacks `asset:view` for answer with the exact same refusal: all
-    // conditions are folded into ONE check, never branches that could
-    // diverge in shape.
     const [asset, canViewAsset] = await Promise.all([
       this.assetDirectory.findById(input.assetId),
       this.permissionResolver.hasPermission(input.actorUserId, 'asset:view'),
     ]);
-    // An asset with `orgUnitId === null` is visible only to a caller with
-    // `GLOBAL` scope - matches `LinkControlUseCase`'s own null-handling
-    // exactly.
     const assetOutOfScope = Boolean(
       asset &&
       (asset.orgUnitId === null
@@ -201,8 +159,6 @@ export class UnlinkAssetUseCase {
 
     const scope = await this.scopeResolver.resolveScope(input.actorUserId);
 
-    // F-38: recorded server-side, via `assertExistingRecordAccessible`,
-    // whenever the risk actually exists outside `scope`.
     const currentRisk = await this.riskRepository.findById(scope, input.riskId);
     if (!currentRisk) {
       return this.scopeEnforcer.assertExistingRecordAccessible(

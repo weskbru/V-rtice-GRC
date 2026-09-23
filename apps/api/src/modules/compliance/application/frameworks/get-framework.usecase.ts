@@ -1,10 +1,3 @@
-/**
- * T021/004-compliance-management — `GetFrameworkUseCase`: the read side of
- * `GET /frameworks/{frameworkId}` (`getFramework` operation). No scope
- * resolution, no scope-denial recording (research.md D-2) — unlike
- * `GetControlUseCase`, a `Framework` that does not exist is simply
- * `NotFoundDomainError`, never a scope question.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

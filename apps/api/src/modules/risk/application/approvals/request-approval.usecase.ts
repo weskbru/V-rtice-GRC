@@ -1,33 +1,3 @@
-/**
- * T157 — `RequestApprovalUseCase` (ADR-006, FR-029, FR-029c, FR-029d,
- * ADR-013). `POST /risks/{riskId}/approvals`
- * (`contracts/risks.openapi.yaml`'s `requestRiskApproval` operation).
- * Requires `risk:transition` — enforced statically by
- * `@RequirePermission('risk:transition')` on the controller route, since
- * every approval-gated row in the transition table names the SAME
- * permission to request it (`domain/risk-lifecycle.ts`'s own header
- * explains why "request" and "decide" are always distinct permissions).
- *
- * ## FR-029c — the risk stays exactly where it is
- *
- * This use case NEVER writes `Risk.status`. It writes `pendingApprovalId`
- * only, via the SAME version-gated `applyLifecycleTransition` mechanism
- * every other lifecycle write uses (ADR-013) — "awaiting approval is an
- * explicit condition on the record, not a ninth state" (the contract's own
- * words). Applying the transition itself is `DecideApprovalUseCase`'s job,
- * on `APPROVED` only.
- *
- * ## Two independent guards against a double-pending approval
- *
- * `current.pendingApprovalId !== undefined` is checked here, in the
- * application layer, before ever inserting a row — but the
- * `approvals_one_pending_per_entity` partial unique index
- * (`20260905170100_risk_lifecycle_and_approvals_baseline`) is what actually
- * makes this race-free: two simultaneous requests could both pass this
- * in-memory check before either commits, and the SECOND `INSERT` (whichever
- * one loses the race) fails on the unique index instead, which this method
- * maps to the SAME 409 `ConflictDomainError`.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType, type RiskStatus } from '@prisma/client';
 
@@ -56,9 +26,7 @@ const RISK_ENTITY_LABEL = 'Risco';
 export interface RequestApprovalInput {
   readonly actorUserId: string;
   readonly riskId: string;
-  /** From the `If-Match` header (ADR-013). */
   readonly expectedVersion: number;
-  /** The only gated targets in this release (FR-029). */
   readonly toStatus: Extract<RiskStatus, 'ACCEPTED' | 'CLOSED'>;
   readonly justification?: string | null | undefined;
 }
@@ -101,8 +69,6 @@ export class RequestApprovalUseCase {
 
     const preconditionResults = evaluatePreconditions(rule.preconditions, {
       risk: current,
-      // Gated rows never declare `REASSESSED_DURING_REVIEW` (only the
-      // UNDER_REVIEW -> ASSESSED return path does) — irrelevant here.
       reassessedDuringReview: false,
     });
     const unmet = preconditionResults.filter((result) => !result.met);

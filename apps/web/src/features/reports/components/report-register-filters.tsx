@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — report catalog filter toolbar (009-indicators-reports, T061). Mirrors the
- * `isActive` half of `features/assets/components/asset-register-filters.tsx` (CLAUDE.md §18.12) —
- * no free-text search, no org-unit filter: `listReportDefinitions` declares only `isActive` beyond
- * pagination (`contracts/reports.openapi.yaml`).
- *
- * Collapsible disposition (CLAUDE.md §18.12 family convergence, `FilterBar`'s own doc comment on
- * `collapsible`): the single `Situação` control lives behind the "Filtros" disclosure button, and
- * the active-filter chip stays visible whether the panel is open or closed — same shape as
- * `AuditEngagementRegisterFilters`, which converges a register with no search either.
- */
 import { FilterBar, type ActiveFilterChip } from '@pharos/design-system/components';
 
 import {
@@ -30,7 +19,6 @@ export interface ReportRegisterFiltersProps {
   isActive: boolean | undefined;
   onIsActiveChange: (value: boolean | undefined) => void;
   hasActiveFilters: boolean;
-  /** Shown as a badge on the collapsed "Filtros" button. */
   activeFilterCount: number;
   onClearFilters: () => void;
 }

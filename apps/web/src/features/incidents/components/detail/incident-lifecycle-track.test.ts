@@ -6,16 +6,6 @@ import { buildIncidentLifecycleTrack } from './incident-lifecycle-track';
 
 import type { IncidentDetail, IncidentStatus } from '../../types';
 
-/**
- * Pure-logic evidence for the "Ciclo de vida" track model
- * (018-incident-detail-experience, Fase 2+3) — the honesty constraints this
- * module exists to enforce (see its own header comment): `IN_PROGRESS` is
- * NEVER marked completed, `CANCELLED` only ever appears as a node when the
- * incident's CURRENT status actually is `CANCELLED`, and `OPEN`/`RESOLVED`/
- * `CLOSED` are only "completed" when a real timestamp on the payload proves
- * it, never inferred from status order alone.
- */
-
 function facts(
   status: IncidentStatus,
   overrides: { resolvedAt?: string | null; closedAt?: string | null } = {},
@@ -36,7 +26,6 @@ describe('buildIncidentLifecycleTrack', () => {
     const model = buildIncidentLifecycleTrack(incident, availableIncidentTransitions('OPEN'));
 
     expect(nodeState(model, 'OPEN')).toBe('current');
-    // OPEN -> IN_PROGRESS is a legal, offered transition.
     expect(nodeState(model, 'IN_PROGRESS')).toBe('available');
     expect(nodeState(model, 'RESOLVED')).toBe('unavailable');
     expect(nodeState(model, 'CLOSED')).toBe('unavailable');
@@ -90,9 +79,6 @@ describe('buildIncidentLifecycleTrack', () => {
       ),
     ).toBe('completed');
 
-    // Defensive case: a CLOSED incident should always carry resolvedAt in
-    // practice (CLOSED is only reachable from RESOLVED), but the model must
-    // not silently assume it — only the timestamp itself proves the fact.
     const closedWithoutResolvedAt = facts('CLOSED', { closedAt: '2026-01-03T10:00:00.000Z' });
     expect(
       nodeState(
@@ -113,9 +99,6 @@ describe('buildIncidentLifecycleTrack', () => {
     );
     expect(cancelledModel.cancelled).toEqual({ status: 'CANCELLED', state: 'current' });
 
-    // OPEN and IN_PROGRESS both offer CANCELLED as a legal target transition
-    // — that must never surface as a rendered node on an incident that has
-    // not actually been cancelled.
     const open = facts('OPEN');
     expect(
       buildIncidentLifecycleTrack(open, availableIncidentTransitions('OPEN')).cancelled,

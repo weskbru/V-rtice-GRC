@@ -5,15 +5,6 @@ import { FindingCloseDialog } from './finding-close-dialog';
 
 import type { Finding } from '../types';
 
-/**
- * Component-mount evidence for T077 (`FindingCloseDialog`, 005-audit-findings,
- * FR-010). `../api` and `@/features/evidence/api` are mocked at the network
- * boundary, mirroring `findings-panel.test.tsx`'s own pattern. These tests
- * specifically exercise the ADDITIVE evidence requirement this phase
- * introduces on top of the pre-existing Invariant F1/F2 (segregation of
- * duties), which `findings-panel.test.tsx` already covers.
- */
-
 const { closeFindingMock, listBySubjectMock } = vi.hoisted(() => ({
   closeFindingMock: vi.fn(),
   listBySubjectMock: vi.fn(),

@@ -1,9 +1,3 @@
-/**
- * 009-indicators-reports, T027 — `INCIDENT_OPEN_COUNT_BY_SEVERITY`.
- * Delegates to `IncidentMetricsPort`
- * (`shared/grc-ports/incident-metrics.port.ts`), which itself reuses
- * `PrismaIncidentRepository.list` — no query of this file's own.
- */
 import { Injectable } from '@nestjs/common';
 
 import { IncidentMetricsPort } from '../../../../shared/grc-ports/incident-metrics.port';

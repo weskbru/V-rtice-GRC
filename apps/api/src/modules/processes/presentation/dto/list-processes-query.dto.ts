@@ -1,9 +1,3 @@
-/**
- * T022/006-assets-processes — matches `GET /processes`'s query parameters
- * exactly (`contracts/processes.openapi.yaml`'s `listProcessCatalog`
- * operation). Identical in shape to
- * `modules/assets/presentation/dto/list-assets-query.dto.ts` (FR-020).
- */
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -39,11 +33,6 @@ function splitCsv({ value }: { value: unknown }): unknown {
   return items.length > 0 ? items : undefined;
 }
 
-/** See `modules/assets/presentation/dto/list-assets-query.dto.ts`'s own
- * `toBoolean` doc comment (FR-020) — identical fix, for the identical
- * reason: `enableImplicitConversion: true` coerces `isActive`'s raw query
- * string via `Boolean(...)` before a `value`-keyed `@Transform` would ever
- * see it, silently turning an explicit `isActive=false` into `true`. */
 function toBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
   const raw = obj[key];
   if (typeof raw === 'boolean') return raw;

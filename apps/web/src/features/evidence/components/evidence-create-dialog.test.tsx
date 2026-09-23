@@ -7,15 +7,6 @@ import { buildTestSession } from '@/lib/test-fixtures/session';
 
 import { EvidenceCreateDialog } from './evidence-create-dialog';
 
-/**
- * S-10 (`specs/013-stabilization-audit`) — the "Responsável" field became a
- * server-searched `UserPicker`, which displays its own `owner` state rather
- * than the form value. Closing the dialog runs `form.reset()`; before the
- * reset also restored `owner`, reopening the dialog showed the PREVIOUS pick
- * while the form would submit the default owner — the same shape existed in
- * `FindingCreateDialog` and `EngagementFindingCreateDialog`, fixed identically.
- */
-
 const { searchUsersMock } = vi.hoisted(() => ({ searchUsersMock: vi.fn() }));
 
 vi.mock('../api', () => ({

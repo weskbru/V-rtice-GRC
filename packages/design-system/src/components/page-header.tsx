@@ -3,23 +3,13 @@ import { cn } from '../lib/utils';
 import type { ReactNode } from 'react';
 
 export interface PageHeaderProps {
-  /** Page or section title. Rendered as an <h1> — every screen has exactly one. */
   title: string;
-  /** Short supporting copy under the title. */
   description?: string;
-  /** Breadcrumb or back-navigation, rendered above the title. */
   breadcrumb?: ReactNode;
-  /** Primary/secondary action buttons (owned by the caller — PageHeader renders no buttons of its own). */
   actions?: ReactNode;
   className?: string;
 }
 
-/**
- * Platform-wide page/section heading (FR-045: consistent patterns across
- * every module). Every screen composes it the same way: optional
- * breadcrumb, a single <h1>, optional description, and a right-aligned
- * action slot — so a new GRC module needs no new header pattern (SC-011).
- */
 export function PageHeader({
   title,
   description,

@@ -1,41 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk detail, Causas e Consequências section (T098, FR-057,
- * redesigned Área 4, 2026-09-17).
- *
- * ## The contract this redesign works within (measured, not re-investigated)
- *
- * `PUT /risks/{riskId}/causes` and `.../consequences` each REPLACE THE
- * WHOLE COLLECTION (`replace-risk-statements-request.dto.ts`,
- * `risk.controller.ts`) — there is no per-item create/edit/delete endpoint,
- * and a collection is capped at 50 items (`@ArrayMaxSize(50)`). Nothing
- * here simulates a per-item save the backend does not offer: every confirm
- * or remove below still sends the FULL list of descriptions for that one
- * kind, exactly as before this redesign.
- *
- * ## The one dirty item at a time rule
- *
- * A collective PUT means confirming ONE item while a SECOND item (in
- * either list) sits half-typed would silently persist that second item's
- * draft too — a real risk the old always-open-inputs design invited.
- * `activeEditor` is therefore a SINGLE piece of state shared by both
- * lists: at most one row, in either "Causas" or "Consequências", is ever
- * in edit/creation mode. Every other row's "Editar"/"Remover" and both
- * "Adicionar" buttons are disabled while it is set, with
- * `lockedHint` explaining why — never a silent, unexplained disable.
- *
- * ## Four visually distinct states
- *
- * A row is exactly one of: **persisted** (plain read-only text, "Editar"/
- * "Remover" beside it), **em edição** (an existing row's own text loaded
- * into an accent-bordered input, labelled "Editando"), **novo** (the same
- * accent input, empty, labelled "Nova causa"/"Nova consequência"), or
- * mid-flight ("Confirmar" disabled + spinner while the collective PUT is
- * in progress). "Alteração não confirmada" is not a fifth visual state —
- * it is simply what "em edição"/"novo" ARE until "Confirmar" succeeds; the
- * input itself is the unconfirmed-change indicator.
- */
 import { FormField } from '@pharos/design-system/components';
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -57,7 +21,6 @@ export interface RiskCausesConsequencesProps {
   riskId: string;
   initialCauses: readonly RiskStatement[];
   initialConsequences: readonly RiskStatement[];
-  /** The risk's current `ETag` (ADR-013). */
   etag: string;
   onSaved: (result: { kind: StatementKind; items: readonly RiskStatement[]; etag: string }) => void;
 }
@@ -66,7 +29,6 @@ type StatementKind = 'cause' | 'consequence';
 
 interface ActiveEditor {
   kind: StatementKind;
-  /** `null` — creating a new row; otherwise the index of the persisted row being edited. */
   index: number | null;
   value: string;
 }
@@ -343,10 +305,6 @@ export function RiskCausesConsequences({
     if (ok) setPendingRemove(null);
   }
 
-  // Two independent lists side by side reads well while both are short —
-  // beyond a dozen combined rows, two tall columns fighting for width lose
-  // to a single, scannable stack (2026-09-17 Área 4: "não force" the
-  // side-by-side metaphor once the real record count works against it).
   const sideBySide = causes.length + consequences.length <= 12;
 
   return (

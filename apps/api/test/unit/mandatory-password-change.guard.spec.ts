@@ -1,12 +1,3 @@
-/**
- * S-01 (audit A6-F01) — unit coverage for `MandatoryPasswordChangeGuard` in
- * isolation (no HTTP, no database, no NestJS testing module): a real
- * `Reflector` reading metadata off real decorated fixture methods, mirroring
- * `permission.guard.spec.ts`'s own established pattern for this codebase's
- * guards. The fast, precise complement to the contract/integration proof
- * that a real `GET /risks` call is actually refused end to end
- * (`test/contract/mandatory-password-change.spec.ts`).
- */
 import { Reflector } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
 
@@ -22,24 +13,16 @@ import type { Request } from 'express';
 
 class FixtureController {
   @Public()
-  publicRoute(): void {
-    /* fixture only */
-  }
+  publicRoute(): void {}
 
   @AllowedDuringMandatoryPasswordChange()
-  allowedDuringChangeRoute(): void {
-    /* fixture only */
-  }
+  allowedDuringChangeRoute(): void {}
 
   ordinaryRoute(): void {
-    /* fixture only */
+    return;
   }
 }
 
-// Used purely as Reflect-metadata lookup keys (the identity of the function
-// `SetMetadata` attached metadata to) — never invoked as a bound method —
-// mirroring `permission.guard.spec.ts`'s own justification for this
-// disable.
 /* eslint-disable @typescript-eslint/unbound-method */
 const publicRouteHandler = FixtureController.prototype.publicRoute;
 const allowedDuringChangeRouteHandler = FixtureController.prototype.allowedDuringChangeRoute;

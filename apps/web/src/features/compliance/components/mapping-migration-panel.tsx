@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — the "Migração de mapeamento" tab of a framework version's
- * detail screen (US2, FR-012 to FR-014). Lists every migration already
- * executed into this version (newest first) and offers `MappingMigrationDialog`
- * to run a new one. Loading, genuinely-empty and failed-to-load stay three
- * distinguishable states with a retry (CLAUDE.md §18.11).
- */
 import { EmptyState, ErrorState, LoadingState } from '@pharos/design-system/components';
 import { GitMerge } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -37,7 +30,6 @@ export interface MappingMigrationPanelProps {
   frameworkId: string;
   versionId: string;
   canMap: boolean;
-  /** Called after a migration executes — the requirement listing and compliance summary shown elsewhere on this screen are now stale. */
   onMigrated?: () => void;
 }
 

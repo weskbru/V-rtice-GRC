@@ -1,17 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem register column definitions (008-incidents-problems,
- * US2), mirroring `features/incidents/components/incident-register-
- * columns.tsx` exactly (CLAUDE.md §18.12).
- *
- * `enableSorting` is `false` on every column absent from `GET /problems`'s
- * own `sort` enum (`code, title, severity, status, identifiedOn, updatedAt`
- * — every column here IS in that enum, so none needs it disabled).
- *
- * Severity and status each pair a colour with a real pt-BR word plus an
- * icon (`StatusBadge`) — never colour alone (CLAUDE.md §18.8).
- */
 import { StatusBadge } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';
@@ -132,9 +120,6 @@ export function buildProblemRegisterColumns(): ColumnDef<ProblemSummary, unknown
       accessorKey: 'updatedAt',
       header: columns.updatedAt,
       size: 160,
-      // `updatedAt` is absent from `ProblemSummary`'s generated `required`
-      // array even though the server always sets it — see
-      // `problem-detail-view.tsx`'s identical comment.
       cell: ({ row }) => (
         <span className="text-muted-foreground">
           {formatTimestampDate(row.original.updatedAt!)}

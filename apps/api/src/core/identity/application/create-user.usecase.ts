@@ -1,23 +1,3 @@
-/**
- * T176 — `POST /admin/users` (`contracts/admin.openapi.yaml`, FR-001,
- * US8 AS1). Provisions an internal platform identity with a local
- * credential flagged for mandatory change on first sign-in, optionally
- * assigning roles and organizational scope grants atomically with the
- * user (contract: "applied atomically with the user").
- *
- * Reuses `RoleAdminService.replaceUserRoles` (`core/authorization`) and
- * `ScopeGrantService.grant` (`core/organizations`) for the optional
- * `roleIds`/`scopeGrants` rather than duplicating their validation/audit
- * logic — both are called from inside this use case's own
- * `TransactionRunnerPort.run(...)` scope, so their own (redundant but
- * harmless) `runInTransaction` calls simply join the already-open
- * transaction (`PrismaService.runInTransaction`'s documented behavior).
- *
- * The initial password is validated against the same
- * `PASSWORD_POLICY_SETTINGS`/hashed with the same `ARGON2_SETTINGS` as
- * `AuthOrchestrator.changeOwnPassword` — never stored in reversible form,
- * never logged or audited (FR-005, FR-035).
- */
 import { Inject, Injectable } from '@nestjs/common';
 import { AuditEntityType, AuditOutcome } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -73,8 +53,6 @@ export class CreateUserUseCase {
   async execute(command: CreateUserCommand): Promise<AdminUserRecord> {
     const actor = await this.userDirectory.findAdminRecordById(command.actorUserId);
     if (!actor) {
-      // Defensive only: `SessionGuard` already proved this actor has a
-      // live session (see `create-risk.usecase.ts`'s identical reasoning).
       throw new UnauthorizedDomainError();
     }
 
@@ -151,8 +129,6 @@ export class CreateUserUseCase {
       }
 
       const finalRecord = await this.userDirectory.findAdminRecordById(created.id);
-      // Cannot be `undefined`: the user row was just created inside this
-      // same transaction.
       return finalRecord!;
     });
   }

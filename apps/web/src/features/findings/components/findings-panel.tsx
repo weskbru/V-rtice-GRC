@@ -1,64 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Findings panel (T075/T077/T078, 002-shared-grc-foundation +
- * 005-audit-findings, US3).
- *
- * Consumed by the risk detail screen's own "Achados" tab — the ONE
- * frontend surface Phase 1 gave Finding (spec.md's own Assumptions:
- * "Evidência, Ação e Achado não recebem entrada própria na navegação
- * principal nesta fase"). Mirrors `EvidencePanel`'s established shape for
- * a collaboration-style panel embedded in another entity's detail screen.
- *
- * ## Scoped by organizational unit, not a persisted Finding-to-Risk link
- *
- * `data-model.md`'s own overview diagram gave `Finding` exactly two
- * relationships in Phase 1: `Finding --1:N--> Action` and
- * `Finding --N:M--> Evidence` (via `EvidenceLink`). This panel still lists
- * its findings by the risk's OWN organizational unit (`GET
- * /findings?orgUnitId=`) rather than by a Finding-to-Risk link — that
- * read path is unchanged. What 005-audit-findings adds is the link ITSELF
- * (`FindingRiskLink`, US3, FR-015): each finding row below now also
- * renders `FindingLinksSection`, which lists/links/withdraws that new N:M
- * relationship explicitly, alongside the equally new Finding↔Control one.
- *
- * ## Origin (005-audit-findings, SC-001)
- *
- * `Finding.auditEngagementId` is non-null for a finding produced by
- * `POST /audits/{auditId}/findings` and null for one recorded manually via
- * this panel's own "Novo achado" (`POST /findings`, unchanged). Both cases
- * are surfaced explicitly per row — never left to silent inference — using
- * `findingsFromEngagement.originNotice`/`.manualOriginNotice`. The
- * engagement's own `code` is resolved lazily and cached by id (a small,
- * best-effort lookup — `findingsFromEngagement.originNoticeUnknown` covers
- * the case where the viewer cannot read `audit-engagement:view` and the
- * lookup itself is refused).
- *
- * ## Collapsed/expanded rows (016-risk-detail-experience, Área 5, 2026-09-17)
- *
- * With ten or twenty findings this panel used to render every field,
- * select, checkbox and action button for every row at once — a wall of
- * open forms rather than a list. Each row is now a `DisclosureGroup`
- * (`@pharos/design-system`, already used by this same screen's contextual
- * aside): collapsed shows only what identifies and prioritizes a finding —
- * code, title, status, severity — using fields `GET /findings?orgUnitId=`
- * already returned, no additional request. Expanded shows EVERYTHING that
- * rendered unconditionally before this change — category/origin/priority,
- * owner/identified-on, open-action/evidence counts, description,
- * recommendation, closure justification, the origin notice, the corrective-
- * actions toggle, every edit/remediate/close/reopen/archive action, and
- * `FindingLinksSection`'s link/unlink affordances — byte-for-byte the same
- * markup, moved rather than rewritten. No capability is removed.
- *
- * `DisclosureGroup` UNMOUNTS its content while collapsed (that component's
- * own doc comment explains why — `docs/STATE.md` §8 registers this as a
- * known, deliberate trade-off, not something to fix here). A side effect
- * worth stating plainly, not leaving implicit: `FindingLinksSection`'s own
- * two per-row requests, and the corrective-actions fetch, now fire only for
- * a finding the reader actually expands, instead of for every row in the
- * list unconditionally — fewer incidental requests, not a behaviour change
- * to what either request does or returns.
- */
 import {
   ConfirmDialog,
   DisclosureGroup,
@@ -104,9 +45,7 @@ export interface FindingsPanelProps {
   canEdit: boolean;
   canClose: boolean;
   canAdminister: boolean;
-  /** `finding:remediate` (005-audit-findings, T077) — gates `FindingRemediationAction`, itself further gated by `item.status === 'OPEN'`. */
   canRemediate: boolean;
-  /** `finding:link` (005-audit-findings, T078) — gates the link/unlink affordances of `FindingLinksSection`; the list itself is always shown to anyone who can already see this panel. */
   canLinkFindings: boolean;
 }
 
@@ -133,13 +72,6 @@ const STATUS_VARIANT: Record<Finding['status'], 'info' | 'warning' | 'success' |
   ARCHIVED: 'neutral',
 };
 
-/**
- * 005-audit-findings, SC-001 — one line, always present, distinguishing a
- * finding produced by an engagement from one recorded manually. `null`
- * return (only while the engagement's own `code` is still being resolved,
- * `undefined` in the map) renders nothing rather than a stale/incorrect
- * line.
- */
 function findingOriginNotice(
   item: Finding,
   engagementCodeById: Readonly<Record<string, string | null>>,
@@ -165,12 +97,6 @@ export function FindingsPanel({
   const [items, setItems] = useState<readonly Finding[]>([]);
   const [error, setError] = useState(false);
 
-  // 005-audit-findings, SC-001 — the engagement `code` behind each
-  // produced finding's `auditEngagementId`, resolved lazily and cached by
-  // id so the same engagement is fetched at most once regardless of how
-  // many of this panel's findings it produced. `null` means the lookup was
-  // attempted and refused/failed (`originNoticeUnknown`'s own case), never
-  // "not yet attempted" (absent from the map).
   const [engagementCodeById, setEngagementCodeById] = useState<Record<string, string | null>>({});
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -180,12 +106,6 @@ export function FindingsPanel({
   const [archiveTarget, setArchiveTarget] = useState<Finding | null>(null);
   const [archiving, setArchiving] = useState(false);
 
-  // Corrective actions (audit-findings follow-up, 2026-09-12) — collapsed
-  // per finding by default, so mounting this panel never fires one
-  // `GET /actions` request per finding the way `FindingLinksSection`'s own
-  // two per-row requests already do unconditionally. Expanded on demand via
-  // each row's own "N ações em aberto" toggle (`FindingCorrectiveActions`'s
-  // own header comment has the full reasoning).
   const [expandedActionsFindingIds, setExpandedActionsFindingIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
@@ -262,20 +182,6 @@ export function FindingsPanel({
     setItems((current) => [created, ...current]);
   }
 
-  /**
-   * `Finding.openActionCount` is derived on the SERVER, on read, from the
-   * `actions` table (`prisma-finding.repository.ts`) — never held here as an
-   * editable field and never recomputed client-side (CLAUDE.md §19.7). So
-   * when the expanded panel creates or transitions one of those actions, the
-   * only correct way to refresh the count is to re-read the finding.
-   *
-   * Without this the header kept reporting the count it was loaded with —
-   * the reader added a third remediation action and the row still said two.
-   * Given that this whole surface exists because that number had nowhere to
-   * lead, leaving it stale would have replaced a dead number with a wrong
-   * one. A failed re-read is deliberately silent: the action itself already
-   * succeeded and reported so, and the count self-corrects on the next load.
-   */
   function refreshFindingCounts(findingId: string): void {
     void findingsApi
       .getFinding(findingId)
@@ -291,8 +197,6 @@ export function FindingsPanel({
       replaceItem(archived);
       setArchiveTarget(null);
     } catch {
-      // The dialog stays open with its own destructive action still
-      // available to retry — mirrors `EvidencePanel#confirmArchive`.
     } finally {
       setArchiving(false);
     }
@@ -386,7 +290,6 @@ export function FindingsPanel({
                           )}
                         </p>
                       ) : null}
-                      {/* 005-audit-findings, SC-001 — origin surfaced explicitly, both directions (never left to silent inference). */}
                       <p className="text-sm text-muted-foreground">
                         {findingOriginNotice(item, engagementCodeById)}
                       </p>

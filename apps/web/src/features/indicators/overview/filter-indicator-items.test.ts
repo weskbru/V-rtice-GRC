@@ -59,10 +59,6 @@ describe('filterIndicatorOverviewItems', () => {
   });
 
   it('trims surrounding whitespace from the query', () => {
-    // "ativos" alone would also match "Controles inativos"/"Processos
-    // inativos" (substring of "inativos") — the full phrase is unique to
-    // "Ativos inativos", so this asserts trimming without also asserting a
-    // narrower-match behaviour the query itself does not claim to have.
     const result = filterIndicatorOverviewItems(ITEMS, {
       query: '  ativos inativos  ',
       domain: 'ALL',

@@ -1,9 +1,3 @@
-/**
- * D-11 — every administrative endpoint refuses an UNAUTHENTICATED caller
- * with 401 (distinct from T172's `admin-permissions.spec.ts`, which proves
- * 403 for an authenticated caller lacking the permission). Same 22-endpoint
- * enumeration, no session cookie at all.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';

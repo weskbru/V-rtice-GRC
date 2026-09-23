@@ -1,17 +1,3 @@
-/**
- * T034/002-shared-grc-foundation, US1 — matches
- * `contracts/grc-foundation.openapi.yaml`'s `UpdateEvidenceRequest`
- * exactly: `minProperties: 1` is enforced at the controller
- * (`assertUpdateBodyNotEmpty`, mirroring `risk.controller.ts`'s own
- * function), not by a `class-validator` decorator here — matching
- * `UpdateRiskRequestDto`'s own documented reasoning (a key-count check
- * misses `class-transformer`'s own-property-with-`undefined`-value
- * behavior under this project's `target: ES2023`).
- *
- * `code`, `status`, `archivedAt` and the creation metadata are not
- * declared here at all — not editable, matching the OpenAPI document's own
- * description.
- */
 import {
   IsDateString,
   IsIn,

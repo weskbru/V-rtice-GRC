@@ -1,40 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — audit engagement register URL state (T076), mirroring
- * `features/controls/hooks/use-catalog-state.ts` exactly (CLAUDE.md §18.12
- * — a new module extends established patterns, it does not invent its
- * own). See that hook's own doc comment (and `features/risks/hooks/use-
- * register-state.ts`'s, which it in turn mirrors) for the full reasoning
- * behind URL-as-state and `replace()` vs `push()`.
- *
- * Deliberately simpler in two ways that both trace back to `GET /audits`'s
- * own contract (audit.openapi.yaml), not to a smaller ambition for this
- * screen:
- *
- *   - `status`/`orgUnitId`/`leadAuditorUserId` are each a SINGLE value in
- *     the query string here, never CSV-joined — unlike `controls`'s/
- *     `risks`' own catalogs, `GET /audits` accepts exactly one value per
- *     filter field, not an array (see `AuditEngagementListQuery` in
- *     `../types`). A `MultiSelectFilter` that silently kept only the first
- *     of several checked boxes would misrepresent what the control can do;
- *     the register's own filter toolbar uses single-value `Select`s
- *     instead (mirroring `MyActionsFilters`'s own precedent).
- *   - there is no free-text `q` parameter on this endpoint at all, so this
- *     hook carries no search-input state or debounce, unlike `use-catalog
- *     -state.ts`'s own `searchInputValue`/`setSearch`.
- *
- * `AGENTS.md` "Frontend state": this hook owns no `useState` mirror plus a
- * write-back effect for anything the URL itself already represents —
- * every setter commits directly to the URL via `router.replace`, and every
- * read comes straight from `useSearchParams()` on the next render. Two
- * writers racing to update the same fact is the exact shape of the
- * causes/consequences defect CLAUDE.md §18 records paying for once already.
- */
-
-// Reads the current screen's own query string. The WRITE side — and the
-// `useRouter` import the loader policy restricts — lives in the shared
-// `@/lib/register/url-state` (specs/014-institutional-loader §2.3).
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -87,7 +52,6 @@ function parseSingleValue(value: string | null): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
-/** Which presentation the results area is currently rendering — cards is the primary view (CLAUDE.md §18), matching every other register in this codebase. */
 export type EngagementCatalogView = 'cards' | 'table';
 
 export interface EngagementCatalogUrlState {
@@ -112,16 +76,11 @@ export interface UseEngagementCatalogStateResult {
   setView: (view: EngagementCatalogView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter fields are currently applied — shown on the collapsed "Filtros" button. */
   activeFilterCount: number;
 }
 
 export function useEngagementCatalogState(): UseEngagementCatalogStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism — one change applied to the CURRENT query string,
-  // `replace` not `push`, page reset by default — is shared with every
-  // other register (`@/lib/register/url-state`). What stays here is what
-  // only this catalog knows: its enums, sortable fields and defaults.
   const commit = useUrlQueryCommit();
 
   const state: EngagementCatalogUrlState = {
@@ -211,7 +170,6 @@ export function useEngagementCatalogState(): UseEngagementCatalogStateResult {
     });
   }, [commit]);
 
-  /** Which filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows, from the same conditions the chip row is built on. */
   const activeFilterCount =
     (state.status !== undefined ? 1 : 0) +
     (state.orgUnitId !== undefined ? 1 : 0) +

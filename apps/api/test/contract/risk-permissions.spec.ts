@@ -1,15 +1,3 @@
-/**
- * T079 — `POST /api/v1/risks` and `PATCH /api/v1/risks/{riskId}` refuse a
- * caller who lacks `risk:create`/`risk:edit` (ADR-003: `PermissionGuard` is
- * the single decision path, checked BEFORE the controller body — and
- * therefore before any per-record existence/scope check ever runs).
- *
- * FR-030's non-disclosure requirement is proven by comparing the refusal
- * for a REAL risk id against the refusal for a RANDOM, nonexistent one:
- * both must be byte-for-byte the same shape (status/title/type/detail),
- * because the permission denial happens before the controller could ever
- * know whether either id refers to a real row.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -57,16 +45,8 @@ describe('Risk permission enforcement (T079, FR-030, ADR-003)', () => {
     const owner = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('rp-owner')}@example.test`,
     });
-    // F-CV-2: `owner` here is a SEPARATE fixture from the restricted actor
-    // this file exists to test (`loginAsUnprivilegedActor`, below) — it
-    // only seeds the pre-existing risk the 403 tests target, and is never
-    // itself the subject of an assertion. Made eligible; the restricted
-    // actor's own permission set is untouched (Case B).
     await makeRiskAssignmentVisible(prisma, { user: owner, orgUnitId: orgUnit.id });
 
-    // An existing risk, seeded directly through the use case (not HTTP —
-    // this test is about the UNPRIVILEGED caller below, not about proving
-    // creation again, which T080 already covers).
     const authorizedActor = await createUserFixture(prisma, {
       email: `${uniqueTestMarker('rp-privileged')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
@@ -94,19 +74,11 @@ describe('Risk permission enforcement (T079, FR-030, ADR-003)', () => {
     await ctx.close();
   });
 
-  /** A real, logged-in user holding `risk:view` (and organizational scope
-   * over SOME unit — deliberately irrelevant to this test) but NEITHER
-   * `risk:create` NOR `risk:edit`. */
   async function loginAsUnprivilegedActor(): Promise<ReturnType<typeof request.agent>> {
     const prisma = ctx.app.get(PrismaService);
     const orgUnit = await createOrgUnitFixture(prisma, {
       code: uniqueTestMarker('rp-unpriv-org'),
     });
-    // Short prefix deliberately: `IsEmail` enforces the 64-octet local-part
-    // limit (RFC 5321), and `uniqueTestMarker` appends a full UUID (36
-    // chars) — a longer prefix here previously pushed the address over that
-    // limit and made `POST /auth/login` itself fail with 400 before this
-    // test's actual subject (the 403 permission checks below) ever ran.
     const fixture = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('rp-unpriv')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
@@ -142,7 +114,6 @@ describe('Risk permission enforcement (T079, FR-030, ADR-003)', () => {
     const body = response.body as ProblemBody;
     expect(body.status).toBe(403);
 
-    // No stack trace, no SQL fragment, no internal identifier (FR-107).
     const raw = JSON.stringify(response.body);
     expect(raw).not.toMatch(/stack/i);
     expect(raw).not.toMatch(/prisma/i);
@@ -170,8 +141,6 @@ describe('Risk permission enforcement (T079, FR-030, ADR-003)', () => {
     const existingBody = responseForExistingRisk.body as ProblemBody;
     const nonexistentBody = responseForNonexistentRisk.body as ProblemBody;
 
-    // The refusal cannot be used to probe whether `existingRiskId` is a
-    // real risk: same status, title, type and detail regardless.
     expect(nonexistentBody.status).toBe(existingBody.status);
     expect(nonexistentBody.title).toBe(existingBody.title);
     expect(nonexistentBody.type).toBe(existingBody.type);

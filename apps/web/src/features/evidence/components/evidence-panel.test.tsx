@@ -8,12 +8,6 @@ import { EvidencePanel } from './evidence-panel';
 
 import type { Evidence } from '../types';
 
-/**
- * Component-mount evidence for T038 (`EvidencePanel`, 002-shared-grc-foundation,
- * US1). `../api` is mocked at the network boundary, mirroring
- * `risk-attachments-section.test.tsx`'s own pattern.
- */
-
 const {
   listBySubjectMock,
   listLinksMock,
@@ -40,9 +34,6 @@ vi.mock('../api', () => ({
     createEvidence: vi.fn(),
     linkEvidence: vi.fn(),
     uploadAttachment: vi.fn(),
-    // `EvidenceAttachmentsSection` (assurance-audit Fix 1) is mounted for
-    // every evidence card now — it needs its own network mocks, mirroring
-    // `evidence-attachments-section.test.tsx`'s own.
     listAttachments: listAttachmentsMock,
     withdrawAttachment: vi.fn(),
   },
@@ -72,7 +63,6 @@ function evidenceFixture(overrides: Partial<Evidence> = {}): Evidence {
   };
 }
 
-/** `EvidenceCreateDialog` reads the signed-in user (S-10 default owner label), exactly as inside the real app shell. */
 function renderWithSession(ui: React.ReactElement) {
   return render(ui, {
     wrapper: ({ children }) => (
@@ -178,12 +168,6 @@ describe('EvidencePanel', () => {
     await waitFor(() => expect(listBySubjectMock).toHaveBeenCalledTimes(2));
   });
 
-  // Assurance-audit Fix 1 (HIGH): before this fix, a file attached at
-  // creation time was invisible on every other screen where evidence
-  // appears — no filename, no download link, no icon, no count — and
-  // `evidenceApi.listAttachments` had zero callers anywhere in the
-  // product. This is the panel-level proof that the wiring is real, not
-  // just `EvidenceAttachmentsSection`'s own isolated unit coverage.
   it("surfaces each evidence's attached file as a real, downloadable link", async () => {
     listBySubjectMock.mockResolvedValue(pageOf([evidenceFixture({})]));
     listAttachmentsMock.mockResolvedValue(

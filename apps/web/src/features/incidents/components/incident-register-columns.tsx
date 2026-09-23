@@ -1,19 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — incident register column definitions (008-incidents-
- * problems, US1), mirroring `features/assets/components/asset-register-
- * columns.tsx` (CLAUDE.md §18.12).
- *
- * `enableSorting` is `false` on every column absent from `GET /incidents`'s
- * own `sort` enum (`code, title, severity, status, reportedOn, updatedAt`
- * — every column here IS in that enum, so none needs it disabled).
- *
- * Severity and status each pair an icon-free colour with a real pt-BR word
- * (`StatusBadge`) — never colour alone (CLAUDE.md §18.8), the same
- * indicator this product's other registers already use
- * (`findings-panel.tsx`'s own `SEVERITY_VARIANT`/`STATUS_VARIANT`).
- */
 import { StatusBadge } from '@pharos/design-system/components';
 
 import { Link } from '@/components/navigation/link';

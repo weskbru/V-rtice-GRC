@@ -1,12 +1,3 @@
-/**
- * T055 — deactivating a user revokes their sessions (FR-017) and blocks
- * further authentication (FR-011), against real PostgreSQL.
- *
- * Exercises `AuthUseCasesPort.deactivateUser` directly — user
- * administration has no HTTP surface in this release (a later phase), but
- * FR-011/FR-017 must already hold end-to-end, and a future admin-facing
- * endpoint will call exactly this same port method.
- */
 import { AuditEntityType, AuditOutcome, UserStatus } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

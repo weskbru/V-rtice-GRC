@@ -1,7 +1,3 @@
-/**
- * T180 — maps `DetailedOrgScopeGrantRecord` to
- * `contracts/admin.openapi.yaml`'s `OrgScopeGrant` response schema.
- */
 import type { DetailedOrgScopeGrantRecord } from '../../domain/ports/org-scope-repository.port';
 
 export interface OrgUnitRefResponse {

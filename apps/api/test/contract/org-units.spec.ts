@@ -1,23 +1,3 @@
-/**
- * D-11 gap-coverage — `GET /org-units` (`OrgUnitController.list`,
- * `contracts/admin.openapi.yaml` line ~78) had NO test anywhere in the
- * repository before this dispatch, found by the same coverage audit that
- * surfaced the untested `/risk-methodology` and `GET /users` endpoints (see
- * `risk-methodology.spec.ts`/`directory-users.spec.ts`'s own header
- * comments).
- *
- * The contract is explicit on two points this file proves independently:
- *
- *   1. "Requires an authenticated session; no administrative permission" —
- *      a zero-permission authenticated user must genuinely succeed.
- *   2. "Returns only units inside the caller's resolved organizational
- *      scope ... A caller holding a GLOBAL grant receives the whole tree."
- *      `ListOrgUnitsUseCase`/`PrismaOrgUnitDirectoryRepository`'s own doc
- *      comments claim this listing IS scope-filtered (`ScopedRepository`
- *      with `'id'` as the scope field, unioned with descendants via the
- *      materialized path) — this file verifies that claim against the real
- *      HTTP surface rather than trusting the comment.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -83,9 +63,6 @@ describe('GET /org-units — organizational units within the caller scope (contr
       email: `${uniqueTestMarker('org-units-noperm')}@example.test`,
       primaryOrgUnitId: orgUnit.id,
     });
-    // No role, no permission at all — only a UNIT scope grant (a distinct
-    // axis from RBAC permissions), so the listing has something
-    // deterministic to return.
     await grantUnitScopeFixture(prisma, { user: fixture.user, orgUnitId: orgUnit.id });
 
     const agent = await loginAs(fixture.user.email, fixture.rawPassword);
@@ -106,9 +83,6 @@ describe('GET /org-units — organizational units within the caller scope (contr
   it('returns OrgUnitNode-shaped rows for a caller with a UNIT scope, and is genuinely scope-filtered: sees the granted unit and its descendant, but not a sibling tree outside the grant', async () => {
     const prisma = ctx.app.get(PrismaService);
 
-    // A small tree: grantedParent -> grantedChild (both must be visible),
-    // and a wholly separate outsideUnit (must NOT be visible) — proves
-    // filtering, not merely that SOME array comes back.
     const grantedParent = await createOrgUnitFixture(prisma, {
       code: uniqueTestMarker('org-units-scope-parent'),
     });
@@ -117,9 +91,6 @@ describe('GET /org-units — organizational units within the caller scope (contr
       id: grantedChildId,
       code: uniqueTestMarker('org-units-scope-child'),
       parentId: grantedParent.id,
-      // Materialized-path prefix match (ADR-004): a descendant's path
-      // extends its parent's path with its own id — the exact convention
-      // `expandToDescendants` relies on (prisma-org-scope.repository.ts).
       path: `${grantedParent.path}${grantedChildId}/`,
       depth: 1,
     });
@@ -145,8 +116,6 @@ describe('GET /org-units — organizational units within the caller scope (contr
     expect(ids).toContain(grantedChild.id);
     expect(ids).not.toContain(outsideUnit.id);
 
-    // OrgUnitNode shape (contracts/admin.openapi.yaml): required
-    // [id, code, name, depth, status].
     for (const node of body) {
       expect(typeof node.id).toBe('string');
       expect(typeof node.code).toBe('string');
@@ -189,7 +158,6 @@ describe('GET /org-units — organizational units within the caller scope (contr
     const fixture = await createLocalUserFixture(prisma, {
       email: `${uniqueTestMarker('org-units-nogrant-actor')}@example.test`,
     });
-    // Deliberately NO grantUnitScopeFixture/grantGlobalScopeFixture call.
 
     const agent = await loginAs(fixture.user.email, fixture.rawPassword);
     const response = await agent.get('/api/v1/org-units').set('Origin', appOrigin);
@@ -197,7 +165,6 @@ describe('GET /org-units — organizational units within the caller scope (contr
     expect(response.status).toBe(200);
     const body = response.body as readonly OrgUnitNodeBody[];
     expect(body).toEqual([]);
-    // Not a coincidental empty page - the unit really exists.
     const exists = await prisma.client.organizationalUnit.findUnique({
       where: { id: someUnit.id },
     });

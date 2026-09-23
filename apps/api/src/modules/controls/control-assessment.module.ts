@@ -1,34 +1,3 @@
-/**
- * T027-T035/003-controls-management, User Story 2 — `ControlAssessmentModule`,
- * this workstream's own composition root for assessments and attestation
- * (operations 7-11 of `contracts/controls.openapi.yaml`). Sits directly
- * under `src/modules/controls/`, outside the `domain/application/
- * infrastructure/presentation` folders the boundary lint rules classify —
- * exactly like `controls.module.ts`/`control-directory.module.ts`.
- *
- * ## Why this is its own module, not added to `controls.module.ts`
- *
- * This task's own instructions forbid editing `controls.module.ts` (owned
- * by the concurrent catalogue/lifecycle workstream, T018-T026). This
- * module is therefore a SEPARATE Nest module carrying its own controller
- * and every provider that controller's use cases need — Nest registers a
- * module's `controllers` regardless of which OTHER module imports it, as
- * long as it is reachable from the root module, so wiring this into
- * `AppModule` directly (see `app.module.ts`) is sufficient; the
- * coordinator may later fold it into `controls.module.ts`'s own `imports`
- * if that turns out to read better once both workstreams have landed.
- *
- * ## Task C registrations, performed in this module's constructor
- *
- * The `CONTROL_ASSESSMENT` action origin type is registered here against
- * the shared resolver registry — the exact shape `RiskModule`'s own
- * constructor already establishes for its own origin type, and
- * `FindingModule`'s for its own. Also calls
- * `registerControlAssessmentAuditAllowlists()` — see that file's header
- * for why it is a SEPARATE registration function from
- * `registerControlAuditAllowlists()` (the catalogue/lifecycle
- * workstream's own).
- */
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../../core/audit/audit.module';
@@ -57,12 +26,6 @@ import { ControlLookupRepository } from './infrastructure/control-lookup.reposit
 import { PrismaControlReferenceDataRepository } from './infrastructure/prisma-control-reference-data.repository';
 import { ControlAssessmentController } from './presentation/control-assessment.controller';
 
-// `RiskModule`'s constructor runs every time a NestJS testing module
-// (`Test.createTestingModule({ imports: [ControlAssessmentModule] })`)
-// instantiates it — once per spec FILE within the same worker process,
-// not once per process — so the one-time registry call below needs its
-// own idempotency guard, mirroring `risk.module.ts`'s own
-// `collaborationEntityTypesRegistered` flag exactly.
 let collaborationRegistered = false;
 
 @Module({
@@ -71,10 +34,6 @@ let collaborationRegistered = false;
   providers: [
     { provide: TransactionRunnerPort, useClass: GrcTransactionRunner },
     { provide: ControlLookupPort, useClass: ControlLookupRepository },
-    // `ControlReferenceDataPort` is the catalogue/lifecycle workstream's
-    // own small, stable port (`domain/ports/control-reference-data.port.ts`,
-    // T020) — reused here (not re-declared) for actor lookups, avoiding a
-    // second "look up a user by id" implementation (CLAUDE.md §13.8).
     { provide: ControlReferenceDataPort, useClass: PrismaControlReferenceDataRepository },
     { provide: ControlAssessmentRepositoryPort, useClass: ControlAssessmentRepository },
     {

@@ -1,22 +1,3 @@
-/**
- * T059/005-audit-findings — FR-012/SC-005: no operation under
- * `grc/finding/presentation` ever deletes a `Finding` row. Structural grep
- * over the presentation layer's own source, the same filesystem-scan
- * method `audit-engagements-module-boundary.spec.ts`/
- * `finding-grc-ports-boundary.spec.ts` already use — this test does not
- * edit `grc/finding`, only reads it.
- *
- * Scoped to `grc/finding` (this module's own ownership boundary) — the
- * companion assertion over `modules/audit-engagements`'s own presentation
- * layer and over `contracts/audit.openapi.yaml` belongs to whichever task
- * owns that module (T059's own text names both surfaces; this file proves
- * the half `grc/finding` is responsible for).
- *
- * The only `@Delete` routes anywhere under `grc/finding/presentation` are
- * `unlinkControl`/`unlinkRisk` (`finding-relationship.controller.ts`) —
- * both WITHDRAW a link (`unlinkedAt` stamped) rather than deleting a row,
- * and neither touches the `findings` table at all.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -58,7 +39,7 @@ describe('grc/finding — no operation ever deletes a Finding row (FR-012, SC-00
       'utf8',
     );
     const deleteRouteCount = (contents.match(/@Delete\(/g) ?? []).length;
-    expect(deleteRouteCount).toBe(2); // controls/:linkId, risks/:linkId — never /findings/:findingId
+    expect(deleteRouteCount).toBe(2);
   });
 
   it('no file under grc/finding/infrastructure calls a Prisma delete method against the finding table', () => {

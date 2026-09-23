@@ -1,8 +1,3 @@
-/**
- * The sole implementation of `IncidentProcessLinkReadPort`
- * (`shared/grc-ports/incident-process-link-read.port.ts`, ADR-020 part 3).
- * Mirrors `incident-risk-link-read.adapter.ts` exactly, against `Process`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

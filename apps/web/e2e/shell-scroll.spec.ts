@@ -4,36 +4,6 @@ import { requireSeedCredentials, signInAsWorkerAdmin } from './support/admin-ses
 
 import type { Page } from '@playwright/test';
 
-/**
- * E2E for the authenticated shell's scroll ownership (F-67, and cause 2 of
- * F-66).
- *
- * The shell is viewport-bound: `<main>` is the ONE region that scrolls page
- * content, and the document itself must never scroll. Until this spec existed
- * that was an *implicit* invariant — it held only for as long as nothing else
- * in `<body>` happened to have height, and nothing in the repository checked
- * it. Anything that escapes into the initial containing block (an `sr-only`
- * `<table>`, a Radix popper, the toast region, the dev overlay, a browser
- * extension) gave the document scrollable height, and the symptom was the
- * reported one: a second scrollbar on the right, and scrolling past the bottom
- * of `<main>` continuing into a large empty area below the shell.
- *
- * `stray body content` below is that trigger, made deterministic: a tall
- * element appended to `<body>`, which is what every one of those sources
- * amounts to. It is the scenario that failed against the unguarded shell.
- *
- * `the dashboard's accessible chart tables` covers the specific element that
- * caused the reported defect — the charts' visually-hidden data tables, which
- * as bare `sr-only` tables ignored `width`/`height`/`overflow` and took up real
- * space (F-66 cause 2).
- *
- * The sidebar's own navigation scroller is deliberately NOT forbidden — it has
- * to scroll when the rail is taller than a short viewport — but it is required
- * to stay silent when it is not needed, so a normal window never shows two
- * scrollbars.
- */
-
-/** The scroll geometry of the page, read from the browser. */
 async function scrollGeometry(page: Page): Promise<{
   documentOverflow: number;
   horizontalOverflow: number;
@@ -64,9 +34,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
     'SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD are not set in the environment — point this run at a seeded backend to exercise the real shell.',
   );
 
-  // A tall window where the dashboard fits comfortably, a short one where it
-  // overflows `<main>` by a lot and the sidebar rail needs its own scroll, and
-  // a phone width, where the chart tables used to widen the whole document.
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 1280, height: 720 },
@@ -96,12 +63,8 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
     await page.goto('/dashboard', { waitUntil: 'networkidle' });
 
     const hidden = await page.evaluate(() => {
-      // A table must never carry `sr-only` itself: a table box treats
-      // width/height as minimums and CSS leaves `overflow` on it undefined, so
-      // it stays fully laid out while looking hidden.
       const selfHiding = document.querySelectorAll('table.sr-only').length;
 
-      // The wrapper that does hide it must really collapse to a 1px box.
       const wrappers = [...document.querySelectorAll('main .sr-only')].filter((el) =>
         el.querySelector('table'),
       );
@@ -123,25 +86,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
   test('the organization admin screen does not overflow sideways at 390px (F-66 causa 3)', async ({
     page,
   }, testInfo) => {
-    // `docs/deferred-findings.md` F-66 causa 3: below `lg`, the two-column
-    // grid (`OrgUnitTree` + `ScopeGrantsPanel`) had no `grid-template-
-    // columns` of its own at all — an implicit, content-sized single track,
-    // not one clamped to the viewport, so a long org unit/scope name grew
-    // the whole grid instead of wrapping or truncating. Measured 525px at a
-    // 390px viewport before the fix (`grid-cols-1` on the base breakpoint,
-    // `organization-admin-view.tsx`).
-    //
-    // Deliberately NOT `scrollGeometry()`'s `horizontalOverflow` (used by
-    // every other test in this file): that reads `document.documentElement
-    // .scrollWidth`, which this shell's own top-level `overflow-hidden`
-    // (T203) clips before it ever reaches the document — proven directly
-    // while writing this test: reverting the grid fix left
-    // `documentElement.scrollWidth` at exactly 390 while the grid itself
-    // still measured 525px, which would have made this guard pass against
-    // the unfixed code. F-66 causa 3 is content CLIPPED inside `<main>`,
-    // not a document-level scrollbar (that class is F-66 causa 1, still
-    // open) — the only instrument that actually distinguishes the two is a
-    // direct bounding-box measurement of the elements themselves.
     await page.setViewportSize({ width: 390, height: 844 });
     await signInAsWorkerAdmin(page, testInfo);
     await page.goto('/admin/organization', { waitUntil: 'networkidle' });
@@ -174,15 +118,12 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
         return rail ? rail.scrollHeight - rail.clientHeight : -1;
       });
 
-    // Tall window: the rail fits, so it must not put up a second scrollbar.
     expect(await railOverflow(), 'a tall window shows no sidebar scrollbar').toBe(0);
 
-    // Short window: the rail no longer fits and must become reachable.
     await page.setViewportSize({ width: 1440, height: 520 });
     await page.waitForTimeout(300);
     expect(await railOverflow(), 'a short window lets the rail scroll').toBeGreaterThan(0);
 
-    // Even then the document itself stays put.
     expect((await scrollGeometry(page)).documentOverflow).toBe(0);
   });
 
@@ -193,7 +134,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
     await signInAsWorkerAdmin(page, testInfo);
     await page.goto('/dashboard', { waitUntil: 'networkidle' });
 
-    // Wheel well past the end of the page's own content, the way a user does.
     await page.mouse.move(900, 400);
     for (let tick = 0; tick < 20; tick += 1) {
       await page.mouse.wheel(0, 500);
@@ -206,7 +146,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
     });
     expect(mainScrolledToBottom, '<main> reached its own bottom').toBe(true);
 
-    // The last thing on the dashboard has to be readable there.
     await expect(page.getByRole('heading', { name: 'Ações rápidas' })).toBeInViewport();
 
     const geometry = await scrollGeometry(page);
@@ -221,9 +160,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
     await signInAsWorkerAdmin(page, testInfo);
     await page.goto('/dashboard', { waitUntil: 'networkidle' });
 
-    // Stand in for anything that lands outside `<main>` and takes up space: an
-    // escaped `sr-only` table, a popper, the toast region, the dev overlay, a
-    // browser extension. The shell must keep owning the viewport regardless.
     await page.evaluate(() => {
       const stray = document.createElement('div');
       stray.id = 'stray-body-content';
@@ -232,10 +168,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
     });
     await page.waitForTimeout(200);
 
-    // The stray node is clipped, not removed, so `scrollHeight` still counts it
-    // and `window.scrollTo` still moves a locked document — neither is what a
-    // user can do. The invariants are the ones the user actually experiences:
-    // no second scrollbar, and the wheel cannot take them into the empty area.
     expect(
       await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth),
       'the document must not put up a scrollbar of its own',
@@ -256,7 +188,6 @@ test.describe('Authenticated shell — only <main> scrolls', () => {
       'the shell locks the document while it is mounted',
     ).toBe('hidden');
 
-    // The shell still occupies exactly the viewport, header included.
     await expect(page.locator('header').first()).toBeInViewport();
   });
 

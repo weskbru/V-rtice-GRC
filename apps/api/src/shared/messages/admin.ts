@@ -1,7 +1,3 @@
-/** Access administration (US8, T176-T180) — spans `core/identity`,
- * `core/authorization` and `core/organizations`; none of the three is a
- * sole owner, so their combined admin-surface text lives together here
- * rather than being split three ways for its own sake. */
 export const admin = {
   updateRequestEmpty: 'Informe ao menos um campo para atualizar.',
   emailAlreadyInUse: 'Este endereço de e-mail já está em uso.',
@@ -10,11 +6,6 @@ export const admin = {
     'Este usuário não possui uma credencial local para redefinição de senha.',
   invalidRoleIds: 'Um ou mais papéis informados não existem.',
   roleNameAlreadyInUse: 'Já existe um papel com este nome.',
-  /** F-68 — the platform owns a system role WHOLE: name, description and
-   * permission set. This exact string is the `detail` of the RFC 9457
-   * problem body, and `test/integration/system-role-immutability.spec.ts`
-   * asserts it so that "422 because it is a system role" is distinguishable
-   * from "422 for any other reason". */
   systemRoleImmutable:
     'Papéis do sistema são definidos pela plataforma: o nome, a descrição e o conjunto de permissões não podem ser alterados.',
   roleHasAssignedUsers: 'Este papel está atribuído a ao menos um usuário e não pode ser excluído.',
@@ -33,8 +24,6 @@ export const admin = {
   scopeGrantDuplicate: 'Esta concessão de escopo já existe para este usuário.',
 } as const;
 
-/** `CreateUserRequestDto`/`UpdateUserRequestDto` (T180, US8,
- * `POST|PATCH /admin/users[/{userId}]`). */
 export const adminUser = {
   email: {
     isEmail: 'Informe um endereço de e-mail válido.',
@@ -56,7 +45,6 @@ export const adminUser = {
   roleIds: { isUuid: 'Um dos papéis informados é inválido.' },
 } as const;
 
-/** `SetUserStatusRequestDto` (T180, `PUT /admin/users/{userId}/status`). */
 export const setUserStatus = {
   status: { isIn: 'O status informado é inválido.' },
   reason: {
@@ -65,8 +53,6 @@ export const setUserStatus = {
   },
 } as const;
 
-/** `ResetUserPasswordRequestDto` (T180,
- * `PUT /admin/users/{userId}/password`). */
 export const resetUserPassword = {
   newPassword: {
     isString: 'A nova senha deve ser um texto.',
@@ -74,20 +60,15 @@ export const resetUserPassword = {
   },
 } as const;
 
-/** `ReplaceUserRolesRequestDto` (T180,
- * `PUT /admin/users/{userId}/roles`). */
 export const replaceUserRoles = {
   roleIds: { isUuid: 'Um dos papéis informados é inválido.' },
 } as const;
 
-/** `GrantOrgScopeRequestDto` (T180,
- * `POST /admin/users/{userId}/scope-grants`). */
 export const grantOrgScope = {
   scopeType: { isIn: 'O tipo de escopo informado é inválido.' },
   orgUnitId: { isUuid: 'A unidade organizacional informada é inválida.' },
 } as const;
 
-/** `ListAdminUsersQueryDto` — `GET /admin/users` (T180). */
 export const listAdminUsersQuery = {
   page: { isInt: 'A página informada é inválida.' },
   pageSize: { isInt: 'O tamanho de página informado é inválido.' },
@@ -99,8 +80,6 @@ export const listAdminUsersQuery = {
   direction: { isIn: 'A direção de ordenação informada é inválida.' },
 } as const;
 
-/** `WriteRoleRequestDto`/`UpdateRoleRequestDto` (T180, US8,
- * `POST|PATCH /admin/roles[/{roleId}]`). */
 export const writeRole = {
   name: {
     isString: 'O nome deve ser um texto.',
@@ -115,19 +94,15 @@ export const writeRole = {
   },
 } as const;
 
-/** `ListRolesQueryDto` — `GET /admin/roles` (T180). */
 export const listRolesQuery = {
   page: { isInt: 'A página informada é inválida.' },
   pageSize: { isInt: 'O tamanho de página informado é inválido.' },
 } as const;
 
-/** `ListPermissionsQueryDto` — `GET /admin/permissions` (T180). */
 export const listPermissionsQuery = {
   resource: { maxLength: 'O recurso informado deve ter no máximo 64 caracteres.' },
 } as const;
 
-/** `CreateOrgUnitRequestDto`/`UpdateOrgUnitRequestDto` (T180, US8,
- * `POST|PATCH /admin/org-units[/{orgUnitId}]`). */
 export const writeOrgUnit = {
   code: {
     isString: 'O código deve ser um texto.',
@@ -140,13 +115,10 @@ export const writeOrgUnit = {
   parentId: { isUuid: 'A unidade organizacional pai informada é inválida.' },
 } as const;
 
-/** `SetOrgUnitStatusRequestDto` (T180,
- * `PUT /admin/org-units/{orgUnitId}/status`). */
 export const setOrgUnitStatus = {
   status: { isIn: 'O status informado é inválido.' },
 } as const;
 
-/** `AdminOrgUnitsQueryDto` — `GET /admin/org-units` (T180). */
 export const adminOrgUnitsQuery = {
   status: { isIn: 'O status informado é inválido.' },
 } as const;

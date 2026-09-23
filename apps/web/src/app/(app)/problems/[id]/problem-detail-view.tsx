@@ -1,107 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem detail screen (019-problem-detail-experience, Fase A
- * shell + Fase B "Visão geral"/"Ciclo de vida" + Fase C contextual aside and
- * overlay editing — supersedes the flat `EntityHeader` + loose
- * lifecycle-action card + one-level `EntityTabs` strip this screen used
- * before, itself built by 008-incidents-problems mirroring
- * `AssetDetailView`).
- *
- * ## What changed, and what did not
- *
- * The page composes `DetailLayout` (`@pharos/design-system/components`) —
- * the same two-column shell `RiskDetailView`/`IncidentDetailView` already
- * established — with a breadcrumb + code/badges/title/metadata header and a
- * two-level navigation (four groups, seven leaf sections) in the main
- * column. `summary`/`asideLead`/`aside` are all omitted in this phase (see
- * below); Fase C adds the contextual aside. Every section's underlying
- * component, endpoint, permission and behaviour is UNCHANGED — this rodada
- * reorganizes presentation only, never business logic, authorization or
- * lifecycle semantics (CLAUDE.md §18.9). The seven sections that existed
- * before Fase A all still exist, all with the same capabilities: Visão
- * geral, Riscos, Incidentes, Ações corretivas, Evidência, Anexos,
- * Comentários. None of them is gated by a view permission.
- *
- * ## "Visão geral" (Fase B)
- *
- * The read-only path of the "overview" section now composes `ProblemOverview`
- * (three cards: Descrição, Causa raiz, Detalhes do problema — see that
- * component's own header comment for why Causa raiz earns its own card) and
- * `ProblemLifecycleSection` (`components/detail/`, a fourth "Ciclo de vida"
- * card: the lifecycle track visual, the transition button row, and the
- * conditional outcome facts moved out of the old flat `<dl>`) — mirroring
- * `IncidentDetailView`'s own identical two-component composition exactly.
- * `ProblemLifecycleActions` (the transition buttons) is no longer rendered
- * directly by this file; `ProblemLifecycleSection` owns it now.
- *
- * ## `summary` and `asideLead` stay omitted — both decisions, not gaps
- *
- * `DetailLayout`'s `summary` slot stays empty — the coordinator's own
- * measurement of this screen found no honest KPI worth a dedicated card:
- * severity now has a real presence in the header's own badges (moved there
- * in Fase A), and "Registrado em"/"Atualizado em" are temporal context, not
- * a KPI. `asideLead` is likewise never passed, in Fase C or any later phase:
- * `Problem` has no honest pendency to list — no overdue review, no pending
- * approval, no blocked precondition distinct from "not offered" (mirrors
- * `IncidentContextAside`'s own reasoning, `features/incidents/components/
- * detail/incident-context-aside.tsx`'s header comment).
- *
- * ## Contextual aside (Fase C)
- *
- * `aside` now composes `ProblemContextAside` (`components/detail/`) —
- * "Ações rápidas", "Relacionamentos" (Riscos/Incidentes, no count, "Ver"
- * hint) and "Última atualização" — fed entirely by the `ProblemDetail`
- * already loaded on mount, zero requests of its own. `asideLabel` is the
- * catalog's own accessible name for the resulting `complementary` landmark,
- * present only at `xl`+ (`DetailLayout`'s own contract).
- *
- * ## Severity joins the header badges (Fase A)
- *
- * Before this phase, the header showed only the status badge — severity sat
- * exclusively inside the "Visão geral" tab's body. It is not new
- * information: `ProblemDetail.severity` was already loaded on mount. It now
- * renders as a second badge beside status, mirroring
- * `IncidentDetailView`'s own header exactly (severity, then status).
- *
- * ## One request on mount, unchanged
- *
- * `GET /problems/{problemId}` (`problemsApi.getById`) is the ONLY request
- * this page fires on mount, exactly as before this phase.
- *
- * ## Deep link (`?section=<id>`)
- *
- * The seven leaf ids are EXACTLY the ids this screen's tabs already used
- * before this phase (`overview`, `risks`, `incidents`, `corrective-actions`,
- * `evidence`, `attachments`, `comments`) — nothing renamed, nothing
- * invented. An unknown or no-longer-visible id resolves silently to the
- * first visible section (`resolveActiveDetailSection`,
- * `@/components/detail/detail-navigation`) — never an error, never nothing
- * selected.
- *
- * ## Leitura × edição (Fase C — overlay, no longer an inline swap)
- *
- * `Editar` opens `ProblemEditPanel` — an overlay `Sheet` composing
- * `DetailPanel mode="overlay"` around the SAME `ProblemForm` (`mode="edit"`,
- * untouched) — instead of swapping "Visão geral"'s own content for the form
- * inline, as it did through Fase A/B. The page behind the panel (Ciclo de
- * vida, the aside) stays fully readable throughout; saving closes the panel
- * and updates `problem` through the same `onSaved` shape as before. The
- * "Editar" button in the header no longer hides itself while `editing` is
- * true (it used to, when editing meant the button's own tab content
- * disappeared) — mirrors `IncidentDetailView`'s own header actions exactly;
- * the `Sheet`'s own focus trap and D-15's documented focus-return handle
- * the rest.
- *
- * ## `Suspense` (`useDetailSection` reads `useSearchParams()`)
- *
- * `page.tsx` (out of this rodada's territory, left untouched) renders
- * `ProblemDetailView` directly, with no `Suspense` of its own. This
- * component therefore supplies the boundary itself, mirroring
- * `IncidentDetailView`'s own split exactly: the exported component is a
- * thin wrapper, and every hook — including the search-params-reading
- * `useDetailSection` — lives in `ProblemDetailViewContent` underneath it.
- */
 import {
   DetailLayout,
   EmptyState,
@@ -158,13 +56,6 @@ export interface ProblemDetailViewProps {
   problemId: string;
 }
 
-/**
- * Level-1 group icons only — `EntityTabs` itself ignores `icon` on a
- * `subordinate` strip, so the level-2 leaf tabs built from `group.sections`
- * below never need an entry here. Reused, not invented (CLAUDE.md §18.12):
- * the exact same four keys/icons `IncidentDetailView`'s own `GROUP_ICONS`
- * already uses for the same four concepts.
- */
 const GROUP_ICONS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   overview: Eye,
   response: Wrench,
@@ -429,12 +320,6 @@ function ProblemDetailViewContent({ problemId }: ProblemDetailViewProps): React.
             metadata={
               <>
                 <span>{problems.detail.metadata.orgUnit(problem.orgUnit.name)}</span>
-                {/* `createdAt`/`updatedAt` are absent from `ProblemDetail`'s
-                    own generated `required` array (the contract under-declares
-                    fields the API always actually returns — the same class of
-                    gap `features/findings/types.ts`'s own header documents) —
-                    the server always sets both, so a non-null assertion here
-                    reflects reality rather than papering over a genuine gap. */}
                 <span>
                   {problems.detail.metadata.createdAt(formatTimestampDate(problem.createdAt!))}
                 </span>

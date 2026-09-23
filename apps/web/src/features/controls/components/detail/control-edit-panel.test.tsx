@@ -6,15 +6,6 @@ import { ControlEditPanel } from './control-edit-panel';
 import type { ControlDetail } from '../../types';
 import type { ControlFormProps } from '../control-form';
 
-/**
- * Component-mount evidence for `ControlEditPanel`
- * (021-control-detail-experience, Fase C) — mirrors `ProblemEditPanel`'s/
- * `ActionEditPanel`'s own shape. `../control-form` is mocked at the module
- * boundary: this suite's job is to prove the PANEL wires the right props
- * and chrome, not to re-exercise `ControlForm` itself (untouched, and out
- * of this rodada's scope).
- */
-
 vi.mock('../control-form', () => ({
   ControlForm: (props: ControlFormProps) => (
     <div data-testid="control-form-mock">
@@ -26,11 +17,6 @@ vi.mock('../control-form', () => ({
       >
         Simular salvar
       </button>
-      {/* F-79 (`docs/deferred-findings.md`): the real `ControlForm` calls
-          `props.onCancel` if supplied, `navigate.back()` otherwise. This
-          mock stands in only for the `onCancel` branch — the default
-          `navigate.back()` fallback is `control-form.test.tsx`'s own
-          responsibility, not this panel's. */}
       <button type="button" onClick={() => props.onCancel?.()}>
         Simular cancelar
       </button>
@@ -107,13 +93,6 @@ describe('ControlEditPanel', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  /**
-   * F-79 — `ControlForm`'s own "Cancelar" must close through the SAME
-   * `onOpenChange(false)` the `Sheet`'s `X`/`Escape` already use, never a
-   * second, independently-written mechanism (e.g. `navigate.back()`,
-   * which took a caller off `/controls/{id}` entirely before this fix —
-   * `docs/deferred-findings.md`).
-   */
   it('wires ControlForm.onCancel to the same onOpenChange(false) the Sheet’s own X/Escape use', () => {
     const onOpenChange = vi.fn();
     render(

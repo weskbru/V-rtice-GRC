@@ -1,12 +1,3 @@
-/**
- * T033/003-controls-management, User Story 2 — the `page`/`pageSize`
- * query parameters for `GET /controls/{controlId}/assessments`
- * (`contracts/controls.openapi.yaml`'s `#/components/parameters/Page`/
- * `PageSize`). Mirrors `modules/risk/presentation/dto/page-query.dto.ts`'s
- * own shape — this module's own copy, reusing the shared, generic
- * `USER_MESSAGES.dto.pageQuery` message (not an import from
- * `modules/risk`).
- */
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 

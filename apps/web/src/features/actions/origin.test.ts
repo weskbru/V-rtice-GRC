@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { actionOriginHref } from './origin';
 
-/**
- * `actionOriginHref` — the ONE function `my-actions-columns.tsx`'s origin
- * cell and `ActionOverview`'s origin field both call (this task's own
- * instruction: one decision, not two copies). Exercises all five
- * `ActionOriginType` values explicitly, so a sixth value added to the
- * contract tomorrow fails this suite's own `Record` exhaustiveness inside
- * `origin.ts` at compile time, not silently here.
- */
 describe('actionOriginHref', () => {
   it('links RISK_TREATMENT to /risks/{originId} — the risk itself', () => {
     expect(actionOriginHref('RISK_TREATMENT', 'risk-1')).toBe('/risks/risk-1');

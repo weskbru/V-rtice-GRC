@@ -11,15 +11,6 @@ import {
 
 import type { Permission } from '../../types';
 
-/**
- * Unit evidence for the area-based grouping helpers (roles screen
- * refinement). `groupPermissionsByResource` (the resource-only grouping) is
- * already covered by `role-permissions-summary.test.tsx`, which must keep
- * passing unchanged — this file only exercises the AREA vocabulary added on
- * top of it: `areaForResource`, `resourceLabel`, `permissionVerbLabel` and
- * `groupPermissionsByArea` itself.
- */
-
 function permission(overrides: Partial<Permission> & Pick<Permission, 'identifier'>): Permission {
   const separator = overrides.identifier.indexOf(':');
   const resource = separator >= 0 ? overrides.identifier.slice(0, separator) : overrides.identifier;
@@ -59,9 +50,6 @@ describe('resourceLabel', () => {
 
 describe('permissionVerbLabel', () => {
   it('reads the verb from the identifier suffix, not from the coarser `action` category', () => {
-    // `control:test` is typed with action ASSESS (there is no TEST value in
-    // `PermissionAction`), yet its own verb reads "Testar", not "Avaliar" —
-    // the identifier's own vocabulary always wins over the category.
     const testPermission = permission({
       identifier: 'control:test',
       resource: 'control',
@@ -88,9 +76,9 @@ describe('permissionVerbLabel', () => {
 describe('groupPermissionsByArea', () => {
   it('orders areas by the fixed product order, regardless of the input order', () => {
     const permissions = [
-      permission({ identifier: 'user:administer', resource: 'user' }), // administration
-      permission({ identifier: 'risk:view', resource: 'risk' }), // risk
-      permission({ identifier: 'finding:view', resource: 'finding' }), // audit
+      permission({ identifier: 'user:administer', resource: 'user' }),
+      permission({ identifier: 'risk:view', resource: 'risk' }),
+      permission({ identifier: 'finding:view', resource: 'finding' }),
     ];
 
     const areas = groupPermissionsByArea(permissions);
@@ -115,10 +103,6 @@ describe('groupPermissionsByArea', () => {
   });
 
   it('orders resources within one area by the fixed product order, not alphabetically or by input order', () => {
-    // Within the "audit" area, `audit-engagement` is declared before
-    // `finding` in the product order — fed in reverse here to prove the
-    // output order comes from the fixed table, not from input or alphabet
-    // (alphabetically "finding" < "audit-engagement", the opposite result).
     const permissions = [
       permission({ identifier: 'finding:view', resource: 'finding' }),
       permission({ identifier: 'audit-engagement:scope', resource: 'audit-engagement' }),
@@ -155,19 +139,6 @@ describe('groupPermissionsByArea', () => {
   });
 });
 
-/**
- * Migrated coverage (removal discipline): `permission-checklist.test.tsx`
- * guarded five distinct search behaviours before `PermissionChecklist` was
- * retired with the create dialog it served. The predicate itself moved here
- * — where it is a pure function and can be asserted directly — and the
- * search box that drives it is exercised in `role-edit-fields.test.tsx`.
- *
- * The pt-BR half of the predicate is the part that matters: `control:test`
- * has `action = ASSESS` and an English description, so "Testar" appears
- * NOWHERE in its raw data. A search that only looked at the identifier and
- * the description would find nothing for a reader typing the word the
- * screen itself shows them.
- */
 describe('permissionMatchesQuery — migrated from PermissionChecklist', () => {
   const risk = permission({ identifier: 'risk:view', resource: 'risk' });
   const controlTest = permission({
@@ -193,8 +164,6 @@ describe('permissionMatchesQuery — migrated from PermissionChecklist', () => {
   });
 
   it('matches the pt-BR verb label, absent from the identifier and from the action', () => {
-    // `control:test` is action ASSESS; "Testar" comes from the identifier's
-    // own verb through the pt-BR catalogue, and is the word the screen shows.
     expect(controlTest.action).toBe('ASSESS');
     expect(filterPermissionsByQuery(catalogue, 'testar')).toEqual([controlTest]);
   });

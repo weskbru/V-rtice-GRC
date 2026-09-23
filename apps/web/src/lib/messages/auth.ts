@@ -1,11 +1,3 @@
-/**
- * PharosGRC — authentication screens and flows (pt-BR).
- *
- * Covers `(public)/login/` and the in-place re-authentication seam
- * (`components/shell/session-expired-dialog.tsx`) — both submit to the same
- * `POST /auth/login`, so they intentionally share the same field labels and
- * the same generic credentials-rejection copy (`errors.invalidCredentials`).
- */
 export const auth = {
   brand: {
     name: 'PharosGRC',
@@ -16,10 +8,6 @@ export const auth = {
     heading: 'Entrar',
     subheading: 'Use suas credenciais organizacionais para acessar o ambiente de trabalho.',
     formAriaLabel: 'Entrar',
-    // Names the outer `<section>` (brand, slogan, card and institutional
-    // footer) — distinct from `formAriaLabel`, which names the `<form>`
-    // nested inside it. Reusing `formAriaLabel` here gave the page two
-    // same-named landmarks (`SECTION:Entrar` and `FORM:Entrar`).
     institutionalAriaLabel: 'Acesso institucional',
     emailLabel: 'E-mail',
     passwordLabel: 'Senha',

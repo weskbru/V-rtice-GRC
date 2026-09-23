@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new incident route (008-incidents-problems, US1).
- * `IncidentForm` navigates to `/incidents/{id}` on a successful create —
- * this route stays a thin composition of the page chrome and the reusable
- * form, mirroring `(app)/assets/new/page.tsx`.
- */
 import { PageHeader } from '@pharos/design-system/components';
 
 import { IncidentForm } from '@/features/incidents/components/incident-form';

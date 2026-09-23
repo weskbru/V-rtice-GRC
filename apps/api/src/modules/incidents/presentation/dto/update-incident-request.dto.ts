@@ -1,13 +1,3 @@
-/**
- * 008-incidents-problems, US1 — matches
- * `contracts/incidents.openapi.yaml`'s `UpdateIncidentRequest` exactly:
- * `minProperties: 1` is enforced at the controller
- * (`assertUpdateBodyNotEmpty`, mirroring `FindingController`'s own
- * function). **`status`/`code` are deliberately not declared here at
- * all** — not declaring them IS the rejection, via the global
- * `ValidationPipe`'s `forbidNonWhitelisted`: a caller must go through
- * `POST /incidents/{id}/transitions` for any status change.
- */
 import { IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

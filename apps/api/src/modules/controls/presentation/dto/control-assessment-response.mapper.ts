@@ -1,9 +1,3 @@
-/**
- * T033/003-controls-management, User Story 2 — maps
- * `ControlAssessmentRecord`/`ControlAssessmentApprovalRecord` to
- * `contracts/controls.openapi.yaml`'s `ControlAssessment`/
- * `ControlAssessmentAttestation` response shapes.
- */
 import type { ControlAssessmentApprovalRecord } from '../../domain/ports/control-assessment-approval-repository.port';
 import type { ControlAssessmentRecord } from '../../domain/ports/control-assessment-repository.port';
 

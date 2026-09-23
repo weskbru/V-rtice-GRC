@@ -1,24 +1,3 @@
-/**
- * T020/003-controls-management — `ControlRepository`: the sole Prisma-
- * backed implementation of `ControlRepositoryPort`. Extends
- * `ControlScopedRepository` (T017) so every method below is compile-time
- * required to apply the caller's organizational `ScopeFilter` (FR-007) —
- * the same discipline `RiskRepository` establishes for Risk.
- *
- * `effectiveness` is never a stored column (data-model.md §3, FR-012):
- * every method that returns a `ControlRecord` computes it fresh, via the
- * single calculator (`calculateControlEffectiveness`,
- * `domain/control-effectiveness.service.ts`, D-2) fed by
- * `listAssessmentsForEffectiveness`'s own read of `control_assessments` —
- * never a second, hand-rolled rule.
- *
- * ## `updateWithVersion`/`applyLifecycleTransition` — race-free by the
- * same mechanism `RiskRepository` documents
- *
- * A single conditional `UPDATE ... WHERE id = ? AND version = ? AND
- * <scope>` (ADR-013) — see `RiskRepository`'s own header for the full
- * `EvalPlanQual` reasoning this file does not repeat.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -69,11 +48,6 @@ export class ControlRepository extends ControlScopedRepository implements Contro
       include: CONTROL_INCLUDE,
     });
 
-    // A brand-new control provably has no assessment yet — no query
-    // needed to know `effectiveness` is `NOT_ASSESSED` (FR-013), but this
-    // still routes through the ONE calculator rather than hard-coding the
-    // literal, so a future change to "what counts as no history" cannot
-    // diverge between this call site and every other one.
     return toControlRecord(
       created,
       calculateControlEffectiveness([], created.frequency, referenceDate),
@@ -98,10 +72,6 @@ export class ControlRepository extends ControlScopedRepository implements Contro
       calculateControlEffectiveness(assessments, row.frequency, referenceDate),
     );
   }
-
-  // `findOrgUnitIdUnscoped` is implemented once, on `ControlScopedRepository`
-  // (research.md D-11/D-R11) — both this class and `ControlLookupRepository`
-  // used to duplicate the identical Prisma query.
 
   async updateWithVersion(
     scope: ScopeFilter,
@@ -157,10 +127,6 @@ export class ControlRepository extends ControlScopedRepository implements Contro
     }));
   }
 
-  /** Shared conditional `UPDATE ... WHERE id = ? AND version = ? AND
-   * <scope>` mechanism, factored out of `updateWithVersion`/
-   * `applyLifecycleTransition` exactly as `RiskRepository
-   * .conditionalVersionUpdate` factors out its own equivalents. */
   private async conditionalVersionUpdate(
     scope: ScopeFilter,
     id: string,
@@ -174,8 +140,6 @@ export class ControlRepository extends ControlScopedRepository implements Contro
 
     if (result.count > 0) {
       const updated = await this.findById(scope, id, referenceDate);
-      // Defensive only: a row this same transaction just updated cannot
-      // vanish from a `findById` scoped by the same filter a moment later.
       if (!updated) {
         return { outcome: 'NOT_FOUND' };
       }

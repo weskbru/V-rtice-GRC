@@ -15,29 +15,15 @@ export interface ToolbarSelectOption {
 }
 
 export interface ToolbarSelectProps {
-  /** The control's accessible name, e.g. "Ordenar por" or "Base do nível exibido" — always a full phrase, even when `prefix` shows something shorter. */
   label: string;
-  /** Short visible text in front of the control ("Ordenar por", "Base"). Hidden from assistive technology, which reads `label` instead, so the phrase is never announced twice. */
   prefix?: string;
   options: readonly ToolbarSelectOption[];
   value: string;
   onValueChange: (value: string) => void;
-  /** Widths differ by content: an ordering preset needs more room than "Residual". */
   triggerClassName?: string;
   className?: string;
 }
 
-/**
- * One compact labelled `<Select>` for a register's results toolbar (ordering,
- * a display basis, anything else a module needs to sit beside them).
- *
- * The registers had each built this pair — a small caption plus a select —
- * with their own spacing and their own trigger width, which is how two
- * neighbouring modules ended up with `w-[13rem]` and `w-[15rem]` for the
- * same control. The visible caption is `aria-hidden` and the trigger keeps
- * the full `label` as its accessible name: a screen reader hears "Ordenar
- * por, Código (crescente)", not "Ordenar por Ordenar por".
- */
 export function ToolbarSelect({
   label,
   prefix,

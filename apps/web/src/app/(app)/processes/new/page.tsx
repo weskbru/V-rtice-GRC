@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — new process route (T048). `ProcessForm` navigates to
- * `/processes/{id}` on a successful create — this route stays a thin
- * composition of the page chrome and the reusable form.
- */
 import { PageHeader } from '@pharos/design-system/components';
 
 import { ProcessForm } from '@/features/processes/components/process-form';

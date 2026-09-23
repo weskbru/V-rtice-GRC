@@ -5,18 +5,6 @@ import { cn } from "cn"
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
-    // `tabIndex={0}` — WCAG 2.1.1/2.1.3, axe's `scrollable-region-focusable`:
-    // a scrollable region with no focusable descendant and no tabindex of
-    // its own is unreachable by keyboard alone once its content actually
-    // overflows. Every caller of this primitive happened to fit within the
-    // viewport until `EngagementFindingsSection` (005-audit-findings, T085)
-    // rendered a genuinely wide table and surfaced it — the same real,
-    // previously-undetected defect `packages/design-system`'s own
-    // `DataTable` already found and fixed this exact way (see that
-    // component's own comment), reused here rather than invented again.
-    // Fixed in this shared primitive, not per call site, so every current
-    // and future consumer of `Table` is covered — see
-    // `docs/local-environment.md` D-15.
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"

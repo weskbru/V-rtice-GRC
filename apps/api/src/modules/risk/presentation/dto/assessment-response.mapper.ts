@@ -1,14 +1,3 @@
-/**
- * T125 — maps `AssessmentRecord` (`domain/ports/risk-assessment-repository
- * .port.ts`) to `contracts/risks.openapi.yaml`'s `RiskAssessment` response
- * shape, including the `levelChange` computed relative to the assessment
- * this one superseded (FR-066).
- *
- * `controlsConsidered` is returned as bare `{ id }` refs — `Control` does
- * not exist yet (US5), so there is no name/code to resolve; this mirrors
- * `risk-response.mapper.ts`'s own "empty/deterministic answer for a
- * capability not yet implemented" pattern rather than inventing one.
- */
 import type { RiskLevelValue } from '../../domain/methodology.schema';
 import type { AssessmentRecord } from '../../domain/ports/risk-assessment-repository.port';
 
@@ -47,13 +36,6 @@ export interface AssessmentResponse {
   readonly levelChange: LevelChangeResponse;
 }
 
-/** `previous`, when supplied, is the assessment `current.previousAssessmentId`
- * points to — the caller (`AssessmentController`, or `RiskRepository`'s
- * `findById` include for `RiskDetailResponse.currentAssessment`) resolves it
- * from the same page/lookup/query so this mapper stays a pure transform with
- * no I/O of its own. Only the two derived levels are required — that is all
- * `toLevelChange` below ever reads — so a full `AssessmentRecord` is never
- * required just to compute a level change. */
 export function toAssessmentResponse(
   current: AssessmentRecord,
   previous: Pick<AssessmentRecord, 'inherentLevel' | 'residualLevel'> | undefined,

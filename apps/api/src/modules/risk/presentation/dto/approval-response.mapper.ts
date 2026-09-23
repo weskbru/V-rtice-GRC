@@ -1,8 +1,3 @@
-/**
- * T158 — maps `ApprovalRecord` (`domain/ports/approval-repository.port.ts`)
- * to `contracts/risks.openapi.yaml`'s `Approval` wire shape. The ONE place
- * an approval becomes a response body (ADR-009).
- */
 import type { UserRefResponse } from './risk-response.mapper';
 import type { ApprovalRecord } from '../../domain/ports/approval-repository.port';
 import type { ApprovalStatus } from '@prisma/client';

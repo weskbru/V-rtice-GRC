@@ -1,21 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem lifecycle transition dialog (008-incidents-problems,
- * US2), covering every transition EXCEPT `toStatus: CLOSED` (that one has
- * its own dedicated `ProblemCloseDialog`, below, for the proactive
- * legibility CLAUDE.md §18.11 asks for). Handles `startAnalysis` (no
- * field), `resolve` (`rootCause`, required), `cancel`
- * (`cancellationReason`, required), and `reopen` (`reopenReason`,
- * required) — the field shown and its requiredness come from
- * `availableProblemTransitions`' own `requiredField`, never a second,
- * independent guess at which transition needs what.
- *
- * Client-side non-empty validation runs before the request is even sent
- * (immediate feedback, no round trip needed to know a blank reason is
- * wrong) — the server's own `422` remains the authoritative check
- * regardless (`incident.entity.ts`'s sibling on the Problems side).
- */
 import { FormField } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';

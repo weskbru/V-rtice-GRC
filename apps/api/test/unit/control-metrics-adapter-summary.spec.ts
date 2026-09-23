@@ -1,15 +1,3 @@
-/**
- * Unit test for `ControlMetricsAdapter.getSummary`
- * (`src/modules/controls/infrastructure/control-metrics.adapter.ts`), added
- * for `GET /dashboard/summary`'s `breakdowns.controls`
- * (`get-dashboard-summary.usecase.ts`). `ControlQueryService.listCatalog`
- * is a hand-rolled fake — no I/O, no NestJS test module, no real
- * `controlEffectivenessExpression` SQL. The fact this file exists to prove:
- * `getSummary` issues exactly THREE `listCatalog` calls (unfiltered,
- * `status: ['ACTIVE']`, and `status: ['ACTIVE'] + effectiveness:
- * ['INEFFECTIVE']`) and reads each one's own `total` — never a fourth call,
- * never a client-side re-count.
- */
 import { describe, expect, it, vi } from 'vitest';
 
 import { ControlMetricsAdapter } from '../../src/modules/controls/infrastructure/control-metrics.adapter';

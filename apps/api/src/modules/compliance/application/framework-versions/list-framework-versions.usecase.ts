@@ -1,9 +1,3 @@
-/**
- * T023/004-compliance-management — `ListFrameworkVersionsUseCase`: the
- * read side of `GET /frameworks/{frameworkId}/versions`
- * (`listFrameworkVersions` operation). Confirms the framework exists
- * first — an unknown `frameworkId` answers `404`, never an empty page.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../../shared/errors/domain-error';

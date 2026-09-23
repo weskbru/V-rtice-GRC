@@ -1,13 +1,3 @@
-/**
- * T030/004-compliance-management — `FrameworkVersionController`: the
- * version catalog, edit and publish operations of
- * `contracts/compliance.openapi.yaml` (`listFrameworkVersions`,
- * `createFrameworkVersion`, `getFrameworkVersion`, `updateFrameworkVersion`,
- * `publishFrameworkVersion` — operations 5-9). Mirrors
- * `framework.controller.ts`'s own conventions (`formatETag`/
- * `parseIfMatchHeader`, imported from it — same module, so this is not a
- * cross-module import).
- */
 import {
   Body,
   Controller,

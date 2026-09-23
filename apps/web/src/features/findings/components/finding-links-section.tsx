@@ -1,63 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Finding↔Control and Finding↔Risk link management (T078,
- * 005-audit-findings, US3, FR-013 to FR-016, ADR-020).
- *
- * Mirrors `features/controls/components/control-links-section.tsx`'s own
- * anatomy: a local, unexported generic `RelationshipSubsection<TLink>` (NOT
- * imported from `features/controls` — CLAUDE.md §2, §4, business modules
- * must not depend directly on each other) rendering two independent
- * sections — Controles and Riscos — each with its own list, its own
- * registry picker and its own withdraw confirmation.
- *
- * Two things this section deliberately does NOT do, both load-bearing:
- *
- *   - **"Desvincular" is never "excluir".** Withdrawing calls `DELETE
- *     /findings/{findingId}/{controls|risks}/{linkId}` at the HTTP level,
- *     but the server answers `200` with the link body, `unlinkedAt`
- *     stamped — the row is preserved forever (FR-012/SC-005). Every string
- *     shown here says "desvincular"/"vínculo desfeito", never "excluir" or
- *     "remover permanentemente" — `findingLinks.controls.unlinkAction`
- *     already reads that way in the catalog, and the confirm dialog's own
- *     description makes the preservation explicit.
- *   - **No client-invented restriction.** A retired/suspended/draft
- *     control and an archived risk both remain linkable — that is
- *     deliberate (history is preserved); the picker never filters by
- *     status. The one restriction this section DOES apply client-side is
- *     the finding not being `ARCHIVED` (`findingLinks.controls
- *     .archivedFindingError`'s own precondition) — combined here, not by
- *     the caller, from the raw `finding:link` permission plus
- *     `findingStatus`, so the proactive archived notice (§18.11 — shown
- *     BEFORE any attempt) and the picker's own gating can never drift
- *     apart from each other.
- *
- * Unlike `ControlLinksSection` (one control's whole detail page, so full
- * `Card` chrome per relationship makes sense), `FindingLinksSection` is
- * embedded inside `FindingsPanel`'s own already-bordered per-finding `<li>`
- * — a `Card` in here would be exactly the "cartão dentro de cartão"
- * CLAUDE.md §18.5 rules out. Each subsection below is a plain block with a
- * small heading instead, the same choice `evidence-attachments-section
- * .tsx`'s own header comment already makes and explains for the identical
- * "many rows, each needing its own nested collaboration section" shape.
- *
- * ## Fetched only near the viewport (S-08, `F-61`/`A4-F05`)
- *
- * `FindingsPanel` mounts one `FindingLinksSection` per finding, unconditionally,
- * and each one used to fetch its controls AND its risks the moment it mounted —
- * two requests per finding, with no limit. Measured against a populous org
- * unit (`RSK-2026-0871`, root unit) this produced 150-350 requests on a single
- * page load. `useLoadWhenNearViewport` below defers both fetches until the
- * section is at or near the viewport (`IntersectionObserver`, generous
- * `rootMargin` so it loads slightly BEFORE scrolling it fully into view) —
- * once triggered it stays active permanently (scrolling away and back never
- * re-fetches), so the vínculos still appear automatically, without requiring
- * a click, exactly as before this fix (S-08's own constraint: "sem mudar o
- * que o usuário vê"). An environment without `IntersectionObserver` (older
- * browsers; this project's own Vitest/jsdom setup, which polyfills only
- * `ResizeObserver`) falls back to immediately active — the original
- * eager-fetch behavior — never to "never loads".
- */
 import { ConfirmDialog, SearchablePicker } from '@pharos/design-system/components';
 import { Loader2, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -93,26 +35,11 @@ import type { SearchablePickerOption } from '@pharos/design-system/components';
 
 const { findingLinks } = auditEngagements;
 
-/**
- * Gates a section's data fetch behind viewport visibility (S-08, see this
- * file's own header). `active` starts `false` and flips to `true` exactly
- * once, the first time the returned `containerRef` element intersects the
- * viewport (or comes within `rootMargin` of it) — it never flips back, so a
- * section that has already loaded is never re-fetched by scrolling away and
- * back. Falls back to immediately `active` when `IntersectionObserver` does
- * not exist, rather than never loading at all.
- */
 function useLoadWhenNearViewport(rootMargin = '200px'): {
   containerRef: React.RefObject<HTMLDivElement | null>;
   active: boolean;
 } {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // The "no IntersectionObserver" fallback is decided ONCE, as the initial
-  // state itself (lazy initializer), never as a `setActive` call inside the
-  // effect body below — `react-hooks/set-state-in-effect` flags a direct
-  // synchronous `setState` in an effect, and this fallback has no external
-  // event to react to in the first place (unlike the real observer callback
-  // below, which fires on an actual intersection event).
   const [active, setActive] = useState(() => typeof IntersectionObserver === 'undefined');
 
   useEffect(() => {
@@ -141,9 +68,7 @@ interface RelationshipMessages {
   readonly pickerLabel: string;
   readonly pickerPlaceholder: string;
   readonly pickerNoOptions: string;
-  /** Front H: placeholder text inside the picker's own search input. */
   readonly pickerSearchPlaceholder: string;
-  /** Front H: accessible name for the picker's trigger button. */
   readonly pickerAriaLabel: string;
   readonly empty: string;
   readonly loading: string;
@@ -182,15 +107,11 @@ interface RelationshipSubsectionProps<TLink extends RelationshipLink> {
   messages: RelationshipMessages;
   regionLabel: string;
   entityColumnLabel: string;
-  /** A stable, ASCII id fragment (e.g. `"control"`/`"risk"`) — kept separate from `entityColumnLabel` (pt-BR display text) so the checkbox's DOM `id` never embeds accented characters or spaces. */
   idSuffix: string;
-  /** S-08 — `false` until this section is at or near the viewport; `fetchLinks` does not run before then (this file's own header). */
   active: boolean;
   canLink: boolean;
   getRef: (link: TLink) => RegistryOption;
   fetchLinks: (includeWithdrawn: boolean) => Promise<readonly TLink[]>;
-  /** Front H: called with the user's live search text — see
-   * `risk-controls-section.tsx`'s identical prop for the full reasoning. */
   fetchRegistry: (q: string) => Promise<{ data: readonly RegistryOption[]; isPartial: boolean }>;
   onLink: (registryItemId: string) => Promise<void>;
   onUnlink: (linkId: string) => Promise<void>;
@@ -227,9 +148,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
   const [unlinking, setUnlinking] = useState(false);
 
   useEffect(() => {
-    // S-08 — do not fetch until this section is at or near the viewport;
-    // `loading` (derived below from `resolvedRequestKey`) stays `true` in the
-    // meantime, so the UI shows exactly what it already showed pre-fetch.
     if (!active) return;
     let cancelled = false;
     fetchLinks(includeWithdrawn)
@@ -319,14 +237,6 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
   return (
     <div className="flex flex-col gap-3">
       <div>
-        {/* `<h2>`, not `<h4>` (axe `heading-order` — a real defect, found by a
-            rendered-page scan of `problem-relationships-section.tsx`, the
-            section modelled on this one, 2026-09-11, and confirmed to already
-            exist here too): the audit engagement detail page's `EntityHeader`
-            renders the page's only `<h1>`, and neither it nor `EntityTabs`
-            nor `FindingsPanel` renders any heading of its own, so this is
-            always the first heading inside its tab panel — `<h4>` skipped
-            two levels. */}
         <h2 className="text-sm font-semibold text-foreground">{messages.sectionTitle}</h2>
         <p className="text-xs text-muted-foreground">{messages.sectionDescription}</p>
       </div>
@@ -480,13 +390,10 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
 
 export interface FindingLinksSectionProps {
   findingId: string;
-  /** Used only to gate `canLink` below and to show the proactive archived notice (CLAUDE.md §18.11 — communicated before an attempt, not only as a refusal). */
   findingStatus: FindingStatus;
-  /** `finding:link` alone — this component combines it with `findingStatus !== 'ARCHIVED'` itself, unlike `ControlLinksSectionProps.canLinkRelationships` (which the caller pre-combines) — kept local here so the archived notice below and the picker's own gating can never drift apart. */
   canLinkPermission: boolean;
 }
 
-/** `getRef` adapters — `FindingControlLink`/`FindingRiskLink` each name their target under a different key (`control`/`risk`). */
 function controlRef(link: FindingControlLink): RegistryOption {
   return link.control;
 }

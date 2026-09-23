@@ -1,11 +1,3 @@
-/**
- * T193 — `ListNotificationsUseCase`: `GET /notifications` (FR-101).
- * Requires only an authenticated session (`@NoPermissionRequired()` on the
- * controller) — every result is unconditionally filtered to
- * `recipientUserId = actorUserId`, so there is no permission narrower than
- * "is authenticated" that could ever apply (a user may always read their
- * own notifications).
- */
 import { Injectable } from '@nestjs/common';
 
 import { createPageRequest } from '../../../shared/pagination/page-request';

@@ -1,9 +1,3 @@
-/**
- * Matches `auth.openapi.yaml`'s `LoginRequest` schema exactly:
- * `additionalProperties: false` (enforced by the global `ValidationPipe`'s
- * `forbidNonWhitelisted`), `email` (format email, maxLength 320), `password`
- * (minLength 1, maxLength 256).
- */
 import { IsEmail, IsString, Length, MaxLength } from 'class-validator';
 
 import { USER_MESSAGES } from '../../../../shared/messages/user-messages';

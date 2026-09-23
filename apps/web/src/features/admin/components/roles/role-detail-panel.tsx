@@ -1,35 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, the role detail panel
- * (015-roles-permissions-surface FR-009 to FR-012, FR-026 to FR-032,
- * T034/T035).
- *
- * ## Two presentations, one panel
- *
- * Both — inline beside the list at `xl` and wider, an overlay `Sheet` below
- * it — live in `RolePanelShell`, which the create panel uses as well. The
- * reasoning behind the pair, and behind the inline height cap, is written
- * there rather than duplicated here.
- *
- * ## A system role has no edit action at all (F-68)
- *
- * The platform owns a seeded role whole — name, description and permission
- * set — and `RoleAdminService.update` refuses all three. Offering "Editar
- * papel" for one would be a control whose every save the server refuses, so
- * this panel offers "Ver definição" instead: the same three fields, rendered
- * read-only with their reasons in words, and a footer with one way out and
- * no save. The reason is also written beside the actions, in the reading
- * state, so nobody has to open the sheet to learn it.
- *
- * ## The editor stays mounted while reading
- *
- * `useRoleEditor` is called unconditionally. Mounting it only while editing
- * would mean unmounting and remounting the `Sheet` around it below `xl` —
- * i.e. the overlay closing the moment the user pressed "Editar papel". The
- * request it would otherwise make is gated by its own `enabled` flag, so
- * reading a role still costs zero extra requests (NFR-006).
- */
 import { DisclosureGroup, EntityTabs } from '@pharos/design-system/components';
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Code2, Loader2, Lock, Pencil, Trash2 } from 'lucide-react';
@@ -52,15 +22,6 @@ import { useRoleEditor } from './use-role-editor';
 
 import type { Role } from '../../types';
 
-/**
- * Why "Excluir" is unavailable for a role, mirroring the server's own two
- * refusals (system role; still assigned). `null` when it can be deleted.
- *
- * The same rule `role-admin-columns.tsx` carried for the table's row menu,
- * moved here with the affordance it explains — the restriction is written
- * out, never merely enforced by a dimmed control
- * (`specs/012-admin-roles-screen/STATE.md` §2.5).
- */
 export function roleDeleteBlockedReason(role: Role): string | null {
   if (role.isSystem) return admin.roles.actions.deleteBlockedSystem;
   if (role.assignedUserCount > 0) {
@@ -72,7 +33,6 @@ export function roleDeleteBlockedReason(role: Role): string | null {
 export interface RoleDetailPanelProps {
   role: Role;
   canManageRoles: boolean;
-  /** Whether the CURRENT user holds `user:administer` — never inferred from `role:administer` (FR-019). */
   canAdministerUsers: boolean;
   canManageOrgUnits: boolean;
   onClose: () => void;
@@ -107,7 +67,6 @@ export function RoleDetailPanel({
   }
 
   function discardEditing(): void {
-    // FR-032 — nothing is persisted, and the panel returns to reading.
     editor.reset();
     setConfirmCancelOpen(false);
     setEditing(false);
@@ -132,8 +91,6 @@ export function RoleDetailPanel({
     <>
       {editing ? (
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          {/* F-68 — a system role opens as a definition sheet, not as an
-              edit form, and the heading must not promise otherwise. */}
           {role.isSystem ? admin.roles.edit.viewTitle : admin.roles.edit.title}
         </span>
       ) : null}
@@ -144,15 +101,6 @@ export function RoleDetailPanel({
         {privileged ? <RolePrivilegeBadge roleName={displayName} /> : null}
       </div>
 
-      {/*
-       * ADR-022, traceability — the heading above is a pt-BR label; THIS is
-       * the value the server stores, the API returns and the audit trail
-       * records. It rides the same "Ver identificadores técnicos" control
-       * that reveals `risk:view` beside each permission (FR-016), because it
-       * is the same question asked about a different field, and it is shown
-       * for every role — including a custom one, where seeing the two agree
-       * is itself the answer.
-       */}
       {showIdentifiers && !editing ? (
         <p className="text-xs text-muted-foreground">
           <span>{admin.roles.technicalName.label}: </span>
@@ -244,13 +192,6 @@ export function RoleDetailPanel({
 
   const footer = editing ? (
     role.isSystem ? (
-      /*
-       * F-68 — nothing on a system role is writable, so there is NO save
-       * control: a button whose every press the server refuses is a promise
-       * the product cannot keep, and the one it used to keep (description
-       * only) is exactly the defect. One way out, no confirmation to ask for,
-       * because nothing was changed.
-       */
       <div className="flex w-full justify-end">
         <Button type="button" variant="outline" onClick={discardEditing}>
           {admin.roles.edit.close}
@@ -275,14 +216,7 @@ export function RoleDetailPanel({
       </div>
     )
   ) : (
-    // Two rows, never one: the panel is 26rem wide and the row would carry a
-    // long toggle label, a destructive action, its reason and the primary
-    // action. Measured on screen at 1440 px, "Editar papel" wrapped under the
-    // rest — the primary action is the one thing that must not look like an
-    // afterthought (§18.11, "O usuário identifica imediatamente a ação
-    // primária?").
     <div className="flex w-full flex-col gap-2">
-      {/* FR-016 — the identifiers are revealed on demand, never rewritten. */}
       <Button
         type="button"
         variant="ghost"
@@ -299,12 +233,6 @@ export function RoleDetailPanel({
 
       {canManageRoles ? (
         <>
-          {/*
-           * F-68 — why this role carries no edit action, on its own line and
-           * before the controls, so the reader learns it without clicking
-           * anything. It replaces the shorter "Papel do sistema" that used to
-           * sit beside "Excluir" alone, and covers both refusals at once.
-           */}
           {role.isSystem ? (
             <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
               <Lock aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
@@ -325,11 +253,6 @@ export function RoleDetailPanel({
               <Trash2 aria-hidden="true" className="size-4" />
               {admin.roles.actions.delete}
             </Button>
-            {/*
-             * "Editar papel" is offered only where something can be edited. A
-             * system role opens the same fields, read-only, under a name that
-             * says so.
-             */}
             {role.isSystem ? (
               <Button type="button" variant="outline" size="sm" onClick={startEditing}>
                 <Lock aria-hidden="true" className="size-4" />

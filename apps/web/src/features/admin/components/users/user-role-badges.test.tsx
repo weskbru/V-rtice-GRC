@@ -5,21 +5,6 @@ import { UserRoleBadges } from './user-role-badges';
 
 import type { AdminRoleRef } from '../../types';
 
-/**
- * Component-mount evidence for `UserRoleBadges`'s "+N" overflow control —
- * the coordinator's explicit requirement that every hidden role name stays
- * reachable by a screen reader, not only by hover or a `title` tooltip —
- * and for the deterministic one-line fit behind BOTH of its callers
- * (`widthBudget` as a number for the table, `'measure'` for the card; see
- * this component's own header for why the two differ).
- *
- * `widthBudget: 'measure'` always yields exactly one visible badge (plus
- * "+N" when more than one role exists) under jsdom: `ResizeObserver` is a
- * no-op polyfill there (`vitest.setup.ts`) and `clientWidth` is always 0,
- * which is this component's own documented "never show zero roles"
- * fallback — not a bug in these tests, the fixed-pixel tests below exercise
- * the real fit arithmetic instead.
- */
 function role(id: string, name: string): AdminRoleRef {
   return { id, name };
 }
@@ -38,23 +23,19 @@ describe('UserRoleBadges', () => {
       />,
     );
 
-    // pt-BR display names (`roleDisplayName`, ADR-022) — never the stored, English `Role.name`.
     expect(screen.getByText('Analista de Riscos')).toBeInTheDocument();
     expect(screen.getByText('Auditor')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   const FOUR_ROLES = [
-    role('r1', 'Risk Analyst'), // "Analista de Riscos"
-    role('r2', 'Auditor'), // "Auditor"
-    role('r3', 'Control Owner'), // "Responsável por Controle"
-    role('r4', 'Read Only'), // "Somente Leitura"
+    role('r1', 'Risk Analyst'),
+    role('r2', 'Auditor'),
+    role('r3', 'Control Owner'),
+    role('r4', 'Read Only'),
   ];
 
   it("the '+N' trigger's own accessible name states how many more roles there are AND what they are", () => {
-    // Deterministic character-width estimate (this component's own header):
-    // at 150px, only the first label ("Analista de Riscos", 18 chars ≈
-    // 140px) fits before the "+N" reserve would be exceeded.
     render(<UserRoleBadges roles={FOUR_ROLES} widthBudget={150} />);
 
     expect(screen.getByText('Analista de Riscos')).toBeInTheDocument();
@@ -115,15 +96,6 @@ describe('UserRoleBadges', () => {
   });
 
   it('re-measures once roles arrive after starting empty — the same instance, not just a fresh mount', () => {
-    // The `EmptyValue` branch renders no row `<div>` at all, so the very
-    // first render of this test has nothing for `ResizeObserver` to attach
-    // to. Before the fix, the measuring effect was keyed only on
-    // `widthBudget === 'measure'` (unchanged across the rerender below) and
-    // read a `useRef` that had captured `null` on that first, div-less
-    // render — so the row was never observed and stayed stuck at the
-    // zero-roles fallback (one badge + "+N") even once real roles, and real
-    // width, arrived. A card re-rendering after the "assign roles" dialog
-    // succeeds and its query refetches is exactly this sequence.
     const clientWidthSpy = vi
       .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
       .mockReturnValue(1000);
@@ -146,9 +118,6 @@ describe('UserRoleBadges', () => {
 
       rerender(<UserRoleBadges roles={FOUR_ROLES} widthBudget="measure" />);
 
-      // The row mounted for the first time on this rerender — it must have
-      // been observed, and the stubbed 1000px `clientWidth` must have been
-      // used to fit all four roles with no overflow.
       expect(observedTargets).toHaveLength(1);
       expect(screen.getByText('Analista de Riscos')).toBeInTheDocument();
       expect(screen.getByText('Auditor')).toBeInTheDocument();

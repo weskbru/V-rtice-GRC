@@ -1,10 +1,3 @@
-/**
- * T022/006-assets-processes — matches `GET /assets`'s query parameters
- * exactly (`contracts/assets.openapi.yaml`'s `listAssetCatalog` operation).
- * Comma-separated array parameters use `style: form, explode: false` per
- * the OpenAPI document — mirrors `ListControlsQueryDto`'s own `splitCsv`
- * convention exactly.
- */
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -40,23 +33,6 @@ function splitCsv({ value }: { value: unknown }): unknown {
   return items.length > 0 ? items : undefined;
 }
 
-/**
- * `enableImplicitConversion: true` (the platform's global
- * `ValidationPipe`, `infrastructure/http/validation.ts`) resolves this
- * property's reflected TypeScript type (`boolean`) and coerces the RAW
- * query string via `Boolean(rawValue)` BEFORE any `@Transform` runs — so
- * `Boolean('false')` (a non-empty string) already evaluates to `true` by
- * the time a naive `@Transform(({ value }) => ...)` would receive it,
- * silently discarding an explicit `isActive=false` (verified against this
- * exact `class-transformer` version's `TransformOperationExecutor`: the
- * implicit, reflected-type conversion runs first, and `applyCustomTransformations`
- * hands a custom `@Transform` the ALREADY-coerced value, not the original
- * string). Reading `obj[key]` — the untouched raw plain object — instead
- * of the corrupted `value` is what makes `false` distinguishable from
- * `true` here; a version keyed on `value` alone would report FR-007's
- * `isActive=false` filter as "no rows" for every genuinely inactive
- * asset, which is exactly the regression this comment exists to prevent
- * from being "fixed" back into the naive form. */
 function toBoolean({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown {
   const raw = obj[key];
   if (typeof raw === 'boolean') return raw;

@@ -4,28 +4,6 @@ import { buildControlLifecycleTrack } from './control-lifecycle-track';
 
 import type { AvailableControlTransition, ControlStatus } from '../../types';
 
-/**
- * Pure-logic evidence for the "Ciclo de vida" track model
- * (021-control-detail-experience, Fase B) — the honesty constraints this
- * module exists to enforce (see its own header comment):
- *
- *   - `SUSPENDED` is NEVER marked completed — no field on `ControlDetail`
- *     ever proves it, and both `ACTIVE` and `RETIRED` are reachable without
- *     ever passing through it;
- *   - `ACTIVE` is marked completed ONLY when the control's current status is
- *     `SUSPENDED` — graph reachability over `CONTROL_LIFECYCLE_TRANSITIONS`
- *     (`SUSPENDED` has exactly one inbound edge, `ACTIVE -> SUSPENDED`), not
- *     a stamp;
- *   - `RETIRED` only ever appears as the detached `retired` node, and only
- *     when the control's CURRENT status actually is `RETIRED` — never as a
- *     position on the three-node main track, and never inferred for a
- *     control that has not actually been retired.
- *
- * Mirrors `action-lifecycle-track.test.ts`'s/`problem-lifecycle-track
- * .test.ts`'s own coverage shape, adapted to Control's own three-position,
- * partly-bidirectional main track.
- */
-
 function facts(status: ControlStatus): { status: ControlStatus } {
   return { status };
 }
@@ -90,9 +68,6 @@ describe('buildControlLifecycleTrack', () => {
     const retiredModel = buildControlLifecycleTrack(facts('RETIRED'), []);
     expect(retiredModel.retired).toEqual({ status: 'RETIRED', state: 'current' });
 
-    // DRAFT, ACTIVE and SUSPENDED all offer RETIRED as a legal target
-    // transition — that must never surface as a rendered node on a control
-    // that has not actually been retired.
     expect(buildControlLifecycleTrack(facts('DRAFT'), [transition('RETIRED')]).retired).toBeNull();
     expect(buildControlLifecycleTrack(facts('ACTIVE'), [transition('RETIRED')]).retired).toBeNull();
     expect(

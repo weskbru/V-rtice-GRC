@@ -1,17 +1,3 @@
-/**
- * T126 — matches `contracts/platform.openapi.yaml`'s
- * `CreateRiskMethodologyVersionRequest` exactly: `additionalProperties:
- * false` means `versionNumber`/`isActive` — server-owned per that schema's
- * own description — are never accepted (same mechanism as
- * `CreateRiskRequestDto`'s header documents for `Risk`).
- *
- * Nested arrays of objects (`ScalePoint`/`MatrixCell`/`LevelBand`) need
- * `@ValidateNested({ each: true })` + `@Type(() => X)` for `class-validator`
- * to descend into each element — the first such nested-array DTO in this
- * codebase, so the three small `*Dto` classes below are local to this file
- * rather than a shared primitive invented ahead of a second consumer
- * (CLAUDE.md: "não criar abstrações prematuras").
- */
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,

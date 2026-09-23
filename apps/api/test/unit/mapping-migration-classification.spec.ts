@@ -1,11 +1,3 @@
-/**
- * T037-T040/004-compliance-management, User Story 2 — exhaustive unit
- * coverage of `classifyMappingMigrationTarget`
- * (`domain/requirement-control-mapping-migration.entity.ts`, research.md
- * D-6). Pure function: no I/O, no database — the DB-backed re-runnability/
- * one-audit-event guarantees are covered separately by
- * `test/integration/mapping-migration.spec.ts`.
- */
 import { describe, expect, it } from 'vitest';
 
 import { classifyMappingMigrationTarget } from '../../src/modules/compliance/domain/requirement-control-mapping-migration.entity';
@@ -32,10 +24,6 @@ describe('classifyMappingMigrationTarget (T036, research.md D-6)', () => {
   });
 
   it('never infers a correspondence from matching externalRef/text — this function only ever sees ids the caller decided, so a coincidental external-code match that was never listed in correspondences cannot reach this function as a source at all, and an absent target is PENDING_DECISION regardless of any coincidence upstream', () => {
-    // Simulates two requirements sharing an externalRef in different
-    // versions: the caller (`ExecuteMappingMigrationUseCase`) never
-    // includes an inferred pairing, so this function only ever receives
-    // `undefined` for that target.
     expect(classifyMappingMigrationTarget(false, undefined)).toBe('PENDING_DECISION');
   });
 });

@@ -1,10 +1,3 @@
-/**
- * 009-indicators-reports, Fase 8 (T068 prep) — `GetReportDefinitionUseCase`
- * (`getReportDefinition`, `GET /reports/{reportId}`). No `ScopeFilter`
- * anywhere (research.md D-8, `ReportDefinitionRepositoryPort`'s own
- * header) — mirrors `modules/indicators/application/
- * get-indicator-definition.usecase.ts`'s identical shape.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';

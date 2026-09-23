@@ -1,58 +1,3 @@
-/**
- * PharosGRC — risk detail, Assessment section (T130, US4, FR-069, FR-093,
- * ADR-006, redesigned 016-risk-detail-experience Área 2, 2026-09-17).
- *
- * Presents the risk's `currentAssessment` — already returned inline by
- * `GET /risks/{riskId}` (`RiskDetailResponse.currentAssessment`) — and never
- * re-fetches it separately. The methodology matrix is fetched independently
- * of `AssessmentForm`'s own fetch (same reasoning `risk-register-filters.tsx`
- * gives for its own duplicated reference-data loading): this section must
- * stay usable on its own, so it cannot depend on a sibling having already
- * fetched anything. That fetch happens when THIS section opens, not on page
- * mount — outside the two-request budget §4.9 protects (pre-existing
- * behaviour, unchanged by this redesign).
- *
- * ## Hierarchy: resultado → interpretação → contexto → ação (Área 2)
- *
- * 1. The matrix — inherent AND residual plotted together via `RiskMatrix`'s
- *    own multi-`highlighted` support — is the main analytical element,
- *    beside a compact score/level/probability/impact-TERM comparison for
- *    glance comparability (`RiskMatrix.highlighted` already carried both
- *    bases before this redesign; only the loading state and the layout
- *    around it changed).
- * 2. "Contexto da avaliação" (methodology version, date, assessor,
- *    rationale, controls considered) at subordinate visual weight —
- *    smaller type, muted, after the analytical result, never competing
- *    with it.
- * 3. A Causas/Consequências COMPARATIVE SUMMARY — first items and a count,
- *    never the full list a second time — with an explicit path to the real
- *    leaf section (`onViewCausesConsequences`, wired to `?section=causes-
- *    consequences` by the caller). Progressive disclosure, not duplication:
- *    the leaf section itself is untouched by this file.
- * 4. "Registrar nova avaliação" / "Alterar próxima revisão" are now
- *    CONTEXTUAL ACTIONS — `AssessmentForm`/`RiskReviewSchedule` are
- *    unmodified (zero blast radius on either component or its own test
- *    suite: both still render their full, always-complete form the instant
- *    they mount) — this section merely decides WHEN to mount them, via a
- *    local toggle exactly like `treatment-actions-table.tsx`'s canonical
- *    "list first, form behind a button" reference. Each auto-collapses on
- *    its own success callback — confirming returns the screen to its quiet
- *    read state, matching the round's cross-cutting principle (estado
- *    primeiro → ação quando solicitada). Neither form is nested inside this
- *    section's own `Card` — each keeps its own top-level `Card`, appearing
- *    as a sibling below when revealed, so revealing one never produces a
- *    card-in-card (CLAUDE.md §18.5).
- * 5. `AssessmentHistory` stays last, unconditionally visible — a permanent
- *    record, never behind an action.
- *
- * ## The loading state that used to be silent
- *
- * Before this redesign, `methodology === null && !methodologyError`
- * rendered nothing at all while the fetch was in flight — the matrix
- * appeared to simply not exist for however long the request took. This
- * file's own JSX below now has three branches for the matrix (`loading` /
- * loaded / `methodologyError`), never a fourth implicit "nothing" case.
- */
 'use client';
 
 import { LoadingState, RiskMatrix, RiskScore } from '@pharos/design-system/components';
@@ -75,14 +20,11 @@ import type { RiskMatrixHighlight } from '@pharos/design-system/components';
 
 export interface RiskAssessmentSectionProps {
   risk: RiskDetail;
-  /** The risk's current `ETag` (ADR-013) — forwarded to `AssessmentForm`/`RiskReviewSchedule`, whichever is open. */
   etag: string;
   canAssess: boolean;
   onAssessed: () => void;
   onReviewSaved: (result: { risk: RiskDetail; etag: string }) => void;
-  /** Bumped by the caller after a new assessment is recorded, so `AssessmentHistory` refetches. */
   assessmentHistoryRefreshToken: number;
-  /** Jumps to the "Causas e Consequências" leaf section (`?section=causes-consequences`) — never a second copy of that list here. */
   onViewCausesConsequences: () => void;
 }
 
@@ -152,23 +94,6 @@ export function RiskAssessmentSection({
             </div>
           ) : (
             <>
-              {/*
-                1. Resultado + interpretação. The matrix and the compact
-                comparison are DELIBERATELY NOT grid/flex siblings sharing a
-                track (2026-09-17, D1 fix): `RiskMatrix` is intrinsically
-                wide and scrolls internally on its own, and a grid column
-                that shares a row with it inherits that same content-driven
-                minimum width, even on a LATER row of the same implicit
-                column — the comparison's own short text ends up positioned
-                past the visible edge of `<main>`'s viewport-driven scroll
-                container at 390px and 1024px (measured: the term's own box
-                sat at x=384/right=559 in a 390px-wide viewport). Stacking
-                the comparison in its own, fully independent block below the
-                matrix — never sharing a column/row track with it — removes
-                the propagation path entirely rather than chasing a
-                breakpoint threshold that would only mask it for today's
-                methodology size.
-              */}
               <div>
                 {methodology ? (
                   <RiskMatrix
@@ -216,7 +141,6 @@ export function RiskAssessmentSection({
                 ) : null}
               </div>
 
-              {/* 2. Contexto da avaliação — subordinate visual weight. */}
               <div className="flex flex-col gap-2 border-t border-border pt-4">
                 <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {m.contextHeading}
@@ -243,7 +167,6 @@ export function RiskAssessmentSection({
                 </dl>
               </div>
 
-              {/* 3. Causas e Consequências — comparative SUMMARY, not a duplicate of the full leaf section. */}
               <div className="flex flex-col gap-2 border-t border-border pt-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -301,7 +224,6 @@ export function RiskAssessmentSection({
             </>
           )}
 
-          {/* 4. Ação — contextual triggers, never a permanently open form. */}
           <div className="flex flex-wrap gap-2 border-t border-border pt-4">
             {canAssess && !showAssessmentForm ? (
               <Button type="button" onClick={() => setShowAssessmentForm(true)}>

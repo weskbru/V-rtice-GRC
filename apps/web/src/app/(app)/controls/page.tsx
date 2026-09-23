@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — control catalog route (T045), mirroring `(app)/risks/page.tsx`
- * exactly: `ControlCatalogView` reads `useSearchParams()` (via
- * `useCatalogState`), which Next.js requires behind a `<Suspense>` boundary.
- */
 import { LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { Suspense } from 'react';

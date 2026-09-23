@@ -1,32 +1,10 @@
 'use client';
 
-/**
- * PharosGRC — indicator catalog URL state (009-indicators-reports, T062).
- *
- * Same mechanism as `features/incidents/hooks/use-incident-register-state
- * .ts` (that file's own header explains the shareable-link/Back-button/
- * no-drift reasoning this one does not repeat: every setter commits
- * directly to the URL via `router.replace`, every read comes straight from
- * `useSearchParams()` on the next render) — trimmed further than that
- * file, to the axes `indicators.openapi.yaml`'s own `listIndicatorDefinitions`
- * operation actually accepts: `page`, `pageSize`, `isActive`. No `search`,
- * no `sort` — the contract declares neither for this list (the catalog is
- * the closed, eleven-key `IndicatorMetricKey` registry; the register this
- * hook backs lists only the keys someone has actually configured, and
- * there is no free-text field or sortable column to expose yet). No
- * debounced search box either, for the same reason `use-incident-register
- * -state.ts` has one and this hook does not: there is nothing to debounce.
- */
-
-// This hook writes the CURRENT screen's own query string (filters, sorting, pagination): not a
-// navigation between screens, and routing it through `useNavigate` would raise the page-level
-// loader over a filter change (specs/014-institutional-loader §2.3).
 // eslint-disable-next-line no-restricted-imports -- see above.
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
 
 export const INDICATOR_CATALOG_PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
-/** Matches `indicators.openapi.yaml`'s own `PageSize` parameter default. */
 const DEFAULT_PAGE_SIZE = 20;
 
 function parsePositiveInt(value: string | null, fallback: number): number {

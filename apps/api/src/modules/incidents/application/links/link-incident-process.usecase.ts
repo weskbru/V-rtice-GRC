@@ -1,10 +1,3 @@
-/**
- * 008-incidents-problems, US3 — `LinkIncidentProcessUseCase`/
- * `UnlinkIncidentProcessUseCase`/`ListIncidentProcessLinksUseCase`. Sibling
- * of `link-incident-asset.usecase.ts`, same reasoning, against `Process`
- * instead of `Asset` — see that file's header for the full account this
- * one does not repeat.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

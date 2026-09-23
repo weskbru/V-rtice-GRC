@@ -13,25 +13,6 @@ import type {
   DashboardSummaryResponse,
 } from '@/features/dashboard/types';
 
-/**
- * Integration-level evidence for the platform landing screen. Both
- * `GET /dashboard` and `GET /dashboard/summary` are mocked at the network
- * boundary; everything between them and the rendered DOM is real.
- *
- * The guarantees, each with a test below:
- *
- * - every figure is rendered as the server sent it, never re-derived — the
- *   fixture numbers deliberately do not add up, so a recomputation fails; the
- *   only sums are of buckets/statuses that arrived together, and those are
- *   asserted to their exact expected totals;
- * - a capability the caller cannot read has NO card — for catalogue metrics
- *   and for `breakdowns` blocks independently — asserted as absent, not merely
- *   as quiet;
- * - a zero is ordinary: no error, and its attention card is muted;
- * - the summary failing alone degrades with an explicit notice; a caller who
- *   can see nothing gets an explanation; `undefined` never renders as zero;
- * - loading, error and retry still behave.
- */
 const { getDashboardMock, getSummaryMock } = vi.hoisted(() => ({
   getDashboardMock: vi.fn(),
   getSummaryMock: vi.fn(),
@@ -52,12 +33,6 @@ const ZERO_BY_STATUS = {
   ARCHIVED: 0,
 } as const;
 
-/**
- * `byResidualLevel` sums to 21 while `risks.total` is 999, and
- * `treatmentActions` does not add up either. A page that derived a figure
- * from another field instead of rendering the one the API sent would show a
- * number this fixture does not contain.
- */
 function dashboardFixture(overrides: Partial<DashboardResponse> = {}): DashboardResponse {
   return {
     risks: {
@@ -173,12 +148,6 @@ function cardFor(heading: string): HTMLElement {
 }
 
 function statValue(heading: string): string {
-  // text-3xl — unchanged from before 025-dashboard-composition F2. The
-  // fase's first pass shrank this to text-xl to make the height budget,
-  // then the coordinator's review reversed that: the figure is the most
-  // important thing in the tile and must dominate the title (§18.11), so
-  // F2's second pass restored text-3xl and found the ≤160px/≤235px targets
-  // by trimming padding/gap/leading instead.
   return cardFor(heading).querySelector('p.text-3xl')?.textContent ?? '';
 }
 
@@ -204,8 +173,6 @@ describe('DashboardPage', () => {
     await waitForLoaded();
 
     expect(statValue('Aprovações pendentes')).toBe('3');
-    // Platform-wide overdue actions from the SUMMARY (11), never the risk
-    // module's treatment-only count (2).
     expect(statValue('Ações atrasadas')).toBe('11');
     expect(statValue('Ações vencendo em breve')).toBe('6');
     expect(
@@ -217,22 +184,15 @@ describe('DashboardPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  /**
-   * The sums on this screen, each of values that arrived in one response. The
-   * fixture is chosen so a total can never coincide with one of its parts.
-   */
   it('totals only what arrived together, to the exact expected figure', async () => {
     getDashboardMock.mockResolvedValueOnce(dashboardFixture());
     getSummaryMock.mockResolvedValueOnce(fullSummary());
     renderDashboard();
     await waitForLoaded();
 
-    // Open incidents: sum of the four severity buckets.
     expect(statValue('Incidentes abertos')).toBe('10');
     expect(within(cardFor('Incidentes abertos')).getByText('4 críticos')).toBeInTheDocument();
-    // Pending problems: OPEN + IN_ANALYSIS, not every status (which is 10).
     expect(statValue('Problemas pendentes')).toBe('9');
-    // Actions "em aberto": OPEN + IN_PROGRESS, not the 41 of all statuses.
     expect(moduleValue('Planos de Ação', 'Em aberto')).toBe('9');
     expect(moduleValue('Incidentes', 'Abertos')).toBe('10');
     expect(moduleValue('Auditoria', 'Achados')).toBe('21');
@@ -244,7 +204,6 @@ describe('DashboardPage', () => {
     renderDashboard();
     await waitForLoaded();
 
-    // risks.total (999), never the sum of byResidualLevel (21).
     expect(moduleValue('Riscos', 'Total')).toBe('999');
     expect(moduleValue('Riscos', 'Altos')).toBe('1');
     expect(moduleValue('Riscos', 'Críticos')).toBe('17');
@@ -300,10 +259,6 @@ describe('DashboardPage', () => {
     }
   });
 
-  /**
-   * The server omits a catalogue metric whose source-domain permission the
-   * caller lacks. Absence must mean NO card — not a zero, not a placeholder.
-   */
   it('renders no card for a capability the summary omitted', async () => {
     getDashboardMock.mockResolvedValueOnce(dashboardFixture());
     getSummaryMock.mockResolvedValueOnce({
@@ -332,12 +287,6 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Planos de ação por status')).not.toBeInTheDocument();
   });
 
-  /**
-   * `breakdowns` blocks are omitted independently of the catalogue metrics.
-   * With every metric present and no breakdowns, everything that exists only
-   * in a breakdown must disappear — and nothing may render as a column of
-   * zeros in its place.
-   */
   it('drops every breakdown-only figure when the breakdown blocks are absent', async () => {
     getDashboardMock.mockResolvedValueOnce(dashboardFixture());
     getSummaryMock.mockResolvedValueOnce({ metrics: fullMetrics(), breakdowns: {} });

@@ -1,24 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — framework version detail screen (US1/US2/US3, ADR-017),
- * mirroring `control-detail-view.tsx`'s structure (CLAUDE.md §18.12):
- * `EntityHeader` + `EntityTabs`, a 404 rendered identically whether the
- * version does not exist, does not belong to this framework, or the caller
- * lacks `compliance:view`.
- *
- * A published version's identifier and requirements are immutable
- * (FR-004, FR-006) — this screen says so plainly rather than silently
- * disabling a control (CLAUDE.md §18.11's "erros são compreensíveis"
- * extended to "gated actions explain themselves").
- *
- * Three tabs: **Visão geral** (identity, publication, the calculated
- * compliance summary), **Requisitos** (the real, server-fetched clause
- * listing — operation 10), and **Migração de mapeamento** (US2). All three
- * share one `summaryRefreshToken`, bumped whenever a requirement is created
- * or a migration executes, so the compliance summary card never goes stale
- * relative to what the other two tabs just changed.
- */
 import {
   EmptyState,
   EntityHeader,

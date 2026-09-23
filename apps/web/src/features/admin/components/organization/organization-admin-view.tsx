@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, organizational structure (T183, FR-024,
- * FR-025a, FR-025b, ADR-004). Tree navigation over organizational units
- * (left) plus organizational scope grant administration (right) — the two
- * are one screen because granting `UNIT` scope needs the unit picked from
- * this same tree.
- */
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@pharos/design-system/components';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -45,9 +38,6 @@ export function OrganizationAdminView(): React.JSX.Element {
   } | null>(null);
   const [statusUnit, setStatusUnit] = useState<OrgUnitNode | null>(null);
 
-  // `loading` is derived, not `setLoading(true)` called synchronously at the
-  // top of the effect — see `UserAdminView`'s identical pattern and doc
-  // comment (`react-hooks/set-state-in-effect`).
   const [resolvedReloadToken, setResolvedReloadToken] = useState<number | null>(null);
   const loading = resolvedReloadToken !== reloadToken;
 
@@ -114,16 +104,6 @@ export function OrganizationAdminView(): React.JSX.Element {
       ) : units.length === 0 ? (
         <EmptyState description={admin.organization.tree.empty} />
       ) : (
-        // F-66 causa 3 (`docs/deferred-findings.md`): below `lg` this grid had
-        // no `grid-template-columns` of its own at all — an implicit,
-        // content-sized single track, not one clamped to the viewport. A
-        // long org unit/scope name anywhere inside either child then grew
-        // the WHOLE grid instead of truncating or wrapping, measured 525px
-        // at a 390px viewport (the panel's own placeholder text, forced
-        // wide by that shared track, not a defect in the placeholder
-        // itself). `grid-cols-1` makes the base breakpoint an explicit,
-        // width-constrained single column — `lg:` keeps the two-column
-        // layout unchanged.
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div className="rounded-md border border-border p-3">
             <OrgUnitTree

@@ -1,13 +1,3 @@
-/**
- * T021/006-assets-processes — `DeactivateAssetUseCase` (`POST
- * /assets/{assetId}/deactivate`, `deactivateAsset` operation, FR-005,
- * data-model.md §3). The asset stays fully readable and stays visible in
- * every `RiskAssetLink`/`ControlAssetLink` it already has — only NEW links
- * to it are refused from this point on (FR-006, Invariant A5, enforced
- * elsewhere — see `domain/asset.entity.ts`'s own header). Refused with
- * `422` if the asset is already inactive, and nothing changes. No
- * deletion anywhere (FR-012).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

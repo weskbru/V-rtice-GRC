@@ -1,8 +1,3 @@
-/**
- * T021/006-assets-processes — `DeactivateProcessUseCase`: identical in
- * shape to `modules/assets/application/deactivate-asset.usecase.ts`
- * (FR-020).
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 

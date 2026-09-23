@@ -1,12 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — problem register card view (CLAUDE.md §18.12). The grid
- * frame itself is the shared `CardGrid`; what stays here is which card to
- * render and a skeleton shaped like it, mirroring
- * `AuditEngagementCardGrid`'s identical structure (no quick-view "compact"
- * mode either — see `ProblemCard`'s own doc comment for why).
- */
 import { CardGrid, type ErrorStateProblem } from '@pharos/design-system/components';
 
 import { Skeleton } from '@/components/ui/skeleton';

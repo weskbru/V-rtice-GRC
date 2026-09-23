@@ -1,30 +1,3 @@
-/**
- * T034/T034a/T034b/T035/T036/005-audit-findings, User Story 1 — proves the
- * engagement's four-state lifecycle end to end, through the REAL
- * application services (`CreateAuditEngagementUseCase` ->
- * `StartAuditEngagementUseCase`/`CompleteAuditEngagementUseCase`/
- * `CancelAuditEngagementUseCase`), not by re-reading the transition table
- * — the same discipline `requirement-compliance-state-reachability.spec.ts`
- * already establishes for `004-compliance-management`.
- *
- * Every state is exercised for its OWN observable consequence, the exact
- * discipline `FindingStatus` (Fase 1) shipped without and `ControlStatus
- * .DRAFT` (Fase 2) nearly shipped without (quickstart.md §2):
- *
- * - `PLANNING` — editable; cannot start without scope (FR-003, T035).
- * - `IN_PROGRESS` — no longer editable (research.md D-3); would accept
- *   findings (asserted at the domain level — the real HTTP producer is
- *   Fase 4/`grc/finding`'s own scope, T042, not this task's).
- * - `COMPLETED` — terminal, remains fully readable afterward (FR-004,
- *   T036); would refuse a new finding (same domain-level assertion).
- * - `CANCELLED` (FR-004a) — reachable from `PLANNING` AND `IN_PROGRESS`
- *   (T034a), requires a justification, terminal, would refuse a new
- *   finding too.
- *
- * T034b — the reachability proof this whole amendment exists for: an
- * engagement stuck in `PLANNING` with NO scope (cannot start, FR-003)
- * still has a way out (`-> CANCELLED`) — never a dead end.
- */
 import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -164,8 +137,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
       leadAuditorUserId: actor.id,
     });
 
-    // No scope link exists yet — starting must be refused, and the
-    // engagement must remain PLANNING (not silently advance).
     await expect(
       startEngagement.execute({
         actorUserId: actor.id,
@@ -180,7 +151,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
     });
     expect(stillPlanning.status).toBe('PLANNING');
 
-    // Add a control to scope — now starting is legal.
     const control = await setupControl(orgUnit.id);
     await linkControlScope.execute({
       actorUserId: actor.id,
@@ -282,8 +252,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
     expect(completed.status).toBe('COMPLETED');
     expect(completed.completedAt).toBeInstanceOf(Date);
 
-    // FR-004 — "permanece integralmente legível": every field still reads
-    // back normally, `200`-equivalent, no opacity introduced by COMPLETED.
     const read = await getEngagement.execute({
       actorUserId: actor.id,
       auditEngagementId: engagement.id,
@@ -292,13 +260,8 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
     expect(read.objective).toBe(engagement.objective);
     expect(read.periodStart.getTime()).toBe(engagement.periodStart.getTime());
 
-    // COMPLETED never accepts a new finding — the domain rule
-    // `grc/finding`'s own `CreateFindingFromEngagementUseCase` (Fase 4,
-    // out of this task's scope) consumes.
     expect(() => assertAuditEngagementAcceptsFindings(read.status)).toThrow(ValidationDomainError);
 
-    // No edge leaves COMPLETED — neither start nor complete nor cancel is
-    // legal from here.
     await expect(
       startEngagement.execute({
         actorUserId: actor.id,
@@ -331,7 +294,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
       leadAuditorUserId: actor.id,
     });
 
-    // Empty justification is refused, nothing changes.
     await expect(
       cancelEngagement.execute({
         actorUserId: actor.id,
@@ -351,7 +313,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
     expect(cancelled.cancelledAt).toBeInstanceOf(Date);
     expect(cancelled.cancellationJustification).toContain('aberto por engano');
 
-    // Terminal: cannot start, complete or cancel again.
     await expect(
       startEngagement.execute({
         actorUserId: actor.id,
@@ -368,8 +329,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
       }),
     ).rejects.toBeInstanceOf(ValidationDomainError);
 
-    // Remains fully readable (mirrors FR-004's own guarantee for COMPLETED
-    // — CANCELLED is equally not an opaque state).
     const read = await getEngagement.execute({
       actorUserId: actor.id,
       auditEngagementId: engagement.id,
@@ -419,9 +378,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
     });
     const actor = await setupActor(orgUnit.id);
 
-    // An engagement with NO scope link of any kind cannot start (FR-003) —
-    // the exact trap FindingStatus (Fase 1) and Control's DRAFT (Fase 2)
-    // fell into: no way forward, and (before FR-004a) no way out either.
     const engagement = await createEngagement.execute({
       actorUserId: actor.id,
       objective: 'Engajamento sem escopo algum.',
@@ -439,7 +395,6 @@ describe('AuditEngagement lifecycle — every state reachable, with its own obse
       }),
     ).rejects.toBeInstanceOf(ValidationDomainError);
 
-    // The one transition FR-004a guarantees is still there: cancel.
     const cancelled = await cancelEngagement.execute({
       actorUserId: actor.id,
       auditEngagementId: engagement.id,

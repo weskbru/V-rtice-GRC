@@ -5,29 +5,6 @@ import { ActionLifecycleSection } from './action-lifecycle-section';
 
 import type { Action } from '../../types';
 
-/**
- * Component-mount evidence for the "Ciclo de vida" card
- * (020-action-detail-experience, Fase B). Guarantees this suite exists to
- * prove:
- *
- *   1. The behaviour change this rodada makes deliberately: the card keeps
- *      rendering its read-only track EVEN when `ActionLifecycleActions`
- *      itself renders nothing (`!canTransition` or a terminal status) — see
- *      this component's own header comment.
- *   2. The conditional outcome facts (`completedAt`/`reopenedAt`) render
- *      ONLY when the underlying value is actually present on the action —
- *      never "Não definido" for a fact that has not happened yet.
- *   3. The reopened case the coordinator asked to see proven end to end —
- *      corrected 2026-09-18 to match the REAL server behaviour
- *      (`action-lifecycle-track.ts`'s own header comment has the full
- *      story: `completedAt` is cleared by the reopen transition, confirmed
- *      by reading `TransitionActionUseCase` AND by `action-plan.spec.ts`'s
- *      Fase D E2E test failing against the real API when this suite's own
- *      earlier assumption was wrong). A reopened action therefore renders
- *      ONLY "Reaberta em" — "Concluída em" is correctly ABSENT, because the
- *      live record no longer proves completion.
- */
-
 vi.mock('../../api', () => ({
   actionsApi: {
     transitionAction: vi.fn(() => new Promise(() => undefined)),
@@ -67,12 +44,8 @@ describe('ActionLifecycleSection', () => {
     );
 
     expect(screen.getByText('Ciclo de vida')).toBeInTheDocument();
-    // The track renders twice in the DOM (vertical below-`sm`, horizontal
-    // `sm`+ — toggled with `hidden`/responsive `display`; jsdom applies no
-    // real CSS layout to hide either copy from a query).
     expect(screen.getAllByText('Aberta').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Em andamento').length).toBeGreaterThan(0);
-    // But no transition button — the row this component owns is gone.
     expect(screen.queryByRole('button', { name: 'Iniciar' })).not.toBeInTheDocument();
   });
 
@@ -131,7 +104,6 @@ describe('ActionLifecycleSection', () => {
 
     expect(screen.getByText('Reaberta em')).toBeInTheDocument();
     expect(screen.queryByText('Concluída em')).not.toBeInTheDocument();
-    // The track reads like a fresh OPEN action — current, not completed.
     expect(screen.getAllByText('Atual').length).toBeGreaterThan(0);
     expect(screen.queryByText('Concluído')).not.toBeInTheDocument();
   });

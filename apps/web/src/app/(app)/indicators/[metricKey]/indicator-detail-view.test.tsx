@@ -1,18 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Component-mount evidence for `IndicatorDetailView`'s scope label (S-07, `A4-F01`): an
- * `ORGANIZATION_WIDE` metric (`COMPLIANCE_PERCENTAGE` today) must read "Organização inteira" even
- * for a caller whose OWN `EffectiveScope.global` is `false` — the metric's own business rule, not
- * the caller's scope, decides this label. Before the fix, `metricScopeLabel` took only the
- * caller's `scope.global` and this exact fixture rendered "Escopo: Sua unidade organizacional".
- *
- * The non-global label itself is "Unidades organizacionais do seu escopo" (plural/count-free),
- * never "Sua unidade organizacional" (singular) — `EffectiveScope.orgUnitIds` is an array and can
- * genuinely hold more than one id (several grants, or one grant expanded to its descendants,
- * FR-025b) — see `indicators.register.scopeLabel`'s own doc comment for the full evidence.
- */
 const { getCurrentValueMock } = vi.hoisted(() => ({ getCurrentValueMock: vi.fn() }));
 
 vi.mock('@/features/indicators/api', () => ({

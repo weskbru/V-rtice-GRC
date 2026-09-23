@@ -1,14 +1,3 @@
-/**
- * 008-incidents-problems, US3 (data-model.md §6) — the sole implementation
- * of `ProblemIncidentLinkRepositoryPort`, the full read/write path over
- * `problem_incident_links` that `modules/problems` owns. Sibling of
- * `prisma-problem-risk-link.repository.ts`, same reasoning, against
- * `Incident` instead of `Risk` — the `incident` relation is included via a
- * direct Prisma projection of the shared schema (not a TypeScript import
- * of `modules/incidents`), exactly the precedent
- * `prisma-incident-problem-link-read.repository.ts`'s own header
- * documents for the READ-side counterpart.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';

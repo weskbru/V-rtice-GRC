@@ -1,38 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, composing a NEW role (Fase 1 de "Novo
- * papel").
- *
- * ## Why this is a panel and not the dialog it replaces
- *
- * Until now creating a role opened `RoleCreateDialog`: a modal carrying a
- * flat `PermissionChecklist`, with no module state, no idea how much of the
- * platform the role would reach, and no statement of what the form
- * required. 015 rebuilt reading and editing as a panel beside the list with
- * a module tree and a tri-state selector, and left creation behind — so the
- * screen spoke two visual languages, one of them retired.
- *
- * It now speaks one. The create panel is the SAME `RolePanelShell` the
- * detail panel uses (inline at `xl`, an overlay `Sheet` below it, with the
- * same focus contract), and the SAME `RoleEditFields` over the SAME
- * `useRoleEditor` — `null` target instead of a role. Nothing about
- * composing a role is written twice (CLAUDE.md §19.4).
- *
- * ## The counts live in the fixed header
- *
- * The body scrolls — fourteen modules and seventy permissions do not fit —
- * so "what will this role grant" belongs where it cannot scroll away. The
- * two figures in the header are the same ones the detail panel shows for a
- * stored role, in the same idiom, computed live from the current selection.
- *
- * ## A created role is never a system role
- *
- * `prisma-role.repository.ts:69` forces `isSystem: false`, so there is no
- * kind to choose, nothing here is ever locked, and the form says so in
- * words (`create.kindNotice`) rather than offering a control that would do
- * nothing.
- */
 import { ConfirmDialog } from '@pharos/design-system/components';
 import { Loader2 } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -65,8 +32,6 @@ export function RoleCreatePanel({ onClose, onCreated }: RoleCreatePanelProps): R
   const moduleCount = groupPermissionsByArea(selectedPermissions).length;
 
   function requestClose(): void {
-    // Nothing is persisted either way; the question exists so a half-composed
-    // role is not lost to a stray click on the backdrop or the close button.
     if (editor.pending.hasChanges) {
       setConfirmDiscardOpen(true);
       return;
@@ -92,13 +57,6 @@ export function RoleCreatePanel({ onClose, onCreated }: RoleCreatePanelProps): R
         {messages.title}
       </span>
 
-      {/*
-       * The subject, not the action: the eyebrow above already says "NOVO
-       * PAPEL", and repeating it here said nothing twice. Until a name is
-       * typed the heading is an explicit placeholder, dimmed so it does not
-       * read as a stored value, and it becomes the real name as the person
-       * types it.
-       */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <h2
           className={
@@ -111,7 +69,6 @@ export function RoleCreatePanel({ onClose, onCreated }: RoleCreatePanelProps): R
         </h2>
       </div>
 
-      {/* Live, and fixed: the body scrolls past fourteen modules, this does not. */}
       <dl className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
         <div className="flex flex-col">
           <dt className="text-xs text-muted-foreground">{admin.roles.panel.counts.permissions}</dt>

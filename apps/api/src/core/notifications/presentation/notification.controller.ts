@@ -1,12 +1,3 @@
-/**
- * T193 — `NotificationController`: `/notifications` (`contracts/
- * platform.openapi.yaml`'s Notifications paths, FR-101). Every route
- * carries `@NoPermissionRequired()` — the contract states "Requires an
- * authenticated session; no additional permission" for all three
- * operations, and every result/mutation is unconditionally scoped to the
- * caller's own `recipientUserId` (never a query parameter, never
- * client-supplied), so there is no narrower permission to gate on.
- */
 import {
   Body,
   Controller,

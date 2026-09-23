@@ -1,42 +1,3 @@
-/**
- * 2026-09-14 — a system role is owned by the platform WHOLE, and the refusal
- * says so in a way a caller can tell apart from every other 422.
- *
- * ## The two gaps this closes
- *
- * **F-68** (`docs/deferred-findings.md`): `RoleAdminService.update` refused
- * `name` and `permissionIdentifiers` on a system role and ACCEPTED
- * `description`. The seed's `upsertSystemRoles` reconciles `description` on
- * every run, so the field had two writers: an administrator could edit it
- * through the product, the edit was recorded as a `role.updated`
- * `audit_event`, and the next seed run silently restored the file's literal
- * writing no audit event at all (a seed run has no acting identity, ADR-005).
- * The trail then asserted a state the database no longer had. The product
- * decision — taken 2026-09-14 — is that the seed file is the single declared
- * owner of all three fields, the seed KEEPS reconciling, and the service
- * refuses every write that would compete with it.
- *
- * **STATE §16.1 item 3**: the one test that guarded the old rule
- * (`test/contract/admin-roles.spec.ts`) asserted status codes only. A 422
- * "because it is a system role" and a 422 "because a permission identifier
- * does not exist" were indistinguishable to it, so the rule could have been
- * replaced by any other refusal and the test would not have noticed. Every
- * assertion below reads the RFC 9457 body — `type`, `title`, `detail` — and
- * the counter-controls at the end prove those bodies really do differ.
- *
- * ## Why the audit assertion is here and not incidental
- *
- * F-68 is a defect ABOUT the audit trail, so "the request is refused" is only
- * half the fix. The other half is that a refused edit leaves no `role.updated`
- * row claiming it happened. That is asserted directly against `audit_event`.
- *
- * ## Test marker prefixes
- *
- * F-45/F-54: `uniqueTestMarker` appends a 36-character UUID, and a prefix of
- * exactly 2 or 6 characters yields a 43-character base64url-looking marker
- * that `information-disclosure.spec.ts` reports as a leaked session token.
- * Every prefix here is longer.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -103,7 +64,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
     await ctx.close();
   });
 
-  /** A real `isSystem: true` row, created directly — the API never creates one (`prisma-role.repository.ts` forces `isSystem: false`). */
   async function createSystemRole(description = 'Descrição semeada original.'): Promise<{
     id: string;
     name: string;
@@ -133,17 +93,12 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
     return { id: body.id, name: body.name };
   }
 
-  /** Asserts the shape every problem of this API carries (ADR-009, RFC 9457). */
   function expectProblemEnvelope(body: ProblemBody, status: number, instancePath: string): void {
     expect(body.status).toBe(status);
     expect(typeof body.detail).toBe('string');
     expect(body.instance).toContain(instancePath);
     expect(typeof body.correlationId).toBe('string');
   }
-
-  // -------------------------------------------------------------------
-  // The rule, field by field and all together — by BODY, not by status.
-  // -------------------------------------------------------------------
 
   const systemRoleRefusals: readonly { readonly label: string; readonly body: object }[] = [
     { label: 'name', body: { name: 'Nome novo' } },
@@ -174,15 +129,12 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
       expect(problem.type).toBe(VALIDATION_TYPE);
       expect(problem.title).toBe(USER_MESSAGES.problemTitle.unprocessableEntity);
 
-      // THE assertion §16.1 item 3 asked for: the cause, not merely the code.
       expect(problem.detail).toBe(USER_MESSAGES.admin.systemRoleImmutable);
-      // And it is not any of the other refusals this endpoint can produce.
       expect(problem.detail).not.toBe(USER_MESSAGES.admin.invalidPermissionIdentifiers);
       expect(problem.detail).not.toBe(USER_MESSAGES.admin.roleNameAlreadyInUse);
       expect(problem.detail).not.toBe(USER_MESSAGES.admin.systemRoleNotDeletable);
       expect(problem.detail).not.toBe(USER_MESSAGES.admin.updateRequestEmpty);
 
-      // Nothing was written.
       const stored = await prisma.client.role.findUniqueOrThrow({ where: { id: role.id } });
       expect(stored.name).toBe(role.name);
       expect(stored.description).toBe(role.description);
@@ -198,13 +150,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
       .set('Origin', appOrigin)
       .send({ description: 'Descrição idêntica.' });
 
-    /*
-     * A "nothing actually changed, so let it pass" exemption would be the
-     * defect coming back through a side door: the client that sent it would
-     * be told the write succeeded, and the field would still have two
-     * owners. The rule is about WHO MAY WRITE, not about whether the value
-     * differs.
-     */
     expect(response.status).toBe(422);
     expect((response.body as ProblemBody).detail).toBe(USER_MESSAGES.admin.systemRoleImmutable);
   });
@@ -220,12 +165,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
       expect(response.status).toBe(422);
     }
 
-    /*
-     * The heart of F-68. The old behaviour recorded `role.updated` for a
-     * description edit that the next seed run silently undid, so the trail
-     * asserted a state the database no longer had. A refused write must
-     * leave the trail saying nothing happened, because nothing did.
-     */
     const events = await prisma.client.auditEvent.findMany({
       where: { entityId: role.id },
       select: { action: true },
@@ -246,10 +185,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
     expect(problem.detail).toBe(USER_MESSAGES.admin.systemRoleNotDeletable);
     expect(problem.detail).not.toBe(USER_MESSAGES.admin.systemRoleImmutable);
   });
-
-  // -------------------------------------------------------------------
-  // The counter-control: a CUSTOM role accepts all three.
-  // -------------------------------------------------------------------
 
   it('accepts name, description and permissions on a CUSTOM role, singly and together (200)', async () => {
     const role = await createCustomRole();
@@ -288,10 +223,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
     });
   });
 
-  // -------------------------------------------------------------------
-  // The other refusals, so "422" is never read as "system role".
-  // -------------------------------------------------------------------
-
   it('distinguishes an unknown permission identifier: same status, same type, DIFFERENT detail', async () => {
     const role = await createCustomRole();
 
@@ -304,8 +235,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
     const problem = response.body as ProblemBody;
     expect(problem.type).toBe(VALIDATION_TYPE);
     expect(problem.detail).toBe(USER_MESSAGES.admin.invalidPermissionIdentifiers);
-    // Same status AND same type as the system-role refusal — which is exactly
-    // why the old status-only assertion could not tell them apart.
     expect(problem.detail).not.toBe(USER_MESSAGES.admin.systemRoleImmutable);
   });
 
@@ -334,11 +263,6 @@ describe('A system role is immutable, and the refusal names its own cause (F-68,
       .set('Origin', appOrigin)
       .send({});
 
-    /*
-     * Deliberately asserted on a SYSTEM role: the emptiness check runs in the
-     * controller, before the service's system-role rule, so this proves the
-     * two refusals stay distinct even where both could plausibly apply.
-     */
     expect(response.status).toBe(400);
     const problem = response.body as ProblemBody;
     expect(problem.detail).not.toBe(USER_MESSAGES.admin.systemRoleImmutable);

@@ -1,14 +1,3 @@
-/**
- * `GET /actions/{actionId}/audit-events`
- * (`contracts/grc-foundation.openapi.yaml`'s `listActionAuditEvents`
- * operation). Mirrors `test/contract/risk-audit.spec.ts`'s exact coverage
- * shape for the analogous risk endpoint — the stated two-tier
- * authorization rule (BOTH `action:view` AND `audit:view`, with the
- * contract's own two-tier refusal — 404 for "cannot see the action at
- * all", 403 for "can see it but lacks `audit:view`"), a `401` for an
- * unauthenticated caller, scope non-disclosure, and the declared
- * `{data, meta}` response shape.
- */
 import { randomUUID } from 'node:crypto';
 
 import request from 'supertest';
@@ -85,11 +74,6 @@ describe('GET /actions/{actionId}/audit-events (listActionAuditEvents)', () => {
       email: `${marker}-responsible@example.test`,
     });
     responsibleUserId = responsible.id;
-    // F-CV-2: `responsible` here is a pure precondition (risk owner AND
-    // action responsible) — not the object of this file's assertions
-    // (the action:view/audit:view two-tier rule). Made visible to BOTH
-    // org units `createRiskBackedAction` can be called with (the default
-    // `orgUnitId`, and the scope-refusal test's `otherOrgUnitId`).
     await makeRiskAssignmentVisible(prisma, { user: responsible, orgUnitId: orgUnit.id });
     await grantUnitScopeFixture(prisma, { user: responsible, orgUnitId: otherOrgUnit.id });
   });
@@ -123,9 +107,6 @@ describe('GET /actions/{actionId}/audit-events (listActionAuditEvents)', () => {
     return agent;
   }
 
-  /** A `RISK_TREATMENT`-eligible origin, plus the Action itself, created
-   * through the real routes — mirrors `test/contract/actions.spec.ts`'s own
-   * `createRisk`/`createActionViaApi` helpers. */
   async function createRiskBackedAction(
     agent: ReturnType<typeof request.agent>,
     riskOrgUnitId: string = orgUnitId,
@@ -193,8 +174,6 @@ describe('GET /actions/{actionId}/audit-events (listActionAuditEvents)', () => {
     const creator = await agentWithPermissions(CREATOR_PERMISSIONS);
     const actionId = await createRiskBackedAction(creator);
 
-    // Holds `audit:view` but NOT `action:view` — proves the 404 gate for
-    // "cannot see the action" is checked BEFORE `audit:view`.
     const auditOnly = await agentWithPermissions(['audit:view']);
     const response = await auditOnly
       .get(`/api/v1/actions/${actionId}/audit-events`)
@@ -238,7 +217,6 @@ describe('GET /actions/{actionId}/audit-events (listActionAuditEvents)', () => {
   it('paginates: page 1 with pageSize 1 returns exactly one entry and totalPages reflects the full trail', async () => {
     const agent = await agentWithPermissions(CREATOR_PERMISSIONS);
     const actionId = await createRiskBackedAction(agent);
-    // A second write (edit) so the trail has at least two events.
     await agent
       .patch(`/api/v1/actions/${actionId}`)
       .set('Origin', appOrigin)

@@ -5,30 +5,6 @@ import { IncidentLifecycleActions } from './incident-lifecycle-actions';
 
 import type { IncidentDetail } from '../types';
 
-/**
- * Component-mount evidence for `IncidentLifecycleActions` (008-incidents-
- * problems, US1). `../api` is mocked at the network boundary.
- *
- * The central assertion here is the coordinator's own non-negotiable: an
- * illegal transition is never rendered as a disabled/refused button — it is
- * simply absent. A `CLOSED`/`CANCELLED` incident therefore renders nothing
- * from THIS component, and every other status renders EXACTLY the buttons
- * `availableIncidentTransitions` names, never more, never fewer.
- *
- * ## Scope of "renders nothing" (018-incident-detail-experience, Fase 2+3)
- *
- * This component is mounted here in isolation, exactly as it always was —
- * `toBeEmptyDOMElement()` below is true because THIS component still
- * returns `null` under the same two conditions it always has
- * (`!canTransition || options.length === 0`), not because a surrounding
- * card disappears. Since this rodada, the caller
- * (`incident-lifecycle-section.tsx`) embeds this component inside a
- * persistent "Ciclo de vida" card that keeps rendering the read-only track
- * regardless of what this component returns — that composition is this
- * suite's caller's concern, not this one's. The guarantee this file proves
- * is narrower and unchanged: no illegal transition is ever offered, and a
- * caller without `incident:transition` sees no button at all.
- */
 const { transitionMock } = vi.hoisted(() => ({
   transitionMock: vi.fn(),
 }));
@@ -175,10 +151,6 @@ describe('IncidentLifecycleActions', () => {
     expect(within(dialog).getByText('Fechar este incidente?')).toBeInTheDocument();
     expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
 
-    // The dialog's own "X" close affordance carries the same accessible
-    // name ("Fechar") as this transition's confirm button by coincidence —
-    // the confirm button is the one inside `dialog-footer`, rendered before
-    // the close affordance in DOM order.
     const fecharButtons = within(dialog).getAllByRole('button', { name: 'Fechar' });
     const confirmCloseButton = fecharButtons[0];
     expect(confirmCloseButton).toBeDefined();

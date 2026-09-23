@@ -1,8 +1,3 @@
-/**
- * T126 — read side of `/risk-methodology` and `/risk-methodology/versions`.
- * No transaction and no audit entry (reads are not audited, ADR-005),
- * mirroring `GetRiskUseCase`/`ListRisksUseCase`.
- */
 import { Injectable } from '@nestjs/common';
 
 import { NotFoundDomainError } from '../../../shared/errors/domain-error';
@@ -14,9 +9,6 @@ const METHODOLOGY_ENTITY_LABEL = 'Metodologia de risco';
 
 export interface MethodologyVersionWithActiveFlag {
   readonly version: MethodologyVersionRecord;
-  /** Whether THIS version is the one currently in force — true for exactly
-   * one version at a time (`findActiveVersion`'s own result), never a
-   * stored column (see that port method's doc comment). */
   readonly isActive: boolean;
 }
 

@@ -1,11 +1,3 @@
-/**
- * T168/US7 — maps `AuditEventSummary`
- * (`core/audit/domain/ports/audit-event-reader.port.ts`) to
- * `contracts/risks.openapi.yaml`'s `AuditEvent` wire shape. The ONE place
- * an audit entry becomes a response body (ADR-009). Never returns any
- * field beyond the contract's declared properties — no secrets, no
- * internal identifiers (CLAUDE.md §12).
- */
 import type { AuditEventSummary } from '../../../../core/audit/domain/ports/audit-event-reader.port';
 
 export interface AuditEventActorResponse {

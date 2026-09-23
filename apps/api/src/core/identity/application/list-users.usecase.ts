@@ -1,9 +1,3 @@
-/**
- * T176 — `GET /admin/users` (`contracts/admin.openapi.yaml`). Unscoped by
- * organizational unit — administrative resources are not organizationally
- * scoped records (that document's own description) — filtered/sorted per
- * the contract's query parameters instead.
- */
 import { Injectable } from '@nestjs/common';
 
 import {

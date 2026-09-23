@@ -1,11 +1,3 @@
-/**
- * T046/004-compliance-management, User Story 3 —
- * `RevokeRequirementApplicabilityUseCase`. `DELETE
- * /requirements/{requirementId}/applicability-declarations/{declarationId}`
- * (`revokeRequirementApplicabilityDeclaration` operation, research.md
- * D-7). Stamps `revokedAt`/`revokedByUserId`; the row is preserved, never
- * deleted.
- */
 import { Injectable } from '@nestjs/common';
 import { AuditEntityType } from '@prisma/client';
 
@@ -85,9 +77,6 @@ export class RevokeRequirementApplicabilityUseCase {
       });
     });
 
-    // The requirement is applicable again and re-enters the compliance
-    // calculation on the next read; research.md D-11's own side-effect
-    // audit.
     await this.complianceReader.deriveForOne(input.requirementId, revokedAt);
   }
 }

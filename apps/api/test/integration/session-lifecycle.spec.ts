@@ -1,14 +1,3 @@
-/**
- * T052 — session lifecycle against real PostgreSQL: creation, idle expiry,
- * absolute expiry, revocation, logout (ADR-002, FR-012 to FR-017).
- *
- * Idle/absolute expiry are exercised by directly backdating the persisted
- * `lastActivityAt`/`expiresAt` columns (rather than mocking the clock) —
- * `SessionService.validateSession` reads those columns (via the cache or a
- * DB fallback) and computes expiry from `Date.now()`, so backdating the
- * stored values is a faithful, real-database way to simulate the passage
- * of time without coupling the test to fake-timer plumbing.
- */
 import { AuthenticationMethod, SessionRevocationReason } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -63,7 +52,7 @@ describe('Session lifecycle (T052, ADR-002, FR-012 to FR-017)', () => {
     const row = await ctx.prisma.client.session.findFirst({ where: { userId: fixture.user.id } });
     expect(row).not.toBeNull();
     expect(row?.revokedAt).toBeNull();
-    expect(row?.tokenHash).not.toBe(outcome.rawToken); // never the raw value
+    expect(row?.tokenHash).not.toBe(outcome.rawToken);
 
     const validation = await sessionService.validateSession(outcome.rawToken);
     expect(validation.valid).toBe(true);
@@ -91,15 +80,6 @@ describe('Session lifecycle (T052, ADR-002, FR-012 to FR-017)', () => {
       where: { id: row!.id },
       data: { lastActivityAt: staleLastActivity },
     });
-    // `authUseCases.login` already warmed the validation cache with the
-    // FRESH `lastActivityAt`. Real traffic never diverges the cache from
-    // the database like this direct backdating does (every real write path
-    // goes through `SessionService`, which keeps both in sync) — evicting
-    // the now-stale cache entry here simply forces the next call onto the
-    // authoritative PostgreSQL fallback path, which is what a real idle
-    // timeout elapsing over real wall-clock time would naturally do too
-    // (the cache TTL, `SESSION_CACHE_TTL_SECONDS`, is far shorter than any
-    // realistic idle timeout).
     await sessionCache.del(hashSessionToken(outcome.rawToken));
 
     const validation = await sessionService.validateSession(outcome.rawToken);
@@ -112,7 +92,6 @@ describe('Session lifecycle (T052, ADR-002, FR-012 to FR-017)', () => {
     expect(revokedRow?.revokedAt).not.toBeNull();
     expect(revokedRow?.revokedReason).toBe(SessionRevocationReason.EXPIRED);
 
-    // Refused on the NEXT request too (not just the one that discovered it).
     const secondValidation = await sessionService.validateSession(outcome.rawToken);
     expect(secondValidation.valid).toBe(false);
   });
@@ -131,7 +110,7 @@ describe('Session lifecycle (T052, ADR-002, FR-012 to FR-017)', () => {
       where: { id: row!.id },
       data: { expiresAt: new Date(Date.now() - 1_000), lastActivityAt: new Date() },
     });
-    await sessionCache.del(hashSessionToken(outcome.rawToken)); // see idle-expiry test's comment above
+    await sessionCache.del(hashSessionToken(outcome.rawToken));
 
     const validation = await sessionService.validateSession(outcome.rawToken);
     expect(validation.valid).toBe(false);
@@ -151,17 +130,10 @@ describe('Session lifecycle (T052, ADR-002, FR-012 to FR-017)', () => {
       ipAddress: undefined,
       userAgent: undefined,
     });
-    // Prime the cache with a valid read first (mirrors a real second
-    // request), THEN revoke — proving revocation invalidates the cache
-    // entry it just warmed, not merely the database row.
     const primed = await sessionService.validateSession(outcome.rawToken);
     expect(primed.valid).toBe(true);
 
     const row = await ctx.prisma.client.session.findFirst({ where: { userId: fixture.user.id } });
-    // `SessionService.revokeSession` audits atomically (ADR-005) — it must
-    // be called from inside an ambient transaction, exactly as
-    // `AuthOrchestrator.logout` does in production; this test opens one
-    // explicitly since it calls the service directly.
     await ctx.prisma.runInTransaction(() =>
       sessionService.revokeSession(row!.id, SessionRevocationReason.ADMIN_REVOKED, 'Test Admin'),
     );

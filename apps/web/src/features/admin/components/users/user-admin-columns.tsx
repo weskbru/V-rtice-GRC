@@ -1,16 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — Administration, users table column definitions (T181, brought
- * into the shared register family CLAUDE.md §18.12). `enableSorting: false`
- * on every column absent from `GET /admin/users`'s `sort` enum (`fullName,
- * email, status, lastLoginAt` — admin.openapi.yaml).
- *
- * Roles and row actions are each ONE shared component
- * (`UserRoleBadges`/`UserRowActionsMenu`), also consumed by `UserAdminCard`
- * — the table and card views can never disagree about what a role badge or
- * an action offers.
- */
 import { EmptyValue, StatusBadge } from '@pharos/design-system/components';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -34,7 +23,6 @@ export const USER_ADMIN_COLUMN_IDS = {
   actions: 'actions',
 } as const;
 
-/** Columns eligible for `ColumnVisibilityMenu` — identity (name) stays always visible (`enableHiding: false` below), so it is deliberately excluded here. */
 export const USER_ADMIN_HIDEABLE_COLUMNS: readonly { id: string; label: string }[] = [
   { id: USER_ADMIN_COLUMN_IDS.email, label: admin.users.table.columns.email },
   { id: USER_ADMIN_COLUMN_IDS.status, label: admin.users.table.columns.status },
@@ -119,12 +107,6 @@ export function buildUserAdminColumns({
     {
       id: USER_ADMIN_COLUMN_IDS.orgUnit,
       accessorFn: (row) => row.primaryOrgUnit?.name ?? '',
-      // The short form, not `columns.orgUnit` — the `<th>` is fixed-width
-      // and never truncates (`data-table.tsx`'s `whitespace-nowrap`), and
-      // the full "Unidade organizacional" measurably overran this column at
-      // 1024px, bleeding into "Papéis". `USER_ADMIN_HIDEABLE_COLUMNS` below
-      // keeps the full name for the `ColumnVisibilityMenu`, which has real
-      // room for it.
       header: admin.users.table.columns.orgUnitHeader,
       enableSorting: false,
       size: 145,
@@ -142,20 +124,11 @@ export function buildUserAdminColumns({
     },
     {
       id: USER_ADMIN_COLUMN_IDS.roles,
-      // ADR-022 — the column's searchable value carries BOTH names, so the
-      // chip the reader sees ("Analista de Riscos") and the stored name
-      // ("Risk Analyst") both find the same person. The two are the same
-      // string for a custom role.
       accessorFn: (row) =>
         row.roles.flatMap((role) => [roleDisplayName(role.name), role.name]).join(', '),
       header: admin.users.table.columns.roles,
       enableSorting: false,
       size: 195,
-      // `widthBudget` = column `size` (195) minus the cell's own `p-2`
-      // horizontal padding (16px, `data-table.tsx`'s own `<td className="p-2
-      // ...">`), rounded down for a safety margin — a known constant, so
-      // the table passes a NUMBER rather than `'measure'` (`UserRoleBadges`'s
-      // own header explains why the two callers differ).
       cell: ({ row }) => <UserRoleBadges roles={row.original.roles} widthBudget={175} />,
     },
     {

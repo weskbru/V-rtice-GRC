@@ -1,47 +1,5 @@
 'use client';
 
-/**
- * PharosGRC — risk register URL state (T112, FR-092, US3 AS7).
- *
- * The URL query string IS the register's state — there is no separate
- * `useState` copy of "current filters" that could drift from it. Every
- * setter here reads the *current* `useSearchParams()` snapshot, applies one
- * change, and calls `router.replace()` with the resulting query string.
- * Three consequences fall out of that single design choice:
- *
- *   1. **Shareable link**: at any moment the address bar already IS the
- *      exact state a copy-pasted link would reproduce — nothing is held
- *      only in memory.
- *   2. **Back button**: `router.replace()` (never `push()`) updates the
- *      *current* history entry instead of stacking one entry per filter
- *      click, so the register's own history entry always reflects the last
- *      applied state. Navigating to a risk's detail page is a `push()` (an
- *      ordinary `<Link>`/`router.push`), so the browser's Back button from
- *      there lands the user back on exactly that one register URL — this is
- *      what FR-092 actually asks for ("preserve applied filters... when the
- *      user navigates to a risk and returns"), not a page reload.
- *   3. **No history spam from typing**: because search commits are
- *      debounced (see `setSearch` below) and also go through `replace()`,
- *      typing a 10-character search term produces at most one settled URL
- *      state, not ten history entries or ten navigations.
- *
- * Defaults are never written to the URL (an unset `sort` means the
- * contract's own default of `code`/`asc`, an unset `riskLevelBasis` means
- * `RESIDUAL`, ...) — this keeps a freshly-opened `/risks` URL clean and
- * means "reset to default" and "remove the parameter" are the same
- * operation, not two things that could disagree.
- *
- * Any filter value read from the URL that doesn't name a real `RiskStatus`/
- * `RiskLevel` is silently dropped (`parseStatusList`/`parseLevelList`)
- * rather than sent to the server — a hand-edited or stale shared link must
- * degrade to "no filter on that field", never to a `400` the user cannot
- * explain.
- */
-
-// Reads the current screen's own query string. The WRITE side — and the
-// `useRouter` import the loader policy restricts — now lives in the shared
-// `@/lib/register/url-state`, with the same justification recorded there
-// (specs/014-institutional-loader §2.3).
 import { useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -124,13 +82,10 @@ function parseSort(value: string | null): RiskRegisterSortField {
     : DEFAULT_SORT;
 }
 
-/** Which presentation the results area is currently rendering. Cards is the primary view; the table stays for dense comparison (CLAUDE.md §18). */
 export type RiskRegisterView = 'cards' | 'table';
 
 export interface RiskRegisterUrlState {
-  /** Committed (URL) search term — for display use `searchInputValue` instead, which updates immediately on every keystroke. */
   q: string;
-  /** 1-based page number. */
   page: number;
   pageSize: number;
   sort: RiskRegisterSortField;
@@ -143,23 +98,11 @@ export interface RiskRegisterUrlState {
   ownerUserId: readonly string[];
   overdueReview?: boolean;
   overdueTreatment?: boolean;
-  /**
-   * Not a filter. Lives in the URL for the same three reasons everything
-   * else here does (shareable link, Back button, no in-memory copy that
-   * could drift) — and, critically, because it means switching Cards ↔
-   * Tabela is a change to ONE parameter of the same query string: filters,
-   * search, sort and page position are not re-derived, re-applied or reset,
-   * they are simply not touched. `hasActiveFilters` deliberately ignores
-   * it: choosing a presentation has never narrowed a result set, and
-   * "Limpar filtros" must not silently throw the user back to the other
-   * view.
-   */
   view: RiskRegisterView;
 }
 
 export interface UseRegisterStateResult {
   state: RiskRegisterUrlState;
-  /** The search input's live value — always up to date, even before the debounced URL commit fires. Bind this to the search box, never `state.q` directly. */
   searchInputValue: string;
   setSearch: (value: string) => void;
   setStatus: (values: readonly RiskStatus[]) => void;
@@ -171,31 +114,16 @@ export interface UseRegisterStateResult {
   setOverdueReview: (value: boolean | undefined) => void;
   setOverdueTreatment: (value: boolean | undefined) => void;
   setSort: (field: RiskRegisterSortField, direction: SortDirection) => void;
-  /** 1-based. */
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
   setView: (view: RiskRegisterView) => void;
   clearFilters: () => void;
   hasActiveFilters: boolean;
-  /** How many filter fields are currently applied — shown on the collapsed "Filtros" button. */
   activeFilterCount: number;
 }
 
-/**
- * Reads/writes the risk register's filters, search term, sort and page
- * position through the URL query string (T112, FR-092). See the module doc
- * comment above for how this satisfies "preserve state across a visit to a
- * risk's detail page", the browser Back button, and a shared link, all from
- * the same single mechanism.
- */
 export function useRegisterState(): UseRegisterStateResult {
   const searchParams = useSearchParams();
-  // The commit mechanism itself — one change applied to the CURRENT query
-  // string, `replace` not `push`, page reset by default — is shared with
-  // every other register (`@/lib/register/url-state`). What stays here is
-  // only what this register knows and no generic hook should: which statuses
-  // and levels exist, which fields `GET /risks` accepts for `sort`, and what
-  // each parameter defaults to.
   const commit = useUrlQueryCommit();
 
   const urlQ = searchParams.get('q') ?? '';
@@ -227,11 +155,6 @@ export function useRegisterState(): UseRegisterStateResult {
     });
   }
 
-  // ---- Search: immediate visual feedback, debounced URL commit ----------
-  // Both directions (typing → URL after a pause, and URL → input on
-  // Back/Forward, a pasted link or "clear filters") are the shared
-  // mechanism's job, including cancelling a pending commit so it can never
-  // overwrite a change that came from elsewhere mid-debounce.
   const {
     inputValue: searchInputValue,
     setValue: setSearch,
@@ -322,13 +245,6 @@ export function useRegisterState(): UseRegisterStateResult {
     [commit],
   );
 
-  /**
-   * `resetPage: false` is the whole requirement, not an optimisation:
-   * changing how results are drawn is not changing which results they are,
-   * so page position (and every filter, the search term and the sort) must
-   * survive the switch untouched. `commit`'s default would have silently
-   * sent the user back to page 1 on every toggle.
-   */
   const setView = useCallback(
     (view: RiskRegisterView) => {
       commit((params) => {
@@ -342,16 +258,6 @@ export function useRegisterState(): UseRegisterStateResult {
     [commit],
   );
 
-  /**
-   * `riskLevelBasis` is deliberately NOT cleared here, and deliberately not
-   * counted below either: choosing between the residual and the inherent
-   * level changes how each risk's level is LABELLED and rendered, never
-   * which risks come back. Treating it as a filter made "Limpar filtros"
-   * silently switch the column the user was reading, and let an empty
-   * result set be explained as "no risk matches these filters" when the
-   * basis had nothing to do with it. It now lives with the ordering and the
-   * Cards/Tabela toggle, where the other display decisions are.
-   */
   const clearFilters = useCallback(() => {
     clearSearchInput();
     commit((params) => {
@@ -370,7 +276,6 @@ export function useRegisterState(): UseRegisterStateResult {
     });
   }, [commit, clearSearchInput]);
 
-  /** Which filter FIELDS are narrowing the list right now — the number the collapsed "Filtros" button shows, and the same conditions the chip row is built from, so the two can never disagree. */
   const activeFilterCount =
     (state.q !== '' ? 1 : 0) +
     (state.status.length > 0 ? 1 : 0) +

@@ -1,14 +1,3 @@
-/**
- * T020/004-compliance-management — `FrameworkRepository`: the sole
- * Prisma-backed implementation of `FrameworkRepositoryPort`. No
- * `ScopeFilter` anywhere (research.md D-2) — every method reads/writes
- * `frameworks` unconditionally, gated only by the controller's
- * `@RequirePermission` decorator, exactly like `PrismaRoleRepository`.
- *
- * `updateWithVersion` follows the same conditional `UPDATE ... WHERE id =
- * ? AND version = ?` mechanism `ControlRepository.updateWithVersion`
- * documents (ADR-013), minus the scope predicate.
- */
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -92,8 +81,6 @@ export class FrameworkRepository implements FrameworkRepositoryPort {
 
     if (result.count > 0) {
       const updated = await this.findById(id);
-      // Defensive only: a row this same transaction just updated cannot
-      // vanish from a `findById` a moment later.
       if (!updated) {
         return { outcome: 'NOT_FOUND' };
       }

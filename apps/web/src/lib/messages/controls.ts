@@ -1,19 +1,3 @@
-/**
- * PharosGRC — Gestão de Controles (pt-BR), 003-controls-management.
- *
- * Second business-module message area (CLAUDE.md §1, §9 established the
- * convention for Risks; this file follows it identically for Controls).
- * Field labels mirror `specs/003-controls-management/data-model.md` and the
- * request/response schemas in `contracts/controls.openapi.yaml` — every
- * label here names a real `Control`/`ControlAssessment` field, never an
- * invented one.
- *
- * `statusLabels`/`effectivenessLabels`/... below are exhaustive `Record`s
- * typed against this app's own union types (F-1, `risks.ts`'s own header
- * comment) — adding a value to an enum without adding its translation here
- * is a compile error, never a raw identifier shown to a Brazilian user at
- * runtime.
- */
 import type {
   ControlAssessmentResult,
   ControlEffectiveness,
@@ -26,7 +10,6 @@ import type {
 } from '@/features/controls/types';
 import type { StatusVariant } from '@pharos/design-system/components';
 
-/** Mirrors `enum ControlStatus` (data-model.md §1, D-6). */
 const CONTROL_STATUS_LABELS: Record<ControlStatus, string> = {
   DRAFT: 'Rascunho',
   ACTIVE: 'Ativo',
@@ -34,20 +17,17 @@ const CONTROL_STATUS_LABELS: Record<ControlStatus, string> = {
   RETIRED: 'Descontinuado',
 };
 
-/** Mirrors `enum ControlNature` — executed by a person or by a system (FR-001). */
 const CONTROL_NATURE_LABELS: Record<ControlNature, string> = {
   MANUAL: 'Manual',
   AUTOMATED: 'Automatizado',
 };
 
-/** Mirrors `enum ControlType` — when the control acts relative to the event (FR-001). */
 const CONTROL_TYPE_LABELS: Record<ControlType, string> = {
   PREVENTIVE: 'Preventivo',
   DETECTIVE: 'Detectivo',
   CORRECTIVE: 'Corretivo',
 };
 
-/** Mirrors `enum ControlFrequency` (D-7). */
 const CONTROL_FREQUENCY_LABELS: Record<ControlFrequency, string> = {
   CONTINUOUS: 'Contínua',
   DAILY: 'Diária',
@@ -58,20 +38,12 @@ const CONTROL_FREQUENCY_LABELS: Record<ControlFrequency, string> = {
   ANNUAL: 'Anual',
 };
 
-/** Mirrors `enum ControlAssessmentResult` — what an assessor records (FR-009). */
 const CONTROL_ASSESSMENT_RESULT_LABELS: Record<ControlAssessmentResult, string> = {
   EFFECTIVE: 'Efetivo',
   PARTIALLY_EFFECTIVE: 'Parcialmente efetivo',
   INEFFECTIVE: 'Inefetivo',
 };
 
-/**
- * Mirrors `enum ControlEffectiveness` (data-model.md §3, D-2) — the
- * control's DERIVED, current effectiveness. `NOT_ASSESSED` and `EXPIRED`
- * are states this catalog must never confuse with `EFFECTIVE`/
- * `PARTIALLY_EFFECTIVE`/`INEFFECTIVE` (FR-013, FR-014) — five distinct
- * words, never collapsed to three.
- */
 const CONTROL_EFFECTIVENESS_LABELS: Record<ControlEffectiveness, string> = {
   NOT_ASSESSED: 'Não avaliado',
   EFFECTIVE: 'Efetivo',
@@ -113,7 +85,6 @@ export const controls = {
     },
   },
 
-  /** `PageHeader` on `/controls` and the "Novo controle" action. */
   register: {
     pageTitle: 'Controles',
     pageDescription:
@@ -227,12 +198,6 @@ export const controls = {
 
     card: {
       regionLabel: 'Controles',
-      /**
-       * The card's own click target now navigates straight to the full
-       * record (quick view removed) — matches the "Abrir o X {code}:
-       * {name}" convention `risks.ts`'s own `card.selectLabel` uses since
-       * the same removal there.
-       */
       selectLabel: (code: string, name: string): string => `Abrir o controle ${code}: ${name}`,
       categoryLabel: 'Natureza',
       orgUnitLabel: 'Unidade',
@@ -267,7 +232,6 @@ export const controls = {
       owner: (name: string): string => `Responsável: ${name}`,
       noOwner: 'Sem responsável definido',
       orgUnit: (name: string): string => `Unidade: ${name}`,
-      /** A control minted before this phase may carry no organizational unit at all (FR-003, US1 AS5) — see `ControlSummary.orgUnit`'s own doc comment in `types.ts`. */
       noOrgUnit: 'Unidade não definida',
       createdAt: (date: string): string => `Cadastrado em ${date}`,
       retiredAt: (date: string): string => `Descontinuado em ${date}`,
@@ -278,65 +242,19 @@ export const controls = {
       relationships: 'Vínculos',
       evidence: 'Evidências',
     },
-    /**
-     * Accessible name for `DetailLayout`'s `asideLabel` — the sticky
-     * `complementary` landmark holding Ações rápidas/Relacionamentos/Última
-     * atualização (021-control-detail-experience, Fase C). Mirrors
-     * `problems.detail.asideLabel`'s/`incidents.detail.asideLabel`'s own
-     * naming exactly.
-     */
     asideLabel: 'Contexto do controle',
-    /**
-     * The contextual aside's "Ações rápidas" and "Relacionamentos" blocks
-     * (`control-context-aside.tsx`, Fase C) — no "Atenção" block exists for
-     * Control (see that file's own header comment: there is no honest
-     * pendency to report distinct from what the lifecycle card's own
-     * pendency bullets already say). Three quick actions: `Control` has one
-     * combined "Vínculos" section (not Problem's separate Riscos/
-     * Incidentes), so there is no per-relationship-type shortcut here —
-     * `linkRelationship` covers all of Processos/Ativos (Riscos is
-     * read-only, FR-021).
-     */
     quickActions: {
       heading: 'Ações rápidas',
-      // Reuses the exact phrase `assessment.form.actions.submit` already
-      // uses for the real button inside "Verificações" — the role
-      // separation (`role="link"` here vs. a real `<button>` there) is what
-      // keeps the two distinguishable, not a deliberately different word
-      // (CLAUDE.md §18.12, mirrors `ProblemContextAside`'s own reasoning
-      // for "Comentar").
       registerAssessment: 'Registrar verificação',
       linkRelationship: 'Vincular processo ou ativo',
       addEvidence: 'Adicionar evidência',
     },
     relationshipsPanel: {
       heading: 'Relacionamentos',
-      /** The single row's own label — see this file's header comment for why there is only one, unlike Problem's two. */
       links: 'Vínculos',
-      /** Trailing hint for the relationship row — `ControlDetail` carries no count, mirroring `problems.detail.relationshipsPanel.viewHint`'s own reasoning: never a fabricated number, never a second request just to produce one. */
       viewHint: 'Ver',
     },
     lastUpdatedHeading: 'Última atualização',
-    /**
-     * "Visão geral", three cards (021-control-detail-experience, Fase B —
-     * replaces the flat, card-less `<dl>` this section used to be, mirroring
-     * `ProblemOverview`'s/`ActionOverview`'s own identical correction on the
-     * sibling screens): "Descrição" gets its own prominent card,
-     * "Efetividade" gets its OWN card right after it (the fact central to a
-     * Control's own record — see `effectiveness` below), and the
-     * classification/ownership facts sit together in "Detalhes do
-     * controle", each field anchored by a small semantic icon via the
-     * shared `DetailField`. `frequency` lives ONLY in the Efetividade card
-     * (it governs vencibility, not identity) — never duplicated into
-     * "Detalhes do controle".
-     *
-     * The FOURTH card this section shows on screen — "Ciclo de vida" — is
-     * `ControlLifecycleSection` (`components/detail/`), composed by the
-     * detail view alongside this one, not inside it. `retiredAt`/
-     * `retiredBy`/`retirementReason` moved there — see `lifecycleOutcomes`
-     * below — because they describe an OUTCOME OF THE LIFECYCLE, not the
-     * record's identity, and this catalog area no longer names them.
-     */
     overview: {
       descriptionCardTitle: 'Descrição',
       effectivenessCardTitle: 'Efetividade',
@@ -350,60 +268,19 @@ export const controls = {
         createdAt: 'Cadastrado em',
         frequency: 'Frequência de verificação',
       },
-      /**
-       * `frequency === null` is a MEANINGFUL absence (FR-015: the control
-       * has no vencible effectiveness), never a data gap — so `DetailField`'s
-       * generic `notSet` ("Não definido") would misrepresent a deliberate
-       * fact as a missing one. This is the honest sentence rendered in its
-       * place instead.
-       */
       frequencyNoExpiry: 'Sem frequência definida — a efetividade deste controle não vence.',
     },
-    /**
-     * `ControlOverview`'s own "Efetividade" card — the fact central to a
-     * Control's record (the coordinator's own framing: the analogue of
-     * "Causa raiz" for Problem, "Origem" for Action). Renders the current
-     * `ControlEffectiveness` value plus `controlEffectivenessHint`'s own
-     * explanatory sentence when one applies (`NOT_ASSESSED`/`EXPIRED`) —
-     * never a fabricated "próxima verificação" or "dias em atraso" the
-     * payload does not carry (`ControlDetail` has no such field).
-     */
     effectiveness: {
       neverAssessedNotice: 'Este controle ainda não foi avaliado.',
     },
-    /**
-     * `ControlLifecycleSection`'s own conditional outcome facts — moved out
-     * of "Detalhes do controle" because they describe an OUTCOME OF THE
-     * LIFECYCLE (retirement), not the record's identity. Mirrors
-     * `problems.detail.lifecycleOutcomes`'s/`actions.detail
-     * .lifecycleOutcomes`'s own shape and reuses the exact same label text
-     * this catalog already had under `overview` before this phase.
-     */
     lifecycleOutcomes: {
       retiredAtLabel: 'Descontinuado em',
       retiredByLabel: 'Descontinuado por',
       retirementReasonLabel: 'Justificativa da descontinuação',
     },
-    /**
-     * The "Ciclo de vida" track visual (`ControlLifecycleTrackView`) —
-     * labels for the three main-track `ControlStatus` positions come from
-     * `controlStatusLabel`/`statusLabels` above, the exact same word the
-     * header's own `StatusBadge` uses. `stateLabels` mirrors
-     * `problems.detail.lifecycleTrack.stateLabels`'s/`actions.detail
-     * .lifecycleTrack.stateLabels`'s own vocabulary exactly (CLAUDE.md
-     * §18.12 — same concept, same word on every module's track).
-     */
     lifecycleTrack: {
       mainAriaLabel: 'Posições do ciclo de vida do controle',
       retiredAriaLabel: 'Controle descontinuado',
-      /**
-       * Short context line under the `RETIRED` node — this payload does not
-       * record which of the three possible origins (`DRAFT`/`ACTIVE`/
-       * `SUSPENDED`) the retirement came from, so the node is presented as a
-       * terminal of the WHOLE trajectory, never visually tied to a specific
-       * column (mirrors `actions.detail.lifecycleTrack.cancelledContextLabel`'s
-       * own reasoning).
-       */
       retiredContextLabel: 'Encerrado por descontinuação',
       stateLabels: {
         current: 'Atual',
@@ -419,7 +296,6 @@ export const controls = {
     createDescription:
       'Cadastre um controle informando o que ele faz, quem responde por ele e em que unidade opera.',
     editTitle: 'Editar controle',
-    /** `ControlEditPanel`'s own overlay header description (021-control-detail-experience, Fase C), mirroring `problems.form.editDescription`'s/`actions.form.editDescription`'s exact wording pattern. */
     editDescription: 'Altere os dados cadastrais do controle.',
     sections: {
       identification: {
@@ -455,7 +331,6 @@ export const controls = {
         loadError: 'Não foi possível carregar os responsáveis elegíveis.',
         clearedNotice:
           'O responsável selecionado não pertence mais à linha organizacional da unidade escolhida e foi limpo.',
-        /** S-10 — the owner picker is now a `UserPicker` (server-side search), which has no built-in "none" row; this is the field's own explicit clear affordance, since the owner is optional (FR-005). */
         clearAction: 'Remover responsável',
       },
     },
@@ -590,13 +465,6 @@ export const controls = {
         genericError: 'Não foi possível registrar a decisão.',
         alreadyDecidedError: 'Esta atestação já foi decidida.',
       },
-      /**
-       * The two segregation-of-duties rules (FR-017, FR-018) explained in
-       * plain pt-BR — surfaced proactively next to the attestation action,
-       * not only after a refusal, so a user understands why a control is
-       * missing before they try it (CLAUDE.md §18.11 — errors and rules
-       * must be understandable, never only inferred from a failure).
-       */
       segregationNotice: {
         title: 'Quem não pode atestar esta verificação',
         assessorRule: 'Quem executou a verificação não pode atestá-la.',
@@ -669,7 +537,6 @@ export const controls = {
     includeWithdrawnLabel: 'Mostrar vínculos desfeitos',
   },
 
-  /** Contextual "abrir ação de remediação" flow from an ineffective assessment (FR-027, US3 AS7). */
   remediation: {
     openAction: 'Abrir ação de remediação',
     dialogTitle: 'Abrir ação de remediação',
@@ -693,7 +560,6 @@ export const controls = {
   },
 } as const;
 
-/** Formats a `ControlEffectiveness` value's supporting hint text, e.g. for the expired case — never invented ad hoc at a call site. */
 export function controlEffectivenessHint(effectiveness: ControlEffectiveness): string | undefined {
   if (effectiveness === 'EXPIRED') {
     return 'A última verificação atestada está além da frequência declarada.';

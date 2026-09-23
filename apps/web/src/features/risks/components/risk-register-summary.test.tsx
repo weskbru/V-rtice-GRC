@@ -5,16 +5,6 @@ import { RiskRegisterSummary } from './risk-register-summary';
 
 import type { DashboardResponse } from '@/features/dashboard/types';
 
-/**
- * Component-mount evidence for `RiskRegisterSummary` (CLAUDE.md §19.7) —
- * `@/features/dashboard/api` is mocked at the network boundary, exactly as
- * `apps/web/src/app/(app)/dashboard/page.test.tsx` mocks it for the GRC
- * dashboard itself.
- *
- * Every stub value below is distinct so a wrong field mapping (e.g. showing
- * `byStatus.UNDER_TREATMENT` under "Riscos críticos") fails one of the
- * number assertions rather than passing by coincidence.
- */
 const { getDashboardMock } = vi.hoisted(() => ({ getDashboardMock: vi.fn() }));
 
 vi.mock('@/features/dashboard/api', () => ({
@@ -54,11 +44,8 @@ describe('RiskRegisterSummary', () => {
 
     await waitFor(() => expect(screen.getByText('321')).toBeInTheDocument());
 
-    // byResidualLevel.CRITICAL (17) — never byStatus, never inherent.
     expect(screen.getByText('17')).toBeInTheDocument();
-    // byStatus.UNDER_TREATMENT (44) — never byResidualLevel.
     expect(screen.getByText('44')).toBeInTheDocument();
-    // itemsRequiringReview.total (58) — never a locally recomputed count.
     expect(screen.getByText('58')).toBeInTheDocument();
   });
 

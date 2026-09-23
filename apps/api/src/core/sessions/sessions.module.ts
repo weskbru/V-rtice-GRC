@@ -1,18 +1,3 @@
-/**
- * `SessionsModule` — the sessions capability's composition root (T062-T064,
- * ADR-011). Sits directly under `src/core/sessions/`, outside the
- * `domain`/`application`/`infrastructure`/`presentation` folders the
- * boundary lint rules classify, so it is the one place allowed to wire a
- * domain port to its infrastructure implementation and to read
- * `AppConfigService` on behalf of `SESSION_SETTINGS` (application/
- * presentation code never reads `AppConfigService` directly, per ADR-011).
- *
- * `SessionGuard` is exported (alongside `SessionService`) so `AppModule`
- * can register it as a global `APP_GUARD` via `useExisting` — see that
- * file's header for the full authentication/authorization guard ordering
- * rationale. `MandatoryPasswordChangeGuard` (S-01) is exported the same
- * way, registered immediately after `SessionGuard`.
- */
 import { Module } from '@nestjs/common';
 
 import { AppConfigService } from '../../infrastructure/config/app-config.service';

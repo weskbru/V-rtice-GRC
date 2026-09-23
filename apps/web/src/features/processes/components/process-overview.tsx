@@ -1,22 +1,14 @@
 'use client';
 
-/**
- * PharosGRC — process detail, overview tab (T047).
- *
- * Read-only presentation of the process's descriptive facts — `ReadOnlyField`
- * throughout (CLAUDE.md §18: "Read-only values must not look editable").
- * Editing happens through `ProcessForm` in `mode="edit"`, swapped in by the
- * detail view, never inline here.
- */
 import { Building2, CalendarClock, CalendarPlus, FileText } from 'lucide-react';
-
-import { formatTimestampDate } from '../date';
-
-import type { ProcessDetail } from '../types';
 
 import { DetailField } from '@/components/detail/detail-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { processes } from '@/lib/messages/processes';
+
+import { formatTimestampDate } from '../date';
+
+import type { ProcessDetail } from '../types';
 
 export interface ProcessOverviewProps {
   process: ProcessDetail;
