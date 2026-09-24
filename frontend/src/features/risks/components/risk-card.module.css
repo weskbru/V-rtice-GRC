@@ -1,0 +1,36 @@
+.card {
+  --card-accent: var(--muted-foreground);
+  --card-tint: var(--muted);
+
+  border-top: 3px solid var(--card-accent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--card-tint) 58%, var(--card)) 0%,
+    var(--card) 62%
+  );
+}
+
+.card[data-level='LOW'] {
+  --card-accent: var(--risk-low-solid-bg);
+  --card-tint: var(--risk-low-bg);
+}
+
+.card[data-level='MEDIUM'] {
+  --card-accent: var(--risk-medium-solid-bg);
+  --card-tint: var(--risk-medium-bg);
+}
+
+.card[data-level='HIGH'] {
+  --card-accent: var(--risk-high-solid-bg);
+  --card-tint: var(--risk-high-bg);
+}
+
+.card[data-level='CRITICAL'],
+.card[data-overdue='true'] {
+  --card-accent: var(--risk-critical-solid-bg);
+  --card-tint: var(--risk-critical-bg);
+}
+
+.codeIcon {
+  color: var(--card-accent);
+}
