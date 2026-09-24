@@ -1,0 +1,1863 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DATABASE_MIGRATION_URL")
+  extensions = [citext, pg_trgm]
+}
+
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AuthenticationMethod {
+  LOCAL
+  LDAP
+  ACTIVE_DIRECTORY
+  OIDC
+  SAML
+}
+
+enum SessionRevocationReason {
+  LOGOUT
+  EXPIRED
+  ADMIN_REVOKED
+  USER_DEACTIVATED
+  PASSWORD_CHANGED
+}
+
+enum PermissionAction {
+  VIEW
+  CREATE
+  EDIT
+  DELETE
+  APPROVE
+  ADMINISTER
+  ASSESS
+  TREAT
+  TRANSITION
+  LINK
+  CLOSE
+}
+
+enum OrgUnitStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum OrgScopeType {
+  UNIT
+  GLOBAL
+}
+
+enum AuditEntityType {
+  USER
+  LOCAL_CREDENTIAL
+  EXTERNAL_IDENTITY
+  SESSION
+  PERMISSION
+  ROLE
+  ROLE_PERMISSION
+  USER_ROLE
+  ORGANIZATIONAL_UNIT
+  ORG_SCOPE_GRANT
+  RISK
+  RISK_ASSESSMENT
+  RISK_METHODOLOGY_VERSION
+  RISK_TREATMENT_DECISION
+  RISK_TREATMENT_ACTION
+  RISK_CONTROL_LINK
+  RISK_PROCESS_LINK
+  RISK_ASSET_LINK
+  RISK_LIFECYCLE_TRANSITION
+  APPROVAL
+  ATTACHMENT
+  COMMENT
+  PROBE_RECORD
+  EVIDENCE
+  EVIDENCE_LINK
+  ACTION
+  FINDING
+  CONTROL
+  CONTROL_LIFECYCLE_TRANSITION
+  CONTROL_ASSESSMENT
+  CONTROL_PROCESS_LINK
+  CONTROL_ASSET_LINK
+  FRAMEWORK
+  FRAMEWORK_VERSION
+  REQUIREMENT
+  REQUIREMENT_CONTROL_LINK
+  REQUIREMENT_CONTROL_MAPPING_MIGRATION
+  REQUIREMENT_APPLICABILITY
+  REQUIREMENT_COMPLIANCE_STATE
+  AUDIT_ENGAGEMENT
+  AUDIT_SCOPE_FRAMEWORK_VERSION
+  AUDIT_SCOPE_REQUIREMENT
+  AUDIT_SCOPE_CONTROL
+  FINDING_CONTROL_LINK
+  FINDING_RISK_LINK
+  ASSET
+  PROCESS
+  INCIDENT
+  PROBLEM
+  INCIDENT_RISK_LINK
+  INCIDENT_ASSET_LINK
+  INCIDENT_PROCESS_LINK
+  PROBLEM_RISK_LINK
+  PROBLEM_INCIDENT_LINK
+  INDICATOR
+  INDICATOR_MEASUREMENT
+  REPORT
+}
+
+
+enum RiskStatus {
+  DRAFT
+  IDENTIFIED
+  ASSESSED
+  UNDER_TREATMENT
+  UNDER_REVIEW
+  ACCEPTED
+  CLOSED
+  ARCHIVED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TreatmentStrategy {
+  MITIGATE
+  AVOID
+  TRANSFER
+  ACCEPT
+}
+
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovableEntityType {
+  RISK
+  CONTROL_ASSESSMENT
+}
+
+enum AttachableEntityType {
+  RISK
+  EVIDENCE
+  INCIDENT
+  PROBLEM
+  PROBE_RECORD
+}
+
+enum CommentableEntityType {
+  RISK
+  INCIDENT
+  PROBLEM
+  INDICATOR
+  PROBE_RECORD
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+
+model User {
+  id               String     @id @default(uuid(7)) @db.Uuid
+  email            String     @unique @db.Citext
+  fullName         String     @map("full_name")
+  jobTitle         String?    @map("job_title")
+  status           UserStatus @default(ACTIVE)
+  primaryOrgUnitId String?    @map("primary_org_unit_id") @db.Uuid
+  lastLoginAt      DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  primaryOrgUnit OrganizationalUnit? @relation("UserPrimaryOrgUnit", fields: [primaryOrgUnitId], references: [id], onDelete: Restrict)
+
+  localCredential                   LocalCredential?
+  externalIdentities                ExternalIdentity[]
+  sessions                          Session[]
+  userRoles                         UserRole[]                @relation("UserRoleAssignee")
+  grantedUserRoles                  UserRole[]                @relation("UserRoleGrantedBy")
+  orgScopeGrants                    OrgScopeGrant[]           @relation("OrgScopeGrantAssignee")
+  grantedScopeGrants                OrgScopeGrant[]           @relation("OrgScopeGrantGrantedBy")
+  auditEventsAsActor                AuditEvent[]              @relation("AuditEventActor")
+  riskOwnerOf                       Risk[]                    @relation("RiskOwner")
+  riskResponsibleOf                 Risk[]                    @relation("RiskResponsible")
+  riskAssessmentsMade               RiskAssessment[]          @relation("RiskAssessmentAssessedBy")
+  riskMethodologyVersionsPublished  RiskMethodologyVersion[]  @relation("RiskMethodologyVersionCreatedBy")
+  riskTreatmentDecisionsDecided     RiskTreatmentDecision[]   @relation("RiskTreatmentDecisionDecidedBy")
+  riskControlLinksLinked            RiskControlLink[]         @relation("RiskControlLinkLinkedBy")
+  riskControlLinksUnlinked          RiskControlLink[]         @relation("RiskControlLinkUnlinkedBy")
+  riskProcessLinksLinked            RiskProcessLink[]         @relation("RiskProcessLinkLinkedBy")
+  riskProcessLinksUnlinked          RiskProcessLink[]         @relation("RiskProcessLinkUnlinkedBy")
+  riskAssetLinksLinked              RiskAssetLink[]           @relation("RiskAssetLinkLinkedBy")
+  riskAssetLinksUnlinked            RiskAssetLink[]           @relation("RiskAssetLinkUnlinkedBy")
+  riskLifecycleTransitionsPerformed RiskLifecycleTransition[] @relation("RiskLifecycleTransitionPerformedBy")
+  approvalsRequested                Approval[]                @relation("ApprovalRequestedBy")
+  approvalsDecided                  Approval[]                @relation("ApprovalDecidedBy")
+  attachmentsUploaded               Attachment[]              @relation("AttachmentUploadedBy")
+  attachmentsWithdrawn              Attachment[]              @relation("AttachmentDeletedBy")
+  commentsAuthored                  Comment[]                 @relation("CommentAuthor")
+  commentsWithdrawn                 Comment[]                 @relation("CommentDeletedBy")
+  notificationsReceived             Notification[]            @relation("NotificationRecipient")
+
+  evidenceOwnerOf       Evidence[]     @relation("EvidenceOwner")
+  evidenceArchivedBy    Evidence[]     @relation("EvidenceArchivedBy")
+  evidenceLinksLinked   EvidenceLink[] @relation("EvidenceLinkLinkedBy")
+  evidenceLinksUnlinked EvidenceLink[] @relation("EvidenceLinkUnlinkedBy")
+  actionsResponsibleFor Action[]       @relation("ActionResponsible")
+  actionsCompleted      Action[]       @relation("ActionCompletedBy")
+  actionsReopened       Action[]       @relation("ActionReopenedBy")
+  findingOwnerOf        Finding[]      @relation("FindingOwner")
+  findingsClosed        Finding[]      @relation("FindingClosedBy")
+  findingsArchived      Finding[]      @relation("FindingArchivedBy")
+
+  controlOwnerOf                       Control[]                    @relation("ControlOwner")
+  controlsRetired                      Control[]                    @relation("ControlRetiredBy")
+  controlAssessmentsAssessed           ControlAssessment[]          @relation("ControlAssessmentAssessedBy")
+  controlAssessmentsAttested           ControlAssessment[]          @relation("ControlAssessmentAttestedBy")
+  controlProcessLinksLinked            ControlProcessLink[]         @relation("ControlProcessLinkLinkedBy")
+  controlProcessLinksUnlinked          ControlProcessLink[]         @relation("ControlProcessLinkUnlinkedBy")
+  controlAssetLinksLinked              ControlAssetLink[]           @relation("ControlAssetLinkLinkedBy")
+  controlAssetLinksUnlinked            ControlAssetLink[]           @relation("ControlAssetLinkUnlinkedBy")
+  controlLifecycleTransitionsPerformed ControlLifecycleTransition[] @relation("ControlLifecycleTransitionPerformedBy")
+
+  frameworkVersionsPublished       FrameworkVersion[]                    @relation("FrameworkVersionPublishedBy")
+  requirementsCreated              Requirement[]                         @relation("RequirementCreatedBy")
+  requirementControlLinksLinked    RequirementControlLink[]              @relation("RequirementControlLinkLinkedBy")
+  requirementControlLinksUnlinked  RequirementControlLink[]              @relation("RequirementControlLinkUnlinkedBy")
+  mappingMigrationsExecuted        RequirementControlMappingMigration[]  @relation("MappingMigrationExecutedBy")
+  applicabilityDeclarationsMade    RequirementApplicabilityDeclaration[] @relation("RequirementApplicabilityDeclaredBy")
+  applicabilityDeclarationsRevoked RequirementApplicabilityDeclaration[] @relation("RequirementApplicabilityRevokedBy")
+
+  auditEngagementsLed               AuditEngagement[]            @relation("AuditEngagementLeadAuditor")
+  auditEngagementsStarted           AuditEngagement[]            @relation("AuditEngagementStartedBy")
+  auditEngagementsCompleted         AuditEngagement[]            @relation("AuditEngagementCompletedBy")
+  auditEngagementsCancelled         AuditEngagement[]            @relation("AuditEngagementCancelledBy")
+  auditScopeFrameworkVersionsLinked AuditScopeFrameworkVersion[] @relation("AuditScopeFrameworkVersionLinkedBy")
+  auditScopeRequirementsLinked      AuditScopeRequirement[]      @relation("AuditScopeRequirementLinkedBy")
+  auditScopeControlsLinked          AuditScopeControl[]          @relation("AuditScopeControlLinkedBy")
+  findingControlLinksLinked         FindingControlLink[]         @relation("FindingControlLinkLinkedBy")
+  findingControlLinksUnlinked       FindingControlLink[]         @relation("FindingControlLinkUnlinkedBy")
+  findingRiskLinksLinked            FindingRiskLink[]            @relation("FindingRiskLinkLinkedBy")
+  findingRiskLinksUnlinked          FindingRiskLink[]            @relation("FindingRiskLinkUnlinkedBy")
+
+  incidentReportedBy           Incident[]            @relation("IncidentReportedBy")
+  incidentOwnerOf              Incident[]            @relation("IncidentOwner")
+  incidentsResolved            Incident[]            @relation("IncidentResolvedBy")
+  incidentsClosed              Incident[]            @relation("IncidentClosedBy")
+  incidentsCancelled           Incident[]            @relation("IncidentCancelledBy")
+  problemOwnerOf               Problem[]             @relation("ProblemOwner")
+  problemsResolved             Problem[]             @relation("ProblemResolvedBy")
+  problemsClosed               Problem[]             @relation("ProblemClosedBy")
+  problemsCancelled            Problem[]             @relation("ProblemCancelledBy")
+  incidentRiskLinksLinked      IncidentRiskLink[]    @relation("IncidentRiskLinkLinkedBy")
+  incidentRiskLinksUnlinked    IncidentRiskLink[]    @relation("IncidentRiskLinkUnlinkedBy")
+  incidentAssetLinksLinked     IncidentAssetLink[]   @relation("IncidentAssetLinkLinkedBy")
+  incidentAssetLinksUnlinked   IncidentAssetLink[]   @relation("IncidentAssetLinkUnlinkedBy")
+  incidentProcessLinksLinked   IncidentProcessLink[] @relation("IncidentProcessLinkLinkedBy")
+  incidentProcessLinksUnlinked IncidentProcessLink[] @relation("IncidentProcessLinkUnlinkedBy")
+  problemRiskLinksLinked       ProblemRiskLink[]     @relation("ProblemRiskLinkLinkedBy")
+  problemRiskLinksUnlinked     ProblemRiskLink[]     @relation("ProblemRiskLinkUnlinkedBy")
+  problemIncidentLinksLinked   ProblemIncidentLink[] @relation("ProblemIncidentLinkLinkedBy")
+  problemIncidentLinksUnlinked ProblemIncidentLink[] @relation("ProblemIncidentLinkUnlinkedBy")
+
+  indicatorDefinitionsOwned     IndicatorDefinition[]  @relation("IndicatorDefinitionOwner")
+  indicatorDefinitionsCreated   IndicatorDefinition[]  @relation("IndicatorDefinitionCreatedBy")
+  indicatorMeasurementsComputed IndicatorMeasurement[] @relation("IndicatorMeasurementComputedBy")
+  reportDefinitionsCreated      ReportDefinition[]     @relation("ReportDefinitionCreatedBy")
+
+  @@map("users")
+}
+
+model LocalCredential {
+  id                 String    @id @default(uuid(7)) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  passwordHash       String    @map("password_hash")
+  passwordChangedAt  DateTime  @map("password_changed_at") @db.Timestamptz(6)
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  failedAttempts     Int       @default(0) @map("failed_attempts")
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("local_credentials")
+}
+
+model ExternalIdentity {
+  id              String               @id @default(uuid(7)) @db.Uuid
+  userId          String               @map("user_id") @db.Uuid
+  method          AuthenticationMethod
+  externalSubject String               @map("external_subject")
+  lastSyncedAt    DateTime?            @map("last_synced_at") @db.Timestamptz(6)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([method, externalSubject])
+  @@map("external_identities")
+}
+
+
+model Session {
+  id                   String                   @id @default(uuid(7)) @db.Uuid
+  tokenHash            String                   @unique @map("token_hash")
+  userId               String                   @map("user_id") @db.Uuid
+  authenticationMethod AuthenticationMethod     @map("authentication_method")
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt            DateTime                 @map("expires_at") @db.Timestamptz(6)
+  lastActivityAt       DateTime                 @map("last_activity_at") @db.Timestamptz(6)
+  ipAddress            String?                  @map("ip_address") @db.Inet
+  userAgent            String?                  @map("user_agent")
+  revokedAt            DateTime?                @map("revoked_at") @db.Timestamptz(6)
+  revokedReason        SessionRevocationReason? @map("revoked_reason")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+
+model Permission {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  identifier  String           @unique
+  resource    String
+  action      PermissionAction
+  description String
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique
+  description String
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId          String   @map("user_id") @db.Uuid
+  roleId          String   @map("role_id") @db.Uuid
+  grantedByUserId String   @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime @map("granted_at") @db.Timestamptz(6)
+
+  user          User @relation("UserRoleAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  role          Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  grantedByUser User @relation("UserRoleGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+
+model OrganizationalUnit {
+  id        String        @id @default(uuid(7)) @db.Uuid
+  code      String        @unique
+  name      String
+  parentId  String?       @map("parent_id") @db.Uuid
+  path      String
+  depth     Int
+  status    OrgUnitStatus @default(ACTIVE)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent   OrganizationalUnit?  @relation("OrgUnitHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children OrganizationalUnit[] @relation("OrgUnitHierarchy")
+
+  usersWithPrimaryUnit User[]              @relation("UserPrimaryOrgUnit")
+  orgScopeGrants       OrgScopeGrant[]     @relation("OrgScopeGrantUnit")
+  auditEvents          AuditEvent[]        @relation("AuditEventOrgUnit")
+  risks                Risk[]              @relation("RiskOrgUnit")
+  controls             Control[]           @relation("ControlOrgUnit")
+  processes            Process[]           @relation("ProcessOrgUnit")
+  assets               Asset[]             @relation("AssetOrgUnit")
+  evidence             Evidence[]          @relation("EvidenceOrgUnit")
+  actions              Action[]            @relation("ActionOrgUnit")
+  findings             Finding[]           @relation("FindingOrgUnit")
+  auditEngagements     AuditEngagement[]   @relation("AuditEngagementOrgUnit")
+  controlAssessments   ControlAssessment[] @relation("ControlAssessmentOrgUnit")
+  incidents            Incident[]          @relation("IncidentOrgUnit")
+  problems             Problem[]           @relation("ProblemOrgUnit")
+
+  @@index([parentId])
+  @@index([path(ops: raw("text_pattern_ops"))], map: "organizational_units_path_pattern_idx")
+  @@map("organizational_units")
+}
+
+model OrgScopeGrant {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  userId          String       @map("user_id") @db.Uuid
+  scopeType       OrgScopeType @map("scope_type")
+  orgUnitId       String?      @map("org_unit_id") @db.Uuid
+  grantedByUserId String       @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime     @map("granted_at") @db.Timestamptz(6)
+
+  user          User                @relation("OrgScopeGrantAssignee", fields: [userId], references: [id], onDelete: Cascade)
+  orgUnit       OrganizationalUnit? @relation("OrgScopeGrantUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  grantedByUser User                @relation("OrgScopeGrantGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+
+  @@map("org_scope_grants")
+}
+
+model PermissionCacheState {
+  id                 String   @id @default("singleton")
+  permissionsVersion Int      @default(1) @map("permissions_version")
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("permission_cache_state")
+}
+
+model OrgScopeCacheState {
+  id             String   @id @default("singleton")
+  orgTreeVersion Int      @default(1) @map("org_tree_version")
+  grantsVersion  Int      @default(1) @map("grants_version")
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("org_scope_cache_state")
+}
+
+
+model AuditEvent {
+  id                   String          @default(uuid(7)) @db.Uuid
+  occurredAt           DateTime        @map("occurred_at") @db.Timestamptz(6)
+  actorUserId          String?         @map("actor_user_id") @db.Uuid
+  actorLabel           String          @map("actor_label")
+  action               String
+  entityType           AuditEntityType @map("entity_type")
+  entityId             String?         @map("entity_id") @db.Uuid
+  previousValues       Json?           @map("previous_values")
+  newValues            Json?           @map("new_values")
+  organizationalUnitId String?         @map("organizational_unit_id") @db.Uuid
+  ipAddress            String?         @map("ip_address") @db.Inet
+  userAgent            String?         @map("user_agent")
+  sessionId            String?         @map("session_id") @db.Uuid
+  correlationId        String          @map("correlation_id") @db.Uuid
+  outcome              AuditOutcome
+
+  actorUser          User?               @relation("AuditEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  organizationalUnit OrganizationalUnit? @relation("AuditEventOrgUnit", fields: [organizationalUnitId], references: [id], onDelete: Restrict)
+
+  @@id([id, occurredAt])
+  @@index([entityType, entityId, occurredAt(sort: Desc)], map: "audit_event_entity_idx")
+  @@index([actorUserId, occurredAt(sort: Desc)], map: "audit_event_actor_idx")
+  @@index([occurredAt(sort: Desc)], map: "audit_event_occurred_at_idx")
+  @@map("audit_event")
+}
+
+
+model RiskCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  description String
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  risks Risk[]
+
+  @@map("risk_categories")
+}
+
+model RiskType {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  description String
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  risks Risk[]
+
+  @@map("risk_types")
+}
+
+model RiskOrigin {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  description String
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  risks Risk[]
+
+  @@map("risk_origins")
+}
+
+model RiskCodeSequence {
+  year      Int @id
+  lastValue Int @default(0) @map("last_value")
+
+  @@map("risk_code_sequences")
+}
+
+model Risk {
+  id          String @id @default(uuid(7)) @db.Uuid
+  code        String @unique
+  title       String
+  description String
+
+  categoryId String? @map("category_id") @db.Uuid
+  typeId     String? @map("type_id") @db.Uuid
+  originId   String? @map("origin_id") @db.Uuid
+
+  orgUnitId         String  @map("org_unit_id") @db.Uuid
+  ownerUserId       String  @map("owner_user_id") @db.Uuid
+  responsibleUserId String? @map("responsible_user_id") @db.Uuid
+
+  status RiskStatus @default(DRAFT)
+
+  currentAssessmentId String? @map("current_assessment_id") @db.Uuid
+  currentTreatmentId  String? @map("current_treatment_id") @db.Uuid
+  pendingApprovalId   String? @map("pending_approval_id") @db.Uuid
+
+  inherentScore Int?       @map("inherent_score")
+  inherentLevel RiskLevel? @map("inherent_level")
+  residualScore Int?       @map("residual_score")
+  residualLevel RiskLevel? @map("residual_level")
+
+  identifiedOn   DateTime  @map("identified_on") @db.Date
+  lastAssessedOn DateTime? @map("last_assessed_on") @db.Date
+  nextReviewOn   DateTime? @map("next_review_on") @db.Date
+
+  version Int @default(0)
+
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category          RiskCategory?          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  type              RiskType?              @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  origin            RiskOrigin?            @relation(fields: [originId], references: [id], onDelete: Restrict)
+  orgUnit           OrganizationalUnit     @relation("RiskOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  owner             User                   @relation("RiskOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  responsible       User?                  @relation("RiskResponsible", fields: [responsibleUserId], references: [id], onDelete: Restrict)
+  currentAssessment RiskAssessment?        @relation("RiskCurrentAssessment", fields: [currentAssessmentId], references: [id], onDelete: Restrict)
+  currentTreatment  RiskTreatmentDecision? @relation("RiskCurrentTreatment", fields: [currentTreatmentId], references: [id], onDelete: Restrict)
+  pendingApproval   Approval?              @relation("RiskPendingApproval", fields: [pendingApprovalId], references: [id], onDelete: Restrict)
+
+  causes               RiskCause[]
+  consequences         RiskConsequence[]
+  assessments          RiskAssessment[]          @relation("RiskAssessmentRisk")
+  treatmentDecisions   RiskTreatmentDecision[]   @relation("RiskTreatmentDecisionRisk")
+  treatmentActions     RiskTreatmentAction[]     @relation("RiskTreatmentActionRisk")
+  controlLinks         RiskControlLink[]         @relation("RiskControlLinkRisk")
+  processLinks         RiskProcessLink[]         @relation("RiskProcessLinkRisk")
+  assetLinks           RiskAssetLink[]           @relation("RiskAssetLinkRisk")
+  lifecycleTransitions RiskLifecycleTransition[] @relation("RiskLifecycleTransitionRisk")
+  incidentLinks        IncidentRiskLink[]
+  problemLinks         ProblemRiskLink[]
+  findingLinks         FindingRiskLink[]
+
+  @@index([orgUnitId, status])
+  @@index([orgUnitId, residualLevel])
+  @@index([orgUnitId, inherentLevel])
+  @@index([orgUnitId, nextReviewOn])
+  @@index([ownerUserId])
+  @@index([categoryId])
+  @@map("risks")
+}
+
+model RiskCause {
+  id          String @id @default(uuid(7)) @db.Uuid
+  riskId      String @map("risk_id") @db.Uuid
+  description String
+  sortOrder   Int    @map("sort_order")
+
+  risk Risk @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  @@index([riskId])
+  @@map("risk_causes")
+}
+
+model RiskConsequence {
+  id          String @id @default(uuid(7)) @db.Uuid
+  riskId      String @map("risk_id") @db.Uuid
+  description String
+  sortOrder   Int    @map("sort_order")
+
+  risk Risk @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  @@index([riskId])
+  @@map("risk_consequences")
+}
+
+model RiskMethodology {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  versions RiskMethodologyVersion[]
+
+  @@map("risk_methodologies")
+}
+
+model RiskMethodologyVersion {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  methodologyId    String   @map("methodology_id") @db.Uuid
+  versionNumber    Int      @map("version_number")
+  probabilityScale Json     @map("probability_scale")
+  impactScale      Json     @map("impact_scale")
+  matrix           Json
+  levelBands       Json     @map("level_bands")
+  effectiveFrom    DateTime @map("effective_from") @db.Timestamptz(6)
+  createdByUserId  String   @map("created_by_user_id") @db.Uuid
+
+  methodology   RiskMethodology @relation(fields: [methodologyId], references: [id], onDelete: Restrict)
+  createdByUser User            @relation("RiskMethodologyVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  assessments RiskAssessment[] @relation("RiskAssessmentMethodologyVersion")
+
+  @@unique([methodologyId, versionNumber])
+  @@map("risk_methodology_versions")
+}
+
+
+model RiskAssessment {
+  id                   String    @id @default(uuid(7)) @db.Uuid
+  riskId               String    @map("risk_id") @db.Uuid
+  methodologyVersionId String    @map("methodology_version_id") @db.Uuid
+  assessedByUserId     String    @map("assessed_by_user_id") @db.Uuid
+  assessedOn           DateTime  @map("assessed_on") @db.Date
+  inherentProbability  Int       @map("inherent_probability")
+  inherentImpact       Int       @map("inherent_impact")
+  inherentScore        Int       @map("inherent_score")
+  inherentLevel        RiskLevel @map("inherent_level")
+  residualProbability  Int       @map("residual_probability")
+  residualImpact       Int       @map("residual_impact")
+  residualScore        Int       @map("residual_score")
+  residualLevel        RiskLevel @map("residual_level")
+  controlsConsidered   String[]  @default([]) @map("controls_considered") @db.Uuid
+  rationale            String?
+  previousAssessmentId String?   @map("previous_assessment_id") @db.Uuid
+
+  risk               Risk                   @relation("RiskAssessmentRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  methodologyVersion RiskMethodologyVersion @relation("RiskAssessmentMethodologyVersion", fields: [methodologyVersionId], references: [id], onDelete: Restrict)
+  assessedByUser     User                   @relation("RiskAssessmentAssessedBy", fields: [assessedByUserId], references: [id], onDelete: Restrict)
+  previousAssessment RiskAssessment?        @relation("RiskAssessmentChain", fields: [previousAssessmentId], references: [id], onDelete: Restrict)
+  supersededBy       RiskAssessment[]       @relation("RiskAssessmentChain")
+  currentForRisks    Risk[]                 @relation("RiskCurrentAssessment")
+
+  @@index([riskId, assessedOn(sort: Desc)])
+  @@map("risk_assessments")
+}
+
+
+model RiskTreatmentDecision {
+  id              String            @id @default(uuid(7)) @db.Uuid
+  riskId          String            @map("risk_id") @db.Uuid
+  strategy        TreatmentStrategy
+  description     String
+  deadline        DateTime?         @db.Date
+  decidedByUserId String            @map("decided_by_user_id") @db.Uuid
+  decidedAt       DateTime          @map("decided_at") @db.Timestamptz(6)
+  supersededAt    DateTime?         @map("superseded_at") @db.Timestamptz(6)
+  supersededById  String?           @map("superseded_by_id") @db.Uuid
+
+  risk          Risk                    @relation("RiskTreatmentDecisionRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  decidedByUser User                    @relation("RiskTreatmentDecisionDecidedBy", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+  supersededBy  RiskTreatmentDecision?  @relation("RiskTreatmentDecisionChain", fields: [supersededById], references: [id], onDelete: Restrict)
+  supersedes    RiskTreatmentDecision[] @relation("RiskTreatmentDecisionChain")
+
+  treatmentActions RiskTreatmentAction[] @relation("RiskTreatmentActionDecision")
+  currentForRisks  Risk[]                @relation("RiskCurrentTreatment")
+
+  @@index([riskId, decidedAt(sort: Desc)])
+  @@map("risk_treatment_decisions")
+}
+
+model RiskTreatmentAction {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  riskId              String   @map("risk_id") @db.Uuid
+  treatmentDecisionId String?  @map("treatment_decision_id") @db.Uuid
+  actionId            String   @unique @map("action_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  risk              Risk                   @relation("RiskTreatmentActionRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  treatmentDecision RiskTreatmentDecision? @relation("RiskTreatmentActionDecision", fields: [treatmentDecisionId], references: [id], onDelete: Restrict)
+  action            Action                 @relation("RiskTreatmentActionAction", fields: [actionId], references: [id], onDelete: Restrict)
+
+  @@index([riskId])
+  @@map("risk_treatment_actions")
+}
+
+
+enum ControlStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  RETIRED
+}
+
+enum ControlNature {
+  MANUAL
+  AUTOMATED
+}
+
+enum ControlType {
+  PREVENTIVE
+  DETECTIVE
+  CORRECTIVE
+}
+
+enum ControlFrequency {
+  CONTINUOUS
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum ControlAssessmentResult {
+  EFFECTIVE
+  PARTIALLY_EFFECTIVE
+  INEFFECTIVE
+}
+
+model Control {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  orgUnitId   String?  @map("org_unit_id") @db.Uuid
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  ownerUserId String?           @map("owner_user_id") @db.Uuid
+  nature      ControlNature?
+  type        ControlType?      @map("control_type")
+  frequency   ControlFrequency?
+  status      ControlStatus     @default(DRAFT)
+
+  retiredAt        DateTime? @map("retired_at") @db.Timestamptz(6)
+  retiredByUserId  String?   @map("retired_by_user_id") @db.Uuid
+  retirementReason String?   @map("retirement_reason")
+
+  version Int @default(1)
+
+  orgUnit       OrganizationalUnit? @relation("ControlOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  owner         User?               @relation("ControlOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  retiredByUser User?               @relation("ControlRetiredBy", fields: [retiredByUserId], references: [id], onDelete: Restrict)
+
+  riskLinks            RiskControlLink[]
+  assessments          ControlAssessment[]
+  processLinks         ControlProcessLink[]
+  assetLinks           ControlAssetLink[]
+  lifecycleTransitions ControlLifecycleTransition[]
+  requirementLinks     RequirementControlLink[]
+  auditScopeLinks      AuditScopeControl[]
+  findingLinks         FindingControlLink[]
+
+  @@index([orgUnitId, status])
+  @@index([ownerUserId])
+  @@map("controls")
+}
+
+model ControlLifecycleTransition {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  controlId         String        @map("control_id") @db.Uuid
+  fromStatus        ControlStatus @map("from_status")
+  toStatus          ControlStatus @map("to_status")
+  performedByUserId String        @map("performed_by_user_id") @db.Uuid
+  performedAt       DateTime      @map("performed_at") @db.Timestamptz(6)
+  justification     String?
+
+  control         Control @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  performedByUser User    @relation("ControlLifecycleTransitionPerformedBy", fields: [performedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([controlId, performedAt(sort: Desc)])
+  @@map("control_lifecycle_transitions")
+}
+
+model ControlAssessment {
+  id               String                  @id @default(uuid(7)) @db.Uuid
+  controlId        String                  @map("control_id") @db.Uuid
+  assessedOn       DateTime                @map("assessed_on") @db.Date
+  assessorUserId   String                  @map("assessor_user_id") @db.Uuid
+  result           ControlAssessmentResult
+  conclusion       String
+  approvalId       String?                 @map("approval_id") @db.Uuid
+  attestedAt       DateTime?               @map("attested_at") @db.Timestamptz(6)
+  attestedByUserId String?                 @map("attested_by_user_id") @db.Uuid
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  orgUnitId String? @map("org_unit_id") @db.Uuid
+
+  control        Control             @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  assessorUser   User                @relation("ControlAssessmentAssessedBy", fields: [assessorUserId], references: [id], onDelete: Restrict)
+  approval       Approval?           @relation("ControlAssessmentApproval", fields: [approvalId], references: [id], onDelete: Restrict)
+  attestedByUser User?               @relation("ControlAssessmentAttestedBy", fields: [attestedByUserId], references: [id], onDelete: Restrict)
+  orgUnit        OrganizationalUnit? @relation("ControlAssessmentOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+
+  @@index([controlId, assessedOn(sort: Desc), createdAt(sort: Desc)])
+  @@index([orgUnitId])
+  @@map("control_assessments")
+}
+
+model ControlProcessLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  controlId        String    @map("control_id") @db.Uuid
+  processId        String    @map("process_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  control        Control @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  process        Process @relation(fields: [processId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("ControlProcessLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("ControlProcessLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([controlId])
+  @@map("control_process_links")
+}
+
+model ControlAssetLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  controlId        String    @map("control_id") @db.Uuid
+  assetId          String    @map("asset_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  control        Control @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("ControlAssetLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("ControlAssetLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([controlId])
+  @@map("control_asset_links")
+}
+
+model Process {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  orgUnitId   String?  @map("org_unit_id") @db.Uuid
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgUnit       OrganizationalUnit?   @relation("ProcessOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  riskLinks     RiskProcessLink[]
+  controlLinks  ControlProcessLink[]
+  incidentLinks IncidentProcessLink[]
+
+  @@map("processes")
+}
+
+model Asset {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  orgUnitId   String?  @map("org_unit_id") @db.Uuid
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgUnit       OrganizationalUnit? @relation("AssetOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  riskLinks     RiskAssetLink[]
+  controlLinks  ControlAssetLink[]
+  incidentLinks IncidentAssetLink[]
+
+  @@map("assets")
+}
+
+model RiskControlLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  riskId           String    @map("risk_id") @db.Uuid
+  controlId        String    @map("control_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  risk           Risk    @relation("RiskControlLinkRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  control        Control @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("RiskControlLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("RiskControlLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([riskId])
+  @@map("risk_control_links")
+}
+
+model RiskProcessLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  riskId           String    @map("risk_id") @db.Uuid
+  processId        String    @map("process_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  risk           Risk    @relation("RiskProcessLinkRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  process        Process @relation(fields: [processId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("RiskProcessLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("RiskProcessLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([riskId])
+  @@map("risk_process_links")
+}
+
+model RiskAssetLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  riskId           String    @map("risk_id") @db.Uuid
+  assetId          String    @map("asset_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  risk           Risk  @relation("RiskAssetLinkRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  asset          Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  linkedByUser   User  @relation("RiskAssetLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User? @relation("RiskAssetLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([riskId])
+  @@map("risk_asset_links")
+}
+
+
+model RiskLifecycleTransition {
+  id                String     @id @default(uuid(7)) @db.Uuid
+  riskId            String     @map("risk_id") @db.Uuid
+  fromStatus        RiskStatus @map("from_status")
+  toStatus          RiskStatus @map("to_status")
+  performedByUserId String     @map("performed_by_user_id") @db.Uuid
+  performedAt       DateTime   @map("performed_at") @db.Timestamptz(6)
+  justification     String?
+  approvalId        String?    @map("approval_id") @db.Uuid
+
+  risk            Risk      @relation("RiskLifecycleTransitionRisk", fields: [riskId], references: [id], onDelete: Restrict)
+  performedByUser User      @relation("RiskLifecycleTransitionPerformedBy", fields: [performedByUserId], references: [id], onDelete: Restrict)
+  approval        Approval? @relation("RiskLifecycleTransitionApproval", fields: [approvalId], references: [id], onDelete: Restrict)
+
+  @@index([riskId, performedAt(sort: Desc)])
+  @@map("risk_lifecycle_transitions")
+}
+
+model Approval {
+  id                  String               @id @default(uuid(7)) @db.Uuid
+  entityType          ApprovableEntityType @map("entity_type")
+  entityId            String               @map("entity_id") @db.Uuid
+  requestedTransition String               @map("requested_transition")
+  requestedByUserId   String               @map("requested_by_user_id") @db.Uuid
+  requestedAt         DateTime             @map("requested_at") @db.Timestamptz(6)
+  status              ApprovalStatus       @default(PENDING)
+  decidedByUserId     String?              @map("decided_by_user_id") @db.Uuid
+  decidedAt           DateTime?            @map("decided_at") @db.Timestamptz(6)
+  justification       String?
+
+  requestedByUser User  @relation("ApprovalRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  decidedByUser   User? @relation("ApprovalDecidedBy", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  lifecycleTransitions RiskLifecycleTransition[] @relation("RiskLifecycleTransitionApproval")
+  pendingForRisks      Risk[]                    @relation("RiskPendingApproval")
+  controlAssessments   ControlAssessment[]       @relation("ControlAssessmentApproval")
+
+  @@index([status, entityType, entityId])
+  @@map("approvals")
+}
+
+
+model Attachment {
+  id               String               @id @default(uuid(7)) @db.Uuid
+  entityType       AttachableEntityType @map("entity_type")
+  entityId         String               @map("entity_id") @db.Uuid
+  fileName         String               @map("file_name")
+  contentType      String               @map("content_type")
+  sizeBytes        BigInt               @map("size_bytes")
+  checksumSha256   String               @map("checksum_sha256")
+  storageKey       String               @map("storage_key")
+  uploadedByUserId String               @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt        DateTime?            @map("deleted_at") @db.Timestamptz(6)
+  deletedByUserId  String?              @map("deleted_by_user_id") @db.Uuid
+
+  uploadedByUser User  @relation("AttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  deletedByUser  User? @relation("AttachmentDeletedBy", fields: [deletedByUserId], references: [id], onDelete: Restrict)
+
+
+  @@index([entityType, entityId, deletedAt])
+  @@map("attachments")
+}
+
+model Comment {
+  id              String                @id @default(uuid(7)) @db.Uuid
+  entityType      CommentableEntityType @map("entity_type")
+  entityId        String                @map("entity_id") @db.Uuid
+  body            String
+  authorUserId    String                @map("author_user_id") @db.Uuid
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt       DateTime?             @map("deleted_at") @db.Timestamptz(6)
+  deletedByUserId String?               @map("deleted_by_user_id") @db.Uuid
+
+  authorUser    User  @relation("CommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  deletedByUser User? @relation("CommentDeletedBy", fields: [deletedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId, deletedAt])
+  @@map("comments")
+}
+
+model Notification {
+  id              String                 @id @default(uuid(7)) @db.Uuid
+  recipientUserId String                 @map("recipient_user_id") @db.Uuid
+  type            String
+  title           String
+  body            String?
+  entityType      CommentableEntityType? @map("entity_type")
+  entityId        String?                @map("entity_id") @db.Uuid
+  readAt          DateTime?              @map("read_at") @db.Timestamptz(6)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  recipientUser User @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+
+enum EvidenceType {
+  DOCUMENT
+  SCREENSHOT
+  SYSTEM_LOG
+  ATTESTATION
+  INSPECTION
+  OTHER
+}
+
+enum EvidenceSource {
+  MANUAL_UPLOAD
+  SYSTEM_EXPORT
+  THIRD_PARTY
+  INSPECTION
+}
+
+enum EvidenceStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum EvidenceSubjectType {
+  RISK
+  RISK_TREATMENT_DECISION
+  FINDING
+  ACTION
+  CONTROL
+  INCIDENT
+  PROBLEM
+}
+
+model Evidence {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  code             String         @unique
+  orgUnitId        String         @map("org_unit_id") @db.Uuid
+  title            String
+  description      String?
+  type             EvidenceType
+  source           EvidenceSource
+  ownerUserId      String         @map("owner_user_id") @db.Uuid
+  collectedOn      DateTime       @map("collected_on") @db.Date
+  validUntil       DateTime?      @map("valid_until") @db.Date
+  status           EvidenceStatus @default(ACTIVE)
+  externalUrl      String?        @map("external_url")
+  observation      String?
+  archivedAt       DateTime?      @map("archived_at") @db.Timestamptz(6)
+  archivedByUserId String?        @map("archived_by_user_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgUnit        OrganizationalUnit @relation("EvidenceOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  ownerUser      User               @relation("EvidenceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  archivedByUser User?              @relation("EvidenceArchivedBy", fields: [archivedByUserId], references: [id], onDelete: Restrict)
+  links          EvidenceLink[]     @relation("EvidenceLinkEvidence")
+
+  @@index([orgUnitId, status])
+  @@index([validUntil, status])
+  @@index([ownerUserId, status])
+  @@map("evidence")
+}
+
+model EvidenceLink {
+  id               String              @id @default(uuid(7)) @db.Uuid
+  evidenceId       String              @map("evidence_id") @db.Uuid
+  subjectType      EvidenceSubjectType @map("subject_type")
+  subjectId        String              @map("subject_id") @db.Uuid
+  linkedAt         DateTime            @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId   String              @map("linked_by_user_id") @db.Uuid
+  unlinkedAt       DateTime?           @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?             @map("unlinked_by_user_id") @db.Uuid
+  note             String?
+
+  evidence       Evidence @relation("EvidenceLinkEvidence", fields: [evidenceId], references: [id], onDelete: Restrict)
+  linkedByUser   User     @relation("EvidenceLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?    @relation("EvidenceLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([subjectType, subjectId, unlinkedAt])
+  @@index([evidenceId, unlinkedAt])
+  @@map("evidence_links")
+}
+
+enum ActionOriginType {
+  RISK_TREATMENT
+  FINDING
+  CONTROL_ASSESSMENT
+  INCIDENT
+  PROBLEM
+  INDICATOR
+}
+
+enum ActionStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Action {
+  id                String           @id @default(uuid(7)) @db.Uuid
+  code              String           @unique
+  orgUnitId         String           @map("org_unit_id") @db.Uuid
+  originType        ActionOriginType @map("origin_type")
+  originId          String           @map("origin_id") @db.Uuid
+  title             String
+  description       String?
+  responsibleUserId String           @map("responsible_user_id") @db.Uuid
+  dueOn             DateTime         @map("due_on") @db.Date
+  status            ActionStatus     @default(OPEN)
+  completedAt       DateTime?        @map("completed_at") @db.Timestamptz(6)
+  completedByUserId String?          @map("completed_by_user_id") @db.Uuid
+  reopenedAt        DateTime?        @map("reopened_at") @db.Timestamptz(6)
+  reopenedByUserId  String?          @map("reopened_by_user_id") @db.Uuid
+  reopenReason      String?          @map("reopen_reason")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgUnit             OrganizationalUnit   @relation("ActionOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  responsibleUser     User                 @relation("ActionResponsible", fields: [responsibleUserId], references: [id], onDelete: Restrict)
+  completedByUser     User?                @relation("ActionCompletedBy", fields: [completedByUserId], references: [id], onDelete: Restrict)
+  reopenedByUser      User?                @relation("ActionReopenedBy", fields: [reopenedByUserId], references: [id], onDelete: Restrict)
+  riskTreatmentAction RiskTreatmentAction? @relation("RiskTreatmentActionAction")
+
+  @@index([responsibleUserId, status, dueOn])
+  @@index([originType, originId])
+  @@index([orgUnitId, status])
+  @@index([dueOn, status])
+  @@map("actions")
+}
+
+enum FindingOrigin {
+  INTERNAL_ASSESSMENT
+  CONTROL_TESTING
+  MANAGEMENT_REVIEW
+}
+
+enum FindingCategory {
+  NONCONFORMITY
+  CONTROL_DEFICIENCY
+  OBSERVATION
+  IMPROVEMENT_OPPORTUNITY
+}
+
+enum FindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FindingPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum FindingStatus {
+  OPEN
+  IN_REMEDIATION
+  CLOSED
+  ARCHIVED
+}
+
+model Finding {
+  id                   String          @id @default(uuid(7)) @db.Uuid
+  code                 String          @unique
+  orgUnitId            String          @map("org_unit_id") @db.Uuid
+  title                String
+  description          String
+  recommendation       String?
+  category             FindingCategory
+  origin               FindingOrigin
+  severity             FindingSeverity
+  priority             FindingPriority
+  ownerUserId          String          @map("owner_user_id") @db.Uuid
+  identifiedOn         DateTime        @map("identified_on") @db.Date
+  status               FindingStatus   @default(OPEN)
+  closedAt             DateTime?       @map("closed_at") @db.Timestamptz(6)
+  closedByUserId       String?         @map("closed_by_user_id") @db.Uuid
+  closureJustification String?         @map("closure_justification")
+  archivedAt           DateTime?       @map("archived_at") @db.Timestamptz(6)
+  archivedByUserId     String?         @map("archived_by_user_id") @db.Uuid
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  auditEngagementId    String?         @map("audit_engagement_id") @db.Uuid
+
+  orgUnit         OrganizationalUnit   @relation("FindingOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  ownerUser       User                 @relation("FindingOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  closedByUser    User?                @relation("FindingClosedBy", fields: [closedByUserId], references: [id], onDelete: Restrict)
+  archivedByUser  User?                @relation("FindingArchivedBy", fields: [archivedByUserId], references: [id], onDelete: Restrict)
+  auditEngagement AuditEngagement?     @relation(fields: [auditEngagementId], references: [id], onDelete: Restrict)
+  controlLinks    FindingControlLink[]
+  riskLinks       FindingRiskLink[]
+
+  @@index([orgUnitId, status])
+  @@index([severity, status])
+  @@index([auditEngagementId])
+  @@index([ownerUserId, status])
+  @@index([status, identifiedOn])
+  @@map("findings")
+}
+
+model GrcCodeSequence {
+  prefix    String
+  year      Int
+  lastValue Int    @default(0) @map("last_value")
+
+  @@id([prefix, year])
+  @@map("grc_code_sequences")
+}
+
+
+enum FrameworkOrigin {
+  EXTERNAL_STANDARD
+  INTERNAL_POLICY
+}
+
+enum FrameworkVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum MappingMigrationOutcome {
+  COPIED
+  PENDING_DECISION
+  SKIPPED_ALREADY_MAPPED
+}
+
+enum RequirementComplianceState {
+  NOT_APPLICABLE
+  NOT_MET
+  NOT_PROVEN
+  PARTIALLY_MET
+  COMPLIANT
+}
+
+
+model Framework {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  code        String          @unique
+  name        String
+  description String
+  origin      FrameworkOrigin
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  versions          FrameworkVersion[]
+  mappingMigrations RequirementControlMappingMigration[]
+
+  @@map("frameworks")
+}
+
+model FrameworkVersion {
+  id                String                 @id @default(uuid(7)) @db.Uuid
+  frameworkId       String                 @map("framework_id") @db.Uuid
+  label             String
+  status            FrameworkVersionStatus @default(DRAFT)
+  publishedAt       DateTime?              @map("published_at") @db.Timestamptz(6)
+  publishedByUserId String?                @map("published_by_user_id") @db.Uuid
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version           Int                    @default(1)
+
+  framework       Framework @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+  publishedByUser User?     @relation("FrameworkVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+
+  requirements     Requirement[]
+  sourceMigrations RequirementControlMappingMigration[] @relation("MappingMigrationSource")
+  targetMigrations RequirementControlMappingMigration[] @relation("MappingMigrationTarget")
+  auditScopeLinks  AuditScopeFrameworkVersion[]
+
+  @@unique([frameworkId, label])
+  @@index([frameworkId])
+  @@map("framework_versions")
+}
+
+model Requirement {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  frameworkVersionId String   @map("framework_version_id") @db.Uuid
+  externalRef        String   @map("external_ref")
+  title              String
+  description        String
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdByUserId    String   @map("created_by_user_id") @db.Uuid
+  version            Int      @default(1)
+
+  frameworkVersion FrameworkVersion @relation(fields: [frameworkVersionId], references: [id], onDelete: Restrict)
+  createdByUser    User             @relation("RequirementCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  controlLinks              RequirementControlLink[]
+  applicabilityDeclarations RequirementApplicabilityDeclaration[]
+  complianceAuditMark       RequirementComplianceAuditMark?
+  mappingMigrationTargetOf  RequirementControlMappingMigrationItem[]
+  auditScopeLinks           AuditScopeRequirement[]
+
+  @@index([frameworkVersionId, externalRef])
+  @@map("requirements")
+}
+
+
+model RequirementControlLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  requirementId    String    @map("requirement_id") @db.Uuid
+  controlId        String    @map("control_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  requirement    Requirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  control        Control     @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  linkedByUser   User        @relation("RequirementControlLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?       @relation("RequirementControlLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([requirementId])
+  @@map("requirement_control_links")
+}
+
+model RequirementControlMappingMigration {
+  id                       String   @id @default(uuid(7)) @db.Uuid
+  frameworkId              String   @map("framework_id") @db.Uuid
+  sourceFrameworkVersionId String   @map("source_framework_version_id") @db.Uuid
+  targetFrameworkVersionId String   @map("target_framework_version_id") @db.Uuid
+  executedAt               DateTime @map("executed_at") @db.Timestamptz(6)
+  executedByUserId         String   @map("executed_by_user_id") @db.Uuid
+
+  framework              Framework        @relation(fields: [frameworkId], references: [id], onDelete: Restrict)
+  sourceFrameworkVersion FrameworkVersion @relation("MappingMigrationSource", fields: [sourceFrameworkVersionId], references: [id], onDelete: Restrict)
+  targetFrameworkVersion FrameworkVersion @relation("MappingMigrationTarget", fields: [targetFrameworkVersionId], references: [id], onDelete: Restrict)
+  executedByUser         User             @relation("MappingMigrationExecutedBy", fields: [executedByUserId], references: [id], onDelete: Restrict)
+
+  items RequirementControlMappingMigrationItem[]
+
+  @@index([targetFrameworkVersionId])
+  @@map("requirement_control_mapping_migrations")
+}
+
+model RequirementControlMappingMigrationItem {
+  id                   String                  @id @default(uuid(7)) @db.Uuid
+  migrationId          String                  @map("migration_id") @db.Uuid
+  targetRequirementId  String                  @map("target_requirement_id") @db.Uuid
+  sourceRequirementIds String[]                @default([]) @map("source_requirement_ids") @db.Uuid
+  outcome              MappingMigrationOutcome
+  copiedLinkCount      Int                     @default(0) @map("copied_link_count")
+
+  migration         RequirementControlMappingMigration @relation(fields: [migrationId], references: [id], onDelete: Restrict)
+  targetRequirement Requirement                        @relation(fields: [targetRequirementId], references: [id], onDelete: Restrict)
+
+  @@index([migrationId])
+  @@map("requirement_control_mapping_migration_items")
+}
+
+model RequirementApplicabilityDeclaration {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  requirementId    String    @map("requirement_id") @db.Uuid
+  justification    String
+  declaredAt       DateTime  @map("declared_at") @db.Timestamptz(6)
+  declaredByUserId String    @map("declared_by_user_id") @db.Uuid
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedByUserId  String?   @map("revoked_by_user_id") @db.Uuid
+
+  requirement    Requirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  declaredByUser User        @relation("RequirementApplicabilityDeclaredBy", fields: [declaredByUserId], references: [id], onDelete: Restrict)
+  revokedByUser  User?       @relation("RequirementApplicabilityRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([requirementId])
+  @@map("requirement_applicability_declarations")
+}
+
+model RequirementComplianceAuditMark {
+  requirementId    String                     @id @map("requirement_id") @db.Uuid
+  lastAuditedState RequirementComplianceState @map("last_audited_state")
+  lastAuditedAt    DateTime                   @map("last_audited_at") @db.Timestamptz(6)
+
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+
+  @@map("requirement_compliance_audit_marks")
+}
+
+
+enum AuditEngagementStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+
+model AuditEngagement {
+  id        String @id @default(uuid(7)) @db.Uuid
+  code      String @unique
+  objective String
+
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+
+  orgUnitId         String @map("org_unit_id") @db.Uuid
+  leadAuditorUserId String @map("lead_auditor_user_id") @db.Uuid
+
+  status AuditEngagementStatus @default(PLANNING)
+
+  startedAt                 DateTime? @map("started_at") @db.Timestamptz(6)
+  startedByUserId           String?   @map("started_by_user_id") @db.Uuid
+  completedAt               DateTime? @map("completed_at") @db.Timestamptz(6)
+  completedByUserId         String?   @map("completed_by_user_id") @db.Uuid
+  cancelledAt               DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledByUserId         String?   @map("cancelled_by_user_id") @db.Uuid
+  cancellationJustification String?   @map("cancellation_justification")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  version Int @default(1)
+
+  orgUnit         OrganizationalUnit @relation("AuditEngagementOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  leadAuditor     User               @relation("AuditEngagementLeadAuditor", fields: [leadAuditorUserId], references: [id], onDelete: Restrict)
+  startedByUser   User?              @relation("AuditEngagementStartedBy", fields: [startedByUserId], references: [id], onDelete: Restrict)
+  completedByUser User?              @relation("AuditEngagementCompletedBy", fields: [completedByUserId], references: [id], onDelete: Restrict)
+  cancelledByUser User?              @relation("AuditEngagementCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+
+  scopeFrameworkVersions AuditScopeFrameworkVersion[]
+  scopeRequirements      AuditScopeRequirement[]
+  scopeControls          AuditScopeControl[]
+  findings               Finding[]
+
+  @@index([orgUnitId, status])
+  @@index([leadAuditorUserId])
+  @@map("audit_engagements")
+}
+
+model AuditScopeFrameworkVersion {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  auditEngagementId  String   @map("audit_engagement_id") @db.Uuid
+  frameworkVersionId String   @map("framework_version_id") @db.Uuid
+  linkedAt           DateTime @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId     String   @map("linked_by_user_id") @db.Uuid
+
+  auditEngagement  AuditEngagement  @relation(fields: [auditEngagementId], references: [id], onDelete: Restrict)
+  frameworkVersion FrameworkVersion @relation(fields: [frameworkVersionId], references: [id], onDelete: Restrict)
+  linkedByUser     User             @relation("AuditScopeFrameworkVersionLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([auditEngagementId, frameworkVersionId])
+  @@index([auditEngagementId])
+  @@map("audit_scope_framework_versions")
+}
+
+model AuditScopeRequirement {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  auditEngagementId String   @map("audit_engagement_id") @db.Uuid
+  requirementId     String   @map("requirement_id") @db.Uuid
+  linkedAt          DateTime @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId    String   @map("linked_by_user_id") @db.Uuid
+
+  auditEngagement AuditEngagement @relation(fields: [auditEngagementId], references: [id], onDelete: Restrict)
+  requirement     Requirement     @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  linkedByUser    User            @relation("AuditScopeRequirementLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([auditEngagementId, requirementId])
+  @@index([auditEngagementId])
+  @@map("audit_scope_requirements")
+}
+
+model AuditScopeControl {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  auditEngagementId String   @map("audit_engagement_id") @db.Uuid
+  controlId         String   @map("control_id") @db.Uuid
+  linkedAt          DateTime @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId    String   @map("linked_by_user_id") @db.Uuid
+
+  auditEngagement AuditEngagement @relation(fields: [auditEngagementId], references: [id], onDelete: Restrict)
+  control         Control         @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  linkedByUser    User            @relation("AuditScopeControlLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([auditEngagementId, controlId])
+  @@index([auditEngagementId])
+  @@map("audit_scope_controls")
+}
+
+
+model FindingControlLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  findingId        String    @map("finding_id") @db.Uuid
+  controlId        String    @map("control_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  finding        Finding @relation(fields: [findingId], references: [id], onDelete: Restrict)
+  control        Control @relation(fields: [controlId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("FindingControlLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("FindingControlLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([findingId, unlinkedAt])
+  @@map("finding_control_links")
+}
+
+model FindingRiskLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  findingId        String    @map("finding_id") @db.Uuid
+  riskId           String    @map("risk_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  finding        Finding @relation(fields: [findingId], references: [id], onDelete: Restrict)
+  risk           Risk    @relation(fields: [riskId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("FindingRiskLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("FindingRiskLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([findingId, unlinkedAt])
+  @@map("finding_risk_links")
+}
+
+
+enum IncidentSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum ProblemSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ProblemStatus {
+  OPEN
+  IN_ANALYSIS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+model Incident {
+  id                 String           @id @default(uuid(7)) @db.Uuid
+  code               String           @unique
+  orgUnitId          String           @map("org_unit_id") @db.Uuid
+  title              String
+  description        String
+  severity           IncidentSeverity
+  status             IncidentStatus   @default(OPEN)
+  reportedByUserId   String           @map("reported_by_user_id") @db.Uuid
+  ownerUserId        String           @map("owner_user_id") @db.Uuid
+  reportedOn         DateTime         @map("reported_on") @db.Date
+  resolutionSummary  String?          @map("resolution_summary")
+  resolvedAt         DateTime?        @map("resolved_at") @db.Timestamptz(6)
+  resolvedByUserId   String?          @map("resolved_by_user_id") @db.Uuid
+  closedAt           DateTime?        @map("closed_at") @db.Timestamptz(6)
+  closedByUserId     String?          @map("closed_by_user_id") @db.Uuid
+  cancellationReason String?          @map("cancellation_reason")
+  cancelledAt        DateTime?        @map("cancelled_at") @db.Timestamptz(6)
+  cancelledByUserId  String?          @map("cancelled_by_user_id") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgUnit         OrganizationalUnit @relation("IncidentOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  reportedBy      User               @relation("IncidentReportedBy", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  owner           User               @relation("IncidentOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  resolvedByUser  User?              @relation("IncidentResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  closedByUser    User?              @relation("IncidentClosedBy", fields: [closedByUserId], references: [id], onDelete: Restrict)
+  cancelledByUser User?              @relation("IncidentCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+
+  riskLinks    IncidentRiskLink[]
+  assetLinks   IncidentAssetLink[]
+  processLinks IncidentProcessLink[]
+  problemLinks ProblemIncidentLink[]
+
+  @@index([orgUnitId])
+  @@map("incidents")
+}
+
+model Problem {
+  id                 String          @id @default(uuid(7)) @db.Uuid
+  code               String          @unique
+  orgUnitId          String          @map("org_unit_id") @db.Uuid
+  title              String
+  description        String
+  severity           ProblemSeverity
+  status             ProblemStatus   @default(OPEN)
+  ownerUserId        String          @map("owner_user_id") @db.Uuid
+  identifiedOn       DateTime        @map("identified_on") @db.Date
+  rootCause          String?         @map("root_cause")
+  resolvedAt         DateTime?       @map("resolved_at") @db.Timestamptz(6)
+  resolvedByUserId   String?         @map("resolved_by_user_id") @db.Uuid
+  closedAt           DateTime?       @map("closed_at") @db.Timestamptz(6)
+  closedByUserId     String?         @map("closed_by_user_id") @db.Uuid
+  cancellationReason String?         @map("cancellation_reason")
+  cancelledAt        DateTime?       @map("cancelled_at") @db.Timestamptz(6)
+  cancelledByUserId  String?         @map("cancelled_by_user_id") @db.Uuid
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgUnit         OrganizationalUnit @relation("ProblemOrgUnit", fields: [orgUnitId], references: [id], onDelete: Restrict)
+  owner           User               @relation("ProblemOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  resolvedByUser  User?              @relation("ProblemResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  closedByUser    User?              @relation("ProblemClosedBy", fields: [closedByUserId], references: [id], onDelete: Restrict)
+  cancelledByUser User?              @relation("ProblemCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+
+  riskLinks     ProblemRiskLink[]
+  incidentLinks ProblemIncidentLink[]
+
+  @@index([orgUnitId])
+  @@map("problems")
+}
+
+model IncidentRiskLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  incidentId       String    @map("incident_id") @db.Uuid
+  riskId           String    @map("risk_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  incident       Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  risk           Risk     @relation(fields: [riskId], references: [id], onDelete: Restrict)
+  linkedByUser   User     @relation("IncidentRiskLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?    @relation("IncidentRiskLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([incidentId, unlinkedAt])
+  @@map("incident_risk_links")
+}
+
+model IncidentAssetLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  incidentId       String    @map("incident_id") @db.Uuid
+  assetId          String    @map("asset_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  incident       Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  asset          Asset    @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  linkedByUser   User     @relation("IncidentAssetLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?    @relation("IncidentAssetLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([incidentId, unlinkedAt])
+  @@map("incident_asset_links")
+}
+
+model IncidentProcessLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  incidentId       String    @map("incident_id") @db.Uuid
+  processId        String    @map("process_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  incident       Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  process        Process  @relation(fields: [processId], references: [id], onDelete: Restrict)
+  linkedByUser   User     @relation("IncidentProcessLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?    @relation("IncidentProcessLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([incidentId, unlinkedAt])
+  @@map("incident_process_links")
+}
+
+model ProblemRiskLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  problemId        String    @map("problem_id") @db.Uuid
+  riskId           String    @map("risk_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  problem        Problem @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  risk           Risk    @relation(fields: [riskId], references: [id], onDelete: Restrict)
+  linkedByUser   User    @relation("ProblemRiskLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?   @relation("ProblemRiskLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([problemId, unlinkedAt])
+  @@map("problem_risk_links")
+}
+
+model ProblemIncidentLink {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  problemId        String    @map("problem_id") @db.Uuid
+  incidentId       String    @map("incident_id") @db.Uuid
+  linkedByUserId   String    @map("linked_by_user_id") @db.Uuid
+  linkedAt         DateTime  @map("linked_at") @db.Timestamptz(6)
+  unlinkedAt       DateTime? @map("unlinked_at") @db.Timestamptz(6)
+  unlinkedByUserId String?   @map("unlinked_by_user_id") @db.Uuid
+
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  incident       Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  linkedByUser   User     @relation("ProblemIncidentLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  unlinkedByUser User?    @relation("ProblemIncidentLinkUnlinkedBy", fields: [unlinkedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([problemId, unlinkedAt])
+  @@index([incidentId, unlinkedAt])
+  @@map("problem_incident_links")
+}
+
+
+enum IndicatorMetricKey {
+  RISK_TOTAL_BY_LEVEL
+  RISK_TREATMENT_OVERDUE_COUNT
+  CONTROL_INACTIVE_COUNT
+  COMPLIANCE_PERCENTAGE
+  AUDIT_ENGAGEMENT_OPEN_COUNT
+  FINDING_OPEN_COUNT_BY_SEVERITY
+  ASSET_INACTIVE_COUNT
+  PROCESS_INACTIVE_COUNT
+  ACTION_OVERDUE_COUNT
+  INCIDENT_OPEN_COUNT_BY_SEVERITY
+  PROBLEM_OPEN_COUNT_BY_SEVERITY
+}
+
+enum IndicatorThresholdComparator {
+  GTE
+  GT
+  LTE
+  LT
+}
+
+model IndicatorDefinition {
+  id                  String                        @id @default(uuid(7)) @db.Uuid
+  code                String                        @unique
+  metricKey           IndicatorMetricKey            @unique @map("metric_key")
+  name                String
+  description         String
+  ownerUserId         String                        @map("owner_user_id") @db.Uuid
+  thresholdComparator IndicatorThresholdComparator? @map("threshold_comparator")
+  thresholdValue      Decimal?                      @map("threshold_value") @db.Decimal
+  isActive            Boolean                       @default(true) @map("is_active")
+  createdByUserId     String                        @map("created_by_user_id") @db.Uuid
+  createdAt           DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner     User @relation("IndicatorDefinitionOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdBy User @relation("IndicatorDefinitionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@map("indicator_definitions")
+}
+
+model IndicatorMeasurement {
+  id               String             @id @default(uuid(7)) @db.Uuid
+  metricKey        IndicatorMetricKey @map("metric_key")
+  value            Decimal?           @db.Decimal
+  valueByBucket    Json?              @map("value_by_bucket")
+  breached         Boolean
+  computedAt       DateTime           @default(now()) @map("computed_at") @db.Timestamptz(6)
+  computedByUserId String             @map("computed_by_user_id") @db.Uuid
+
+  computedByUser User @relation("IndicatorMeasurementComputedBy", fields: [computedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([metricKey, computedAt])
+  @@map("indicator_measurements")
+}
+
+model ReportDefinition {
+  id              String               @id @default(uuid(7)) @db.Uuid
+  code            String               @unique
+  name            String
+  description     String
+  metricKeys      IndicatorMetricKey[] @default([]) @map("metric_keys")
+  isActive        Boolean              @default(true) @map("is_active")
+  createdByUserId String               @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdBy User @relation("ReportDefinitionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@map("report_definitions")
+}

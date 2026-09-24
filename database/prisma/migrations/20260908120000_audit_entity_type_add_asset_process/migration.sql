@@ -1,0 +1,27 @@
+-- T001/006-assets-processes — additive growth of `AuditEntityType` (ADR-008:
+-- "closed platform enums grow by reviewed migration"), the same growth
+-- pattern `20260908110000_audit_entity_type_add_audit_findings` and every
+-- prior enum-growth migration already applied. Two distinct values, not one
+-- generic "registry" value — the same reasoning already given for every
+-- other cross-cutting group above (`RISK_ASSET_LINK`/`RISK_PROCESS_LINK`,
+-- `CONTROL_ASSET_LINK`/`CONTROL_PROCESS_LINK`, ...): `ASSET` and `PROCESS`
+-- are different business facts with their own field allow-lists
+-- (`modules/assets/domain/asset-audit-allowlist.ts`,
+-- `modules/processes/domain/process-audit-allowlist.ts`).
+--
+-- `Asset` and `Process` are pre-existing tables (data-model.md §1) — this is
+-- the ONLY schema change this fase makes to them, and it touches neither:
+-- no column of `assets`/`processes` (or of `risk_asset_links`/
+-- `risk_process_links`/`control_asset_links`/`control_process_links`)
+-- changes type, nullability or name. The four values covering the
+-- Risk/Control relationship to Asset/Process already exist
+-- (`RISK_ASSET_LINK`, `RISK_PROCESS_LINK`, `CONTROL_ASSET_LINK`,
+-- `CONTROL_ASSET_LINK`); what was missing was a type for the RECORD itself,
+-- because until this fase no operation ever created or altered one
+-- (research.md D-8).
+--
+-- A value added by `ALTER TYPE ... ADD VALUE` cannot be referenced by any
+-- statement in the SAME transaction that added it — this migration contains
+-- only `ADD VALUE` statements and writes no row using either of them.
+ALTER TYPE "AuditEntityType" ADD VALUE 'ASSET';
+ALTER TYPE "AuditEntityType" ADD VALUE 'PROCESS';

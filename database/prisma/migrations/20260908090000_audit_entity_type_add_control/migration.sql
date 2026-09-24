@@ -1,0 +1,32 @@
+-- T020/003-controls-management, User Story 1 — additive growth of the
+-- `AuditEntityType` enum: adds `CONTROL` and `CONTROL_LIFECYCLE_TRANSITION`
+-- (ADR-008: "closed platform enums grow by reviewed migration"). Two
+-- distinct values, not one generic "control" value — a control's own
+-- descriptive/ownership edit (`control.created`/`control.updated`) is a
+-- different business fact from an applied lifecycle-state change
+-- (`control.activated`/`control.suspended`/`control.retired`), the same
+-- reasoning that already gave `RISK`/`RISK_LIFECYCLE_TRANSITION` their own
+-- distinct values (`20260905170000_audit_entity_type_add_risk_lifecycle`).
+--
+-- The other Controls Management workstream (assessments, attestation,
+-- process/asset links, operations 7-18 of contracts/controls.openapi.yaml)
+-- registers its own further values (`CONTROL_ASSESSMENT`,
+-- `CONTROL_PROCESS_LINK`, `CONTROL_ASSET_LINK`) separately, by its own
+-- reviewed migration — deliberately not added here, out of this task's
+-- scope.
+--
+-- ## The PostgreSQL restriction this migration must respect
+--
+-- Same restriction as every prior `audit_entity_type_add_*` migration: a
+-- value added by `ALTER TYPE ... ADD VALUE` cannot be referenced by any
+-- statement in the SAME transaction that added it. This migration contains
+-- only the two `ADD VALUE` statements and writes no data using either new
+-- label — nor does the migration that runs immediately after it
+-- (`20260908090100_control_lifecycle_transitions_baseline`), which only
+-- creates a table/index/FK/privilege-revocation and writes no
+-- `audit_event` rows. The first real use of each new label is
+-- `AuditRecorder.record(...)` called at normal application runtime, in an
+-- entirely separate transaction opened long after `prisma migrate deploy`
+-- has committed this one.
+ALTER TYPE "AuditEntityType" ADD VALUE 'CONTROL';
+ALTER TYPE "AuditEntityType" ADD VALUE 'CONTROL_LIFECYCLE_TRANSITION';
