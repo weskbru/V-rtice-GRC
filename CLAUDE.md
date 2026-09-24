@@ -310,7 +310,7 @@ O design deve permitir que novos módulos sejam adicionados sem alterar a estrut
 A interface de usuário da v1 é definitivamente em português do Brasil (pt-BR).
 
 - Toda string nova voltada ao usuário deve ser criada em pt-BR, nos catálogos centralizados
-  (`apps/web/src/lib/messages/` e `apps/api/src/shared/messages/user-messages.ts`) — nunca embutida
+  (`frontend/src/lib/messages/` e `backend/src/shared/messages/user-messages.ts`) — nunca embutida
   diretamente no componente.
 - Texto em inglês voltado ao usuário não pode ser reintroduzido.
 - Permanecem em inglês, por serem identificadores técnicos e não interface: nomes de variáveis,
@@ -480,7 +480,7 @@ A arquitetura deve permitir a implementação incremental dos módulos.
     (evidência, comentário e anexo) e os papéis "Incident Manager"/"Problem Manager" no seed.
     Continua aberto: não existe E2E de escopo organizacional em navegador para os cinco vínculos
     desta fase — `7674efb` entregou a prova apenas no nível de integração de API
-    (`apps/api/test/integration/incident-problem-links-source-scope.spec.ts`), e `apps/web/e2e/`
+    (`backend/test/integration/incident-problem-links-source-scope.spec.ts`), e `frontend/e2e/`
     não tem nenhum spec de escopo de Incidente/Problema; a divisão do job cross-browser (`22021d2`)
     nunca foi verificada por um `workflow_dispatch` real; o commit `44e1e04` deixou em
     `.github/workflows/ci.yml` uma flag diagnóstica TEMPORÁRIA de worker único para WebKit, ainda
@@ -546,7 +546,7 @@ Fase 0 à Fase 7).
 
     **Atualização datada (2026-09-14), sem apagar o parágrafo acima**: F-61 foi **corrigido em
     2026-09-13** (`docs/deferred-findings.md`, F-61, saída F4/S-08) — o texto acima registra quando
-    a lacuna foi aberta, não o estado atual dela. `apps/web/e2e/action-plan.spec.ts` também já
+    a lacuna foi aberta, não o estado atual dela. `frontend/e2e/action-plan.spec.ts` também já
     existe hoje, cobrindo o fluxo de ação entre origens em navegador. Confirmar contra
     `docs/STATE.md` §6/§9 antes de tratar qualquer um dos dois como pendente.
 
@@ -710,7 +710,7 @@ Playwright -> criticar -> corrigir -> verificar de novo.**
   `typeset`, `colorize`, `animate`, `bolder`, `quieter`, `shape`, `craft`, `delight`, `optimize`,
   `overdrive`, `onboard`, `live`, `document`, `extract`, `init`). É a capacidade primária de crítica e
   refinamento de UI/UX. **Não substitui a arquitetura de componentes aprovada.**
-- **Playwright** — já existente como infraestrutura de E2E (`apps/web/e2e/`, `playwright.config.ts`) e
+- **Playwright** — já existente como infraestrutura de E2E (`frontend/e2e/`, `playwright.config.ts`) e
   também o mecanismo primário de verificação em navegador renderizado: navegação, captura de tela,
   múltiplos viewports, comportamento responsivo e acessibilidade via `@axe-core/playwright`.
   **Não substitui a arquitetura da aplicação nem o Design System.** Não introduzir um segundo framework
@@ -718,7 +718,7 @@ Playwright -> criticar -> corrigir -> verificar de novo.**
 
 ### 18.3 Autoridade do Design System
 
-O Design System do PharosGRC (`packages/design-system`) é a camada de implementação autoritativa da
+O Design System do PharosGRC (`frontend/packages/design-system`) é a camada de implementação autoritativa da
 interface. Prefira melhorar tokens, primitivos, componentes e padrões reutilizáveis — layout, navegação,
 tabelas, formulários, representação de status e de risco — a criar estilo isolado por página. Módulos
 futuros reutilizam os padrões estabelecidos; divergência visual entre módulos sem justificativa é
@@ -735,7 +735,7 @@ TanStack Table e Recharts.
 **Não introduzir outro framework de componentes** — Material UI, Ant Design, Chakra UI, Bootstrap,
 Mantine ou equivalentes. Estender o Design System existente.
 
-Exceção registrada: seis primitivos shadcn em `apps/web/src/components/ui/` (`dialog.tsx`,
+Exceção registrada: seis primitivos shadcn em `frontend/src/components/ui/` (`dialog.tsx`,
 `select.tsx`, `avatar.tsx`, `sheet.tsx`, `checkbox.tsx`, `table.tsx`) estão deliberadamente
 modificados por acessibilidade e não podem ser regenerados às cegas — lista completa e motivo de
 cada um em D-15, `docs/local-environment.md`.
@@ -854,7 +854,7 @@ que produz um sistema funcional que parece um conjunto de telas CRUD independent
 
 ### 18.13 Ferramenta de captura renderizada
 
-`apps/web/scripts/ui-capture.mjs` dirige a aplicação em execução com Playwright e grava capturas em um
+`frontend/scripts/ui-capture.mjs` dirige a aplicação em execução com Playwright e grava capturas em um
 diretório de revisão. É o instrumento padrão do laço do §18.1.
 
 ```

@@ -25,7 +25,7 @@ const UNTYPED_FILES = [
   '**/*.config.{js,mjs,cjs,ts,mts,cts}',
   '**/scripts/**/*.{js,mjs,cjs}',
   'eslint.config.mjs',
-  'apps/*/eslint.config.mjs',
+  'frontend/**/eslint.config.mjs',
 ];
 
 export default tseslint.config(
@@ -37,8 +37,8 @@ export default tseslint.config(
       '**/.next/**',
       '**/coverage/**',
       '**/*.d.ts',
-      'apps/api/prisma/migrations/**',
-      'apps/web/src/components/ui/**',
+      'database/prisma/migrations/**',
+      'frontend/src/components/ui/**',
     ],
   },
 
@@ -73,14 +73,14 @@ export default tseslint.config(
 
   {
     ...importPlugin.flatConfigs.recommended,
-    ignores: ['apps/web/**'],
+    ignores: ['frontend/src/**', 'frontend/e2e/**', 'frontend/scripts/**', 'frontend/*.config.*'],
   },
   {
     ...importPlugin.flatConfigs.typescript,
-    ignores: ['apps/web/**'],
+    ignores: ['frontend/src/**', 'frontend/e2e/**', 'frontend/scripts/**', 'frontend/*.config.*'],
   },
   {
-    ignores: ['apps/web/**'],
+    ignores: ['frontend/src/**', 'frontend/e2e/**', 'frontend/scripts/**', 'frontend/*.config.*'],
     settings: {
       'import/resolver': {
         typescript: {
@@ -96,10 +96,18 @@ export default tseslint.config(
 
   ...compat.extends('next/core-web-vitals', 'next/typescript').map((config) => ({
     ...config,
-    files: ['apps/web/**/*.{ts,tsx,js,jsx}'],
+    files: [
+      'frontend/src/**/*.{ts,tsx,js,jsx}',
+      'frontend/e2e/**/*.{ts,tsx,js,jsx}',
+      'frontend/scripts/**/*.{ts,tsx,js,jsx}',
+    ],
   })),
   {
-    files: ['apps/web/**/*.{ts,tsx,js,jsx}'],
+    files: [
+      'frontend/src/**/*.{ts,tsx,js,jsx}',
+      'frontend/e2e/**/*.{ts,tsx,js,jsx}',
+      'frontend/scripts/**/*.{ts,tsx,js,jsx}',
+    ],
     rules: {
       'import/order': IMPORT_ORDER_RULE,
       'import/no-unresolved': 'off',
@@ -125,7 +133,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/web/**/*.{ts,tsx}'],
+    files: ['frontend/src/**/*.{ts,tsx}'],
     languageOptions: {
       globals: {
         ...globals.browser,

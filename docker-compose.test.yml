@@ -14,7 +14,7 @@ services:
     ports:
       - "${TEST_POSTGRES_HOST_PORT:-5434}:5432"
     volumes:
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./database/postgres/init:/docker-entrypoint-initdb.d:ro
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:

@@ -23,8 +23,8 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@pharos/design-system": ["packages/design-system/src/index.ts"],
-      "@pharos/design-system/*": ["packages/design-system/src/*"],
+      "@pharos/design-system": ["frontend/packages/design-system/src/index.ts"],
+      "@pharos/design-system/*": ["frontend/packages/design-system/src/*"],
       "@pharos/api-types": ["packages/api-types/src/index.ts"],
       "@pharos/api-types/*": ["packages/api-types/src/*"]
     }
