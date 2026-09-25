@@ -13,7 +13,7 @@ describe('OrgUnitRef (processes.openapi.yaml)', () => {
     const value: OrgUnitRef = { id: 'org-1', code: 'ORG', name: 'Unidade de teste' };
     expect(value).toEqual({ id: 'org-1', code: 'ORG', name: 'Unidade de teste' });
 
-    // @ts-expect-error -- `code` is required on THIS module's OrgUnitRef; omitting it must not silently type-check.
+    // @ts-expect-error -- `code` pertence ao OrgUnitRef de Riscos.
     const withoutCode: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste' };
     expect(withoutCode).toBeDefined();
   });
@@ -32,7 +32,7 @@ describe('ProcessSummary.orgUnit (data-model.md §1/§6, research.md D-2)', () =
     };
     expect(legacyProcess.orgUnit).toBeNull();
 
-    // @ts-expect-error -- `orgUnit` is required; omitting the key entirely must not silently type-check.
+    // @ts-expect-error -- `orgUnit` é obrigatório.
     const missing: ProcessSummary = {
       id: 'process-1',
       code: 'PRC-2026-0001',
@@ -47,25 +47,25 @@ describe('ProcessSummary.orgUnit (data-model.md §1/§6, research.md D-2)', () =
 
 describe('CreateProcessRequest / UpdateProcessRequest (invariant A6)', () => {
   it('CreateProcessRequest never accepts `code`, `isActive` or a `version` — server-owned', () => {
-    // @ts-expect-error -- `code` is server-generated (PRC- prefix); the API rejects it as an unknown property.
+    // @ts-expect-error -- `code` é gerado pelo servidor (prefixo PRC-).
     const withCode: CreateProcessRequest = { name: 'P', orgUnitId: 'org-1', code: 'PRC-0001' };
     expect(withCode).toBeDefined();
 
-    // @ts-expect-error -- `isActive` is server-owned; a created process is always active.
+    // @ts-expect-error -- `isActive` é definido pelo servidor.
     const withIsActive: CreateProcessRequest = { name: 'P', orgUnitId: 'org-1', isActive: true };
     expect(withIsActive).toBeDefined();
 
-    // @ts-expect-error -- this resource carries no optimistic-locking version at all (see types.ts's own header comment).
+    // @ts-expect-error -- este tipo não inclui versão para controle otimista.
     const withVersion: CreateProcessRequest = { name: 'Processo', orgUnitId: 'org-1', version: 1 };
     expect(withVersion).toBeDefined();
   });
 
   it('UpdateProcessRequest never accepts `code` or `isActive` either — situation changes only through the dedicated transitions', () => {
-    // @ts-expect-error -- `code` is read-only.
+    // @ts-expect-error -- `code` é somente leitura.
     const withCode: UpdateProcessRequest = { code: 'PRC-0001' };
     expect(withCode).toBeDefined();
 
-    // @ts-expect-error -- `isActive` is read-only; use `deactivateProcess`/`reactivateProcess` instead.
+    // @ts-expect-error -- `isActive` é somente leitura; use `deactivateProcess` ou `reactivateProcess`.
     const withIsActive: UpdateProcessRequest = { isActive: false };
     expect(withIsActive).toBeDefined();
   });

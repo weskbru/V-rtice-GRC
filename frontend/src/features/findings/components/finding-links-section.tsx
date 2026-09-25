@@ -166,7 +166,7 @@ function RelationshipSubsection<TLink extends RelationshipLink>({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `includeWithdrawn`/`reloadToken`, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [active, includeWithdrawn, reloadToken]);
 
   function refresh(): void {

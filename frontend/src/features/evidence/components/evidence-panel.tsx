@@ -102,7 +102,7 @@ export function EvidencePanel({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `subjectType`/`subjectId`/`refreshToken`, all already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [subjectType, subjectId, refreshToken]);
 
   async function confirmArchive(): Promise<void> {

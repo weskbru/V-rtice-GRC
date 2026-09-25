@@ -1,6 +1,6 @@
 'use client';
 
-// eslint-disable-next-line no-restricted-imports -- see above.
+// eslint-disable-next-line no-restricted-imports -- este hook centraliza o acesso à URL.
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 

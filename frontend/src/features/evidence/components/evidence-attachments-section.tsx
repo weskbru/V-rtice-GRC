@@ -79,7 +79,7 @@ export function EvidenceAttachmentsSection({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `evidenceId`/`refreshToken`, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [evidenceId, refreshToken]);
 
   async function loadMore(): Promise<void> {

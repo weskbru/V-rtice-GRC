@@ -146,7 +146,7 @@ describe('FindingLinksSection', () => {
 
 describe('FindingLinksSection viewport gating (S-08)', () => {
   let observed: { callback: IntersectionObserverCallback; element: Element } | null;
-  /* eslint-disable @typescript-eslint/no-empty-function -- deliberate no-op stub methods, not a mistake */
+  /* eslint-disable @typescript-eslint/no-empty-function -- métodos vazios intencionais. */
   class FakeIntersectionObserver implements IntersectionObserver {
     readonly root: Element | Document | null = null;
     readonly rootMargin: string = '';
@@ -222,7 +222,7 @@ describe('FindingLinksSection viewport gating (S-08)', () => {
   it('falls back to fetching immediately when IntersectionObserver does not exist', async () => {
     vi.unstubAllGlobals();
     const original = window.IntersectionObserver;
-    // @ts-expect-error -- simulating an environment without IntersectionObserver (older browsers)
+    // @ts-expect-error -- simula navegador sem IntersectionObserver.
     delete window.IntersectionObserver;
 
     try {

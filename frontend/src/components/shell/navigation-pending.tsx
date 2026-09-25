@@ -2,7 +2,7 @@
 
 import { PharosLoader, useDelayedVisibility } from '@pharos/design-system/components';
 import { useLinkStatus } from 'next/link';
-// eslint-disable-next-line no-restricted-imports -- this module IS the product's navigation primitive; `useNavigate` below is what every other module uses instead of `useRouter`.
+// eslint-disable-next-line no-restricted-imports -- este módulo fornece a navegação; os demais usam `useNavigate`.
 import { useRouter } from 'next/navigation';
 import {
   createContext,

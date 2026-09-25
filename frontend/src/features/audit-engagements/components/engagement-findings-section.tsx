@@ -82,7 +82,7 @@ export function EngagementFindingsSection({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `engagementId`/`reloadToken`, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [engagementId, reloadToken]);
 
   function retry(): void {

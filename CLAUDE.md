@@ -316,7 +316,9 @@ A interface de usuário da v1 é definitivamente em português do Brasil (pt-BR)
 - Permanecem em inglês, por serem identificadores técnicos e não interface: nomes de variáveis,
   tipos TypeScript, nomes de arquivo, identificadores de banco (tabelas, colunas, valores de enum,
   nomes de papel semeados), identificadores de API (rotas, campos de DTO, URIs `type` do RFC 9457),
-  nomes de ação de auditoria, mensagens de log operacional, comentários de código e nomes de teste.
+  nomes de ação de auditoria, mensagens de log operacional e nomes de teste.
+- Comentários de código devem ser escritos em pt-BR, com frases curtas e diretas. Identificadores
+  técnicos e diretivas de ferramentas permanecem em sua forma original.
 - Terminologia GRC profissional em português (Risco, Risco inerente, Risco residual, Probabilidade,
   Impacto, Nível de risco, Tratamento, Controle, Avaliação, Aprovação, Trilha de auditoria, Unidade
   organizacional, Plano de ação). "Dashboard" e "Compliance" permanecem como estão — são termos

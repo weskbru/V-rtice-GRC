@@ -89,7 +89,7 @@ export function ComplianceSummaryCard({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already covers `frameworkId`/`versionId`/`refreshToken`/`reloadToken`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [frameworkId, versionId, refreshToken, reloadToken]);
 
   return (

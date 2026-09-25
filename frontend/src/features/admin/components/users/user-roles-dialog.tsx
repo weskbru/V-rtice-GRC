@@ -71,7 +71,7 @@ export function UserRolesDialog({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads only when a new target user opens the dialog; `onError` is a stable callback prop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarrega ao abrir outro usuário; `onError` é estável.
   }, [user]);
 
   function handleOpenChange(next: boolean): void {

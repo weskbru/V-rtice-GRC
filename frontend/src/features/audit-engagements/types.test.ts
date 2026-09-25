@@ -7,7 +7,7 @@ describe('OrgUnitRef (audit.openapi.yaml)', () => {
     const value: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste' };
     expect(value).toEqual({ id: 'org-1', name: 'Unidade de teste' });
 
-    // @ts-expect-error -- `code` is the RISKS-domain OrgUnitRef's own field, not this one's.
+    // @ts-expect-error -- `code` pertence ao OrgUnitRef de Riscos.
     const withCode: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste', code: 'ORG' };
     expect(withCode).toBeDefined();
   });
@@ -26,7 +26,7 @@ describe('VersionConflictProblem (audit.openapi.yaml)', () => {
       title: 'x',
       status: 409,
       currentVersion: 2,
-      // @ts-expect-error -- `currentStatus` belongs to `ControlStatus`'s own VersionConflictProblem, not this one's (this contract declares no such property).
+      // @ts-expect-error -- `currentStatus` pertence ao VersionConflictProblem de ControlStatus.
       currentStatus: 'PLANNING',
     };
     expect(withCurrentStatus).toBeDefined();

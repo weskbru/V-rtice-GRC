@@ -149,7 +149,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'Leitura de toda a organização: riscos, evidências, ações, achados, engajamentos de ' +
       'auditoria, ativos, processos, incidentes, problemas, indicadores, relatórios e a trilha ' +
       'de auditoria.',
-    // global role being created for the identical purpose (§19.4,
+    // Papel global para o mesmo fim (§19.4).
     permissions: [
       'risk:view',
       'audit:view',

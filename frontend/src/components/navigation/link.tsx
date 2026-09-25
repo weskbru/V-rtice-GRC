@@ -1,6 +1,6 @@
 'use client';
 
-// eslint-disable-next-line no-restricted-imports -- this module is the wrapper the rule points everything else at.
+// eslint-disable-next-line no-restricted-imports -- este módulo encapsula o NextLink.
 import NextLink from 'next/link';
 
 import { LinkPendingSignal, useOptionalNavigate } from '@/components/shell/navigation-pending';

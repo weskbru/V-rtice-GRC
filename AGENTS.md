@@ -51,7 +51,8 @@ or migration policy shifted; a new endpoint or authorization rule updates
 - Never bypass authorization checks.
 - Consider auditability for business-critical changes.
 - The v1 user-facing UI language is permanently Brazilian Portuguese (pt-BR); add every new user-facing string to the centralized message catalogs in pt-BR, never inline in a component.
-- Never reintroduce user-facing English text; technical identifiers (code, types, files, database, API, audit action names, logs, comments, test names) stay in English.
+- Never reintroduce user-facing English text; technical identifiers (code, types, files, database, API, audit action names, logs and test names) stay in English.
+- Code comments must be in pt-BR, short and simple.
 
 ---
 

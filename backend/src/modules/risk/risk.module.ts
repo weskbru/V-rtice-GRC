@@ -110,7 +110,7 @@ let collaborationEntityTypesRegistered = false;
     AuthorizationModule,
     ActionModule,
     RiskControlLinkReadModule,
-    // global provider visibility).
+    // Expõe os provedores globais.
     IncidentRiskLinkReadModule,
     ProblemRiskLinkReadModule,
     RiskDirectoryModule,

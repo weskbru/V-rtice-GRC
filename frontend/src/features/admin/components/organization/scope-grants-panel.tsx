@@ -112,7 +112,7 @@ export function ScopeGrantsPanel({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `grantsKey` is derived from these exact two fields; listing it too would refetch on the same change twice for no benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `grantsKey` deriva desses campos; listá-los de novo repetiria a busca.
   }, [selectedUser, reloadToken]);
 
   async function handleGrant(): Promise<void> {

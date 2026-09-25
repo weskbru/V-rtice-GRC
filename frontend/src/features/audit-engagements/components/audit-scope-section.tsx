@@ -82,7 +82,7 @@ export function AuditScopeSection({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already covers `auditId`/`reloadToken`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [auditId, reloadToken]);
 
   function handleAdded(entry: AuditScopeEntry): void {

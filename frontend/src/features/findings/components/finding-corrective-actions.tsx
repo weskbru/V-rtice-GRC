@@ -111,7 +111,7 @@ export function FindingCorrectiveActions({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already derives from `findingId`/`reloadToken`, mirroring `IncidentCorrectiveActions`'s identical, documented pattern.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [requestKey]);
 
   async function loadMore(): Promise<void> {

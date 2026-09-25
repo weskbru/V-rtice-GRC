@@ -80,7 +80,7 @@ export function RiskHistorySection({ riskId }: RiskHistorySectionProps): React.J
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `riskId`/`selectedTypes`, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [riskId, selectedTypes]);
 
   async function loadMore(): Promise<void> {

@@ -48,7 +48,7 @@ export function UserPasswordDialog({
     if (user) {
       form.reset({ newPassword: '', confirmPassword: '' });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resets only when a new target user opens the dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reseta ao abrir para outro usuário.
   }, [user]);
 
   function handleOpenChange(next: boolean): void {

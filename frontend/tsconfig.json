@@ -12,13 +12,8 @@
     "isolatedModules": true,
     "plugins": [{ "name": "next" }],
     "baseUrl": ".",
-    // shadcn/ui's generated primitives in src/components/ui/ are kept
-    // unmodified (plan.md) and are not written against
-    // `exactOptionalPropertyTypes` (several Radix prop types assign
-    // `T | undefined` to an optional `T` prop) — relaxed for this app only,
-    // scoped to the one directory of vendored-by-convention source. Every
-    // other strictness flag from tsconfig.base.json (strict,
-    // noUncheckedIndexedAccess, noImplicitOverride, ...) still applies.
+    // As primitivas geradas do shadcn/ui não atendem `exactOptionalPropertyTypes`.
+    // Essa opção fica desativada no frontend; as demais regras estritas permanecem.
     "exactOptionalPropertyTypes": false,
     "paths": {
       "@/*": ["./src/*"],

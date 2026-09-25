@@ -152,7 +152,7 @@ export function RiskRegisterView(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from every one of these `state.*` fields above (see its own comment); listing the individual fields as well would refetch on the same change twice for no benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva dos filtros listados; repeti-los causaria nova busca.
   }, [requestKey]);
 
   useEffect(() => {

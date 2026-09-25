@@ -78,7 +78,7 @@ export default class ExecutionLedgerReporter implements Reporter {
     this.outputFile = resolve(base, 'playwright-report', 'execution-ledger.json');
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- `Reporter.onEnd` may only return a Promise or void, and everything it does here is synchronous.
+  // eslint-disable-next-line @typescript-eslint/require-await -- a implementação é síncrona; a interface aceita Promise ou void.
   async onEnd(result: FullResult): Promise<{ status?: FullResult['status'] } | void> {
     const tests = this.suite?.allTests() ?? [];
 
@@ -172,7 +172,7 @@ export default class ExecutionLedgerReporter implements Reporter {
     return undefined;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- `Reporter.onExit` is typed as returning `Promise<void>`; there is nothing asynchronous to do here.
+  // eslint-disable-next-line @typescript-eslint/require-await -- a implementação é síncrona, mas o tipo exige Promise<void>.
   async onExit(): Promise<void> {
     if (!this.outputFile) {
       return;

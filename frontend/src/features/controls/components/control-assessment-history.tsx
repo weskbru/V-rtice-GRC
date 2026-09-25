@@ -91,7 +91,7 @@ export function ControlAssessmentHistory({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `controlId`/`refreshToken`/`internalRefreshToken`, all already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [controlId, refreshToken, internalRefreshToken]);
 
   async function loadMore(): Promise<void> {

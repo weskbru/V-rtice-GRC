@@ -106,7 +106,7 @@ export function RequirementListSection({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from every dependency read above; `onTotalChange` is a caller-supplied callback, not part of the fetch key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` cobre as dependências; `onTotalChange` fica fora da chave.
   }, [frameworkId, versionId, page, pageSize, stateFilterKey, reloadToken]);
 
   function handleStateFilterChange(next: readonly string[]): void {

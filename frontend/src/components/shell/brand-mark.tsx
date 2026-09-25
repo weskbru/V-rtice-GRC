@@ -21,7 +21,7 @@ export function BrandMark({
         className,
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- fixed static brand asset, not an optimizable content image */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- imagem de marca estática. */}
       <img
         src="/brand/pharos/symbol-96.png"
         alt=""

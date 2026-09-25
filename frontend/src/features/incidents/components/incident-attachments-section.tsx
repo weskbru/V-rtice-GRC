@@ -78,7 +78,7 @@ export function IncidentAttachmentsSection({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `incidentId`/`refreshToken`, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [incidentId, refreshToken]);
 
   async function loadMore(): Promise<void> {

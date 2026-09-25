@@ -171,7 +171,7 @@ export function FindingsPanel({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-running on `engagementCodeById` itself would loop; `unresolvedIds` is already derived from both `items` and it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `unresolvedIds` já deriva de `items` e `engagementCodeById`; incluí-los causaria um ciclo.
   }, [items]);
 
   function replaceItem(updated: Finding): void {

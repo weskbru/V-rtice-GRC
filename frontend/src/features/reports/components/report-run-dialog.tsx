@@ -77,7 +77,7 @@ export function ReportRunDialog({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already encodes `report.id`/`reloadToken`; re-running on `open` alone (via the guard above) is intentional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` inclui `report.id` e `reloadToken`; `open` é controlado pela guarda.
   }, [open, requestKey]);
 
   const csvUrl = reportsApi.buildRunCsvUrl(report.id);

@@ -7,7 +7,7 @@ describe('OrgUnitRef (contract-backed, assurance-audit Fix 3)', () => {
     const value: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste' };
     expect(value).toEqual({ id: 'org-1', name: 'Unidade de teste' });
 
-    // @ts-expect-error -- `code` is the RISKS-domain OrgUnitRef's own field, not this one's.
+    // @ts-expect-error -- `code` pertence ao OrgUnitRef de Riscos.
     const withCode: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste', code: 'ORG' };
     expect(withCode).toBeDefined();
   });
@@ -47,7 +47,7 @@ describe('Finding.auditEngagementId (005-audit-findings, SC-001)', () => {
   });
 
   it('cannot be omitted — it is required, never optional', () => {
-    // @ts-expect-error -- `auditEngagementId` is required; omitting it must not silently type-check.
+    // @ts-expect-error -- `auditEngagementId` é obrigatório.
     const missing: Finding = { ...BASE_FINDING };
     expect(missing).toBeDefined();
   });

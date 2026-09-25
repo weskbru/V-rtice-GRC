@@ -86,7 +86,7 @@ export function IndicatorHistorySection({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already derives from `page`/`reloadToken`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [metricKey, scope.global, requestKey]);
 
   if (!scope.global) {

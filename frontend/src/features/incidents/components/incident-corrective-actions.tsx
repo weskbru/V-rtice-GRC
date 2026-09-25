@@ -106,7 +106,7 @@ export function IncidentCorrectiveActions({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already derives from `incidentId`/`reloadToken`, mirroring `MyActionsView`'s identical, documented pattern.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [requestKey]);
 
   async function loadMore(): Promise<void> {

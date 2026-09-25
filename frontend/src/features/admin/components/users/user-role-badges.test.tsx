@@ -101,7 +101,7 @@ describe('UserRoleBadges', () => {
       .mockReturnValue(1000);
     const observedTargets: Element[] = [];
     const OriginalResizeObserver = window.ResizeObserver;
-    /* eslint-disable @typescript-eslint/no-empty-function -- deliberate no-op stub, mirrors vitest.setup.ts's own ResizeObserver polyfill */
+    /* eslint-disable @typescript-eslint/no-empty-function -- métodos vazios, como na implementação de compatibilidade do ResizeObserver. */
     class RecordingResizeObserver {
       observe(target: Element): void {
         observedTargets.push(target);

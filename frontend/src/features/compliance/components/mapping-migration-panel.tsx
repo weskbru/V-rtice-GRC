@@ -74,7 +74,7 @@ export function MappingMigrationPanel({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` already covers `frameworkId`/`versionId`/`reloadToken`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [frameworkId, versionId, reloadToken]);
 
   function handleExecuted(): void {

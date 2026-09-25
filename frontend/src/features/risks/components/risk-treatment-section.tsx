@@ -105,7 +105,7 @@ function TreatmentHistory({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` is derived from `riskId`/`refreshToken`, both already listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `requestKey` deriva das dependências listadas.
   }, [riskId, refreshToken]);
 
   async function loadMore(): Promise<void> {

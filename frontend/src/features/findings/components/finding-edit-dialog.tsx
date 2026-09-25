@@ -87,7 +87,7 @@ export function FindingEditDialog({
       setOwner(target.owner);
     }
     if (finding) apply(finding);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resets only when the target finding identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reseta quando muda a identidade do achado.
   }, [finding?.id]);
 
   function handleOpenChange(next: boolean): void {

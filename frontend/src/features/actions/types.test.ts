@@ -7,7 +7,7 @@ describe('OrgUnitRef (contract-backed, assurance-audit Fix 3)', () => {
     const value: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste' };
     expect(value).toEqual({ id: 'org-1', name: 'Unidade de teste' });
 
-    // @ts-expect-error -- `code` is the RISKS-domain OrgUnitRef's own field, not this one's.
+    // @ts-expect-error -- `code` pertence ao OrgUnitRef de Riscos.
     const withCode: OrgUnitRef = { id: 'org-1', name: 'Unidade de teste', code: 'ORG' };
     expect(withCode).toBeDefined();
   });

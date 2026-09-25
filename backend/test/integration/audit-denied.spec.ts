@@ -26,8 +26,7 @@ class FixtureController {
   gatedRoute(): void {}
 }
 
-/* eslint-disable @typescript-eslint/unbound-method -- Reflect-metadata
-   lookup key identity only, never invoked as a bound method. */
+/* eslint-disable @typescript-eslint/unbound-method -- Chave de metadados; não é método vinculado. */
 const gatedRouteHandler = FixtureController.prototype.gatedRoute;
 /* eslint-enable @typescript-eslint/unbound-method */
 
