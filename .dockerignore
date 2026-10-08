@@ -1,7 +1,7 @@
 # .dockerignore
 #
 # Keeps the build context sent to the Docker daemon small and reproducible
-# for docker/api.Dockerfile and docker/web.Dockerfile (T012). Both Dockerfiles
+# for backend/Dockerfile and docker/web.Dockerfile (T012). Both Dockerfiles
 # build from the repository root (`context: .` in docker-compose.yml) because
 # a pnpm workspace needs the lockfile and every workspace package visible to
 # `pnpm install`.
@@ -38,7 +38,7 @@ npm-debug.log*
 # Environment files — never bake secrets into an image layer.
 #
 # The `**/` prefix is load-bearing: a bare `.env` pattern matches ONLY at the
-# root of the build context, so `apps/api/.env` and `apps/web/.env` were being
+# root of the build context, so `backend/.env` and `frontend/.env` were being
 # copied into every image (F-14). Development credentials today; a real secret
 # on any machine that has one. Both forms are kept so the intent survives a
 # future reader who deletes one of them.

@@ -1,0 +1,26 @@
+-- T008/002-shared-grc-foundation — additive growth of the `PermissionAction`
+-- enum: adds `LINK` and `CLOSE` (ADR-008: "closed platform enums grow by
+-- reviewed migration"), the same pattern `ASSESS`/`TREAT`/`TRANSITION`
+-- already established for a domain-specific verb outside the five default
+-- CRUD actions.
+--
+-- `LINK` names `evidence:link` (`grc/evidence/domain/evidence-permissions.ts`
+-- — `linkEvidence`/`unlinkEvidence`, contracts/grc-foundation.openapi.yaml).
+-- `CLOSE` names `finding:close` (`grc/finding/domain/finding-permissions.ts`
+-- — `closeFinding`, segregation-of-duties gated per FR-025, and its inverse
+-- `reopenFinding`, which answers to the same authority per that
+-- operation's own description).
+--
+-- ## The PostgreSQL restriction this migration must respect
+--
+-- Same restriction as every `*_add_*`-style enum-growth migration already
+-- in this history (e.g. `20260905160000_audit_entity_type_add_risk_
+-- treatment`): a value added by `ALTER TYPE ... ADD VALUE` cannot be
+-- referenced by any statement in the SAME transaction that added it. This
+-- migration contains only the two `ADD VALUE` statements and writes no
+-- `permissions` row using either — the seed script
+-- (`backend/seeds/platform.seed.ts`) upserts `permissions` rows in
+-- an entirely separate transaction, run manually, long after `prisma
+-- migrate deploy` has committed this one.
+ALTER TYPE "PermissionAction" ADD VALUE 'LINK';
+ALTER TYPE "PermissionAction" ADD VALUE 'CLOSE';

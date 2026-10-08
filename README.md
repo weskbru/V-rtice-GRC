@@ -25,10 +25,11 @@ decisões em `CLAUDE.md` §3–§4.
 ## Estrutura do repositório
 
 ```
-apps/api/       NestJS — core/, grc/ (núcleo GRC compartilhado), modules/ (domínios de negócio)
-apps/web/       Next.js — features/ por módulo, packages/design-system para a UI compartilhada
-packages/       Pacotes compartilhados (design-system, api-types)
-docker/         Dockerfiles da API e do web
+frontend/       Next.js e Design System — features/ por módulo e componentes de interface
+backend/        NestJS — core/, grc/ (núcleo GRC compartilhado), modules/ (domínios de negócio), testes e Dockerfile
+database/       Schema Prisma, migrations e inicialização PostgreSQL
+packages/       Pacotes compartilhados entre frontend e backend (api-types)
+docker/         Dockerfile da aplicação web
 specs/          Especificação, plano, tarefas e contratos OpenAPI, por fase
 docs/           Arquitetura, decisões, ambiente local, findings — ver docs/README.md
 ```
@@ -49,13 +50,13 @@ pnpm install
 pnpm build
 pnpm lint
 pnpm typecheck
-pnpm test            # unitários (apps/api/test/unit, apps/web)
+pnpm test            # unitários (backend/test/unit, frontend)
 pnpm test:integration
 pnpm test:contract
 ```
 
 Migração de banco é sempre pelo workspace da API — nunca `prisma migrate dev` contra um banco
-real (`apps/api/prisma/schema.prisma`, cabeçalho): `pnpm --filter @pharos/api exec prisma migrate
+real (`database/prisma/schema.prisma`, cabeçalho): `pnpm --filter @pharos/api exec prisma migrate
 deploy`.
 
 ## Documentação

@@ -1,7 +1,0 @@
-/*
- * apps/web owns no Tailwind theme of its own — the entire PharosGRC token
- * layer (base Tailwind + shadcn/ui CSS variables + PharosGRC status/risk
- * severity tokens) is defined once in `@pharos/design-system/styles` and
- * consumed here unmodified (Constitution X: one design system).
- */
-@import '@pharos/design-system/styles';

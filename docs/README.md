@@ -28,6 +28,7 @@ docs/
 ├── deferred-findings.md
 ├── local-environment.md
 ├── architecture/           # referência do sistema como ele é hoje
+│   ├── backend-map.md
 │   ├── database.md
 │   ├── decisions.md
 │   ├── frontend.md
@@ -76,9 +77,10 @@ A lógica por trás das quatro pastas por assunto: `architecture/` é a referên
 | Roteiro de entrada | [`docs/HANDOVER.md`](./HANDOVER.md) | Onboarding, comandos, ordem de leitura |
 | Estado atual | [`docs/STATE.md`](./STATE.md) | Fotografia datada: o que está pronto, parcial, planejado |
 | Arquitetura e limites de módulo | [`docs/architecture.md`](./architecture.md) | core/grc/modules, extension points, exemplo de módulo novo |
+| Mapa do backend implementado | [`docs/architecture/backend-map.md`](./architecture/backend-map.md) | módulos, rotas, dependências, persistência, segurança e testes da API |
 | Modelo de dados | [`docs/architecture/database.md`](./architecture/database.md) | Schema, migrações, política de seed |
 | Segurança | [`docs/architecture/security.md`](./architecture/security.md) | Autenticação, sessões, CSRF, RBAC, escopo, SoD, auditoria, arquivos |
-| Frontend | [`docs/architecture/frontend.md`](./architecture/frontend.md) | Estrutura de `apps/web`, shell, navegação, Design System, mensagens, a11y |
+| Frontend | [`docs/architecture/frontend.md`](./architecture/frontend.md) | Estrutura de `frontend/`, shell, navegação, Design System, mensagens, a11y |
 | Ambiente e desenvolvimento | [`docs/guides/development.md`](./guides/development.md) | Setup do zero, comandos, "como implementar uma funcionalidade nova" |
 | Testes | [`docs/guides/testing.md`](./guides/testing.md) | Suítes, portão de contrato, fixtures, mapeamento do CI |
 | Solução de problemas | [`docs/guides/troubleshooting.md`](./guides/troubleshooting.md) | Sintomas conhecidos e suas causas |
@@ -91,6 +93,8 @@ A lógica por trás das quatro pastas por assunto: `architecture/` é a referên
 | Regras do projeto | [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md), [constituição](../.specify/memory/constitution.md) | Princípios, política de UI/UX, política de arquitetura de domínio GRC |
 
 ## Vigente
+
+- [docs/architecture/backend-map.md](./architecture/backend-map.md) — fotografia provisória do backend na branch refatory.
 
 Documentos que descrevem o estado atual do código e devem ser mantidos junto com ele:
 

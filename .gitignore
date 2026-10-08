@@ -30,7 +30,7 @@ storage/
 # Intermediate UI review captures (CLAUDE.md §18.13). The representative
 # before/after pairs live in docs/reviews/ui/{baseline,after}/ and are tracked;
 # per-wave captures are working artifacts of the refinement loop, regenerable
-# with apps/web/scripts/ui-capture.mjs, and would otherwise add megabytes of
+# with frontend/scripts/ui-capture.mjs, and would otherwise add megabytes of
 # near-duplicate PNGs to the history.
 docs/reviews/ui/wave*/
 

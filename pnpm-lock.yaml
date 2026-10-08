@@ -60,7 +60,7 @@ importers:
         specifier: 8.69.0
         version: 8.69.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
 
-  apps/api:
+  backend:
     dependencies:
       '@nestjs/common':
         specifier: 11.2.3
@@ -125,7 +125,7 @@ importers:
         version: 11.2.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.3)(@nestjs/platform-express@11.2.3)
       '@pharos/api-types':
         specifier: workspace:*
-        version: link:../../packages/api-types
+        version: link:../packages/api-types
       '@swc/core':
         specifier: 1.16.2
         version: 1.16.2
@@ -172,17 +172,17 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
 
-  apps/web:
+  frontend:
     dependencies:
       '@hookform/resolvers':
         specifier: 5.9.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.21.0)(react-hook-form@7.87.0(react@19.0.8))(zod@4.5.4)
       '@pharos/api-types':
         specifier: workspace:*
-        version: link:../../packages/api-types
+        version: link:../packages/api-types
       '@pharos/design-system':
         specifier: workspace:*
-        version: link:../../packages/design-system
+        version: link:packages/design-system
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
@@ -290,7 +290,7 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
-  packages/design-system:
+  frontend/packages/design-system:
     dependencies:
       '@radix-ui/react-dialog':
         specifier: 1.1.23

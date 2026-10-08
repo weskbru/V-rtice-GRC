@@ -9,6 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "postinstall": "pnpm --filter @pharos/api run db:generate",
     "build": "pnpm -r --if-present run build",
     "lint": "pnpm -r --if-present run lint",
     "format": "prettier --write .",

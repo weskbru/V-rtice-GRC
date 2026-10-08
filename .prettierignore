@@ -6,13 +6,13 @@ coverage
 pnpm-lock.yaml
 **/*.md
 packages/api-types/src/generated
-apps/api/openapi.json
+backend/openapi.json
 
 # shadcn/ui generated primitives, kept byte-identical to the CLI's output
 # (plan.md: "shadcn/ui generated primitives (unmodified)") so a future
 # `shadcn diff`/update stays meaningful. PharosGRC styling comes from the
 # design tokens they consume, not from reformatting this directory.
-apps/web/src/components/ui/
+frontend/src/components/ui/
 
 # Owned by spec-kit tooling / another concurrently-working agent — not this
 # task's files to reformat (see specs/001-grc-platform-foundation task split).
