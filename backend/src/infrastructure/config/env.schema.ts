@@ -19,9 +19,9 @@ export const envSchema = z
     APP_ORIGIN: z.string().url(),
 
     DATABASE_URL: z.string().min(1),
-    DATABASE_MIGRATION_URL: z.string().min(1),
-    TEST_DATABASE_URL: z.string().min(1),
-    TEST_DATABASE_MIGRATION_URL: z.string().min(1),
+    DATABASE_MIGRATION_URL: z.string().min(1).optional(),
+    TEST_DATABASE_URL: z.string().min(1).optional(),
+    TEST_DATABASE_MIGRATION_URL: z.string().min(1).optional(),
 
     REDIS_URL: z
       .string()
@@ -97,7 +97,10 @@ export const envSchema = z
       });
     }
 
-    if (config.DATABASE_URL === config.DATABASE_MIGRATION_URL) {
+    if (
+      config.DATABASE_MIGRATION_URL !== undefined &&
+      config.DATABASE_URL === config.DATABASE_MIGRATION_URL
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['DATABASE_MIGRATION_URL'],
@@ -107,7 +110,10 @@ export const envSchema = z
       });
     }
 
-    if (config.TEST_DATABASE_URL === config.TEST_DATABASE_MIGRATION_URL) {
+    if (
+      config.TEST_DATABASE_MIGRATION_URL !== undefined &&
+      config.TEST_DATABASE_URL === config.TEST_DATABASE_MIGRATION_URL
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['TEST_DATABASE_MIGRATION_URL'],

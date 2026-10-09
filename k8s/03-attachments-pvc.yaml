@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pharosgrc-attachments
+  namespace: pharosgrc
+  labels:
+    app.kubernetes.io/name: pharosgrc
+    app.kubernetes.io/component: api
+spec:
+  storageClassName: longhorn-ha
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

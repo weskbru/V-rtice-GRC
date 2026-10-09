@@ -1,0 +1,27 @@
+# Exemplo excluído do kustomization; confirme domínio, classe e TLS.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pharosgrc
+  namespace: pharosgrc
+  labels:
+    app.kubernetes.io/name: pharosgrc
+spec:
+  # Classe encontrada no histórico; confirme que existe no cluster atual.
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - pharosgrc.example.local
+      # Referência a um Secret TLS real que deverá existir; não cria certificado.
+      secretName: pharosgrc-tls
+  rules:
+    - host: pharosgrc.example.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pharosgrc-web
+                port:
+                  number: 3000

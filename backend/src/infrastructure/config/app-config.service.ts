@@ -14,9 +14,9 @@ export interface AppSettings {
 
 export interface DatabaseSettings {
   readonly url: string;
-  readonly migrationUrl: string;
-  readonly testUrl: string;
-  readonly testMigrationUrl: string;
+  readonly migrationUrl: string | undefined;
+  readonly testUrl: string | undefined;
+  readonly testMigrationUrl: string | undefined;
 }
 
 export interface CacheSettings {

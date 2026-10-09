@@ -1,5 +1,6 @@
 services:
   postgres:
+    profiles: ["local-db"]
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
@@ -47,8 +48,6 @@ services:
     environment:
       NODE_ENV: production
       SESSION_COOKIE_SECURE: "true"
-      DATABASE_URL: postgresql://${POSTGRES_APP_USER:-pharos_app}:${POSTGRES_APP_PASSWORD:-pharos_app_dev}@postgres:5432/${POSTGRES_DB:-pharos_grc}?schema=public
-      DATABASE_MIGRATION_URL: postgresql://${POSTGRES_OWNER_USER:-pharos_owner}:${POSTGRES_OWNER_PASSWORD:-pharos_owner_dev}@postgres:5432/${POSTGRES_DB:-pharos_grc}?schema=public
       REDIS_URL: redis://redis:6379
       ATTACHMENT_STORAGE_PATH: /app/storage/attachments
       API_PORT: "3001"
@@ -57,8 +56,6 @@ services:
     volumes:
       - attachments_storage:/app/storage
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
