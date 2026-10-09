@@ -1,12 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import { common } from '@/lib/messages/common';
 
 function repoRoot(): string {
-  let current = __dirname;
+  let current = path.dirname(fileURLToPath(import.meta.url));
   for (let depth = 0; depth < 12; depth += 1) {
     if (existsSync(path.join(current, 'pnpm-workspace.yaml'))) return current;
     const parent = path.dirname(current);
@@ -16,7 +17,7 @@ function repoRoot(): string {
   throw new Error('Could not locate the repository root (no pnpm-workspace.yaml above this test).');
 }
 
-const SEED_FILE = path.join(repoRoot(), 'apps', 'api', 'prisma', 'seed', 'platform.seed.ts');
+const SEED_FILE = path.join(repoRoot(), 'backend', 'seeds', 'platform.seed.ts');
 
 function seededRoleNames(): string[] {
   const lines = readFileSync(SEED_FILE, 'utf8').split(/\r?\n/);

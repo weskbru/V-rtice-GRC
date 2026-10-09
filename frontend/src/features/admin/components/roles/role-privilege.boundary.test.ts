@@ -1,10 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 function repoRoot(): string {
-  let current = __dirname;
+  let current = path.dirname(fileURLToPath(import.meta.url));
   for (let depth = 0; depth < 12; depth += 1) {
     if (existsSync(path.join(current, 'pnpm-workspace.yaml'))) return current;
     const parent = path.dirname(current);
@@ -14,7 +15,7 @@ function repoRoot(): string {
   throw new Error('Could not locate the repository root (no pnpm-workspace.yaml above this test).');
 }
 
-const WEB_SRC = path.join(repoRoot(), 'apps', 'web', 'src');
+const WEB_SRC = path.join(repoRoot(), 'frontend', 'src');
 
 const PRESENTATION_DIR = 'features/admin/components/roles';
 
