@@ -15,8 +15,8 @@ ARG APP_ORIGIN
 ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 ENV APP_ORIGIN=${APP_ORIGIN}
 # Agrupa instalação e build para evitar snapshots intermediários.
-RUN pnpm --filter ./frontend... install --frozen-lockfile \
-    && pnpm --filter ./frontend... run build
+RUN pnpm --filter '@pharos/web...' install --frozen-lockfile \
+    && pnpm --filter '@pharos/web...' run build
 
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production
