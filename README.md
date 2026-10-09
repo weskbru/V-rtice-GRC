@@ -16,6 +16,24 @@ módulo. Interface em português do Brasil; identificadores técnicos em inglês
 ordem de leitura recomendada para o primeiro dia. Este arquivo não duplica a documentação
 existente — aponta para ela. O índice completo vive em **[`docs/README.md`](docs/README.md)**.
 
+## Banco de dados externo
+
+Por padrão, `docker compose up` não inicia um PostgreSQL local. A API usa somente `DATABASE_URL`
+do `.env` para acessar o banco configurado. `DATABASE_MIGRATION_URL` fica disponível para a
+administração separada das migrações e é opcional no startup da API. O PostgreSQL local segue
+disponível opcionalmente com `docker compose --profile local-db up -d postgres`.
+
+Para inicializar uma vez um banco externo vazio pelo DBeaver, gere e execute
+[`database/postgres/bootstrap-pharos-grc.sql`](database/postgres/bootstrap-pharos-grc.sql):
+
+```powershell
+python database/postgres/generate-bootstrap.py
+```
+
+O script aplica as migrações Prisma em ordem e grava seus checksums no histórico Prisma. O servidor
+PostgreSQL precisa ter `citext` e `pg_trgm` disponíveis. A fonte da verdade continua em
+`database/prisma/migrations`; gere novamente o bootstrap quando essas migrações mudarem.
+
 ## Stack
 
 NestJS + TypeScript (API), Next.js + TypeScript + Tailwind + shadcn/ui (web), PostgreSQL + Prisma,

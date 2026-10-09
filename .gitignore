@@ -47,3 +47,7 @@ docs/reviews/ui/*/
 
 # Machine-specific bundled binaries
 .claude/skills/impeccable/scripts/bin/
+
+# Segredos reais do Kubernetes ficam fora do versionamento.
+k8s/secret.yaml
+k8s/secret.env
