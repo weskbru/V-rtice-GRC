@@ -1,23 +1,22 @@
 ARG NODE_VERSION=22-alpine
 
 FROM node:${NODE_VERSION} AS base
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 WORKDIR /workspace
 
-FROM base AS fetch
-COPY pnpm-lock.yaml ./
-RUN pnpm fetch
-
-FROM fetch AS build
-COPY . .
-RUN pnpm install --offline --frozen-lockfile
+FROM base AS build
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY frontend ./frontend
+COPY packages/api-types ./packages/api-types
 ENV DOCKER_BUILD=1
 
 ARG API_INTERNAL_URL
 ARG APP_ORIGIN
 ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 ENV APP_ORIGIN=${APP_ORIGIN}
-RUN pnpm --filter ./frontend... run build
+# Agrupa instalação e build para evitar snapshots intermediários.
+RUN pnpm --filter ./frontend... install --frozen-lockfile \
+    && pnpm --filter ./frontend... run build
 
 FROM node:${NODE_VERSION} AS runtime
 ENV NODE_ENV=production
