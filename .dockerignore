@@ -31,9 +31,39 @@ playwright-report
 test-results
 **/test-results
 
+# Relatórios e caches locais não participam do build.
+reports
+.scannerwork
+**/.scannerwork
+.sonar
+**/.sonar
+.pnpm-store
+**/.pnpm-store
+.cache
+**/.cache
+.turbo
+**/.turbo
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Arquivos temporários locais.
+*.tmp
+**/*.tmp
+*.temp
+**/*.temp
+**/.prisma-schema-*
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+
 # Logs
 *.log
 npm-debug.log*
+**/*.log
+logs
+backend/logs
+frontend/logs
 
 # Environment files — never bake secrets into an image layer.
 #
@@ -66,3 +96,10 @@ CLAUDE.md
 .idea
 .claude
 .github
+
+# Configuração de deploy e dados de runtime ficam fora das imagens.
+k8s
+.gitlab-ci.yml
+sonar-project.properties
+storage
+backend/storage

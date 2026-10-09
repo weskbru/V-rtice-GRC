@@ -1,21 +1,20 @@
 ARG NODE_VERSION=22-alpine
 
 FROM node:${NODE_VERSION} AS base
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 WORKDIR /workspace
 
-FROM base AS fetch
-COPY pnpm-lock.yaml ./
-RUN pnpm fetch
-
-FROM fetch AS build
-COPY . .
-RUN pnpm install --offline --frozen-lockfile
-RUN pnpm --filter ./backend run db:generate
-RUN pnpm --filter ./backend... run build
-RUN pnpm --filter ./backend deploy --prod --legacy /workspace/deploy/api
-
-RUN mkdir -p /workspace/deploy/api/prisma \
+FROM base AS build
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY backend ./backend
+COPY database/prisma ./database/prisma
+COPY packages/api-types ./packages/api-types
+# Agrupa as etapas para evitar snapshots intermediários das dependências.
+RUN pnpm --filter ./backend... install --frozen-lockfile \
+    && pnpm --filter ./backend run db:generate \
+    && pnpm --filter ./backend... run build \
+    && pnpm --filter ./backend deploy --prod --legacy /workspace/deploy/api \
+    && mkdir -p /workspace/deploy/api/prisma \
     && cp database/prisma/schema.prisma /workspace/deploy/api/prisma/schema.prisma \
     && /workspace/backend/node_modules/.bin/prisma generate \
        --schema=/workspace/deploy/api/prisma/schema.prisma
