@@ -84,11 +84,7 @@ sonar:
     - |
       : "${SONAR_HOST_URL:?Configure SONAR_HOST_URL nas variaveis CI/CD protegidas}"
       : "${SONAR_TOKEN:?Configure SONAR_TOKEN nas variaveis CI/CD protegidas}"
-      : "${SONAR_PROJECT_KEY:?Configure a chave real do projeto PharosGRC no SonarQube}"
       sonar-scanner \
-        -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
-        -Dsonar.sources=backend/src,frontend/src,frontend/packages/design-system/src,packages/api-types/src \
-        '-Dsonar.exclusions=**/*.spec.ts,**/*.test.ts,**/*.test.tsx,packages/api-types/src/generated/**' \
         -Dsonar.qualitygate.wait=true \
         -Dsonar.qualitygate.timeout=300
   allow_failure: false
