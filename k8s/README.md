@@ -35,7 +35,7 @@ O Ingress encaminha todas as rotas ao Web, incluindo `/api`. O Next.js encaminha
 | `07-api-deployment.yaml` | API, probes e montagem dos anexos | Sim |
 | `08-web-service.yaml` | Service ClusterIP do Web | Sim |
 | `09-web-deployment.yaml` | Web com configuração mínima | Sim |
-| `10-ingress.example.yaml` | Entrada HTTPS a adaptar | Não |
+| `10-ingress.yaml` | Entrada HTTPS de `pharos-dsv.aeb.gov.br` | Sim |
 | `11-networkpolicy.example.yaml` | Políticas de rede a adaptar | Não |
 | `kustomization.yaml` | Recursos da base no namespace `pharosgrc` | — |
 
@@ -220,18 +220,19 @@ A ordem do deploy é:
 5. Aguardar o rollout do Redis, com timeout de 300 segundos.
 6. Service API (`06-api-service.yaml`).
 7. Service Web (`08-web-service.yaml`).
-8. `kubectl set image --local` no manifesto API (`07-api-deployment.yaml`) com
+8. Ingress (`10-ingress.yaml`), após os Services.
+9. `kubectl set image --local` no manifesto API (`07-api-deployment.yaml`) com
    `${CI_REGISTRY_IMAGE}/api:${CI_COMMIT_SHA}`, seguido de `kubectl apply -f -`.
-9. `kubectl set image --local` no manifesto Web (`09-web-deployment.yaml`) com
+10. `kubectl set image --local` no manifesto Web (`09-web-deployment.yaml`) com
    `${CI_REGISTRY_IMAGE}/web:${CI_COMMIT_SHA}`, seguido de `kubectl apply -f -`.
-10. Aguardar o rollout da API, com timeout de 300 segundos.
-11. Aguardar o rollout do Web, com timeout de 300 segundos.
+11. Aguardar o rollout da API, com timeout de 300 segundos.
+12. Aguardar o rollout do Web, com timeout de 300 segundos.
 
 O Redis mantém `redis:7-alpine`, `imagePullPolicy: IfNotPresent` e o worker `svlparancherwk1`.
 O PVC de anexos é aplicado de forma idempotente, sem remoção ou recriação.
 O Secret manual `pharosgrc-secrets`, que fornece `DATABASE_URL`, não é criado, alterado ou apagado
 pela pipeline. `02-secret.example.yaml` não é aplicado. O Secret de pull também não é gerenciado.
-Não aplica a base Kustomize ou Ingress. PostgreSQL permanece externo.
+Aplica o Ingress versionado após os Services, sem aplicar a base Kustomize. PostgreSQL permanece externo.
 Não executa migrations nem seed. O grupo de recursos `pharosgrc` evita deploys simultâneos.
 
 ## API, volumes e probes
@@ -254,12 +255,16 @@ API, Web e Redis não montam token de ServiceAccount. Requests e limits são val
 para homologação e precisam ser ajustados por medição de carga. Os limites de autenticação e
 logs preservados da configuração local também precisam de revisão antes da operação real.
 
-## Ingress e NetworkPolicy: exemplos
+## Ingress e NetworkPolicy
 
-O exemplo de Ingress usa `pharosgrc.example.local` e encaminha `/` para `pharosgrc-web:3000`.
-`ingressClassName: traefik` segue o histórico do projeto; confirme a classe no cluster atual.
-`pharosgrc-tls` é apenas uma referência a um Secret TLS que deve existir: nenhum certificado
-foi criado. Defina domínio, DNS, certificado e `APP_ORIGIN` de forma consistente.
+`10-ingress.yaml` declara `pharosgrc-ingress` no namespace `pharosgrc`, com o host
+`pharos-dsv.aeb.gov.br` e a rota `/` com `pathType: Prefix` para `pharosgrc-web:3000`.
+Todas as rotas passam pelo Web; `/api/v1` continua usando o proxy do Next.js para a API interna.
+O padrão operacional foi confirmado no `sis-bem-estar`, no mesmo cluster: annotations
+`kubernetes.io/ingress.class: traefik` e `traefik.ingress.kubernetes.io/router.tls: "true"`.
+A IngressClass `traefik` usa o controller `traefik.io/ingress-controller`.
+O bloco `tls.hosts` usa o mesmo host, sem `secretName`, conforme o padrão confirmado.
+`APP_ORIGIN` permanece `https://pharos-dsv.aeb.gov.br` no ConfigMap e na pipeline.
 
 As NetworkPolicies exemplificam restrição por padrão, Ingress Controller → Web, Web → API,
 API → Redis, API → PostgreSQL externo `192.168.52.215/32:5432` e DNS TCP/UDP `53`.
@@ -267,16 +272,17 @@ Namespace e labels do Ingress Controller são fictícios; os selectors de DNS ta
 ser conferidos, especialmente se houver NodeLocal DNSCache. Confirme suporte do CNI e tráfego
 de probes antes de aplicar essas políticas. [Referência: NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/).
 
-Os exemplos de Secret, Ingress e NetworkPolicy estão fora do `kustomization.yaml`.
+O Ingress real está incluído no `kustomization.yaml` e é aplicado pela pipeline após os Services.
+Os exemplos de Secret e NetworkPolicy permanecem fora da base.
 
 ## Ordem de implantação futura
 
 1. Confirmar as pendências abaixo e configurar imagens e origem pública.
 2. Criar o namespace `pharosgrc`.
-3. Criar o Secret real, o Secret de pull se necessário e preparar TLS.
-4. Aplicar a base: ConfigMap, PVC de anexos, Services e Redis, API e Web.
+3. Criar o Secret real e o Secret de pull se necessário.
+4. Aplicar a base: ConfigMap, PVC de anexos, Services e Redis, API, Web e Ingress.
 5. Aguardar readiness e validar os anexos.
-6. Adaptar e aplicar o Ingress; NetworkPolicies exigem uma validação separada.
+6. Validar o acesso HTTPS a `pharos-dsv.aeb.gov.br`; NetworkPolicies exigem uma validação separada.
 
 Comandos para uso futuro, após a revisão, sem execução nesta preparação:
 
@@ -287,15 +293,15 @@ kubectl get pods,svc,pvc -n pharosgrc
 kubectl get events -n pharosgrc --sort-by=.metadata.creationTimestamp
 ```
 
-A base contém dez recursos em nove arquivos, incluindo dois Services Redis. O Namespace não
+A base contém onze recursos em dez arquivos, incluindo dois Services Redis. O Namespace não
 recebe um namespace próprio: somente os objetos namespaced usam `pharosgrc`.
-Secret real e TLS não são gerados pelo Kustomize. [Referência: Kustomize](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/).
+Secrets e certificados não são gerados pelo Kustomize. [Referência: Kustomize](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/).
 
 ## PENDÊNCIAS ANTES DO DEPLOY
 
 - Secret real com somente `DATABASE_URL`, sem versionamento.
 - Imagens API/Web publicadas, registry/caminhos/tags confirmados e acesso de pull.
-- Domínio oficial, DNS, TLS, `APP_ORIGIN` e IngressClass atual.
+- Validar o acesso HTTPS a `pharos-dsv.aeb.gov.br` após o deploy.
 - Conectividade dos workers com `192.168.52.215:5432`.
 - Backup dos anexos e verificação de restauração; `Retain` não substitui backup.
 - Imagem Web construída com os valores corretos de build e runtime.

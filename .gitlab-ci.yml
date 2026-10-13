@@ -161,6 +161,7 @@ deploy:
     - kubectl rollout status statefulset/pharosgrc-redis -n pharosgrc --timeout=300s
     - kubectl apply -f k8s/06-api-service.yaml -n pharosgrc
     - kubectl apply -f k8s/08-web-service.yaml -n pharosgrc
+    - kubectl apply -f k8s/10-ingress.yaml -n pharosgrc
     - |
       kubectl set image --local -f k8s/07-api-deployment.yaml \
         api="${API_IMAGE}" -o yaml |

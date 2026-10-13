@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pharosgrc-ingress
+  namespace: pharosgrc
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  rules:
+    - host: pharos-dsv.aeb.gov.br
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pharosgrc-web
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - pharos-dsv.aeb.gov.br

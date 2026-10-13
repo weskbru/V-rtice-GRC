@@ -11,3 +11,4 @@ resources:
   - 07-api-deployment.yaml
   - 08-web-service.yaml
   - 09-web-deployment.yaml
+  - 10-ingress.yaml
