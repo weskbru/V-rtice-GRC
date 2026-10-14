@@ -10,8 +10,11 @@ const arg = (name, fallback) => {
 };
 
 const ORIGIN = process.env.APP_ORIGIN ?? 'http://localhost:3000';
-const EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.local';
-const BASE_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Dev-Local-Only-P4ssw0rd!';
+const EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@aeb.gov.br';
+const BASE_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
+if (!BASE_PASSWORD) {
+  throw new Error('SEED_ADMIN_PASSWORD is required to capture authenticated screens.');
+}
 const theme = arg('theme', 'light');
 const width = Number(arg('width', '1440'));
 const surface = arg('surface', 'full');

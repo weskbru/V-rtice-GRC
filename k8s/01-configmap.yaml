@@ -38,4 +38,4 @@ data:
   ATTACHMENT_STORAGE_DRIVER: "local"
   ATTACHMENT_STORAGE_PATH: "/app/storage/attachments"
   SEED_DEV_FIXTURES: "false"
-  SEED_ADMIN_EMAIL: "admin@example.local"
+  SEED_ADMIN_EMAIL: "admin@aeb.gov.br"

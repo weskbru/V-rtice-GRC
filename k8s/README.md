@@ -110,9 +110,12 @@ continuam apontando para o único banco de homologação `pharos_grc`.
 `APP_ORIGIN=https://pharos-dsv.aeb.gov.br` é a origem adotada nesta homologação. Mantenha a origem
 pública exata igual no backend, no frontend e no build Web, para que a proteção CSRF funcione.
 O cookie permanece `pgrc_session`, nome que o SSR do frontend procura atualmente.
-`SEED_ADMIN_EMAIL` é obrigatória no validador mesmo em runtime; seu exemplo não cria um novo
-administrador. Ajuste essa identificação à conta já cadastrada. `SEED_ADMIN_PASSWORD` não é
-necessária para iniciar a API e não está no Secret de runtime.
+O administrador bootstrap usa `SEED_ADMIN_EMAIL=admin@aeb.gov.br`. A variável é obrigatória
+no validador mesmo em runtime, mas não cria nem renomeia contas automaticamente.
+A senha inicial é fornecida externamente por `SEED_ADMIN_PASSWORD`, sem valor fixo ou padrão.
+O seed cria a credencial com `mustChangePassword=true` e preserva senhas já cadastradas.
+`SEED_ADMIN_PASSWORD` só é exigida ao executar o seed; não é necessária para iniciar a API
+e não está no Secret de runtime.
 
 O Secret real `pharosgrc-secrets` precisa fornecer:
 

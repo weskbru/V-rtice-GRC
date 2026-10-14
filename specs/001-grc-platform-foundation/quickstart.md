@@ -181,7 +181,7 @@ secrets or a secret manager), never by a checked-in file.
 | `LOG_LEVEL` | pino level | `debug` in dev, `info` otherwise |
 | `LOG_PRETTY` | Human-readable log output locally | `true` in dev, `false` otherwise |
 | `SEED_DEV_FIXTURES` | Gates the development-only fixture (one user per system role, a two-level org unit tree); must stay `false` outside local development | `false` |
-| `SEED_ADMIN_EMAIL` | Identifier of the seeded administrator | `admin@example.local` |
+| `SEED_ADMIN_EMAIL` | Identifier of the seeded administrator | `admin@aeb.gov.br` |
 | `SEED_ADMIN_PASSWORD` | **Placeholder only.** Supplied at seed time by the operator; the account is created with `mustChangePassword = true` | *(unset — must be provided)* |
 
 If `SEED_ADMIN_PASSWORD` is absent or fails the password policy, the seed must fail rather than fall
@@ -487,7 +487,7 @@ pnpm --filter ./apps/web exec playwright install --with-deps   # first run only
 # loading outright, before a single test runs).
 $env:APP_ORIGIN = "http://localhost:3000"
 $env:API_INTERNAL_URL = "http://localhost:3001"
-$env:SEED_ADMIN_EMAIL = "admin@example.local"           # must match the running API's seed
+$env:SEED_ADMIN_EMAIL = "admin@aeb.gov.br"             # Deve corresponder ao seed da API em execução.
 $env:SEED_ADMIN_PASSWORD = "<the same password you seeded with>"
 
 pnpm --filter ./apps/web test:e2e

@@ -94,7 +94,7 @@ describe('LoginForm', () => {
     postMock.mockResolvedValueOnce({ mustChangePassword: true });
     render(<LoginForm returnTo="/dashboard" />);
 
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'admin@example.local' } });
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'admin@aeb.gov.br' } });
     fireEvent.change(screen.getByLabelText('Senha'), {
       target: { value: 'Temp-Password-123' },
     });
