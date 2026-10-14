@@ -1,0 +1,14 @@
+export type * as Auth from './generated/auth';
+export type * as Admin from './generated/admin';
+export type * as Platform from './generated/platform';
+export type * as Risks from './generated/risks';
+export type * as GrcFoundation from './generated/grcfoundation';
+export type * as Controls from './generated/controls';
+export type * as Compliance from './generated/compliance';
+export type * as Audit from './generated/audit';
+export type * as Assets from './generated/assets';
+export type * as Processes from './generated/processes';
+export type * as Incidents from './generated/incidents';
+export type * as Problems from './generated/problems';
+export type * as Indicators from './generated/indicators';
+export type * as Reports from './generated/reports';

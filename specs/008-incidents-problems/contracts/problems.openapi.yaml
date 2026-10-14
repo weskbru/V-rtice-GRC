@@ -1,0 +1,740 @@
+openapi: 3.1.0
+info:
+  title: Vértice GRC - Problem Management API
+  version: 1.0.0
+  summary: >-
+    Problem register, root-cause analysis and lifecycle, linked to Risk, consuming the shared
+    Action and Evidence capabilities for the corrective work and its proof.
+  description: |
+    Draft contract for `008-incidents-problems` (spec.md, data-model.md). Written before
+    implementation - every citation below is to the specification, not to shipped source.
+
+    Same two independent server-side checks as every business module: `problem:*` permission, and
+    organizational scope as a mandatory predicate on every read and write. Existence is not
+    disclosed among callers who hold `problem:view` (`404`, never `403`, for out-of-scope or
+    nonexistent). `code` is server-assigned (`PRB-` prefix). No delete operation - a problem opened
+    in error is cancelled, never removed.
+
+    **Closing a problem is gated, not a plain status write.** `POST /problems/{problemId}/transitions`
+    with `toStatus: CLOSED` is refused with `422` unless: (1) `rootCause` is already populated
+    (requires having passed through `RESOLVED` first); (2) at least one `Action` exists with
+    `originType: PROBLEM` and `originId` equal to this problem, in status `COMPLETED`; and (3) the
+    caller executing the closing transition is not the same user who completed that action
+    (data-model.md invariants P2/P3, research.md D-7). The corrective action itself is created and
+    completed through the existing `Action` API (`POST /actions`,
+    `POST /actions/{id}/transitions`) - **this document has no endpoint for creating or completing
+    it**, by design (spec.md US4): a second write path for the same work would be exactly the defect
+    `007-implementation-remediation` closed for `RiskTreatmentAction`/`Action`.
+
+    **The relationship to `Incident` is owned here, by decision of the coordinator (spec.md
+    "Decisões do coordenador"; research.md D-13 to D-15).** Many-to-many, optional on both sides: a
+    problem needs no incident to exist (proactive problem management is legitimate), and a single
+    incident can carry more than one contributing problem (compound failure is ordinary). This
+    document owns the write path (`POST`/`DELETE /problems/{problemId}/incidents`) because the link
+    is initiated from here; `incidents.openapi.yaml`'s `GET /incidents/{incidentId}/problems` reads
+    the same table without this document's module being imported. Creating the link requires
+    `problem:link` **and** `incident:view` - the same two-sided authorization ADR-020 part 5
+    established, applied to this pair from its first line rather than discovered missing later
+    (`docs/deferred-findings.md` F-46/F-49 record this project having to close the same gap twice).
+    **The link never gates either lifecycle**: no transition of `Incident` or `Problem` inspects it,
+    in either direction - closing a problem never checks its linked incidents' status, and resolving
+    an incident never checks or creates a problem. It exists to correlate and to audit, nothing more.
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Problem Catalog
+    description: Listing, searching and filtering the problem register (US2).
+  - name: Problem Record
+    description: Creating and maintaining a problem's descriptive data (US2).
+  - name: Problem Lifecycle
+    description: The five-state machine and its gated closure (US2, data-model.md D-5/D-7).
+  - name: Problem Relationships
+    description: Links to Risk (US3) - never to Incident (see description above).
+security:
+  - sessionCookie: []
+paths:
+  /problems:
+    get:
+      operationId: listProblems
+      tags: [Problem Catalog]
+      summary: List problems in the caller's organizational scope.
+      description: Requires `problem:view`. Scope applied as a mandatory predicate, including here.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ProblemStatus'
+          style: form
+          explode: true
+        - name: severity
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ProblemSeverity'
+          style: form
+          explode: true
+        - name: search
+          in: query
+          description: Matches against `code` and `title`.
+          schema:
+            type: string
+        - name: orgUnitId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [code, title, severity, status, identifiedOn, updatedAt]
+            default: identifiedOn
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: Paginated problem summaries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProblemSummary'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createProblem
+      tags: [Problem Record]
+      summary: Register a new problem.
+      description: Requires `problem:create`. `orgUnitId` must exist and lie within the caller's scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProblemRequest'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /problems/{problemId}:
+    get:
+      operationId: getProblem
+      tags: [Problem Record]
+      summary: Fetch one problem's detail.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateProblem
+      tags: [Problem Record]
+      summary: Edit a problem's descriptive fields.
+      description: >-
+        Requires `problem:edit`. Never accepts `status`, `code`, or `rootCause` - `rootCause` is set
+        only through the transition to `RESOLVED` below.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProblemRequest'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /problems/{problemId}/transitions:
+    post:
+      operationId: transitionProblem
+      tags: [Problem Lifecycle]
+      summary: Move a problem to a new status.
+      description: >-
+        Requires `problem:transition`. Legal moves: `OPEN->IN_ANALYSIS`, `OPEN->CANCELLED`,
+        `IN_ANALYSIS->RESOLVED`, `IN_ANALYSIS->CANCELLED`, `RESOLVED->CLOSED`,
+        `RESOLVED->IN_ANALYSIS` (reopen, requires `reopenReason`). `toStatus: RESOLVED` requires
+        `rootCause`. `toStatus: CLOSED` requires a completed `Action` of origin `PROBLEM` for this
+        record and a closer different from whoever completed it (data-model.md P2/P3) - checked at
+        transition time, not cached from creation.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionProblemRequest'
+      responses:
+        '200':
+          description: Transitioned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: >-
+            Illegal transition; a required field for this transition is missing; or (for `CLOSED`)
+            no qualifying completed `Action` exists, or the closer is the same user who completed
+            it.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /problems/{problemId}/risks:
+    get:
+      operationId: listProblemRiskLinks
+      tags: [Problem Relationships]
+      summary: List the risks linked to a problem.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProblemRiskLinkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkProblemToRisk
+      tags: [Problem Relationships]
+      summary: Link a problem to a risk it underlies.
+      description: >-
+        Requires `problem:link` **and** `risk:view` (ADR-020 part 5). The target risk must lie
+        within the caller's organizational scope (ADR-020 part 4) - a risk outside scope, and a risk
+        that does not exist, answer identically.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [riskId]
+              properties:
+                riskId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemRiskLinkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Problem, or the target risk (out of scope or nonexistent - indistinguishable), not found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /problems/{problemId}/risks/{linkId}:
+    delete:
+      operationId: unlinkProblemFromRisk
+      tags: [Problem Relationships]
+      summary: Withdraw a risk link, preserving it on the audit trail.
+      description: Requires `problem:link`. Marks `unlinkedAt`; never deletes the row.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+        - name: linkId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Withdrawn - returns the link, now carrying `unlinkedAt`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemRiskLinkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /problems/{problemId}/incidents:
+    get:
+      operationId: listProblemIncidentLinks
+      tags: [Problem Relationships]
+      summary: List the incidents linked to a problem.
+      description: >-
+        Decision of the coordinator (spec.md, research.md D-13 to D-15): many-to-many, optional.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProblemIncidentLinkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkProblemToIncident
+      tags: [Problem Relationships]
+      summary: Link a problem to an incident it explains.
+      description: >-
+        Requires `problem:link` **and** `incident:view` (ADR-020 part 5, applied to this pair from
+        its first line - research.md D-14). The target incident must lie within the caller's
+        organizational scope (ADR-020 part 4) - out of scope and nonexistent answer identically.
+        Never gates either lifecycle (D-15): creating this link changes nothing about what
+        transitions either record may still make.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incidentId]
+              properties:
+                incidentId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Linked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemIncidentLinkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: >-
+            Problem, or the target incident (out of scope or nonexistent - indistinguishable), not
+            found.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /problems/{problemId}/incidents/{linkId}:
+    delete:
+      operationId: unlinkProblemFromIncident
+      tags: [Problem Relationships]
+      summary: Withdraw an incident link, preserving it on the audit trail.
+      description: Requires `problem:link`. Marks `unlinkedAt`; never deletes the row.
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+        - name: linkId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Withdrawn - returns the link, now carrying `unlinkedAt`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemIncidentLinkResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: vertice_session
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    ProblemId:
+      name: problemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    ProblemSeverity:
+      type: string
+      enum: [CRITICAL, HIGH, MEDIUM, LOW]
+    ProblemStatus:
+      type: string
+      enum: [OPEN, IN_ANALYSIS, RESOLVED, CLOSED, CANCELLED]
+    ProblemSummary:
+      type: object
+      required: [id, code, title, severity, status, orgUnit, owner, identifiedOn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        severity:
+          $ref: '#/components/schemas/ProblemSeverity'
+        status:
+          $ref: '#/components/schemas/ProblemStatus'
+        orgUnit:
+          $ref: '#/components/schemas/OrgUnitRef'
+        owner:
+          $ref: '#/components/schemas/UserRef'
+        identifiedOn:
+          type: string
+          format: date
+        updatedAt:
+          type: string
+          format: date-time
+    ProblemDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProblemSummary'
+        - type: object
+          required: [description]
+          properties:
+            description:
+              type: string
+            rootCause:
+              type: [string, 'null']
+            resolvedAt:
+              type: [string, 'null']
+              format: date-time
+            resolvedBy:
+              oneOf:
+                - $ref: '#/components/schemas/UserRef'
+                - type: 'null'
+            closedAt:
+              type: [string, 'null']
+              format: date-time
+            closedBy:
+              oneOf:
+                - $ref: '#/components/schemas/UserRef'
+                - type: 'null'
+            cancellationReason:
+              type: [string, 'null']
+            createdAt:
+              type: string
+              format: date-time
+    CreateProblemRequest:
+      type: object
+      required: [title, description, severity, orgUnitId, identifiedOn]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        severity:
+          $ref: '#/components/schemas/ProblemSeverity'
+        orgUnitId:
+          type: string
+          format: uuid
+        identifiedOn:
+          type: string
+          format: date
+        ownerUserId:
+          type: string
+          format: uuid
+          description: Defaults to the caller when omitted.
+    UpdateProblemRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        severity:
+          $ref: '#/components/schemas/ProblemSeverity'
+        ownerUserId:
+          type: string
+          format: uuid
+    TransitionProblemRequest:
+      type: object
+      required: [toStatus]
+      properties:
+        toStatus:
+          $ref: '#/components/schemas/ProblemStatus'
+        rootCause:
+          type: string
+          description: Required when `toStatus` is `RESOLVED`.
+        cancellationReason:
+          type: string
+          description: Required when `toStatus` is `CANCELLED`.
+        reopenReason:
+          type: string
+          description: Required when `toStatus` is `IN_ANALYSIS` from `RESOLVED`.
+    ProblemRiskLinkResponse:
+      type: object
+      required: [id, risk, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        risk:
+          $ref: '#/components/schemas/RiskRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+    RiskRef:
+      type: object
+      required: [id, code, title]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+    IncidentRef:
+      type: object
+      required: [id, code, title, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/IncidentStatusRef'
+    IncidentStatusRef:
+      type: string
+      description: >-
+        Mirrors `incidents.openapi.yaml`'s `IncidentStatus` - duplicated here because contracts
+        never merge schemas across documents (packages/api-types convention).
+      enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, CANCELLED]
+    ProblemIncidentLinkResponse:
+      type: object
+      required: [id, incident, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        incident:
+          $ref: '#/components/schemas/IncidentRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    OrgUnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    PageMeta:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: The request is malformed, or carries unknown properties.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: >-
+        The caller can see the problem but lacks the permission for this specific action, or the
+        request failed the cross-site request forgery origin check.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: >-
+        No such problem, or it lies outside the caller's authorized organizational scope, or the
+        caller lacks `problem:view` entirely - deliberately indistinguishable.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: >-
+        The request is well formed but violates a domain rule - most commonly, the target
+        organizational unit does not exist or lies outside the caller's authorized scope.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

@@ -1,0 +1,490 @@
+openapi: 3.1.0
+info:
+  title: Vértice GRC - Authentication and Session API
+  version: 1.0.0
+  summary: Sign-in, sign-out, current session, own profile and own-password change.
+  description: |
+    Authentication and session surface of the Vértice GRC platform (ADR-001, ADR-002).
+
+    Sessions are opaque server-side records. On successful authentication the API sets an
+    `httpOnly`, `Secure`, `SameSite=Lax` cookie named `vgrc_session` holding a 256-bit random
+    identifier. The identifier is never readable by client script and the internal `Session.id`
+    is never returned to a client (FR-019, FR-107).
+
+    Every state-changing request must carry an `Origin` (or `Referer`) header matching the
+    deployment origin; requests that do not are refused with `403` (ADR-002 CSRF defence).
+
+    S-01 (server-side enforcement of `mustChangePassword`): while the authenticated caller's
+    credential is flagged for a mandatory password change, EVERY route in the platform other than
+    `POST /auth/logout`, `GET /auth/session`, `GET /auth/me` and `POST /auth/me/password` — the
+    four routes below — is refused with `403` and a dedicated problem
+    `type: /problems/password-change-required`, distinct from the generic `Forbidden` response.
+    This is enforced globally (`MandatoryPasswordChangeGuard`), not only by the web client's own
+    redirect to the password-change screen.
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Authentication
+    description: Sign-in and sign-out.
+  - name: Session
+    description: The caller's current session and effective authorization.
+  - name: Profile
+    description: The caller's own identity and credentials.
+security:
+  - session: []
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Authenticate with local credentials and open a session
+      tags: [Authentication]
+      description: |
+        Public endpoint - no permission required. Verifies local credentials through the
+        `AuthenticationProvider` port and, on success, creates a session and sets the
+        `vgrc_session` cookie (FR-003, FR-012, FR-013, FR-019).
+
+        Failure is always reported as `401` with an identical, generic message whether the account
+        does not exist, is deactivated, or the password is wrong (FR-007, FR-011). Repeated
+        failures are rate limited per account and per origin and answered with `429` (FR-008).
+        Success, failure and lockout are audited (FR-018, FR-032).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: |
+            Authenticated. A new session cookie is set; a fresh identifier is always issued
+            (session fixation defence).
+          headers:
+            Set-Cookie:
+              description: 'vgrc_session=<opaque>; HttpOnly; Secure; SameSite=Lax; Path=/'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedIdentity'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: |
+            Authentication failed. The response is identical for unknown account, deactivated
+            account and wrong password (FR-007).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/invalid-credentials
+                title: Invalid credentials
+                status: 401
+                detail: The credentials supplied are not valid.
+                instance: /api/v1/auth/login
+                correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Terminate the current session
+      tags: [Authentication]
+      description: |
+        Requires an authenticated session; no additional permission. Stamps `revokedAt` with reason
+        `LOGOUT`, clears the cookie and audits the sign-out (FR-016, FR-018). Subsequent requests
+        presenting the same cookie are refused with `401` (FR-015). Idempotent.
+      responses:
+        '204':
+          description: Session terminated and cookie cleared.
+          headers:
+            Set-Cookie:
+              description: 'vgrc_session=; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Path=/'
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /auth/session:
+    get:
+      operationId: getCurrentSession
+      summary: Describe the current session and the caller's effective authorization
+      tags: [Session]
+      description: |
+        Requires an authenticated session; no additional permission. Returns the session metadata
+        recorded for this session (FR-013) together with the caller's effective permission set and
+        resolved organizational scope, so the shell can hide navigation entries the user may not
+        use (FR-040, FR-042). Client-side permission checks are advisory only; the server enforces
+        every decision independently (FR-026, ADR-003).
+
+        The internal session identifier is deliberately not returned (FR-107).
+      responses:
+        '200':
+          description: Current session and effective authorization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/me:
+    get:
+      operationId: getOwnProfile
+      summary: Retrieve the caller's own profile
+      tags: [Profile]
+      description: |
+        Requires an authenticated session; no additional permission - a user may always read their
+        own profile. Returns name, contact identifier, job title, roles and organizational unit
+        (FR-009). Credential material is never included in any representation (FR-005).
+      responses:
+        '200':
+          description: The caller's profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/me/password:
+    post:
+      operationId: changeOwnPassword
+      summary: Change the caller's own password
+      tags: [Profile]
+      description: |
+        Requires an authenticated session and a local credential; no additional permission. The
+        current password must be confirmed (FR-010). The new password is validated against the
+        configured password policy (FR-006); a policy violation is reported as `422` with
+        field-level entries in `errors[]`.
+
+        On success **all** of the user's sessions are revoked with reason `PASSWORD_CHANGED`,
+        including the one making this request (FR-017); the caller must authenticate again. The
+        change is audited without any credential material (FR-010, FR-035).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed. Every session for the user is revoked and the cookie cleared.
+          headers:
+            Set-Cookie:
+              description: 'vgrc_session=; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Path=/'
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: |
+            No valid session, or the supplied current password is wrong. The two cases are
+            indistinguishable in the response body.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: vgrc_session
+      description: |
+        Opaque server-side session identifier (ADR-002). Set by `POST /auth/login`, cleared by
+        `POST /auth/logout`. `httpOnly`, `Secure`, `SameSite=Lax`. Revoked or expired sessions are
+        refused with `401` on the next request (FR-015).
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: Stable problem-type identifier, for example `/problems/validation-failed`.
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+        status:
+          type: integer
+          description: HTTP status code, repeated for convenience.
+        detail:
+          type: string
+          description: |
+            Explanation for this occurrence. Never contains a stack trace, SQL fragment or internal
+            identifier (FR-107).
+        instance:
+          type: string
+          format: uri-reference
+          description: The request path that produced the problem.
+        correlationId:
+          type: string
+          format: uuid
+          description: Request correlation identifier, matching the structured log entry (ADR-012).
+        errors:
+          type: array
+          description: Field-level validation failures. Present on 400 and 422.
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Dotted path of the offending property in the request body or query.
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+          description: Human-readable explanation.
+    LoginRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 256
+    AuthenticationMethod:
+      type: string
+      description: |
+        Mechanism by which the identity was verified (FR-002). Only `LOCAL` is operational in this
+        release; the remaining values exist so federated providers are additive (FR-004).
+      enum: [LOCAL, LDAP, ACTIVE_DIRECTORY, OIDC, SAML]
+    OrgUnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    RoleRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    EffectiveScope:
+      type: object
+      description: The caller's resolved organizational scope (FR-025a, FR-025b, ADR-004).
+      required: [global, orgUnitIds]
+      properties:
+        global:
+          type: boolean
+          description: |
+            True when an explicit `GLOBAL` grant is held. Never implied by role alone (FR-025a).
+        orgUnitIds:
+          type: array
+          description: Granted units plus all their descendants. Empty when `global` is true.
+          items:
+            type: string
+            format: uuid
+    AuthenticatedIdentity:
+      type: object
+      description: Identity, effective authorization and session metadata returned on sign-in.
+      required: [user, permissions, scope, session, mustChangePassword]
+      properties:
+        user:
+          $ref: '#/components/schemas/OwnProfile'
+        permissions:
+          type: array
+          description: |
+            Effective `resource:action` permission identifiers, union over the caller's roles
+            (ADR-003). Advisory for the client only.
+          items:
+            type: string
+        scope:
+          $ref: '#/components/schemas/EffectiveScope'
+        session:
+          $ref: '#/components/schemas/SessionMetadata'
+        mustChangePassword:
+          type: boolean
+          description: |
+            True when the credential is flagged for mandatory change, such as the seeded
+            administrator account on first use. The server enforces this independently of the
+            client (S-01): every route other than `POST /auth/logout`, `GET /auth/session`,
+            `GET /auth/me` and `POST /auth/me/password` is refused with `403` while this is true.
+    CurrentSession:
+      type: object
+      required: [user, permissions, scope, session]
+      properties:
+        user:
+          $ref: '#/components/schemas/OwnProfile'
+        permissions:
+          type: array
+          items:
+            type: string
+        scope:
+          $ref: '#/components/schemas/EffectiveScope'
+        session:
+          $ref: '#/components/schemas/SessionMetadata'
+    SessionMetadata:
+      type: object
+      description: |
+        Recorded session facts (FR-013). The session identifier itself is never exposed. The shape
+        is already sufficient for the deferred self-service session management capability (FR-020).
+      required: [createdAt, expiresAt, lastActivityAt, authenticationMethod]
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        expiresAt:
+          type: string
+          format: date-time
+          description: Absolute lifetime. Inactivity expiry is applied independently (FR-014).
+          readOnly: true
+        lastActivityAt:
+          type: string
+          format: date-time
+          readOnly: true
+        authenticationMethod:
+          $ref: '#/components/schemas/AuthenticationMethod'
+        ipAddress:
+          type: [string, 'null']
+          readOnly: true
+        userAgent:
+          type: [string, 'null']
+          readOnly: true
+    OwnProfile:
+      type: object
+      description: The caller's own identity (FR-009). Contains no credential material (FR-005).
+      required: [id, email, fullName, status, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        fullName:
+          type: string
+          readOnly: true
+        jobTitle:
+          type: [string, 'null']
+          readOnly: true
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          readOnly: true
+        primaryOrgUnit:
+          oneOf:
+            - $ref: '#/components/schemas/OrgUnitRef'
+            - type: 'null'
+          readOnly: true
+        roles:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/RoleRef'
+        lastLoginAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      additionalProperties: false
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 256
+        newPassword:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 12
+          maxLength: 256
+          description: |
+            Validated against the configured password policy (FR-006). The bounds published here
+            are the contract floor; the deployed policy may be stricter and its violations are
+            returned as `422` field errors.
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties, or fails a structural constraint. The
+        global validation pipe strips and rejects unknown properties at the boundary (FR-106).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked (FR-015).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The request origin failed the cross-site request forgery check (ADR-002). Authorization
+        failures on records the caller may not see are reported as `404`, not `403` (FR-030).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: |
+        The request is well formed but violates a domain rule, such as the password policy
+        (FR-006).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: |
+        Rate limit exceeded (FR-008). The body never discloses whether an account exists.
+      headers:
+        Retry-After:
+          description: Seconds until another attempt is accepted.
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

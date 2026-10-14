@@ -1,0 +1,26 @@
+.artwork {
+  --hero-ink: #92b8e7;
+  --hero-line: #628cc4;
+  overflow: hidden;
+}
+:global(.dark) .artwork {
+  --hero-ink: #345577;
+  --hero-line: #8daac9;
+}
+.geometry {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mask-image: linear-gradient(to right, transparent, #00000012 23%, #00000075 48%, #000 68%);
+}
+@media (max-width: 1279px) {
+  .geometry {
+    opacity: 0.55;
+  }
+}
+@media (max-width: 639px) {
+  .geometry {
+    opacity: 0.3;
+  }
+}

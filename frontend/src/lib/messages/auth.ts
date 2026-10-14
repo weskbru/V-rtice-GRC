@@ -1,0 +1,41 @@
+export const auth = {
+  brand: {
+    name: 'Vértice GRC',
+    tagline: 'Plataforma de Governança, Riscos e Compliance',
+    description: 'Vértice GRC — plataforma corporativa de Governança, Riscos e Compliance',
+  },
+  login: {
+    pageTitle: 'Entrar — Vértice GRC',
+    heading: 'Entrar',
+    subheading: 'Use suas credenciais organizacionais para acessar o ambiente de trabalho.',
+    formAriaLabel: 'Entrar',
+    institutionalAriaLabel: 'Acesso institucional',
+    emailLabel: 'E-mail',
+    passwordLabel: 'Senha',
+    submit: 'Entrar',
+    submitting: 'Entrando…',
+    slogan: 'Mais visão para o que importa.',
+    introduction: 'Gestão integrada para um ambiente mais seguro, resiliente e em conformidade.',
+    emailPlaceholder: 'seu@empresa.com.br',
+    passwordPlaceholder: 'Digite sua senha',
+    showPassword: 'Mostrar senha',
+    hidePassword: 'Ocultar senha',
+    restricted: 'Acesso restrito',
+    organization: 'Vértice GRC',
+    signature: 'Governança, Riscos e Compliance em um só lugar',
+    storyEyebrow: 'VISÃO INTEGRADA',
+    storyHeading: 'Decisões com clareza.',
+    storyDescription:
+      'Conecte riscos, controles e evidências para acompanhar o que importa à sua organização.',
+    footer: 'O acesso é provisionado pelo administrador da sua organização.',
+  },
+  sessionExpired: {
+    title: 'Sua sessão expirou',
+    descriptionPrefix: 'Entre novamente para continuar como',
+    descriptionSuffix:
+      '. As informações que você já preencheu nesta página continuam aqui — entrar não fará você perdê-las.',
+    signInAsSomeoneElse: 'Entrar como outra pessoa',
+    submit: 'Continuar',
+    submitting: 'Entrando…',
+  },
+} as const;

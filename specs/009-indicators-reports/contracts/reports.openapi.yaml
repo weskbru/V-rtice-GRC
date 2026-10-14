@@ -1,0 +1,465 @@
+openapi: 3.1.0
+info:
+  title: Vértice GRC - Report Management API
+  version: 1.0.0
+  summary: >-
+    Named, saved compositions of existing indicators, executed on demand under the caller's own
+    scope, with CSV export. Not a generic query builder, not a scheduled export, not a generated
+    document (spec.md, "Decisões do coordenador" Q4/Q5).
+  description: |
+    Draft contract for `009-indicators-reports` (spec.md, data-model.md). Written before
+    implementation - every citation is to the specification, not to shipped source.
+
+    **A `ReportDefinition` references `IndicatorMetricKey` values directly, never an
+    `IndicatorDefinition` id** (data-model.md §6) - it composes catalog keys, not other users'
+    saved configuration.
+
+    **Execution is never stored.** `GET /reports/{id}/run` recomputes every referenced metric on
+    every call, through the exact same calculation path `indicators.openapi.yaml`'s
+    `getIndicatorCurrentValue` uses (spec.md FR-025/FR-027) - two callers with different
+    organizational scopes running the same report see different numbers for unit-scoped metrics,
+    and the same number for `COMPLIANCE_PERCENTAGE` (research.md D-8).
+
+    **A missing source permission narrows one item, never the whole response.** When the caller
+    lacks the read permission a referenced metric's source domain requires, that one item comes
+    back with `available: false` and no value - the rest of the run is served normally (spec.md
+    FR-026, SC-006). This is the one place in this platform's contracts where a per-item
+    authorization failure does not produce a `403` for the containing operation - documented here
+    because it is the exception, not the rule.
+
+    **CSV is the only export format in v1** (research.md D-10) - requested via `format=csv` on the
+    same run operation, never a second endpoint. No PDF, no XLSX, no scheduled delivery.
+
+    **No history for a report.** A `ReportDefinition` has no measurement series of its own
+    (spec.md FR-028) - trend belongs to the individual indicator (`indicators.openapi.yaml`'s
+    `listIndicatorMeasurements`).
+
+    **Paginated list envelope is `{data, meta}`.** `listReportDefinitions` below was drafted
+    against `008-incidents-problems`'s two contracts before those contracts' own `{items, meta}`
+    divergence from every other paginated operation in this platform (specs 001, 003, 004, 005,
+    006, 008) was corrected same-day (commit `13949a1`) - see `indicators.openapi.yaml`'s own
+    header for the full account. Corrected here before this specification was ever committed.
+    `ReportRunResult.items` (below, `/reports/{id}/run`) is a different shape entirely - a result
+    array with no `meta`, never a page - and is untouched by this correction.
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Report Catalog
+    description: Saved, named compositions of indicator metric keys (US5).
+  - name: Report Execution
+    description: On-demand computation and CSV export (US5).
+security:
+  - sessionCookie: []
+paths:
+  /reports:
+    get:
+      operationId: listReportDefinitions
+      tags: [Report Catalog]
+      summary: List report definitions.
+      description: Requires `report:view`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReportDefinition'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createReportDefinition
+      tags: [Report Catalog]
+      summary: Create a report definition.
+      description: >-
+        Requires `report:create`. `code` is never client-supplied - assigned by the server with
+        the `RPT-` prefix (data-model.md §1). `metricKeys` must be a non-empty array of values from
+        the closed `IndicatorMetricKey` catalog (`indicators.openapi.yaml`); an unknown value is
+        rejected as malformed (`400`), not as a domain error, because it fails schema validation
+        before any business rule runs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportDefinitionRequest'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDefinition'
+        '400':
+          description: Malformed request, unknown property, or `metricKeys` empty or containing an
+            unknown `IndicatorMetricKey` value.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /reports/{reportId}:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getReportDefinition
+      tags: [Report Catalog]
+      summary: Fetch one report definition by id.
+      description: Requires `report:view`.
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateReportDefinition
+      tags: [Report Catalog]
+      summary: Edit name, description, referenced metric keys, or active status.
+      description: Requires `report:edit`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportDefinitionRequest'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /reports/{reportId}/run:
+    parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: format
+        in: query
+        description: >-
+          `json` (default) or `csv`. `csv` may also be requested via `Accept: text/csv` -
+          `format` takes precedence when both are present, matching how this platform already
+          resolves an equivalent ambiguity for `Accept` vs. an explicit query parameter elsewhere.
+        schema:
+          type: string
+          enum: [json, csv]
+          default: json
+    get:
+      operationId: runReport
+      tags: [Report Execution]
+      summary: Execute a report - compute every referenced indicator under the caller's own scope.
+      description: >-
+        Requires `report:view`. Never stored (spec.md FR-027) - every call recomputes every item
+        through the same path `GET /indicators/{metricKey}/current` uses. An item whose source
+        permission the caller lacks is returned with `available: false` and no value, never a
+        `403` for the whole operation (spec.md FR-026, SC-006).
+      responses:
+        '200':
+          description: JSON result (default) or `text/csv` when `format=csv`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportRunResult'
+            text/csv:
+              schema:
+                type: string
+                description: >-
+                  Header row (`metricKey,label,available,value,scopeApplicability`) followed by one
+                  data row per referenced metric, in the order `metricKeys` was declared on the
+                  definition. A `BY_BUCKET` item's `value` column is a semicolon-separated
+                  `bucket=count` list (e.g. `LOW=3;MEDIUM=1;HIGH=0;CRITICAL=0`) - CSV has no native
+                  nested-object representation, and this keeps every row single-line (research.md
+                  D-10).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Missing `report:view`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    IndicatorMetricKey:
+      type: string
+      description: >-
+        The same closed catalog `indicators.openapi.yaml` declares (data-model.md §3) - duplicated
+        here, rather than referenced across documents, because this platform's contracts are each
+        self-contained (the same choice `incidents.openapi.yaml`/`problems.openapi.yaml` already
+        made for their own shared enums).
+      enum:
+        - RISK_TOTAL_BY_LEVEL
+        - RISK_TREATMENT_OVERDUE_COUNT
+        - CONTROL_INACTIVE_COUNT
+        - COMPLIANCE_PERCENTAGE
+        - AUDIT_ENGAGEMENT_OPEN_COUNT
+        - FINDING_OPEN_COUNT_BY_SEVERITY
+        - ASSET_INACTIVE_COUNT
+        - PROCESS_INACTIVE_COUNT
+        - ACTION_OVERDUE_COUNT
+        - INCIDENT_OPEN_COUNT_BY_SEVERITY
+        - PROBLEM_OPEN_COUNT_BY_SEVERITY
+    IndicatorScopeApplicability:
+      type: string
+      enum: [ORGANIZATIONAL_UNIT, ORGANIZATION_WIDE]
+    ReportDefinition:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - description
+        - metricKeys
+        - isActive
+        - createdBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: Server-assigned, `RPT-YYYY-NNNN` (research.md D-9).
+        name:
+          type: string
+        description:
+          type: string
+        metricKeys:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/IndicatorMetricKey'
+        isActive:
+          type: boolean
+        createdBy:
+          $ref: '#/components/schemas/UserRef'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateReportDefinitionRequest:
+      type: object
+      additionalProperties: false
+      required: [name, description, metricKeys]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        metricKeys:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/IndicatorMetricKey'
+    UpdateReportDefinitionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        metricKeys:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/IndicatorMetricKey'
+        isActive:
+          type: boolean
+    ReportRunItem:
+      type: object
+      required: [metricKey, label, available, scopeApplicability]
+      properties:
+        metricKey:
+          $ref: '#/components/schemas/IndicatorMetricKey'
+        label:
+          type: string
+          description: pt-BR label from the centralized message catalog.
+        available:
+          type: boolean
+          description: >-
+            `false` when the caller lacks this metric's own source read permission (spec.md
+            FR-026) - `value`/`valueByBucket` are absent in that case, never a zeroed number.
+        scopeApplicability:
+          $ref: '#/components/schemas/IndicatorScopeApplicability'
+        value:
+          type: number
+        valueByBucket:
+          type: object
+          additionalProperties:
+            type: integer
+    ReportRunResult:
+      type: object
+      required: [reportId, computedAt, items]
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        computedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportRunItem'
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    PageMeta:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: The request is malformed, or carries unknown properties.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: >-
+        The caller lacks the permission for this specific action, or the request failed the
+        cross-site request forgery origin check.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: No such report definition.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: vertice_session

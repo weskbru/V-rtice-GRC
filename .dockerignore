@@ -1,0 +1,105 @@
+# .dockerignore
+#
+# Keeps the build context sent to the Docker daemon small and reproducible
+# for backend/Dockerfile and docker/web.Dockerfile (T012). Both Dockerfiles
+# build from the repository root (`context: .` in docker-compose.yml) because
+# a pnpm workspace needs the lockfile and every workspace package visible to
+# `pnpm install`.
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (reinstalled inside the image from the lockfile)
+node_modules
+**/node_modules
+
+# Build output (rebuilt inside the image)
+dist
+**/dist
+.next
+**/.next
+build
+**/build
+
+# Test output
+coverage
+**/coverage
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+
+# Relatórios e caches locais não participam do build.
+reports
+.scannerwork
+**/.scannerwork
+.sonar
+**/.sonar
+.pnpm-store
+**/.pnpm-store
+.cache
+**/.cache
+.turbo
+**/.turbo
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Arquivos temporários locais.
+*.tmp
+**/*.tmp
+*.temp
+**/*.temp
+**/.prisma-schema-*
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+**/*.log
+logs
+backend/logs
+frontend/logs
+
+# Environment files — never bake secrets into an image layer.
+#
+# The `**/` prefix is load-bearing: a bare `.env` pattern matches ONLY at the
+# root of the build context, so `backend/.env` and `frontend/.env` were being
+# copied into every image (F-14). Development credentials today; a real secret
+# on any machine that has one. Both forms are kept so the intent survives a
+# future reader who deletes one of them.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Dockerfiles and compose files themselves
+Dockerfile*
+docker-compose*.yml
+
+# Documentation and planning artifacts — not needed to build or run the apps
+docs
+specs
+.specify
+AGENTS.md
+CLAUDE.md
+*.md
+
+# Editor / tooling metadata not needed inside the image
+.vscode
+.idea
+.claude
+.github
+
+# Configuração de deploy e dados de runtime ficam fora das imagens.
+k8s
+.gitlab-ci.yml
+sonar-project.properties
+storage
+backend/storage

@@ -1,0 +1,38 @@
+name: vertice-grc-test
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Defina uma senha local exclusiva para postgres}
+      POSTGRES_DB: ${TEST_POSTGRES_DB:-vertice_grc_test}
+      POSTGRES_OWNER_USER: ${POSTGRES_OWNER_USER:-vertice_owner}
+      POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina uma senha local exclusiva para vertice_owner}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-vertice_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Defina uma senha local exclusiva para vertice_app}
+    ports:
+      - "127.0.0.1:${TEST_POSTGRES_HOST_PORT:-5434}:5432"
+    volumes:
+      - ./database/postgres/init:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${TEST_REDIS_HOST_PORT:-6380}:6379"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s

@@ -1,0 +1,465 @@
+'use client';
+
+import { Loader2, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { Link } from '@/components/navigation/link';
+import { feedback } from '@/components/shell/feedback-provider';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ApiError } from '@/lib/api-client';
+import { common } from '@/lib/messages/common';
+import { controls } from '@/lib/messages/controls';
+import { ConfirmDialog, SearchablePicker } from '@vertice/design-system/components';
+
+import { controlsApi } from '../api';
+import { formatTimestampDate } from '../date';
+
+import type {
+  ControlAssetLink,
+  ControlProcessLink,
+  ControlRiskLink,
+  RegistrySearchResult,
+} from '../types';
+import type { SearchablePickerOption } from '@vertice/design-system/components';
+
+interface RelationshipMessages {
+  readonly sectionTitle: string;
+  readonly sectionDescription: string;
+  readonly pickerLabel: string;
+  readonly pickerPlaceholder: string;
+  readonly pickerNoOptions: string;
+  readonly pickerSearchPlaceholder: string;
+  readonly pickerAriaLabel: string;
+  readonly empty: string;
+  readonly linkAction: string;
+  readonly unlinkAction: string;
+  readonly linkSuccess: string;
+  readonly unlinkSuccess: string;
+  readonly linkError: string;
+  readonly unlinkError: string;
+  readonly alreadyLinkedError: string;
+  readonly unlinkConfirm: {
+    readonly title: string;
+    readonly description: (name: string) => string;
+  };
+  readonly columns: { readonly name: string; readonly linkedBy: string; readonly linkedAt: string };
+}
+
+interface RelationshipLink {
+  readonly id: string;
+  readonly linkedBy: { readonly fullName: string };
+  readonly linkedAt: string;
+}
+
+interface RelationshipSubsectionProps<TLink extends RelationshipLink> {
+  messages: RelationshipMessages;
+  canLink: boolean;
+  links: readonly TLink[];
+  getRef: (link: TLink) => { id: string; code: string; name: string };
+  fetchRegistry: (
+    query: string,
+  ) => Promise<RegistrySearchResult<{ id: string; code: string; name: string }>>;
+  onLink: (registryItemId: string) => Promise<void>;
+  onUnlink: (linkId: string) => Promise<void>;
+}
+
+function RelationshipSubsection<TLink extends RelationshipLink>({
+  messages,
+  canLink,
+  links,
+  getRef,
+  fetchRegistry,
+  onLink,
+  onUnlink,
+}: RelationshipSubsectionProps<TLink>): React.JSX.Element {
+  const [selectedOption, setSelectedOption] = useState<SearchablePickerOption | undefined>(
+    undefined,
+  );
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [showLinker, setShowLinker] = useState(false);
+
+  const [pendingUnlink, setPendingUnlink] = useState<TLink | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+
+  const linkedIds = new Set(links.map((link) => getRef(link).id));
+
+  async function handleSearch(query: string): Promise<{
+    options: readonly SearchablePickerOption[];
+    isPartial: boolean;
+  }> {
+    try {
+      const result = await fetchRegistry(query);
+      const available = result.data.filter((item) => !linkedIds.has(item.id));
+      return {
+        options: available.map((item) => ({
+          id: item.id,
+          label: item.name,
+          description: item.code,
+        })),
+        isPartial: result.isPartial,
+      };
+    } catch {
+      return { options: [], isPartial: false };
+    }
+  }
+
+  async function handleLink(): Promise<void> {
+    if (!selectedOption) return;
+    setLinkError(null);
+    setLinking(true);
+    try {
+      await onLink(selectedOption.id);
+      feedback.success(messages.linkSuccess);
+      setSelectedOption(undefined);
+      setShowLinker(false);
+    } catch (error) {
+      if (error instanceof ApiError && error.problem.status === 409) {
+        setLinkError(messages.alreadyLinkedError);
+      } else {
+        setLinkError(messages.linkError);
+      }
+    } finally {
+      setLinking(false);
+    }
+  }
+
+  async function confirmUnlink(): Promise<void> {
+    if (!pendingUnlink) return;
+    setUnlinking(true);
+    try {
+      await onUnlink(pendingUnlink.id);
+      feedback.success(messages.unlinkSuccess);
+      setPendingUnlink(null);
+    } catch {
+      feedback.error(messages.unlinkError);
+    } finally {
+      setUnlinking(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{messages.sectionTitle}</CardTitle>
+        <CardDescription>{messages.sectionDescription}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {links.length === 0 ? (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">{messages.empty}</p>
+            {canLink && !showLinker ? (
+              <Button type="button" size="sm" onClick={() => setShowLinker(true)}>
+                <Plus aria-hidden="true" className="size-4" />
+                {messages.pickerLabel}
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="sm:table-fixed">
+              <TableCaption className="sr-only">{messages.sectionTitle}</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40%]">{messages.columns.name}</TableHead>
+                  <TableHead className="w-[24%]">{messages.columns.linkedBy}</TableHead>
+                  <TableHead className="w-[18%]">{messages.columns.linkedAt}</TableHead>
+                  {canLink ? (
+                    <TableHead className="sr-only w-28">{messages.unlinkAction}</TableHead>
+                  ) : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {links.map((link) => {
+                  const ref = getRef(link);
+                  return (
+                    <TableRow key={link.id}>
+                      <TableCell className="whitespace-normal break-words">
+                        <div className="font-medium text-foreground">{ref.name}</div>
+                        <div className="text-sm text-muted-foreground">{ref.code}</div>
+                      </TableCell>
+                      <TableCell className="whitespace-normal break-words">
+                        {link.linkedBy.fullName}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatTimestampDate(link.linkedAt)}
+                      </TableCell>
+                      {canLink ? (
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPendingUnlink(link)}
+                          >
+                            {messages.unlinkAction}
+                          </Button>
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {canLink && links.length > 0 && !showLinker ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={() => setShowLinker(true)}
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            {messages.pickerLabel}
+          </Button>
+        ) : null}
+
+        {canLink && showLinker ? (
+          <div className="flex flex-col gap-2">
+            {linkError ? (
+              <p role="alert" className="text-sm font-medium text-status-danger-fg">
+                {linkError}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-64">
+                <SearchablePicker
+                  value={selectedOption}
+                  onChange={setSelectedOption}
+                  onSearch={handleSearch}
+                  disabled={linking}
+                  labels={{
+                    placeholder: messages.pickerPlaceholder,
+                    searchPlaceholder: messages.pickerSearchPlaceholder,
+                    emptyText: messages.pickerNoOptions,
+                    loadingText: common.searchablePicker.loadingText,
+                    partialResultsText: common.searchablePicker.partialResultsText,
+                    triggerAriaLabel: messages.pickerAriaLabel,
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selectedOption || linking}
+                onClick={() => void handleLink()}
+                aria-label={messages.pickerLabel}
+              >
+                {linking ? (
+                  <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                ) : (
+                  <Plus aria-hidden="true" className="size-4" />
+                )}
+                {messages.linkAction}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={linking}
+                onClick={() => {
+                  setShowLinker(false);
+                  setSelectedOption(undefined);
+                  setLinkError(null);
+                }}
+              >
+                {common.actions.cancel}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+
+      <ConfirmDialog
+        open={pendingUnlink !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingUnlink(null);
+        }}
+        title={messages.unlinkConfirm.title}
+        description={
+          pendingUnlink ? messages.unlinkConfirm.description(getRef(pendingUnlink).name) : ''
+        }
+        labels={{
+          confirm: messages.unlinkAction,
+          cancel: common.confirmDialog.cancel,
+          close: common.confirmDialog.close,
+        }}
+        variant="destructive"
+        isConfirming={unlinking}
+        onConfirm={() => void confirmUnlink()}
+      />
+    </Card>
+  );
+}
+
+export interface ControlLinksSectionProps {
+  controlId: string;
+  canLinkRelationships: boolean;
+  refreshToken?: number;
+}
+
+export function ControlLinksSection({
+  controlId,
+  canLinkRelationships,
+  refreshToken = 0,
+}: ControlLinksSectionProps): React.JSX.Element {
+  const [riskLinks, setRiskLinks] = useState<readonly ControlRiskLink[]>([]);
+  const [riskLinksError, setRiskLinksError] = useState(false);
+  const [processLinks, setProcessLinks] = useState<readonly ControlProcessLink[]>([]);
+  const [assetLinks, setAssetLinks] = useState<readonly ControlAssetLink[]>([]);
+  const [internalToken, setInternalToken] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    controlsApi
+      .listRiskLinks(controlId)
+      .then((links) => {
+        if (!cancelled) {
+          setRiskLinks(links);
+          setRiskLinksError(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRiskLinksError(true);
+      });
+
+    controlsApi
+      .listProcessLinks(controlId)
+      .then((links) => {
+        if (!cancelled) setProcessLinks(links);
+      })
+      .catch(() => undefined);
+
+    controlsApi
+      .listAssetLinks(controlId)
+      .then((links) => {
+        if (!cancelled) setAssetLinks(links);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [controlId, refreshToken, internalToken]);
+
+  function refresh(): void {
+    setInternalToken((token) => token + 1);
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{controls.relationships.risks.sectionTitle}</CardTitle>
+          <CardDescription>{controls.relationships.risks.sectionDescription}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {riskLinksError ? (
+            <p role="alert" className="text-sm font-medium text-status-danger-fg">
+              {controls.assessment.history.loadError}
+            </p>
+          ) : riskLinks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{controls.relationships.risks.empty}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table className="sm:table-fixed">
+                <TableCaption className="sr-only">
+                  {controls.relationships.risks.sectionTitle}
+                </TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40%]">
+                      {controls.relationships.risks.columns.name}
+                    </TableHead>
+                    <TableHead className="w-[24%]">
+                      {controls.relationships.risks.columns.linkedBy}
+                    </TableHead>
+                    <TableHead className="w-[18%]">
+                      {controls.relationships.risks.columns.linkedAt}
+                    </TableHead>
+                    <TableHead className="sr-only w-28">
+                      {controls.relationships.risks.openRisk}
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {riskLinks.map((link) => (
+                    <TableRow key={link.id}>
+                      <TableCell className="whitespace-normal break-words">
+                        <div className="font-medium text-foreground">{link.risk.title}</div>
+                        <div className="text-sm text-muted-foreground">{link.risk.code}</div>
+                      </TableCell>
+                      <TableCell className="whitespace-normal break-words">
+                        {link.linkedBy.fullName}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatTimestampDate(link.linkedAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link href={`/risks/${link.risk.id}`}>
+                            {controls.relationships.risks.openRisk}
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            {controls.relationships.risks.readOnlyNotice}
+          </p>
+        </CardContent>
+      </Card>
+
+      <RelationshipSubsection
+        messages={controls.relationships.processes}
+        canLink={canLinkRelationships}
+        links={processLinks}
+        getRef={(link) => link.process}
+        fetchRegistry={(q) => controlsApi.listProcesses(q)}
+        onLink={async (processId) => {
+          await controlsApi.linkProcess(controlId, { id: processId });
+          refresh();
+        }}
+        onUnlink={async (linkId) => {
+          await controlsApi.unlinkProcess(controlId, linkId);
+          refresh();
+        }}
+      />
+
+      <RelationshipSubsection
+        messages={controls.relationships.assets}
+        canLink={canLinkRelationships}
+        links={assetLinks}
+        getRef={(link) => link.asset}
+        fetchRegistry={(q) => controlsApi.listAssets(q)}
+        onLink={async (assetId) => {
+          await controlsApi.linkAsset(controlId, { id: assetId });
+          refresh();
+        }}
+        onUnlink={async (linkId) => {
+          await controlsApi.unlinkAsset(controlId, linkId);
+          refresh();
+        }}
+      />
+    </div>
+  );
+}

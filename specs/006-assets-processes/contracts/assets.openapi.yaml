@@ -1,0 +1,778 @@
+openapi: 3.1.0
+info:
+  title: Vértice GRC - Asset Management API
+  version: 1.0.0
+  summary: >-
+    Asset inventory as a first-class business domain, with its own authority and organizational
+    scope, replacing the minimal, unscoped registry two other modules used to read directly.
+  description: |
+    The fifth business module (promotion of the minimal `Asset` registry introduced in Fase 1,
+    per `docs/architecture/grc-roadmap.md` and CLAUDE.md §17 item 12). Every operation in this
+    document is subject to two independent server-side checks (FR-009, FR-010):
+
+    1. the caller's `resource:action` permission, named in each operation's description - `asset:*`,
+       never `risk:view` as the two operations this document replaces required until now (US2,
+       research.md D-7);
+    2. the caller's resolved organizational scope, applied as a mandatory predicate in the
+       repository layer on every read and every write, **including the listing** - which today
+       applies none at all (FR-010, spec "Vazamento 1").
+
+    **Existence is not disclosed - among callers who hold `asset:view`.** A single asset outside
+    the caller's organizational scope, and one that does not exist at all, are both answered with
+    `404` on `GET /assets/{assetId}` and on every operation that acts on one - never `403` - so the
+    response cannot be used to probe for records.
+
+    **A caller holding no `asset:view` at all is refused `403`, on every operation in this document,
+    including the single-record ones.** That is the platform's established behaviour, not a
+    weakening chosen here: `PermissionGuard` refuses a missing permission before any handler runs
+    and before any record is loaded, so there is no record whose existence could be disclosed at
+    that point. `specs/003-controls-management`'s own contract and
+    `apps/api/test/contract/control-catalog.spec.ts` already encode exactly this shape for
+    `control:view`, and this document follows it rather than diverging.
+
+    An earlier draft of this paragraph claimed the missing-permission case also collapsed into
+    `404`. It was wrong about the shipped architecture, and is corrected here rather than left to
+    be discovered by whoever implemented against it - which is what happened: the implementation
+    followed the established `403` precedent and reported the contradiction.
+
+    `403` therefore covers two cases: a caller lacking `asset:view` entirely, and a caller who can see
+    the asset but lacks the permission for the specific action attempted. The cross-site request
+    forgery origin check also answers `403`.
+
+    **The organizational unit is required on every asset this API creates, and is verified on both
+    sides.** `orgUnitId` is a required property of `CreateAssetRequest` (invariant A1,
+    data-model.md §4) - the underlying `assets.org_unit_id` column stays nullable, unchanged, so
+    that the handful of rows created before this module existed remain readable (research.md D-2);
+    the obligation lives in the application, not the schema. A target unit that does not exist or
+    lies outside the caller's scope is refused with `422` on create, and the same rule applies to a
+    reassignment on `PATCH /assets/{assetId}` (invariant A2).
+
+    **`code` is never client-supplied.** It is assigned by the server on creation, using the
+    `AST-` prefix (`GrcCodeSequence`, data-model.md §2), and is rejected as an unknown property by
+    the global validation pipe if a caller attempts to supply it, along with `isActive` (invariant
+    A6) - situation changes only through the two dedicated transition operations below, never
+    through `PATCH`.
+
+    **There is no optimistic-locking version on this record, and this document deliberately does
+    not invent one.** `assets` carries no `version` column (verified against `prisma/schema.prisma`
+    - data-model.md §1 states plainly that this fase writes no migration touching this table's
+    shape), unlike `Control` or `AuditEngagement`, which do and therefore require `If-Match` on
+    their own mutating operations. Consequently: **no operation in this document declares an
+    `If-Match` parameter, no response declares an `ETag` header, and no response uses `409` for a
+    version conflict.** `PATCH /assets/{assetId}` and the two transition operations below apply
+    last-write-wins directly to the row. This is an accepted, deliberate trade-off, not an
+    oversight: the fields these operations touch are `name`, `description`, `orgUnitId` and the
+    two-state `isActive` toggle, none of which participates in a multi-step workflow or a derived
+    calculation that a lost update could silently corrupt, and every change - including which
+    fields changed and their previous values - is independently preserved on the audit trail
+    regardless of locking (FR-015). Asserting a concurrency control that is not actually enforced
+    would be worse than declaring none: a client that dutifully sent `If-Match` against this API
+    would receive `400` for an unrecognized header dependency it was never told did not exist.
+
+    **There is no delete operation anywhere in this document (FR-012).** An asset that has left
+    operation is deactivated, never removed - the two link tables that reference it (`RiskAssetLink`,
+    `ControlAssetLink`) carry a `Restrict` foreign key, and erasing the row would in any case orphan
+    the history of every risk and control that was ever linked to it. `POST
+    /assets/{assetId}/deactivate` and `POST /assets/{assetId}/reactivate` are the only two state
+    transitions this record has (data-model.md §3); attempting either while the asset is already in
+    the target state is refused with `422` and nothing changes.
+
+    **A deactivated asset stays fully readable and stays visible in the links it already has.**
+    Deactivation only prevents it from being accepted as the target of a **new**
+    `RiskAssetLink`/`ControlAssetLink` - a rule enforced today in the two link use cases that
+    reference this record (`asset-link.usecase.ts`, `control-asset-link.usecase.ts`) and unchanged
+    by this fase (FR-006, invariant A5).
+
+    **The risk and control relationships shown here are read-only, by design.** `RiskAssetLink` and
+    `ControlAssetLink` are owned by the Risk and Control modules respectively and are created and
+    withdrawn only from those modules' own contracts
+    (`POST`/`DELETE /risks/{riskId}/assets`, `POST`/`DELETE /controls/{controlId}/assets`). `GET
+    /assets/{assetId}` surfaces only the **currently active** links from the asset's own side
+    (FR-008) - there is deliberately no `POST` or `DELETE` on a `/assets/{assetId}/risks` or
+    `/assets/{assetId}/controls` path in this document, and no third relationship path is
+    introduced (FR-013). A link that was withdrawn remains visible through the owning module's own
+    relationship listing (which supports `includeWithdrawn`), not duplicated here. There is
+    deliberately no direct Asset-to-Process relationship in this document either - none is
+    requested by any requirement of this fase, and none has a consumer today (data-model.md
+    §"Relações declaradas"; §19.10).
+
+    **This document supersedes `GET /assets` in `platform.openapi.yaml`.** That operation
+    (`listAssets`, tag "Reference Data") required `risk:view` and applied no organizational scope at
+    all; `platform.openapi.yaml` loses this path in the same change that wires this contract, the
+    same transfer `GET /controls` made out of that document in Fase 2 (research.md D-5). Its two
+    current consumers - the Risk and Control asset-link selectors - move to `listAssetCatalog`
+    below without losing capability (FR-014); the HTTP path (`/assets`) is unchanged, only its owning
+    module, its required permission and the scope it now enforces are.
+
+    **No response in this document computes state at read time.** Every property below is a plain
+    column, or a direct read of an existing link table - never a value joined or aggregated fresh
+    on a particular `GET`. No operation declares `Cache-Control: no-store` (data-model.md §11).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Asset Catalog
+    description: Listing, searching and filtering the asset inventory at scale (US1, US2, US3).
+  - name: Asset Record
+    description: Creating and maintaining an asset's descriptive and ownership data (US1).
+  - name: Asset Status
+    description: The two-state situation (active/inactive) and its two transitions (US1, data-model.md §3).
+  - name: Asset Relationships
+    description: >-
+      READ-ONLY reverse listings of relationships another module owns (013-incidents-problems-reverse-links).
+security:
+  - session: []
+paths:
+  /assets:
+    get:
+      operationId: listAssetCatalog
+      summary: List the asset inventory
+      tags: [Asset Catalog]
+      description: |
+        Requires `asset:view` - the asset's own permission, never `risk:view` (US2, FR-009). Returns
+        a page of assets restricted to the caller's authorized organizational scope; an asset
+        outside it is neither listed nor counted, and does not affect pagination (FR-010, spec
+        "Vazamento 1" - the leak this operation closes). This is the one operation in this document
+        where a caller who holds no `asset:view` at all is refused with a flat `403`, because no
+        specific record's existence is at stake in a list response.
+
+        All filters combine with AND. `orgUnitId`, when supplied, is always intersected with the
+        caller's own authorized scope - it narrows the result, it never widens it. `isActive`, when
+        omitted, returns both active and inactive assets; supplied, it restricts to exactly that
+        situation. Ordering is by the requested `sort` field with `code` as the tiebreaker, so
+        paging is stable across requests. An empty `data` array with `meta.total` of zero and no
+        filters applied means no asset exists in the caller's scope; with filters applied it means
+        no matches.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          description: Case-insensitive text search across asset code and name.
+          schema:
+            type: string
+            maxLength: 200
+        - name: orgUnitId
+          in: query
+          description: >-
+            Organizational units to include. Comma-separated. Always intersected with the caller's
+            authorized scope.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: isActive
+          in: query
+          description: Restrict to active or inactive assets. Omitted returns both.
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [code, name, updatedAt]
+            default: code
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: A page of the inventory, restricted to the caller's organizational scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssetSummary'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createAsset
+      summary: Register an asset
+      tags: [Asset Record]
+      description: |
+        Requires `asset:create`. `orgUnitId` is required (invariant A1) and must lie inside the
+        caller's authorized scope; a nonexistent or out-of-scope unit is refused with `422`.
+
+        The server assigns the unique, human-readable `code` (`AST-` prefix, `GrcCodeSequence`,
+        data-model.md §2), stable for the life of the record and never client-supplied. `code` and
+        `isActive` are server-owned and rejected as unknown properties if supplied (invariant A6);
+        a created asset is always active. Two assets may share the same `name`, including within the
+        same organizational unit - `name` is never the identity (invariant A3).
+
+        Creation is audited with the new values, including the generated `code` and `orgUnitId`
+        (`asset.created`, data-model.md §7).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetRequest'
+      responses:
+        '201':
+          description: Asset created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: >-
+            The target organizational unit does not exist, or lies outside the caller's authorized
+            scope (invariant A2). Field-level entries are returned in `errors[]`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /assets/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    get:
+      operationId: getAsset
+      summary: Retrieve an asset
+      tags: [Asset Record]
+      description: |
+        Requires `asset:view` and the asset must lie inside the caller's authorized organizational
+        scope; otherwise `404` (FR-010). Includes the risks and controls the asset is currently
+        linked to (FR-008), read from `RiskAssetLink`/`ControlAssetLink` on the asset's own side -
+        withdrawn links are not included here (see this document's description).
+      responses:
+        '200':
+          description: The asset.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateAsset
+      summary: Update an asset's descriptive data
+      tags: [Asset Record]
+      description: |
+        Requires `asset:edit` and scope. Every supplied field is validated on the server
+        independently of the interface, and each changed field's previous and new value is written
+        to the audit trail (`asset.updated`, FR-003, data-model.md §7).
+
+        `code` and `isActive` are read-only and are rejected as unknown properties; situation
+        changes only through `POST /assets/{assetId}/deactivate` and `.../reactivate`. Reassigning
+        `orgUnitId` to a unit outside the caller's scope, or to one that does not exist, is refused
+        with `422` (invariant A2); moving an asset between units changes who can see it going
+        forward and does not affect any `RiskAssetLink`/`ControlAssetLink` already recorded
+        (spec Assumption A-4).
+
+        This operation does not carry `If-Match` and there is no version conflict response: see this
+        document's description for why no optimistic-locking mechanism applies to this record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssetRequest'
+      responses:
+        '200':
+          description: Updated asset.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /assets/{assetId}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    post:
+      operationId: deactivateAsset
+      summary: Deactivate an asset
+      tags: [Asset Status]
+      description: |
+        Requires `asset:administer` and scope. No request body. The asset stays fully readable and
+        stays visible in every `RiskAssetLink`/`ControlAssetLink` it already has - only new links to
+        it are refused from this point on (FR-006, invariant A5). Refused with `422` if the asset is
+        already inactive, and nothing changes.
+
+        Records who deactivated the asset and when, and is audited (`asset.deactivated`, FR-015,
+        data-model.md §7). This operation does not carry `If-Match`: see this document's description
+        for why no optimistic-locking mechanism applies to this record.
+      responses:
+        '200':
+          description: Asset deactivated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The asset is already inactive. Nothing changes.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /assets/{assetId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    post:
+      operationId: reactivateAsset
+      summary: Reactivate an asset
+      tags: [Asset Status]
+      description: |
+        Requires `asset:administer` and scope. No request body. The asset becomes eligible again as
+        the target of a new `RiskAssetLink`/`ControlAssetLink`; links already recorded while it was
+        inactive were unaffected by the deactivation and remain unchanged (FR-006).  Refused with
+        `422` if the asset is already active, and nothing changes.
+
+        Records who reactivated the asset and when, and is audited (`asset.reactivated`, FR-015,
+        data-model.md §7). This operation does not carry `If-Match`: see this document's description
+        for why no optimistic-locking mechanism applies to this record.
+      responses:
+        '200':
+          description: Asset reactivated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The asset is already active. Nothing changes.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /assets/{assetId}/incidents:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    get:
+      operationId: listAssetIncidentLinks
+      summary: List the incidents that reference this asset
+      tags: [Asset Relationships]
+      description: |
+        Requires `asset:view` and scope. READ-ONLY reverse of `IncidentAssetLink`
+        (013-incidents-problems-reverse-links): `modules/assets` never writes this table —
+        `POST`/`DELETE /incidents/{incidentId}/assets` on the Incident side own the write path.
+        Surfaces the Incident<->Asset relationship from the Asset detail screen, which the forward
+        direction alone left invisible from this side. The exposed `IncidentRef` is deliberately
+        minimal (id/code/title/status) - the caller's access to the linked incident itself is never
+        re-checked at read time, matching this same table's own precedent
+        (`GET /incidents/{incidentId}/problems`). Returns current links by default; `includeWithdrawn`
+        also returns links that were removed.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The incidents linking to this asset.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetIncidentLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: vgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Never contains a stack trace, SQL fragment or internal identifier.
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    OrgUnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    RiskRef:
+      type: object
+      description: >-
+        The minimal, read-only projection of a `Risk` this API ever shows (ADR-020 part 4) - id,
+        code and title only.
+      required: [id, code, title]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+    ControlRef:
+      type: object
+      description: >-
+        The minimal, read-only projection of a `Control` this API ever shows (ADR-020 part 4) - id,
+        code and name only.
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    AssetSummary:
+      type: object
+      description: One inventory row.
+      required: [id, code, name, orgUnit, isActive, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          description: >-
+            Human-readable, unique and stable for the life of the record. Server-generated; never
+            client-supplied (invariant A6).
+          examples: ['AST-2026-0001']
+        name:
+          type: string
+          readOnly: true
+        descriptionExcerpt:
+          type: [string, 'null']
+          readOnly: true
+          maxLength: 200
+          description: >-
+            The first 200 characters of the asset's description, for list previews only. The full
+            text is on `AssetDetail.description`. `null` when the asset has no description.
+        orgUnit:
+          # Nullable, and deliberately still REQUIRED — the property is always
+          # present, its value may be null. An asset created before this fase
+          # (the minimal registry it was promoted from) has no organizational
+          # unit recorded (research.md D-2). NULL is invisible to any
+          # scope-by-unit caller (data-model.md §6) — never an invented unit.
+          oneOf:
+            - $ref: '#/components/schemas/OrgUnitRef'
+            - type: 'null'
+          readOnly: true
+        isActive:
+          type: boolean
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    AssetDetail:
+      allOf:
+        - $ref: '#/components/schemas/AssetSummary'
+        - type: object
+          required: [description, createdAt, risks, controls]
+          properties:
+            description:
+              type: [string, 'null']
+              description: Stored intact regardless of length. `null` when none was recorded.
+            risks:
+              type: array
+              description: >-
+                The risks this asset is currently linked to (FR-008), read from the existing
+                `RiskAssetLink` on the asset's own side. Only active links - a withdrawn one is not
+                included here; it remains visible through `GET /risks/{riskId}/assets`.
+              items:
+                $ref: '#/components/schemas/RiskRef'
+            controls:
+              type: array
+              description: >-
+                The controls this asset is currently linked to (FR-008), read from the existing
+                `ControlAssetLink` on the asset's own side. Only active links - a withdrawn one is
+                not included here; it remains visible through `GET /controls/{controlId}/assets`.
+              items:
+                $ref: '#/components/schemas/ControlRef'
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+    CreateAssetRequest:
+      type: object
+      description: |
+        Creates an active asset. `code` and `isActive` are server-owned and rejected if supplied
+        (invariant A6).
+      required: [name, orgUnitId]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        orgUnitId:
+          type: string
+          format: uuid
+          description: Required (invariant A1). Must be inside the caller's authorized scope.
+    UpdateAssetRequest:
+      type: object
+      description: |
+        Partial update of descriptive data. Omitted properties are left unchanged. `code` and
+        `isActive` are read-only and rejected if supplied - situation is changed only through
+        `POST /assets/{assetId}/deactivate` and `.../reactivate`.
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        orgUnitId:
+          type: string
+          format: uuid
+          description: >-
+            Reassignment is refused with `422` if the target unit does not exist or lies outside the
+            caller's authorized scope (invariant A2).
+    IncidentRef:
+      type: object
+      description: >-
+        Mirrors `problems.openapi.yaml`'s own `IncidentRef` — duplicated here because contracts
+        never merge schemas across documents (packages/api-types convention).
+      required: [id, code, title, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/IncidentStatusRef'
+    IncidentStatusRef:
+      type: string
+      description: >-
+        Mirrors `incidents.openapi.yaml`'s `IncidentStatus` - duplicated here because contracts
+        never merge schemas across documents (packages/api-types convention).
+      enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, CANCELLED]
+    AssetIncidentLink:
+      type: object
+      description: |
+        READ-ONLY reverse projection of `IncidentAssetLink` (013-incidents-problems-reverse-links):
+        `modules/assets` never creates or withdraws this link — see `listAssetIncidentLinks`'s own
+        description.
+      required: [id, incident, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        incident:
+          $ref: '#/components/schemas/IncidentRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+  responses:
+    BadRequest:
+      description: >-
+        The request is malformed, or carries unknown properties - including any attempt to supply
+        `code` or `isActive`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The caller can see the asset (in scope, holding `asset:view`) but lacks the permission for
+        this specific action, or the request failed the cross-site request forgery origin check. A
+        caller who cannot see the asset at all receives `404`, not `403`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: |
+        No such asset, or the asset exists but lies outside the caller's authorized organizational
+        scope, or the caller lacks `asset:view` entirely. The three are deliberately
+        indistinguishable so the response cannot disclose the existence of a record the caller may
+        not see (FR-010).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: >-
+        The request is well formed but violates a domain rule - most commonly, the target
+        organizational unit does not exist or lies outside the caller's authorized scope (invariant
+        A2).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

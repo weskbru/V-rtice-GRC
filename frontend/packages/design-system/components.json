@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@vertice/design-system/components",
+    "ui": "@vertice/design-system/components/ui",
+    "lib": "@vertice/design-system/lib",
+    "utils": "@vertice/design-system/lib/utils",
+    "hooks": "@vertice/design-system/hooks"
+  }
+}

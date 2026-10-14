@@ -1,0 +1,107 @@
+services:
+  postgres:
+    profiles: ["local-db"]
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Defina uma senha local exclusiva para postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vertice_grc}
+      POSTGRES_OWNER_USER: ${POSTGRES_OWNER_USER:-vertice_owner}
+      POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina uma senha local exclusiva para vertice_owner}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-vertice_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Defina uma senha local exclusiva para vertice_app}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      # A API recebe apenas configuração de runtime, sem credenciais de administração.
+      NODE_ENV: ${NODE_ENV:-production}
+      API_PORT: "3001"
+      WEB_PORT: ${WEB_PORT:-3000}
+      API_INTERNAL_URL: http://api:3001
+      APP_ORIGIN: ${APP_ORIGIN:?Defina a origem publica exata}
+      DATABASE_URL: ${DATABASE_URL:?Defina a conexao do papel restrito da aplicacao}
+      REDIS_URL: redis://redis:6379
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:?Defina SESSION_COOKIE_NAME no arquivo de ambiente}
+      SESSION_COOKIE_SAMESITE: ${SESSION_COOKIE_SAMESITE:?Defina SESSION_COOKIE_SAMESITE no arquivo de ambiente}
+      SESSION_IDLE_TIMEOUT_MINUTES: ${SESSION_IDLE_TIMEOUT_MINUTES:?Defina SESSION_IDLE_TIMEOUT_MINUTES no arquivo de ambiente}
+      SESSION_ABSOLUTE_LIFETIME_HOURS: ${SESSION_ABSOLUTE_LIFETIME_HOURS:?Defina SESSION_ABSOLUTE_LIFETIME_HOURS no arquivo de ambiente}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:?Defina PASSWORD_MIN_LENGTH no arquivo de ambiente}
+      PASSWORD_REQUIRE_COMPLEXITY: ${PASSWORD_REQUIRE_COMPLEXITY:?Defina PASSWORD_REQUIRE_COMPLEXITY no arquivo de ambiente}
+      ARGON2_MEMORY_COST: ${ARGON2_MEMORY_COST:?Defina ARGON2_MEMORY_COST no arquivo de ambiente}
+      ARGON2_TIME_COST: ${ARGON2_TIME_COST:?Defina ARGON2_TIME_COST no arquivo de ambiente}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:?Defina ARGON2_PARALLELISM no arquivo de ambiente}
+      LOG_LEVEL: ${LOG_LEVEL:?Defina LOG_LEVEL no arquivo de ambiente}
+      LOG_PRETTY: ${LOG_PRETTY:?Defina LOG_PRETTY no arquivo de ambiente}
+      THROTTLE_TTL_SECONDS: ${THROTTLE_TTL_SECONDS:?Defina THROTTLE_TTL_SECONDS no arquivo de ambiente}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:?Defina THROTTLE_LIMIT no arquivo de ambiente}
+      AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: ${AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS:?Defina AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS no arquivo de ambiente}
+      AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: ${AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS:?Defina AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS no arquivo de ambiente}
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:?Defina AUTH_RATE_LIMIT_WINDOW_SECONDS no arquivo de ambiente}
+      AUTH_LOCKOUT_MINUTES: ${AUTH_LOCKOUT_MINUTES:?Defina AUTH_LOCKOUT_MINUTES no arquivo de ambiente}
+      ATTACHMENT_STORAGE_DRIVER: ${ATTACHMENT_STORAGE_DRIVER:?Defina ATTACHMENT_STORAGE_DRIVER no arquivo de ambiente}
+      ATTACHMENT_MAX_SIZE_BYTES: ${ATTACHMENT_MAX_SIZE_BYTES:?Defina ATTACHMENT_MAX_SIZE_BYTES no arquivo de ambiente}
+      ATTACHMENT_ALLOWED_MIME_TYPES: ${ATTACHMENT_ALLOWED_MIME_TYPES:?Defina ATTACHMENT_ALLOWED_MIME_TYPES no arquivo de ambiente}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?Defina SEED_ADMIN_EMAIL no arquivo de ambiente}
+      ATTACHMENT_STORAGE_PATH: /app/storage/attachments
+      SEED_DEV_FIXTURES: "false"
+    ports:
+      - "127.0.0.1:${API_PORT:-3001}:3001"
+    volumes:
+      - attachments_storage:/app/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:3001
+        APP_ORIGIN: ${APP_ORIGIN:?Defina a origem publica exata}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:3001
+      APP_ORIGIN: ${APP_ORIGIN:?Defina a origem publica exata}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  attachments_storage:

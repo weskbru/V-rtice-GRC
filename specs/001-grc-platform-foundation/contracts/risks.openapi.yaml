@@ -1,0 +1,2683 @@
+openapi: 3.1.0
+info:
+  title: Vértice GRC - Risk Management API
+  version: 1.0.0
+  summary: >-
+    Risk records, the register, assessments, treatment, control/process/asset links, the approval
+    gated lifecycle, history and per-risk audit.
+  description: |
+    The first business module (US2 to US7). Every operation in this document is subject to two
+    independent server-side checks (FR-025, FR-026, ADR-003, ADR-004):
+
+    1. the caller's `resource:action` permission, named in each operation's description;
+    2. the caller's resolved organizational scope, applied as a mandatory predicate in the
+       repository layer on every read and every write.
+
+    **Existence is not disclosed.** A risk outside the caller's organizational scope, and a risk the
+    caller may not view, are both answered with `404` - never `403` - so the response cannot be used
+    to probe for records (FR-030). `403` is reserved for cases where the caller can see the record
+    but lacks the permission for the specific action, and for the cross-site request forgery origin
+    check.
+
+    **Derived values are read-only.** `inherentScore`, `inherentLevel`, `residualScore` and
+    `residualLevel` are computed exclusively by `RiskScoringService` from the factor values of an
+    assessment and the pinned methodology version. No request body in this document accepts them;
+    they are rejected as unknown properties by the global validation pipe (FR-062, FR-063, ADR-006).
+
+    **Optimistic locking.** Every mutation of a risk or of a risk-owned child requires the
+    `If-Match` header carrying the `version` last read for that risk, returned as the `ETag` of
+    `GET /risks/{riskId}`. A stale version yields `409` with the current version in the problem
+    document; the write is not applied (FR-085, FR-103, ADR-013).
+
+    **History is never overwritten.** Assessments, treatment decisions, lifecycle transitions and
+    approvals are append-only. Risks are archived, never deleted - there is deliberately no
+    `DELETE /risks/{riskId}` (FR-102).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Risk Register
+    description: Listing, searching and filtering risks at scale (US3).
+  - name: Risk Record
+    description: Creating and maintaining a risk and its causes and consequences (US2).
+  - name: Risk Assessment
+    description: Methodology-driven assessment with preserved history (US4).
+  - name: Risk Treatment
+    description: Treatment decisions and risk-owned treatment actions (US5).
+  - name: Risk Relationships
+    description: Explicit links from a risk to controls, processes and assets.
+  - name: Risk Lifecycle
+    description: State transitions and segregation-of-duties approvals (US6).
+  - name: Risk Traceability
+    description: Merged history and the per-risk audit trail (US7).
+security:
+  - session: []
+paths:
+  /risks:
+    get:
+      operationId: listRiskRegister
+      summary: List the risk register
+      tags: [Risk Register]
+      description: |
+        Requires `risk:view`. Returns a page of risks restricted to the caller's authorized
+        organizational scope; risks outside it are neither listed nor counted (FR-090, FR-025).
+
+        All filters combine with AND (FR-088). Ordering is by the requested `sort` field with `code`
+        as the tiebreaker, so paging is stable across requests (US3 AS1). Results are always
+        paginated and never unbounded (FR-086).
+
+        Each row carries the indicators the register must show without relying on colour:
+        `overdueReview`, `overdueTreatment` and the risk level as a named value (FR-091, FR-074b,
+        FR-075). An empty `data` array with `meta.total` of zero and no filters applied means no
+        risks exist; with filters applied it means no matches - the client distinguishes the two
+        from the request it made (US3 AS7).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          description: Text search across risk code, title and description (FR-089).
+          schema:
+            type: string
+            maxLength: 200
+        - name: status
+          in: query
+          description: Lifecycle statuses to include (FR-088). Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/RiskStatus'
+        - name: riskLevel
+          in: query
+          description: Risk levels to include (FR-088). Comma-separated. Applied to the basis named by `riskLevelBasis`.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/RiskLevel'
+        - name: riskLevelBasis
+          in: query
+          description: |
+            Which derived level the `riskLevel` filter and the `riskLevel` sort apply to. Defaults
+            to residual, the level a risk manager works from.
+          schema:
+            type: string
+            enum: [RESIDUAL, INHERENT]
+            default: RESIDUAL
+        - name: categoryId
+          in: query
+          description: Risk categories to include (FR-088). Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: orgUnitId
+          in: query
+          description: |
+            Organizational units to include (FR-088). Comma-separated. Always intersected with the
+            caller's authorized scope - it narrows, never widens.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: includeDescendants
+          in: query
+          description: Whether an `orgUnitId` filter also matches risks in descendant units (FR-025b).
+          schema:
+            type: boolean
+            default: true
+        - name: ownerUserId
+          in: query
+          description: Risk owners to include (FR-088). Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: overdueReview
+          in: query
+          description: |
+            When true, restricts to risks whose `nextReviewOn` has passed (FR-070, FR-091).
+            Evaluated on read from the stored date, never from a cached flag.
+          schema:
+            type: boolean
+        - name: overdueTreatment
+          in: query
+          description: |
+            When true, restricts to risks with at least one treatment action past its due date and
+            not complete, or a passed treatment deadline with outstanding actions (FR-074b, FR-075).
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          description: Sort field (FR-087). `riskLevel` sorts by the basis named in `riskLevelBasis`.
+          schema:
+            type: string
+            enum: [code, title, riskLevel, status, owner, nextReviewOn, identifiedOn, updatedAt]
+            default: code
+        - $ref: '#/components/parameters/SortDirection'
+      responses:
+        '200':
+          description: A page of the register.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskSummary'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createRisk
+      summary: Create a risk
+      tags: [Risk Record]
+      description: |
+        Requires `risk:create`. The risk is created in `DRAFT` and may be incomplete beyond the
+        fields required here (FR-056); the completeness required to leave `DRAFT` is enforced at the
+        transition, not at creation (FR-055).
+
+        The server assigns the unique, human-readable `code`, which is stable for the life of the
+        record and is never client-supplied (FR-054). `status` and all derived levels are likewise
+        server-owned.
+
+        Creation into an organizational unit outside the caller's authorized scope is refused with
+        `422` (FR-025c). Creation is audited with the new values (FR-032).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRiskRequest'
+      responses:
+        '201':
+          description: Risk created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Server-side validation failed (FR-059): a referenced category, type, origin, unit or
+            user does not exist or is inactive (FR-060), or the target organizational unit is
+            outside the caller's scope (FR-025c). Field-level entries are returned in `errors[]`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /risks/{riskId}:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: getRisk
+      summary: Retrieve a risk
+      tags: [Risk Record]
+      description: |
+        Requires `risk:view` and the risk must be inside the caller's authorized organizational
+        scope; otherwise `404` (FR-030, FR-090).
+
+        Returns the structured detail representation - overview, classification, ownership, causes
+        and consequences, current assessment, current treatment, links and lifecycle condition - so
+        the detail screen can present sections rather than one undifferentiated form (FR-093).
+        Section visibility follows the caller's effective permissions from `GET /auth/session`; each
+        section's own endpoint enforces the same rule independently (FR-094, FR-026).
+
+        The `ETag` carries the risk's `version` and must be echoed in `If-Match` on any subsequent
+        mutation (ADR-013).
+      responses:
+        '200':
+          description: The risk.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateRisk
+      summary: Update a risk's business content
+      tags: [Risk Record]
+      description: |
+        Requires `risk:edit` and scope. Every supplied field is validated on the server independently
+        of the interface (FR-059) and each changed field's previous and new value is written to the
+        audit trail (US2 AS3, FR-033). Owner and responsible-person reassignment is recorded with
+        actor and timestamp (FR-058).
+
+        `code`, `status` and all derived levels are read-only and are rejected as unknown properties.
+        Reassignment into an organizational unit outside the caller's scope is refused with `422`
+        (FR-025c). Risks in `CLOSED` or `ARCHIVED` reject business-content updates with `422` while
+        remaining readable (FR-084).
+
+        `If-Match` is required; a stale version yields `409` and nothing is written (FR-103).
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRiskRequest'
+      responses:
+        '200':
+          description: Updated risk.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/causes:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    put:
+      operationId: replaceRiskCauses
+      summary: Replace the risk's causes
+      tags: [Risk Record]
+      description: |
+        Requires `risk:edit` and scope. Causes are individually recorded rows in the supplied order,
+        not a free-text blob (FR-057). The complete list is replaced so the audit entry carries the
+        previous and new sets as one comprehensible change. Refused with `422` on `CLOSED` or
+        `ARCHIVED` risks (FR-084). `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceRiskStatementsRequest'
+      responses:
+        '200':
+          description: The stored causes in order.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RiskStatement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/consequences:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    put:
+      operationId: replaceRiskConsequences
+      summary: Replace the risk's consequences
+      tags: [Risk Record]
+      description: |
+        Requires `risk:edit` and scope. Consequences are individually recorded rows in the supplied
+        order (FR-057). Same replacement, locking and closed-state semantics as causes.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceRiskStatementsRequest'
+      responses:
+        '200':
+          description: The stored consequences in order.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RiskStatement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/assessments:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskAssessments
+      summary: List the risk's assessment history
+      tags: [Risk Assessment]
+      description: |
+        Requires `risk:view` and scope. Returns every assessment, newest first, each with its
+        assessor, date, factor values, pinned methodology version, derived inherent and residual
+        results, the controls considered, and the level change relative to the assessment it
+        superseded (FR-066).
+
+        Prior assessments are returned unchanged for the life of the record; a methodology change
+        never rescores them because each is pinned to the methodology version in force when it was
+        performed (FR-065, FR-068).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of assessments, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskAssessment'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createRiskAssessment
+      summary: Assess or reassess the risk
+      tags: [Risk Assessment]
+      description: |
+        Requires `risk:assess` and scope. The request carries **only** factor values - inherent and
+        residual probability and impact - the controls considered, and an optional rationale. Scores
+        and levels are derived by the platform from the active methodology version and are rejected
+        if supplied (FR-062, FR-063).
+
+        Factor values outside the configured scales are refused with `422` and field-level messages
+        (FR-067). The assessment pins the methodology version resolved at submission; if the
+        methodology changed after the client loaded the form, supply that version in
+        `methodologyVersionId` to complete against it, or omit it to use the active version - a
+        supplied version that is no longer active and no longer accepted is refused with `422`
+        rather than silently rescored (US4 AS5, FR-068).
+
+        A reassessment inserts a new immutable record, links it to its predecessor and repoints the
+        risk's current assessment in the same transaction; nothing is overwritten, and a reassessment
+        yielding an identical level is still stored as a distinct record (FR-064, FR-065). The risk's
+        denormalized levels and `lastAssessedOn` are updated by this operation only.
+
+        `If-Match` is required, so a concurrent edit cannot be lost.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRiskAssessmentRequest'
+      responses:
+        '201':
+          description: Assessment recorded.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskAssessment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: |
+            A factor value falls outside the configured scale (FR-067), a referenced control does
+            not exist, the pinned methodology version is not acceptable, or the risk is `CLOSED` or
+            `ARCHIVED` (FR-084).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /risks/{riskId}/treatments:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskTreatmentDecisions
+      summary: List the risk's treatment decisions
+      tags: [Risk Treatment]
+      description: |
+        Requires `risk:view` and scope. Returns every decision, newest first, including superseded
+        ones with the instant they were superseded - decisions are never overwritten (FR-073).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of treatment decisions, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskTreatmentDecision'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createRiskTreatmentDecision
+      summary: Record a treatment decision
+      tags: [Risk Treatment]
+      description: |
+        Requires `risk:treat` and scope. Records the strategy - mitigate, avoid, transfer/share or
+        accept - with its rationale and deadline (FR-071, FR-072). The deciding user and timestamp
+        are taken from the session, never from the request body, and the decision is audited
+        (US5 AS1).
+
+        Recording a new decision supersedes the previous one by stamping it, not by replacing it
+        (FR-073). Refused with `422` on `CLOSED` or `ARCHIVED` risks. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRiskTreatmentDecisionRequest'
+      responses:
+        '201':
+          description: Decision recorded and any previous decision superseded.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskTreatmentDecision'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/treatment-actions:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskTreatmentActions
+      summary: List the risk's treatment actions
+      tags: [Risk Treatment]
+      description: |
+        Requires `risk:view` and scope. Each action carries its responsible user, due date, status
+        and an `overdue` flag computed on read from the due date and status - never stored
+        (FR-074, FR-074b, ADR-015).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          description: Statuses to include. Comma-separated.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TreatmentActionStatus'
+        - name: overdue
+          in: query
+          description: When true, restricts to actions past their due date and not complete or cancelled.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: A page of treatment actions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskTreatmentAction'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createRiskTreatmentAction
+      summary: Create a treatment action
+      tags: [Risk Treatment]
+      description: |
+        Requires `risk:treat` and scope. An action carries a title, an optional description, a
+        responsible user, a due date and a status, and may reference the treatment decision it
+        arises from (FR-074). Actions are owned by the risk record in this release; the shape is
+        deliberately free of other risk-specific fields so a future shared Action Plans module can
+        take ownership without changing their recorded meaning (FR-074c).
+
+        Creation is audited. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRiskTreatmentActionRequest'
+      responses:
+        '201':
+          description: Action created.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskTreatmentAction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/treatment-actions/{actionId}:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+      - name: actionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateRiskTreatmentAction
+      summary: Update a treatment action
+      tags: [Risk Treatment]
+      description: |
+        Requires `risk:treat` and scope. Changes to description, responsible user, due date or
+        status. A status change is attributed to the acting user with a timestamp and is audited
+        (FR-074a); moving to `COMPLETED` stamps completion. Actions are not deleted - `CANCELLED` is
+        the terminal status that preserves the record (FR-102). `If-Match` is required.
+
+        A status change is checked against the shared `Action` legality table
+        (007-implementation-remediation, D-3): only `OPEN -> IN_PROGRESS`, `IN_PROGRESS ->
+        COMPLETED`, `COMPLETED -> OPEN`, `OPEN -> CANCELLED` and `IN_PROGRESS -> CANCELLED` are
+        legal — `422` for any other pair, including a direct `OPEN -> COMPLETED`. Reopening a
+        `COMPLETED` action (`status: OPEN`) additionally requires a non-empty `reopenReason` -
+        `422` when it is missing or empty.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRiskTreatmentActionRequest'
+      responses:
+        '200':
+          description: Updated action.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskTreatmentAction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/controls:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskControlLinks
+      summary: List the controls associated with the risk
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:view` and scope. Returns current links by default; `includeWithdrawn` also
+        returns links that were removed, with who removed them and when, so a removal remains
+        visible in history (FR-076, US5 AS3). The link is an explicitly modelled relationship
+        carrying its own facts, so a future Controls Management module can take ownership of the
+        control without changing its meaning (FR-077, ADR-008).
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The control links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RiskControlLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: linkControlToRisk
+      summary: Associate a control with the risk
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:treat` and scope. Records who linked the control and when, and is audited
+        (FR-076, FR-032). Associated controls are what a later assessment may take into account when
+        the assessor judges residual probability and impact (FR-078). Linking an already-linked
+        control returns `409`. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkEntityRequest'
+      responses:
+        '201':
+          description: Control linked.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskControlLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The control is already linked to this risk, or the supplied version is stale. The
+            problem `type` distinguishes the two.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/controls/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkControlFromRisk
+      summary: Remove a control association
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:treat` and scope. The link is withdrawn, not deleted: the removal stamps who
+        and when so history remains complete and the risk remains valid (FR-076, FR-102, edge case
+        "referenced control removed"). Assessments already recorded keep their snapshot of the
+        controls considered. Audited. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Control association withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /risks/{riskId}/processes:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    post:
+      operationId: linkProcessToRisk
+      summary: Associate a process with the risk
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:edit` and scope. A lightweight reference to a process from the minimal
+        process registry - no Process Management module exists in this release (FR-053, spec
+        Assumptions). Explicitly modelled as its own relationship rather than a generic mechanism
+        (ADR-008). Audited. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkEntityRequest'
+      responses:
+        '201':
+          description: Process linked.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskEntityLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The process is already linked, or the supplied version is stale.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/processes/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkProcessFromRisk
+      summary: Remove a process association
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:edit` and scope. Withdrawn rather than deleted, preserving history (FR-102).
+        Audited. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Process association withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /risks/{riskId}/assets:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    post:
+      operationId: linkAssetToRisk
+      summary: Associate an asset with the risk
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:edit` and scope. A lightweight reference to an asset from the minimal asset
+        registry - no Asset Management module exists in this release (FR-053, spec Assumptions).
+        Audited. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkEntityRequest'
+      responses:
+        '201':
+          description: Asset linked.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskEntityLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The asset is already linked, or the supplied version is stale.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /risks/{riskId}/assets/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      operationId: unlinkAssetFromRisk
+      summary: Remove an asset association
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:edit` and scope. Withdrawn rather than deleted, preserving history (FR-102).
+        Audited. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Asset association withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+  /risks/{riskId}/incidents:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskIncidentLinks
+      summary: List the incidents that reference this risk
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:view` and scope. READ-ONLY reverse of `IncidentRiskLink`
+        (013-incidents-problems-reverse-links): `modules/risk` never writes this table —
+        `POST`/`DELETE /incidents/{incidentId}/risks` on the Incident side (ADR-020) own the write
+        path. Surfaces the Incident<->Risk relationship from the Risk detail screen, which the
+        forward direction alone left invisible from this side. The exposed `IncidentRef` is
+        deliberately minimal (id/code/title/status) — the caller's access to the linked incident
+        itself is never re-checked at read time, matching this same table's own precedent
+        (`GET /incidents/{incidentId}/problems`, which reads a link table it does not own the same
+        way). Returns current links by default; `includeWithdrawn` also returns links that were
+        removed.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The incidents linking to this risk.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RiskIncidentLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /risks/{riskId}/problems:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskProblemLinks
+      summary: List the problems that reference this risk
+      tags: [Risk Relationships]
+      description: |
+        Requires `risk:view` and scope. READ-ONLY reverse of `ProblemRiskLink`
+        (013-incidents-problems-reverse-links): `modules/risk` never writes this table —
+        `POST`/`DELETE /problems/{problemId}/risks` on the Problem side (ADR-020) own the write
+        path. Mirrors `listRiskIncidentLinks` above exactly, for `Problem` instead of `Incident`.
+      parameters:
+        - name: includeWithdrawn
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The problems linking to this risk.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RiskProblemLink'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /risks/{riskId}/lifecycle:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: getRiskLifecycle
+      summary: Retrieve the current state and the transitions available to the caller
+      tags: [Risk Lifecycle]
+      description: |
+        Requires `risk:view` and scope. Returns the current status, any pending-approval condition,
+        and the transitions that are both valid from the current state and permitted to this caller,
+        each with its unmet preconditions and whether it requires an approval by a different user
+        (FR-080, FR-082, FR-029c).
+
+        This endpoint exists so the interface offers only legal, permitted transitions. It is not
+        the control: `POST /risks/{riskId}/transitions` re-evaluates the same declarative transition
+        table server-side on every request (FR-026, FR-081, ADR-006).
+      responses:
+        '200':
+          description: Current lifecycle state and available transitions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskLifecycleState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /risks/{riskId}/transitions:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    post:
+      operationId: transitionRisk
+      summary: Apply a lifecycle transition
+      tags: [Risk Lifecycle]
+      description: |
+        Requires the permission the declarative transition table assigns to the requested pair -
+        `risk:edit` for `DRAFT` to `IDENTIFIED`, `risk:assess` for transitions into `ASSESSED`,
+        `risk:treat` for `UNDER_TREATMENT`, `risk:transition` for `UNDER_REVIEW`, `risk:administer`
+        for `ARCHIVED` - plus scope (ADR-006, FR-080).
+
+        A pair absent from the table, or one whose preconditions are unmet, is refused with `422`
+        naming what is missing, and the record is left unchanged (FR-081, US6 AS3).
+
+        Transitions into `ACCEPTED` and `CLOSED` are approval gated and are **not** performed here:
+        use `POST /risks/{riskId}/approvals` to request them (FR-029). Requesting one through this
+        endpoint is refused with `422`.
+
+        Each applied transition records previous state, new state, acting user, timestamp and any
+        justification, and is audited (FR-083, FR-032). `If-Match` is required, so two concurrent
+        transition requests cannot both apply - the loser receives `409` with the current state
+        (FR-085).
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionRiskRequest'
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskLifecycleTransition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          description: |
+            The transition is not permitted from the current state, its preconditions are unmet, or
+            it is approval gated and must be requested through the approvals endpoint. The record is
+            unchanged.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /risks/{riskId}/approvals:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskApprovals
+      summary: List approval requests and decisions for the risk
+      tags: [Risk Lifecycle]
+      description: |
+        Requires `risk:view` and scope. Every request and decision is retrievable with the
+        requesting user, the deciding user, the outcome, the timestamps and any justification
+        (FR-029b, SC-016).
+      responses:
+        '200':
+          description: Approvals, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Approval'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: requestRiskApproval
+      summary: Request an approval-gated transition
+      tags: [Risk Lifecycle]
+      description: |
+        Requires `risk:transition` and scope. Opens a pending approval for a transition into
+        `ACCEPTED` or `CLOSED` - the only gated transitions in this release (FR-029).
+
+        The risk **stays in its current lifecycle state**; awaiting approval is an explicit condition
+        on the record, not a ninth state, visible to the requester and to eligible approvers
+        (FR-029c). The pending approval appears in eligible approvers' dashboard pending-approvals
+        area (FR-049, US6 AS8).
+
+        Only one approval may be pending per risk; a second request is refused with `409`. A
+        transition that is not gated is refused with `422`. `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestApprovalRequest'
+      responses:
+        '201':
+          description: Approval requested; the risk remains in its current state.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: An approval is already pending for this risk, or the supplied version is stale.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: |
+            The requested transition is not approval gated, is not valid from the current state, or
+            its preconditions are unmet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /risks/{riskId}/approvals/{approvalId}/decision:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+      - name: approvalId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: decideRiskApproval
+      summary: Approve or reject a pending approval
+      tags: [Risk Lifecycle]
+      description: |
+        Requires `risk:approve` and scope.
+
+        **Segregation of duties: the deciding user must differ from the requesting user.** A caller
+        attempting to decide their own request is refused with `422` and the risk does not change
+        state, regardless of the permissions they hold and regardless of the entry point used - the
+        rule lives in the domain service with a database check constraint behind it (FR-029a,
+        US6 AS6, SC-016).
+
+        `APPROVED` applies the requested transition in the same transaction, writes the lifecycle
+        transition record linked to the approval, and clears the pending condition. `REJECTED`
+        clears the pending condition, leaves the risk in the state it was already in, and records
+        the rejection with actor, timestamp and justification (FR-029c, US6 AS7).
+
+        The decision is recorded once and is immutable; a second decision on the same approval is
+        refused with `409`. Both outcomes are audited (FR-029b, FR-032). `If-Match` is required.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Decision recorded; on approval the transition has been applied.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The approval has already been decided, or the supplied version is stale. The problem
+            `type` distinguishes the two.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: |
+            The deciding user is the requesting user (FR-029a), or the gated transition is no longer
+            valid from the risk's current state.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: /problems/segregation-of-duties
+                title: Approver must differ from requester
+                status: 422
+                detail: The user who requested this transition cannot approve it.
+                instance: /api/v1/risks/0193c1f6-0000-7000-8000-000000000001/approvals/0193c1f6-0000-7000-8000-000000000002/decision
+                correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+  /risks/{riskId}/history:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: getRiskHistory
+      summary: Retrieve the risk's chronological history
+      tags: [Risk Traceability]
+      description: |
+        Requires `risk:view` and scope. A merged, chronological, attributed account of assessments
+        and the risk-level changes between them, ownership changes, treatment decisions, lifecycle
+        transitions and approvals (FR-105, US7 AS1).
+
+        This is a query over the append-only domain records and the relevant audit entries, not a
+        stored table (ADR-007). It is available to anyone who may view the risk; the raw audit trail
+        is a separate, permission-gated view.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: type
+          in: query
+          description: Entry types to include. Comma-separated. Omit for all.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/RiskHistoryEntryType'
+      responses:
+        '200':
+          description: A page of history entries, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskHistoryEntry'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /risks/{riskId}/audit-events:
+    parameters:
+      - $ref: '#/components/parameters/RiskId'
+    get:
+      operationId: listRiskAuditEvents
+      summary: Retrieve the audit trail for the risk
+      tags: [Risk Traceability]
+      description: |
+        Requires `audit:view` **and** `risk:view` and scope. Returns audit entries for the risk and
+        its child records, each with actor, timestamp, action, entity type, entity identifier,
+        outcome and the allow-listed previous and new values (FR-036, FR-033, US7 AS2).
+
+        A caller without `audit:view` who can otherwise see the risk receives `403` - the risk's
+        existence is already known to them, so no information is disclosed by the distinction
+        (US7 AS4). A caller who cannot see the risk at all receives `404` (FR-030).
+
+        Audit entries are append-only: there is deliberately no endpoint that modifies or deletes
+        one (FR-034, US7 AS5). Secrets, credentials and session identifiers never appear in any
+        payload (FR-035).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: action
+          in: query
+          description: Filter to one business action, for example `risk.accepted`.
+          schema:
+            type: string
+            maxLength: 100
+        - name: actorUserId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: occurredFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: occurredTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: A page of audit entries, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEvent'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: vgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  headers:
+    ETag:
+      description: |
+        The risk's optimistic-locking `version` as an entity tag, for example `"7"`. Echo it in
+        `If-Match` on the next mutation (ADR-013).
+      schema:
+        type: string
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set (FR-086).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    SortDirection:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: asc
+    RiskId:
+      name: riskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LinkId:
+      name: linkId
+      in: path
+      required: true
+      description: Identifier of the relationship record, not of the linked entity.
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: |
+        The risk `version` last read, as an entity tag, for example `"7"` (ADR-013). Required on
+        every risk mutation. A missing or malformed header is `400`; a stale value is `409` and
+        nothing is written.
+      schema:
+        type: string
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Never contains a stack trace, SQL fragment or internal identifier (FR-107).
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+    VersionConflictProblem:
+      description: |
+        Problem document returned when the supplied `If-Match` version is not the current one. The
+        write was not applied; the client reloads, re-applies its edits and retries (FR-103).
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [currentVersion, currentStatus]
+          properties:
+            currentVersion:
+              type: integer
+              description: The risk's current version, to be echoed in the retried `If-Match`.
+            currentStatus:
+              $ref: '#/components/schemas/RiskStatus'
+            modifiedAt:
+              type: string
+              format: date-time
+            modifiedBy:
+              $ref: '#/components/schemas/UserRef'
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    RiskStatus:
+      type: string
+      description: The eight lifecycle states (FR-079).
+      enum: [DRAFT, IDENTIFIED, ASSESSED, UNDER_TREATMENT, UNDER_REVIEW, ACCEPTED, CLOSED, ARCHIVED]
+    RiskLevel:
+      type: string
+      description: |
+        Derived level from the configured methodology bands. Always accompanied by a score, so the
+        interface can distinguish levels by name and value rather than by colour alone (FR-091).
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    TreatmentStrategy:
+      type: string
+      enum: [MITIGATE, AVOID, TRANSFER, ACCEPT]
+      description: Mitigate, avoid, transfer/share or accept (FR-071).
+    TreatmentActionStatus:
+      type: string
+      enum: [OPEN, IN_PROGRESS, COMPLETED, CANCELLED]
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    OrgUnitRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    ReferenceDataRef:
+      type: object
+      description: A risk category, type or origin (ADR-008 reference tables).
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    ControlRef:
+      type: object
+      description: |
+        An entry in the minimal control registry. Controls exist in this release only to be
+        referenced from a risk; there is no Controls Management module (spec Out of Scope).
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    EntityRef:
+      type: object
+      description: An entry in the minimal process or asset registry.
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    RiskStatement:
+      type: object
+      description: An individually recorded cause or consequence (FR-057).
+      required: [id, description, sortOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        description:
+          type: string
+        sortOrder:
+          type: integer
+          minimum: 0
+          readOnly: true
+    RiskSummary:
+      type: object
+      description: One register row (FR-086, FR-091).
+      required:
+        [id, code, title, status, orgUnit, owner, overdueReview, overdueTreatment, pendingApproval, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          description: Human-readable, unique and stable for the life of the record (FR-054).
+        title:
+          type: string
+          readOnly: true
+        descriptionExcerpt:
+          type: [string, 'null']
+          readOnly: true
+          maxLength: 200
+          description: >-
+            The first 200 characters of the risk's description, provided for
+            list previews only. The full text is on `RiskDetail.description`.
+            Truncated by character count, not on a word boundary.
+        status:
+          $ref: '#/components/schemas/RiskStatus'
+        category:
+          oneOf:
+            - $ref: '#/components/schemas/ReferenceDataRef'
+            - type: 'null'
+          readOnly: true
+        orgUnit:
+          $ref: '#/components/schemas/OrgUnitRef'
+        owner:
+          $ref: '#/components/schemas/UserRef'
+        responsible:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        inherentScore:
+          type: [integer, 'null']
+          readOnly: true
+          description: Derived by the platform from the current assessment. Never accepted as input (FR-062).
+        inherentLevel:
+          oneOf:
+            - $ref: '#/components/schemas/RiskLevel'
+            - type: 'null'
+          readOnly: true
+          description: Derived by the platform. Never accepted as input (FR-062).
+        residualScore:
+          type: [integer, 'null']
+          readOnly: true
+          description: Derived by the platform. Never accepted as input (FR-062).
+        residualLevel:
+          oneOf:
+            - $ref: '#/components/schemas/RiskLevel'
+            - type: 'null'
+          readOnly: true
+          description: Derived by the platform. Never accepted as input (FR-062).
+        lastAssessedOn:
+          type: [string, 'null']
+          format: date
+          readOnly: true
+        nextReviewOn:
+          type: [string, 'null']
+          format: date
+        overdueReview:
+          type: boolean
+          readOnly: true
+          description: '`nextReviewOn` has passed. Computed on read (FR-070, FR-091).'
+        overdueTreatment:
+          type: boolean
+          readOnly: true
+          description: |
+            A treatment deadline has passed with outstanding actions, or an action is past due and
+            not complete. Reported separately from `overdueReview` so the two conditions are
+            individually visible (FR-074b, FR-075).
+        pendingApproval:
+          type: boolean
+          readOnly: true
+          description: An approval is awaiting decision on this risk (FR-029c).
+        version:
+          type: integer
+          readOnly: true
+          description: Optimistic-locking version (ADR-013).
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    RiskDetail:
+      allOf:
+        - $ref: '#/components/schemas/RiskSummary'
+        - type: object
+          required: [description, identifiedOn, causes, consequences]
+          properties:
+            description:
+              type: string
+              description: Stored intact regardless of length (edge case "long free text").
+            type:
+              oneOf:
+                - $ref: '#/components/schemas/ReferenceDataRef'
+                - type: 'null'
+            origin:
+              oneOf:
+                - $ref: '#/components/schemas/ReferenceDataRef'
+                - type: 'null'
+            causes:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/RiskStatement'
+            consequences:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/RiskStatement'
+            currentAssessment:
+              oneOf:
+                - $ref: '#/components/schemas/RiskAssessment'
+                - type: 'null'
+              readOnly: true
+            currentTreatment:
+              oneOf:
+                - $ref: '#/components/schemas/RiskTreatmentDecision'
+                - type: 'null'
+              readOnly: true
+            controls:
+              type: array
+              readOnly: true
+              description: Current control links, shown where they influence residual risk (FR-078).
+              items:
+                $ref: '#/components/schemas/RiskControlLink'
+            processes:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/RiskEntityLink'
+            assets:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/RiskEntityLink'
+            treatmentActionSummary:
+              type: object
+              readOnly: true
+              required: [total, open, overdue]
+              properties:
+                total:
+                  type: integer
+                open:
+                  type: integer
+                overdue:
+                  type: integer
+            pendingApprovalDetail:
+              oneOf:
+                - $ref: '#/components/schemas/Approval'
+                - type: 'null'
+              readOnly: true
+            identifiedOn:
+              type: string
+              format: date
+            archivedAt:
+              type: [string, 'null']
+              format: date-time
+              readOnly: true
+              description: Set by the transition to `ARCHIVED`. Risks are never hard-deleted (FR-102).
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+    CreateRiskRequest:
+      type: object
+      description: |
+        Creates a `DRAFT` risk. `code`, `status`, all derived scores and levels, and `version` are
+        server-owned and rejected if supplied (FR-054, FR-062).
+      required: [title, description, orgUnitId, ownerUserId]
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        categoryId:
+          type: [string, 'null']
+          format: uuid
+          description: Required before the risk may leave `DRAFT` (FR-055).
+        typeId:
+          type: [string, 'null']
+          format: uuid
+        originId:
+          type: [string, 'null']
+          format: uuid
+        orgUnitId:
+          type: string
+          format: uuid
+          description: Must be inside the caller's authorized scope (FR-025c).
+        ownerUserId:
+          type: string
+          format: uuid
+        responsibleUserId:
+          type: [string, 'null']
+          format: uuid
+        identifiedOn:
+          type: string
+          format: date
+          description: Defaults to the current date when omitted.
+        nextReviewOn:
+          type: [string, 'null']
+          format: date
+        causes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        consequences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+    UpdateRiskRequest:
+      type: object
+      description: |
+        Partial update of business content. Omitted properties are left unchanged. `code`, `status`
+        and all derived scores and levels are read-only and rejected if supplied (FR-062).
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          minLength: 1
+        categoryId:
+          type: [string, 'null']
+          format: uuid
+        typeId:
+          type: [string, 'null']
+          format: uuid
+        originId:
+          type: [string, 'null']
+          format: uuid
+        orgUnitId:
+          type: string
+          format: uuid
+          description: Reassignment is refused if the target unit is outside the caller's scope (FR-025c).
+        ownerUserId:
+          type: string
+          format: uuid
+        responsibleUserId:
+          type: [string, 'null']
+          format: uuid
+        identifiedOn:
+          type: string
+          format: date
+        nextReviewOn:
+          type: [string, 'null']
+          format: date
+    ReplaceRiskStatementsRequest:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          description: The complete ordered list. An empty array clears it.
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+    RiskAssessment:
+      type: object
+      description: |
+        An immutable point-in-time evaluation (FR-064). Never updated; a reassessment creates a new
+        record (FR-065).
+      required:
+        [id, assessedBy, assessedOn, methodologyVersion, inherentProbability, inherentImpact,
+         inherentScore, inherentLevel, residualProbability, residualImpact, residualScore,
+         residualLevel]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        assessedBy:
+          $ref: '#/components/schemas/UserRef'
+        assessedOn:
+          type: string
+          format: date
+          readOnly: true
+        methodologyVersion:
+          type: object
+          readOnly: true
+          description: |
+            The methodology version in force when the assessment was performed. Pins interpretation
+            so a later methodology change never rescores this record (FR-068).
+          required: [id, versionNumber]
+          properties:
+            id:
+              type: string
+              format: uuid
+            versionNumber:
+              type: integer
+        inherentProbability:
+          type: integer
+          readOnly: true
+        inherentImpact:
+          type: integer
+          readOnly: true
+        inherentScore:
+          type: integer
+          readOnly: true
+          description: Derived by `RiskScoringService`. Never accepted as input (FR-062).
+        inherentLevel:
+          allOf:
+            - $ref: '#/components/schemas/RiskLevel'
+          readOnly: true
+          description: Derived by `RiskScoringService`. Never accepted as input (FR-062).
+        residualProbability:
+          type: integer
+          readOnly: true
+        residualImpact:
+          type: integer
+          readOnly: true
+        residualScore:
+          type: integer
+          readOnly: true
+          description: Derived by `RiskScoringService`. Never accepted as input (FR-062).
+        residualLevel:
+          allOf:
+            - $ref: '#/components/schemas/RiskLevel'
+          readOnly: true
+          description: Derived by `RiskScoringService`. Never accepted as input (FR-062).
+        controlsConsidered:
+          type: array
+          readOnly: true
+          description: |
+            Snapshot of the controls taken into account at assessment time, retained even if a link
+            is later withdrawn (FR-064, FR-078).
+          items:
+            $ref: '#/components/schemas/ControlRef'
+        rationale:
+          type: [string, 'null']
+          readOnly: true
+        previousAssessmentId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+        levelChange:
+          type: object
+          readOnly: true
+          description: |
+            Change relative to the assessment this one superseded, so the register and history can
+            show the movement (FR-066). Null members mean there was no previous assessment.
+          properties:
+            previousInherentLevel:
+              oneOf:
+                - $ref: '#/components/schemas/RiskLevel'
+                - type: 'null'
+            previousResidualLevel:
+              oneOf:
+                - $ref: '#/components/schemas/RiskLevel'
+                - type: 'null'
+            direction:
+              type: [string, 'null']
+              enum: [INCREASED, DECREASED, UNCHANGED, null]
+    CreateRiskAssessmentRequest:
+      type: object
+      description: |
+        Factor values only. Scores and levels are derived; supplying `inherentScore`,
+        `inherentLevel`, `residualScore` or `residualLevel` is rejected as an unknown property
+        (FR-062, FR-063).
+      required: [inherentProbability, inherentImpact, residualProbability, residualImpact]
+      additionalProperties: false
+      properties:
+        assessedOn:
+          type: string
+          format: date
+          description: Defaults to the current date. May not be in the future.
+        inherentProbability:
+          type: integer
+          minimum: 1
+          description: A value on the configured probability scale; outside it is rejected (FR-067).
+        inherentImpact:
+          type: integer
+          minimum: 1
+          description: A value on the configured impact scale; outside it is rejected (FR-067).
+        residualProbability:
+          type: integer
+          minimum: 1
+          description: Post-control probability judged by the assessor, on the same scale (ADR-006).
+        residualImpact:
+          type: integer
+          minimum: 1
+          description: Post-control impact judged by the assessor, on the same scale (ADR-006).
+        controlIdsConsidered:
+          type: array
+          description: Controls taken into account when judging the residual values.
+          items:
+            type: string
+            format: uuid
+        rationale:
+          type: [string, 'null']
+        methodologyVersionId:
+          type: [string, 'null']
+          format: uuid
+          description: |
+            The methodology version the client scored against. Supply it so an assessment started
+            before a methodology change completes against the version it started under, or is
+            refused with an explanation - never silently rescored (US4 AS5). Omit to use the active
+            version.
+        nextReviewOn:
+          type: [string, 'null']
+          format: date
+          description: Sets the risk's next review date as part of the assessment (FR-070).
+    RiskTreatmentDecision:
+      type: object
+      description: An immutable treatment decision; superseded decisions are retained (FR-073).
+      required: [id, strategy, description, decidedBy, decidedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        strategy:
+          $ref: '#/components/schemas/TreatmentStrategy'
+        description:
+          type: string
+          description: The rationale for the decision (FR-072).
+        deadline:
+          type: [string, 'null']
+          format: date
+        decidedBy:
+          $ref: '#/components/schemas/UserRef'
+        decidedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        supersededAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        deadlineOverdue:
+          type: boolean
+          readOnly: true
+          description: |
+            The deadline has passed with outstanding actions. Computed on read (FR-075).
+    CreateRiskTreatmentDecisionRequest:
+      type: object
+      description: |
+        The deciding user and timestamp are taken from the session and are not accepted as input
+        (FR-072).
+      required: [strategy, description]
+      additionalProperties: false
+      properties:
+        strategy:
+          $ref: '#/components/schemas/TreatmentStrategy'
+        description:
+          type: string
+          minLength: 1
+        deadline:
+          type: [string, 'null']
+          format: date
+    RiskTreatmentAction:
+      type: object
+      required: [id, title, responsible, dueOn, status, overdue]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: |
+            Identifies the shared `Action` (grc/action), not a `risk_treatment_actions` link row —
+            007-implementation-remediation's Action convergence (research.md D-2). The JSON shape
+            is unchanged (still a `uuid`); only what it identifies changed. This listing now
+            includes every `Action` with `originType: RISK_TREATMENT`, with or without a link row.
+        treatmentDecisionId:
+          type: [string, 'null']
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        responsible:
+          $ref: '#/components/schemas/UserRef'
+        dueOn:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/TreatmentActionStatus'
+        overdue:
+          type: boolean
+          readOnly: true
+          description: |
+            Due date passed while not `COMPLETED` or `CANCELLED`. Computed on read, never stored
+            (FR-074b, ADR-015).
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateRiskTreatmentActionRequest:
+      type: object
+      required: [title, responsibleUserId, dueOn]
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: [string, 'null']
+        responsibleUserId:
+          type: string
+          format: uuid
+        dueOn:
+          type: string
+          format: date
+        treatmentDecisionId:
+          type: [string, 'null']
+          format: uuid
+          description: The decision this action arises from, when applicable.
+    UpdateRiskTreatmentActionRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: [string, 'null']
+        responsibleUserId:
+          type: string
+          format: uuid
+        dueOn:
+          type: string
+          format: date
+        status:
+          allOf:
+            - $ref: '#/components/schemas/TreatmentActionStatus'
+          description: |
+            The change is attributed to the acting user with a timestamp and audited (FR-074a).
+            Every transition is checked against the shared `Action` legality table
+            (007-implementation-remediation, D-3): only `OPEN -> IN_PROGRESS`,
+            `IN_PROGRESS -> COMPLETED`, `COMPLETED -> OPEN`, `OPEN -> CANCELLED` and
+            `IN_PROGRESS -> CANCELLED` are legal. A transition this route used to accept but the
+            table refuses (e.g. `OPEN -> COMPLETED` directly, or `CANCELLED -> COMPLETED`) now
+            answers `422`, the correction — not a regression to work around.
+        reopenReason:
+          type: [string, 'null']
+          minLength: 1
+          description: |
+            Required when `status: OPEN` reopens an action currently `COMPLETED`
+            (007-implementation-remediation, D-3). Ignored (may be omitted or null) for every
+            other transition. Missing or empty when required answers `422`.
+    RiskControlLink:
+      type: object
+      description: |
+        An explicitly modelled risk-to-control relationship carrying its own facts (FR-077,
+        ADR-008).
+      required: [id, control, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        control:
+          $ref: '#/components/schemas/ControlRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    RiskEntityLink:
+      type: object
+      description: An explicitly modelled risk-to-process or risk-to-asset relationship.
+      required: [id, entity, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        entity:
+          $ref: '#/components/schemas/EntityRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    LinkEntityRequest:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identifier of the control, process or asset to associate.
+    IncidentRef:
+      type: object
+      description: >-
+        Mirrors `problems.openapi.yaml`'s own `IncidentRef` — duplicated here because contracts
+        never merge schemas across documents (packages/api-types convention).
+      required: [id, code, title, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/IncidentStatusRef'
+    IncidentStatusRef:
+      type: string
+      description: >-
+        Mirrors `incidents.openapi.yaml`'s `IncidentStatus` - duplicated here because contracts
+        never merge schemas across documents (packages/api-types convention).
+      enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, CANCELLED]
+    ProblemRef:
+      type: object
+      description: >-
+        Mirrors `incidents.openapi.yaml`'s own `ProblemRef` — duplicated here because contracts
+        never merge schemas across documents (packages/api-types convention).
+      required: [id, code, title, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProblemStatusRef'
+    ProblemStatusRef:
+      type: string
+      description: >-
+        Mirrors `problems.openapi.yaml`'s `ProblemStatus` - duplicated here because contracts never
+        merge schemas across documents (packages/api-types convention).
+      enum: [OPEN, IN_ANALYSIS, RESOLVED, CLOSED, CANCELLED]
+    RiskIncidentLink:
+      type: object
+      description: |
+        READ-ONLY reverse projection of `IncidentRiskLink` (013-incidents-problems-reverse-links):
+        `modules/risk` never creates or withdraws this link — see `listRiskIncidentLinks`'s own
+        description.
+      required: [id, incident, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        incident:
+          $ref: '#/components/schemas/IncidentRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    RiskProblemLink:
+      type: object
+      description: |
+        READ-ONLY reverse projection of `ProblemRiskLink` (013-incidents-problems-reverse-links):
+        `modules/risk` never creates or withdraws this link — see `listRiskProblemLinks`'s own
+        description.
+      required: [id, problem, linkedBy, linkedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        problem:
+          $ref: '#/components/schemas/ProblemRef'
+        linkedBy:
+          $ref: '#/components/schemas/UserRef'
+        linkedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        unlinkedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+    RiskLifecycleState:
+      type: object
+      required: [status, pendingApproval, availableTransitions, traversedStatuses]
+      properties:
+        status:
+          $ref: '#/components/schemas/RiskStatus'
+        pendingApproval:
+          oneOf:
+            - $ref: '#/components/schemas/Approval'
+            - type: 'null'
+          description: The pending-approval condition on the risk, if any (FR-029c).
+        availableTransitions:
+          type: array
+          description: |
+            Transitions valid from the current state **and** permitted to this caller (FR-082).
+            Advisory: the server re-evaluates on every transition request (FR-081).
+          items:
+            type: object
+            required: [toStatus, requiredPermission, requiresApproval, preconditionsMet]
+            properties:
+              toStatus:
+                $ref: '#/components/schemas/RiskStatus'
+              requiredPermission:
+                type: string
+                description: The `resource:action` identifier the transition requires.
+              requiresApproval:
+                type: boolean
+                description: |
+                  True for transitions into `ACCEPTED` and `CLOSED`, which must be requested through
+                  the approvals endpoint and decided by a different user (FR-029, FR-029a).
+              preconditionsMet:
+                type: boolean
+              unmetPreconditions:
+                type: array
+                description: What is missing, phrased for display (FR-081, US6 AS3).
+                items:
+                  type: string
+        traversedStatuses:
+          type: array
+          description: |
+            Every status this risk's own transition history proves it actually passed through,
+            derived server-side from the append-only lifecycle transition log — never inferred
+            from `status` alone. Always includes `DRAFT`; a risk with no transitions yet has
+            traversed exactly `[DRAFT]`. Lets the client distinguish "traversed but not available
+            now" (e.g. an ARCHIVED risk's own past UNDER_TREATMENT step) from "never happened".
+          items:
+            $ref: '#/components/schemas/RiskStatus'
+    TransitionRiskRequest:
+      type: object
+      required: [toStatus]
+      additionalProperties: false
+      properties:
+        toStatus:
+          allOf:
+            - $ref: '#/components/schemas/RiskStatus'
+          description: |
+            Target state. Must be a legal transition from the current state and must not be an
+            approval-gated one.
+        justification:
+          type: string
+          maxLength: 2000
+          description: Recorded with the transition (FR-083).
+    RiskLifecycleTransition:
+      type: object
+      description: An append-only record of a state change (FR-083).
+      required: [id, fromStatus, toStatus, performedBy, performedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fromStatus:
+          $ref: '#/components/schemas/RiskStatus'
+        toStatus:
+          $ref: '#/components/schemas/RiskStatus'
+        performedBy:
+          $ref: '#/components/schemas/UserRef'
+        performedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        justification:
+          type: [string, 'null']
+        approvalId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+          description: The approval that authorized this transition, for gated transitions.
+    Approval:
+      type: object
+      description: |
+        A request for, and decision on, a transition requiring segregation of duties (FR-029b). The
+        requesting and deciding users always differ (FR-029a).
+      required: [id, requestedTransition, requestedBy, requestedAt, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        requestedTransition:
+          type: string
+          description: 'The gated transition, for example `UNDER_TREATMENT->ACCEPTED`.'
+          readOnly: true
+        requestedBy:
+          $ref: '#/components/schemas/UserRef'
+        requestedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+          readOnly: true
+        decidedBy:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+        decidedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        justification:
+          type: [string, 'null']
+          readOnly: true
+    RequestApprovalRequest:
+      type: object
+      required: [toStatus]
+      additionalProperties: false
+      properties:
+        toStatus:
+          type: string
+          enum: [ACCEPTED, CLOSED]
+          description: The only approval-gated targets in this release (FR-029).
+        justification:
+          type: string
+          maxLength: 2000
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      additionalProperties: false
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED]
+        justification:
+          type: string
+          maxLength: 2000
+          description: Recorded with the decision; expected on rejection (FR-029b, US6 AS7).
+    RiskHistoryEntryType:
+      type: string
+      enum:
+        [ASSESSMENT, LEVEL_CHANGE, OWNERSHIP_CHANGE, TREATMENT_DECISION, TREATMENT_ACTION,
+         CONTROL_LINK, LIFECYCLE_TRANSITION, APPROVAL, FIELD_CHANGE]
+    RiskHistoryEntry:
+      type: object
+      description: |
+        One entry in the merged chronological account (FR-105). Assembled from the append-only
+        domain records and allow-listed audit entries; not a stored table (ADR-007).
+      required: [type, occurredAt, actor, summary]
+      properties:
+        type:
+          $ref: '#/components/schemas/RiskHistoryEntryType'
+        occurredAt:
+          type: string
+          format: date-time
+          readOnly: true
+        actor:
+          $ref: '#/components/schemas/UserRef'
+        summary:
+          type: string
+          description: Human-readable account of what changed.
+          readOnly: true
+        previousValue:
+          type: [string, 'null']
+          readOnly: true
+        newValue:
+          type: [string, 'null']
+          readOnly: true
+        referenceId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+          description: |
+            The assessment, decision, transition or approval this entry refers to, so the client can
+            deep-link to it.
+    AuditEvent:
+      type: object
+      description: |
+        An immutable audit entry (FR-033). Append-only - no operation modifies or deletes one
+        (FR-034).
+      required: [id, occurredAt, actorLabel, action, entityType, outcome, correlationId]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        occurredAt:
+          type: string
+          format: date-time
+          readOnly: true
+        actor:
+          oneOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+          readOnly: true
+          description: Null only for pre-authentication events.
+        actorLabel:
+          type: string
+          readOnly: true
+          description: Actor name as recorded, so history reads correctly after a rename.
+        action:
+          type: string
+          readOnly: true
+          description: 'Business action, for example `risk.accepted` - never a table name.'
+        entityType:
+          type: string
+          readOnly: true
+        entityId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+        previousValues:
+          type: [object, 'null']
+          readOnly: true
+          description: |
+            Allow-listed fields only. Secrets, credentials and session identifiers are never
+            eligible (FR-035).
+        newValues:
+          type: [object, 'null']
+          readOnly: true
+        outcome:
+          type: string
+          enum: [SUCCESS, FAILURE, DENIED]
+          readOnly: true
+          description: '`DENIED` records security-relevant refusals (FR-037).'
+        ipAddress:
+          type: [string, 'null']
+          readOnly: true
+        userAgent:
+          type: [string, 'null']
+          readOnly: true
+        correlationId:
+          type: string
+          format: uuid
+          readOnly: true
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties - including any attempt to supply a
+        derived score or level - or omits a required header such as `If-Match` (FR-062, FR-106).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked (FR-015).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The caller may see the risk but lacks the permission for this action, or the request failed
+        the cross-site request forgery origin check. Refusals are audited where security relevant
+        (FR-026, FR-037). A caller who may not see the record at all receives `404`, not `403`
+        (FR-030).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: |
+        No such risk, **or** the risk exists but lies outside the caller's authorized organizational
+        scope or the caller lacks `risk:view`. The two are deliberately indistinguishable so the
+        response cannot disclose the existence of records the caller may not see (FR-030, FR-090,
+        SC-015).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    VersionConflict:
+      description: |
+        The supplied `If-Match` version is stale - the risk was modified by someone else since it
+        was read. Nothing was written; last-write-wins never occurs (FR-103, FR-085, ADR-013).
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/VersionConflictProblem'
+          example:
+            type: /problems/version-conflict
+            title: The risk was modified by another user
+            status: 409
+            detail: Reload the risk and reapply your changes.
+            instance: /api/v1/risks/0193c1f6-0000-7000-8000-000000000001
+            correlationId: 0193c1f6-8c1a-7b6c-9f27-3f2b0a5b6d11
+            currentVersion: 8
+            currentStatus: UNDER_TREATMENT
+    UnprocessableEntity:
+      description: |
+        The request is well formed but violates a domain rule - server-side validation, referential
+        integrity, organizational scope on the target unit, a closed or archived record, or a
+        lifecycle rule (FR-059, FR-060, FR-025c, FR-084, FR-081).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

@@ -1,0 +1,39 @@
+-- 002-shared-grc-foundation, US1 design correction — additive growth of
+-- the `AttachableEntityType` enum: adds `EVIDENCE` (ADR-008: "closed
+-- platform enums grow by reviewed migration"), the same growth pattern
+-- `20260907090000_audit_entity_type_add_grc_foundation` already applied to
+-- `AuditEntityType` for this same feature.
+--
+-- ## Why this migration exists, and why it is separate from the one after it
+--
+-- `Evidence.fileId` was implemented at T005/T007
+-- (`20260907090100_grc_foundation_baseline`) as a real FK to
+-- `Attachment.id`. That shape cannot work: `Attachment` requires its
+-- parent to already exist (`UploadService`/
+-- `getAttachableEntityAccessor(...).resolveViewableParent` resolves the
+-- parent BEFORE the attachment row is created, throwing if it does not
+-- exist), so `Evidence.file_id` was necessarily NULL at the moment an
+-- evidence row is inserted — a column no `INSERT` could ever legally
+-- populate. See `schema.prisma`'s own `Evidence` section header comment
+-- for the full account.
+--
+-- The fix is to let evidence reach a file the SAME way `Risk` already
+-- does: through the generic attachment mechanism, keyed by
+-- `entityType`/`entityId`, created strictly AFTER the parent record
+-- exists. That requires `EVIDENCE` to be a legal `AttachableEntityType`
+-- value — this migration.
+--
+-- ## The PostgreSQL restriction this migration must respect
+--
+-- Same restriction as every prior `*_add_*`-style enum-growth migration in
+-- this history: a value added by `ALTER TYPE ... ADD VALUE` cannot be
+-- referenced by any statement in the SAME transaction that added it. This
+-- migration contains only the one `ADD VALUE` statement and writes no
+-- `attachments` row using it — nor does the migration that runs
+-- immediately after it
+-- (`20260907091100_evidence_file_fk_correction`), which only drops a
+-- column/constraint and adds a new CHECK, writing no data. The first real
+-- use of `EVIDENCE` is an actual `POST /attachments` call at normal
+-- application runtime, in an entirely separate transaction opened long
+-- after `prisma migrate deploy` has committed this one.
+ALTER TYPE "AttachableEntityType" ADD VALUE 'EVIDENCE';

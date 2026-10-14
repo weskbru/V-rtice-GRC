@@ -1,0 +1,28 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["dom", "dom.iterable", "ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
+    // As primitivas geradas do shadcn/ui não atendem `exactOptionalPropertyTypes`.
+    // Essa opção fica desativada no frontend; as demais regras estritas permanecem.
+    "exactOptionalPropertyTypes": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@vertice/design-system": ["./packages/design-system/src/index.ts"],
+      "@vertice/design-system/*": ["./packages/design-system/src/*"],
+      "@vertice/api-types": ["../packages/api-types/src/index.ts"],
+      "@vertice/api-types/*": ["../packages/api-types/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

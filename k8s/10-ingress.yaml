@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: verticegrc-ingress
+  namespace: verticegrc
+spec:
+  rules:
+    - host: grc.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: verticegrc-web
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - grc.example.com
+      secretName: verticegrc-tls

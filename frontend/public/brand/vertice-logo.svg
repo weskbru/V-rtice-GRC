@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 100" role="img" aria-labelledby="vertice-logo-title">
+  <title id="vertice-logo-title">Vértice GRC</title>
+  <path d="M12 16 H33 L57 88 H43 Z" fill="#17324d" />
+  <path d="M67 16 H88 L57 88 H43 Z" fill="#2878c8" />
+  <text x="110" y="65" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="42" font-weight="600" fill="#17324d">Vértice GRC</text>
+</svg>

@@ -1,0 +1,57 @@
+# Claude Code local settings (may contain credentials/auth tokens)
+.claude/settings.local.json
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Configurações locais e segredos; somente templates são publicados.
+.env*
+!.env.example
+!**/.env.example
+
+# Build output
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# Local attachment storage (FileStorageProvider local adapter, ADR-010)
+storage/
+
+# Intermediate UI review captures (CLAUDE.md §18.13). The representative
+# before/after pairs live in docs/reviews/ui/{baseline,after}/ and are tracked;
+# per-wave captures are working artifacts of the refinement loop, regenerable
+# with frontend/scripts/ui-capture.mjs, and would otherwise add megabytes of
+# near-duplicate PNGs to the history.
+docs/reviews/ui/wave*/
+
+# Impeccable design-hook dedup cache — machine-local, regenerated on every run
+.impeccable/hook.cache.json
+
+# UI review artifacts - keep only representative documentation
+docs/reviews/ui/*/
+!docs/reviews/ui/baseline/
+!docs/reviews/ui/after/
+!docs/reviews/ui/after-dark/
+!docs/reviews/ui/after-narrow/
+!docs/reviews/ui/decisions/
+
+# Machine-specific bundled binaries
+.claude/skills/impeccable/scripts/bin/
+
+# Segredos reais do Kubernetes ficam fora do versionamento.
+k8s/secret.yaml
+k8s/secret.env
+
+# Cópias de trabalho locais.
+.worktrees/

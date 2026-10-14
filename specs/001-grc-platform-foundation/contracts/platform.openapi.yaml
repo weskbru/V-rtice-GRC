@@ -1,0 +1,1592 @@
+openapi: 3.1.0
+info:
+  title: Vértice GRC - Platform Capabilities API
+  version: 1.0.0
+  summary: >-
+    Comments, attachments, notifications, the GRC dashboard, health checks, risk methodology
+    configuration and reference data.
+  description: |
+    Cross-cutting capabilities that every present and future GRC module reuses (FR-110), plus the
+    GRC dashboard and the risk methodology configuration.
+
+    **Parent-record authorization.** Comments and attachments carry no access rules of their own.
+    Every read and write is authorized against the parent record's permissions and organizational
+    scope; there is no independent access path (FR-098). Consequently a comment or attachment whose
+    parent the caller may not see is answered with `404`, never `403`, exactly as the parent would
+    be (FR-030).
+
+    **Entity types are a registry, not an open set.** `entityType` accepts only entity types
+    registered as participating in the capability. `RISK` is the only value in this release; a
+    future module registers its own without a schema change (ADR-008, FR-110).
+servers:
+  - url: /api/v1
+    description: Single-origin API root (ADR-014).
+tags:
+  - name: Comments
+    description: Attributed notes on a GRC record (FR-095).
+  - name: Attachments
+    description: Evidence files governed by their parent record (FR-096 to FR-100).
+  - name: Notifications
+    description: In-application notifications (FR-101).
+  - name: Dashboard
+    description: The GRC dashboard aggregates (FR-047 to FR-052).
+  - name: Health
+    description: Liveness and readiness probes (ADR-012).
+  - name: Risk Methodology
+    description: The versioned probability/impact scales, matrix and level bands (FR-061, FR-068).
+  - name: Reference Data
+    description: >-
+      Configurable classification data (risk categories, types and origins). `GET /controls` moved
+      out of this document in Phase 2 (003-controls-management): ownership of the control catalog
+      transferred to `contracts/controls.openapi.yaml`'s `listControlCatalog` operation. `GET
+      /processes` and `GET /assets` moved out in the same way in 006-assets-processes (Fase 4):
+      ownership of the process and asset registries transferred to `contracts/processes.openapi.yaml`'s
+      `listProcessCatalog` and `contracts/assets.openapi.yaml`'s `listAssetCatalog` operations —
+      neither is a lightweight reference registry any longer (FR-009, FR-010).
+security:
+  - session: []
+paths:
+  /comments:
+    get:
+      operationId: listComments
+      summary: List the comments on a record
+      tags: [Comments]
+      description: |
+        Requires the view permission of the parent record - `risk:view` for `entityType=RISK` - and
+        the parent must lie inside the caller's authorized organizational scope; otherwise `404`
+        (FR-098, FR-030). Withdrawn comments are omitted; their attribution and audit link are
+        retained in the audit trail (FR-102).
+      parameters:
+        - $ref: '#/components/parameters/CommentableEntityTypeQuery'
+        - $ref: '#/components/parameters/EntityIdQuery'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of comments, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: createComment
+      summary: Add a comment to a record
+      tags: [Comments]
+      description: |
+        Requires `comment:create` plus the view permission of the parent record and its scope
+        (FR-098). The author and timestamp are taken from the session, never from the request
+        (FR-095). The body is stored raw and rendered as plain text - it is never interpreted as
+        markup (FR-095, XSS defence). The addition is audited (FR-100).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: Comment stored.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /comments/{commentId}:
+    parameters:
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteComment
+      summary: Withdraw a comment
+      tags: [Comments]
+      description: |
+        Requires `comment:delete` plus the view permission of the parent record and its scope. The
+        comment is withdrawn, not erased: author, timestamp and the audit link are preserved
+        (FR-102). The removal is audited with actor and timestamp (FR-100).
+      responses:
+        '204':
+          description: Comment withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attachments:
+    get:
+      operationId: listAttachments
+      summary: List the attachments on a record
+      tags: [Attachments]
+      description: |
+        Requires the view permission of the parent record and its organizational scope; otherwise
+        `404` (FR-098, FR-030). Returns metadata only - uploading user, timestamp, original file
+        name, size and content type (FR-096). Content is retrieved through the authorizing download
+        endpoint; no static path to a stored file exists (ADR-010).
+      parameters:
+        - $ref: '#/components/parameters/AttachableEntityTypeQuery'
+        - $ref: '#/components/parameters/EntityIdQuery'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of attachment metadata, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      operationId: uploadAttachment
+      summary: Upload an attachment to a record
+      tags: [Attachments]
+      description: |
+        Requires `attachment:create` plus the view permission of the parent record and its scope
+        (FR-098).
+
+        The declared content type must be on the configured allow-list **and** must match the
+        sniffed magic bytes of the uploaded content; the size must be within the configured maximum
+        (25 MB by default). A disallowed type is refused with `422` and an excessive size with
+        `413`; in both cases nothing is stored (FR-097, US9 AS3).
+
+        The original file name is recorded as metadata only. The stored key is generated by the
+        platform and is never derived from user input, so identical or unsafe names cannot collide
+        or escape the storage root (ADR-010, edge case "attachment name collisions and unsafe
+        names"). The upload is audited (FR-100).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [entityType, entityId, file]
+              additionalProperties: false
+              properties:
+                entityType:
+                  $ref: '#/components/schemas/AttachableEntityType'
+                entityId:
+                  type: string
+                  format: uuid
+                file:
+                  type: string
+                  format: binary
+                  description: The file content. Maximum size is configuration; 25 MB by default.
+            encoding:
+              file:
+                contentType: application/octet-stream
+      responses:
+        '201':
+          description: Attachment stored.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: The file exceeds the configured maximum size. Nothing is stored (FR-097).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: |
+            The content type is not on the allow-list, or the declared type does not match the
+            sniffed content. Nothing is stored (FR-097).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /attachments/{attachmentId}:
+    parameters:
+      - $ref: '#/components/parameters/AttachmentId'
+    delete:
+      operationId: deleteAttachment
+      summary: Withdraw an attachment
+      tags: [Attachments]
+      description: |
+        Requires `attachment:delete` plus the view permission of the parent record and its scope.
+        The attachment is withdrawn, preserving uploader attribution and the audit link (FR-102),
+        and the removal is audited (FR-100). Subsequent content requests return `404`.
+      responses:
+        '204':
+          description: Attachment withdrawn.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /attachments/{attachmentId}/content:
+    parameters:
+      - $ref: '#/components/parameters/AttachmentId'
+    get:
+      operationId: downloadAttachmentContent
+      summary: Download an attachment's content
+      tags: [Attachments]
+      description: |
+        Requires the view permission of the **parent record** and the parent's organizational scope.
+        This is the only path to stored bytes: attachments are never served from a static location,
+        so a shared URL is not an unauthenticated capability (FR-098, ADR-010). A caller who may not
+        see the parent receives `404`, which also covers a withdrawn attachment (FR-030, US9 AS4).
+
+        The response is always sent as a download of opaque bytes, never as active content in the
+        browser (FR-099):
+
+        - `Content-Disposition: attachment; filename="<sanitised original name>"`
+        - `X-Content-Type-Options: nosniff`
+        - `Content-Security-Policy: default-src 'none'`
+        - `Content-Type` restricted to the stored, allow-listed type
+      responses:
+        '200':
+          description: The file content, streamed.
+          headers:
+            Content-Disposition:
+              description: Always `attachment`, with the sanitised original file name (FR-099).
+              schema:
+                type: string
+                examples: ['attachment; filename="assessment-worksheet.xlsx"']
+            X-Content-Type-Options:
+              description: Always `nosniff`, so the browser cannot reinterpret the payload (FR-099).
+              schema:
+                type: string
+                const: nosniff
+            Content-Security-Policy:
+              description: Always `default-src 'none'`, so nothing in the payload can execute.
+              schema:
+                type: string
+                const: "default-src 'none'"
+            Cache-Control:
+              description: Always `private, no-store`, so authorized content is not cached by shared caches.
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /notifications:
+    get:
+      operationId: listNotifications
+      summary: List the caller's notifications
+      tags: [Notifications]
+      description: |
+        Requires an authenticated session; no additional permission. Returns only notifications
+        addressed to the caller (FR-101). In-application only - no outbound channel exists in this
+        release.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: A page of notifications, newest first, with the unread count.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, unreadCount]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+                  unreadCount:
+                    type: integer
+                    minimum: 0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: markAllNotificationsRead
+      summary: Mark all of the caller's notifications as read
+      tags: [Notifications]
+      description: |
+        Requires an authenticated session; no additional permission. Marks every unread notification
+        addressed to the caller as read. Idempotent. Notifications are not deletable over the API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              additionalProperties: false
+              properties:
+                action:
+                  type: string
+                  const: MARK_ALL_READ
+      responses:
+        '204':
+          description: All the caller's notifications are marked read.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /notifications/{notificationId}/read:
+    parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: markNotificationRead
+      summary: Mark one notification as read
+      tags: [Notifications]
+      description: |
+        Requires an authenticated session; no additional permission. A notification addressed to
+        another user is answered with `404`, so its existence is not disclosed (FR-030). Idempotent.
+      responses:
+        '204':
+          description: Notification marked read.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /dashboard:
+    get:
+      operationId: getDashboard
+      summary: Retrieve the GRC dashboard aggregates
+      tags: [Dashboard]
+      description: |
+        Requires an authenticated session. Every figure is computed on the server from records
+        inside the caller's authorized organizational scope and filtered by the caller's
+        permissions; a caller without `risk:view` receives zeroed risk areas rather than counts of
+        records they may not see (FR-049, FR-025, FR-030).
+
+        Areas backed by Risk Management carry real data: the risk profile, pending approvals
+        awaiting the caller, overdue risk treatment actions, and risks past their next review date
+        (FR-049). Areas for modules not implemented in this release - problems, incidents and
+        controls - are returned in `plannedAreas` with a status and **no metrics at all**, so no
+        fabricated value can be displayed (FR-050, SC-013). A future module contributes an area
+        without redesigning this response (FR-051).
+
+        Each populated area carries `link`, the register query that reproduces it, so the dashboard
+        can navigate to the corresponding filtered view (FR-052).
+      responses:
+        '200':
+          description: Dashboard aggregates scoped to the caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      summary: Retrieve the cross-domain GRC dashboard summary
+      tags: [Dashboard]
+      description: |
+        Requires an authenticated session; no additional permission gates the endpoint itself, the
+        same shape `GET /dashboard` already uses. `metrics` is the closed, platform-wide
+        `IndicatorMetricKey` catalog `indicators.openapi.yaml`/`reports.openapi.yaml` also declare
+        (data-model.md §3, CLAUDE.md §19.7) - the same single calculator Indicators and Reports use
+        (`IndicatorCalculationService`), never a second computation of any of the eleven keys.
+
+        A metric key is present in `metrics` only when the caller holds that key's OWN
+        source-domain read permission (for example `risk:view` for `RISK_TOTAL_BY_LEVEL`,
+        `control:view` for `CONTROL_INACTIVE_COUNT`). A key the caller cannot see is OMITTED
+        entirely - never computed, never returned zeroed, never returned with a flag marking it
+        unavailable. This differs deliberately from `GET /dashboard`'s own risk areas, which are
+        always present but zeroed when the caller lacks `risk:view`: this catalog is the platform's
+        own closed set, not a caller-configured list that must echo one entry per key, so there is
+        nothing to echo back for a key the caller cannot see. A caller holding none of the eleven
+        source permissions receives a genuine `200` with `metrics: []`, never a `403`.
+
+        Every returned metric is computed inside the caller's authorized organizational scope,
+        resolved once for the whole request (ADR-004) - the same "resolve escopo uma vez" discipline
+        `GET /dashboard` and `GET /reports/{reportId}/run` already follow.
+
+        `breakdowns` carries real model data the closed eleven-key `metrics` catalog does not -
+        status distributions and counts for domains that are not, themselves, one of the eleven
+        `IndicatorMetricKey`s. It has six independently-gated blocks (`actions`, `incidents`,
+        `problems`, `controls`, `compliance`, `indicators`), each keyed to its own source-domain
+        read permission (`action:view`, `incident:view`, `problem:view`, `control:view`,
+        `compliance:view`, `indicator:view` respectively) and OMITTED ENTIRELY - never present
+        zeroed - when the caller lacks it, the identical "omitted, never zeroed" rule `metrics`
+        itself follows. Every status/state map inside a present block is zero-filled: every value
+        of the relevant enum is always a key, even at zero. Every number is computed by the SAME
+        single source each domain's own metric provider already uses (CLAUDE.md §19.7) - never a
+        second rule.
+      responses:
+        '200':
+          description: The metrics the caller is permitted to see, each computed under their own scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /health/live:
+    get:
+      operationId: getLiveness
+      summary: Liveness probe
+      tags: [Health]
+      description: |
+        Public endpoint - no session and no permission required. Reports process liveness only. It
+        deliberately exposes no version, dependency or configuration detail to an unauthenticated
+        caller (ADR-012, FR-107).
+      security: []
+      responses:
+        '200':
+          description: The process is live.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /health/ready:
+    get:
+      operationId: getReadiness
+      summary: Readiness probe
+      tags: [Health]
+      description: |
+        Public endpoint - no session and no permission required. Reports whether the process can
+        serve traffic, having checked PostgreSQL and Redis connectivity. The body carries a status
+        only; which dependency failed is written to the operational log, not returned (ADR-012,
+        FR-107).
+      security: []
+      responses:
+        '200':
+          description: Ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: A required dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /risk-methodology:
+    get:
+      operationId: getActiveRiskMethodology
+      summary: Retrieve the active risk methodology version
+      tags: [Risk Methodology]
+      description: |
+        Requires an authenticated session; no additional permission - the assessment form and the
+        risk detail view need the scales, matrix and bands to label and explain derived values
+        (FR-061, FR-069).
+
+        The methodology is configuration, not logic embedded in interface components: the same
+        version is what `RiskScoringService` derives levels from, so the interface can never disagree
+        with the stored result (FR-062, FR-063).
+      responses:
+        '200':
+          description: The active methodology version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskMethodologyVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /risk-methodology/versions:
+    get:
+      operationId: listRiskMethodologyVersions
+      summary: List methodology versions
+      tags: [Risk Methodology]
+      description: |
+        Requires an authenticated session; no additional permission. Historical versions are
+        returned so an assessment recorded under an earlier version remains interpretable under the
+        methodology in force when it was performed (FR-068, US4 AS5).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: A page of versions, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RiskMethodologyVersion'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createRiskMethodologyVersion
+      summary: Publish a new methodology version
+      tags: [Risk Methodology]
+      description: |
+        Requires `methodology:administer`. A methodology change never edits a version - it publishes
+        a new immutable one, which becomes active from `effectiveFrom` (FR-068). Assessments already
+        recorded keep their pinned version and their stored results are never recomputed (US4 AS5).
+
+        The submitted scales, matrix and bands are validated as a whole: every combination of
+        probability and impact must have a matrix cell, every cell score must fall inside exactly
+        one band, and the bands must be contiguous and non-overlapping. A violation is refused with
+        `422` and nothing is published. The publication is audited (FR-032).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRiskMethodologyVersionRequest'
+      responses:
+        '201':
+          description: Version published.
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskMethodologyVersion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            The scales, matrix and bands are not a consistent whole - an uncovered cell, a score
+            outside every band, or overlapping bands.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /risk-categories:
+    get:
+      operationId: listRiskCategories
+      summary: List risk categories
+      tags: [Reference Data]
+      description: |
+        Requires an authenticated session; no additional permission. Organization-configurable
+        classification data seeded with the release (FR-053, ADR-008). Reference data in use is
+        deactivated, never deleted, so historical risks keep a resolvable classification (FR-060).
+      parameters:
+        - $ref: '#/components/parameters/IncludeInactive'
+      responses:
+        '200':
+          description: Categories in display order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReferenceDataItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /risk-types:
+    get:
+      operationId: listRiskTypes
+      summary: List risk types
+      tags: [Reference Data]
+      description: Requires an authenticated session; no additional permission (FR-053).
+      parameters:
+        - $ref: '#/components/parameters/IncludeInactive'
+      responses:
+        '200':
+          description: Types in display order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReferenceDataItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /risk-origins:
+    get:
+      operationId: listRiskOrigins
+      summary: List risk origins
+      tags: [Reference Data]
+      description: Requires an authenticated session; no additional permission (FR-053).
+      parameters:
+        - $ref: '#/components/parameters/IncludeInactive'
+      responses:
+        '200':
+          description: Origins in display order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReferenceDataItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  # `GET /processes` and `GET /assets` moved OUT of this document
+  # (006-assets-processes, Fase 4, T030) — ownership of the process and
+  # asset registries transferred to `contracts/processes.openapi.yaml`'s
+  # `listProcessCatalog` and `contracts/assets.openapi.yaml`'s
+  # `listAssetCatalog` operations, the same handover `GET /controls` made
+  # to `contracts/controls.openapi.yaml` in Phase 2 (see the "Reference
+  # Data" tag description above). An operation declared in two contracts
+  # at once is ambiguous ownership, not harmless redundancy.
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: vgrc_session
+      description: Opaque server-side session identifier (ADR-002).
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 1-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Rows per page. Capped at 100; no endpoint returns an unbounded set (FR-086).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    # 2026-09-11, Finding B (007-implementation-remediation): split from one
+    # shared `EntityTypeQuery` into two — `GET /comments` and `GET
+    # /attachments` govern two DIFFERENT backend registries
+    # (`registerCommentableEntityType`/`registerAttachableEntityType`,
+    # `core/comments/domain/entity-registry.ts`) that do not carry the same
+    # set of registered types (`RISK` is both; `EVIDENCE` is attachable
+    # only). One shared parameter+schema pair could not express that
+    # asymmetry without asserting something false for whichever operation
+    # it did not actually govern.
+    CommentableEntityTypeQuery:
+      name: entityType
+      in: query
+      required: true
+      description: >-
+        Parent record type for a comments operation. Only registered
+        commentable types are accepted; `RISK` in this release.
+      schema:
+        $ref: '#/components/schemas/CommentableEntityType'
+    AttachableEntityTypeQuery:
+      name: entityType
+      in: query
+      required: true
+      description: >-
+        Parent record type for an attachments operation. Only registered
+        attachable types are accepted; `RISK` and `EVIDENCE` in this
+        release.
+      schema:
+        $ref: '#/components/schemas/AttachableEntityType'
+    EntityIdQuery:
+      name: entityId
+      in: query
+      required: true
+      description: Parent record identifier. Authorization is evaluated against this record (FR-098).
+      schema:
+        type: string
+        format: uuid
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IncludeInactive:
+      name: includeInactive
+      in: query
+      description: |
+        Include deactivated entries, needed when displaying a historical record that references one.
+      schema:
+        type: boolean
+        default: false
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem detail - the single error shape across the API (ADR-009).
+      required: [type, title, status, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+          description: Never contains a stack trace, SQL fragment or internal identifier (FR-107).
+        instance:
+          type: string
+          format: uri-reference
+        correlationId:
+          type: string
+          format: uuid
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      # 2026-09-11, Finding A (007-implementation-remediation): `code` was
+      # required here since this schema's introduction, but no error path in
+      # the implementation has ever populated it — the shared
+      # `ValidationFieldError` type (apps/api/src/shared/errors/domain-
+      # error.ts) carries only `field` and `message`, and the frontend's own
+      # error type never reads a `code` either. Relaxed to optional rather
+      # than implemented: a machine-readable per-field validation-code
+      # taxonomy is a real future capability, but it needs its own
+      # specification and a real consumer that must branch on failure
+      # programmatically — not retrofitted here to satisfy a line nobody
+      # currently reads.
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+          description: >-
+            Reserved for a future machine-readable per-field validation code.
+            Not populated by any error path today — never assume its
+            presence.
+        message:
+          type: string
+    PageMeta:
+      type: object
+      description: Offset pagination envelope metadata (ADR-009).
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+    UserRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+    # 2026-09-11, Finding B (007-implementation-remediation): the single
+    # `EntityType` this replaces collapsed two distinct backend registries
+    # into one shared enum. `core/comments/domain/entity-registry.ts`
+    # exposes `registerCommentableEntityType`/`registerAttachableEntityType`
+    # as two separate registries under two separate names precisely so one
+    # is never assumed from the other — `schema.prisma`'s own comment on
+    # `CommentableEntityType` states this directly: "Risk is registered as
+    # both attachable and commentable today, but a future module need not
+    # be both." The collapsed enum could only be corrected by adding
+    # `EVIDENCE` to the shared set, which would have made this document
+    # assert that comments on evidence are accepted — they are not
+    # (verified: `grc/evidence/evidence.module.ts` calls
+    # `registerAttachableEntityType('EVIDENCE', ...)` and never calls
+    # `registerCommentableEntityType`). One concept, one name (CLAUDE.md's
+    # own first principle) means two registries need two schemas.
+    #
+    # `PROBE_RECORD` (a third, real value on both underlying Prisma enums,
+    # for the SC-011/T206a throwaway module-boundary probe) is deliberately
+    # excluded from both schemas below: no production module ever registers
+    # it, the request-time validator refuses it, and it is permanent
+    # residue in the database enum only because PostgreSQL cannot drop an
+    # enum value. No real response can ever carry it, so listing it here
+    # would mislead a reader for nothing.
+    CommentableEntityType:
+      type: string
+      description: |
+        A record type registered as participating in the comments capability
+        (`registerCommentableEntityType`, FR-110). `RISK` is the only value
+        registered today.
+      enum: [RISK]
+    AttachableEntityType:
+      type: string
+      description: |
+        A record type registered as participating in the attachments
+        capability (`registerAttachableEntityType`, FR-110). `RISK` and
+        `EVIDENCE` are both registered today — `EVIDENCE` via the additive
+        migration `20260907091000_attachable_entity_type_add_evidence`,
+        which this document had never been updated to reflect until this
+        fix (Finding B).
+      enum: [RISK, EVIDENCE]
+    RiskLevel:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    Comment:
+      type: object
+      description: An attributed note on a GRC record, reusable across modules (FR-095).
+      required: [id, entityType, entityId, body, author, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        entityType:
+          $ref: '#/components/schemas/CommentableEntityType'
+        entityId:
+          type: string
+          format: uuid
+          readOnly: true
+        body:
+          type: string
+          description: Plain text. Never interpreted as markup when rendered.
+        author:
+          $ref: '#/components/schemas/UserRef'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    CreateCommentRequest:
+      type: object
+      required: [entityType, entityId, body]
+      additionalProperties: false
+      properties:
+        entityType:
+          $ref: '#/components/schemas/CommentableEntityType'
+        entityId:
+          type: string
+          format: uuid
+        body:
+          type: string
+          minLength: 1
+          maxLength: 10000
+    Attachment:
+      type: object
+      description: |
+        Attachment metadata (FR-096). The storage key is internal and is never exposed (FR-107,
+        ADR-010).
+      required: [id, entityType, entityId, fileName, contentType, sizeBytes, uploadedBy, createdAt, contentUrl]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        entityType:
+          $ref: '#/components/schemas/AttachableEntityType'
+        entityId:
+          type: string
+          format: uuid
+          readOnly: true
+        fileName:
+          type: string
+          readOnly: true
+          description: The original file name, recorded as metadata only.
+        contentType:
+          type: string
+          readOnly: true
+          description: The stored, allow-listed content type.
+        sizeBytes:
+          type: integer
+          readOnly: true
+        checksumSha256:
+          type: string
+          readOnly: true
+        uploadedBy:
+          $ref: '#/components/schemas/UserRef'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        contentUrl:
+          type: string
+          format: uri-reference
+          readOnly: true
+          description: |
+            The authorizing download path, `/api/v1/attachments/{id}/content`. Every retrieval is
+            re-authorized against the parent record; this is not a shareable capability (FR-098).
+    Notification:
+      type: object
+      description: An in-application message directed to one user (FR-101).
+      required: [id, type, title, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        type:
+          type: string
+          readOnly: true
+          description: 'Event type, for example `risk.approval.requested`.'
+        title:
+          type: string
+          readOnly: true
+        body:
+          type: [string, 'null']
+          readOnly: true
+          description: >-
+            2026-09-11, Finding D (007-implementation-remediation): a
+            notification's body is optional at creation
+            (notification.service.ts's own `body?: string | undefined`) and
+            normalized to `null` in the response when absent
+            (notification-response.mapper.ts: `body: record.body ?? null`)
+            — verified directly, not assumed. Declared as a plain
+            non-nullable `string` before this fix.
+        entityType:
+          oneOf:
+            - $ref: '#/components/schemas/CommentableEntityType'
+            - type: 'null'
+          readOnly: true
+          description: Deep-link target, when the notification refers to a record.
+        entityId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+        readAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+    Dashboard:
+      type: object
+      description: |
+        The GRC dashboard, not a risk-only dashboard: it carries areas for the implemented domain
+        and declares the planned ones (FR-047, FR-048, FR-051).
+      required: [risks, pendingApprovals, overdueActions, itemsRequiringReview, treatmentActions, plannedAreas]
+      properties:
+        risks:
+          type: object
+          description: Risk profile inside the caller's authorized scope (FR-049).
+          required: [total, byResidualLevel, byStatus]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            byResidualLevel:
+              type: object
+              description: Counts keyed by derived residual level. Levels are named, never colour-only (FR-091).
+              additionalProperties:
+                type: integer
+                minimum: 0
+            byStatus:
+              type: object
+              additionalProperties:
+                type: integer
+                minimum: 0
+            link:
+              $ref: '#/components/schemas/DashboardLink'
+        pendingApprovals:
+          type: object
+          description: |
+            Risk acceptance and closure approvals awaiting **this** caller - requests they may
+            decide, excluding their own (FR-049, FR-029a, US6 AS8).
+          required: [total, items]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            items:
+              type: array
+              maxItems: 10
+              items:
+                $ref: '#/components/schemas/DashboardRiskItem'
+            link:
+              $ref: '#/components/schemas/DashboardLink'
+        overdueActions:
+          type: object
+          description: |
+            Risk treatment actions past their due date and not complete, computed on read (FR-049,
+            FR-074b).
+          required: [total, items]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            items:
+              type: array
+              maxItems: 10
+              items:
+                $ref: '#/components/schemas/DashboardActionItem'
+            link:
+              $ref: '#/components/schemas/DashboardLink'
+        itemsRequiringReview:
+          type: object
+          description: Risks past their next review date (FR-049, FR-070).
+          required: [total, items]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            items:
+              type: array
+              maxItems: 10
+              items:
+                $ref: '#/components/schemas/DashboardRiskItem'
+            link:
+              $ref: '#/components/schemas/DashboardLink'
+        treatmentActions:
+          type: object
+          description: |
+            The action-plans area, backed in this release by risk-owned treatment actions. A shared
+            Action Plans module is deferred; when it arrives this area's source changes without the
+            dashboard being redesigned (FR-048, FR-051, FR-074c).
+          required: [total, open, overdue]
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            open:
+              type: integer
+              minimum: 0
+            overdue:
+              type: integer
+              minimum: 0
+            link:
+              $ref: '#/components/schemas/DashboardLink'
+        plannedAreas:
+          type: array
+          description: |
+            Areas for modules not implemented in this release. They carry a label and a status and
+            deliberately no metric of any kind, so nothing fabricated can be displayed (FR-050,
+            SC-013).
+          items:
+            type: object
+            required: [key, label, status]
+            properties:
+              key:
+                type: string
+                enum: [PROBLEMS, INCIDENTS, CONTROLS]
+              label:
+                type: string
+              status:
+                type: string
+                const: PLANNED
+    DashboardLink:
+      type: object
+      description: |
+        The filtered view this area corresponds to, so the dashboard can link through where a
+        functional module exists (FR-052).
+      required: [path]
+      properties:
+        path:
+          type: string
+          format: uri-reference
+          description: 'Relative register path with query, for example `/risks?overdueReview=true`.'
+    DashboardRiskItem:
+      type: object
+      required: [riskId, code, title]
+      properties:
+        riskId:
+          type: string
+          format: uuid
+        code:
+          type: string
+        title:
+          type: string
+        residualLevel:
+          oneOf:
+            - $ref: '#/components/schemas/RiskLevel'
+            - type: 'null'
+          readOnly: true
+          description: Derived by the platform; never accepted as input anywhere (FR-062).
+        dueContext:
+          type: [string, 'null']
+          description: 'Why the item is listed, for example the review date that has passed.'
+    DashboardActionItem:
+      type: object
+      required: [actionId, riskId, riskCode, title, dueOn]
+      properties:
+        actionId:
+          type: string
+          format: uuid
+          description: |
+            The shared `Action`'s id (grc/action) — 007-implementation-remediation's Action
+            convergence (research.md D-2). Previously the `risk_treatment_actions` link row's own
+            id; the JSON shape is unchanged, only what it identifies. The same identifier
+            `GET/POST/PATCH /risks/{riskId}/treatment-actions` now returns as `RiskTreatmentAction.id`.
+        riskId:
+          type: string
+          format: uuid
+        riskCode:
+          type: string
+        title:
+          type: string
+        dueOn:
+          type: string
+          format: date
+        responsible:
+          $ref: '#/components/schemas/UserRef'
+    DashboardSummary:
+      type: object
+      description: |
+        The cross-domain GRC summary (CLAUDE.md §19.7, §19.8): every entry in `metrics` is one of
+        the eleven `IndicatorMetricKey`s the closed catalog also declares
+        (`indicators.openapi.yaml`), computed by the same single calculator Indicators and Reports
+        use. A key whose source-domain read permission the caller lacks is never present in this
+        array (see this operation's own description).
+      required: [metrics, breakdowns]
+      properties:
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardSummaryMetric'
+        breakdowns:
+          $ref: '#/components/schemas/DashboardSummaryBreakdowns'
+    DashboardSummaryBreakdowns:
+      type: object
+      description: |
+        Six independently-gated blocks of real model data the closed `metrics` catalog does not
+        carry (see this operation's own description). Every block is OPTIONAL and OMITTED entirely
+        - never present zeroed - when the caller lacks that block's own source-domain read
+        permission. `breakdowns` itself is always present, even as `{}` for a caller holding none
+        of the six permissions.
+      properties:
+        actions:
+          $ref: '#/components/schemas/DashboardSummaryActionsBreakdown'
+        incidents:
+          $ref: '#/components/schemas/DashboardSummaryIncidentsBreakdown'
+        problems:
+          $ref: '#/components/schemas/DashboardSummaryProblemsBreakdown'
+        controls:
+          $ref: '#/components/schemas/DashboardSummaryControlsBreakdown'
+        compliance:
+          $ref: '#/components/schemas/DashboardSummaryComplianceBreakdown'
+        indicators:
+          $ref: '#/components/schemas/DashboardSummaryIndicatorsBreakdown'
+    DashboardSummaryActionsBreakdown:
+      type: object
+      description: Requires `action:view`. Scoped by the shared `Action` capability's own org unit.
+      required: [byStatus, dueSoon, dueSoonWindowDays]
+      properties:
+        byStatus:
+          type: object
+          description: Zero-filled count of every `ActionStatus` value.
+          required: [OPEN, IN_PROGRESS, COMPLETED, CANCELLED]
+          properties:
+            OPEN:
+              type: integer
+            IN_PROGRESS:
+              type: integer
+            COMPLETED:
+              type: integer
+            CANCELLED:
+              type: integer
+        dueSoon:
+          type: integer
+          description: >-
+            Actions with status OPEN or IN_PROGRESS whose due date falls in
+            [today, today + dueSoonWindowDays) - not yet overdue.
+        dueSoonWindowDays:
+          type: integer
+          description: Fixed at 7; never caller-configured.
+    DashboardSummaryIncidentsBreakdown:
+      type: object
+      description: Requires `incident:view`. Scoped by the incident's own org unit.
+      required: [byStatus]
+      properties:
+        byStatus:
+          type: object
+          description: Zero-filled count of every `IncidentStatus` value.
+          required: [OPEN, IN_PROGRESS, RESOLVED, CLOSED, CANCELLED]
+          properties:
+            OPEN:
+              type: integer
+            IN_PROGRESS:
+              type: integer
+            RESOLVED:
+              type: integer
+            CLOSED:
+              type: integer
+            CANCELLED:
+              type: integer
+    DashboardSummaryProblemsBreakdown:
+      type: object
+      description: Requires `problem:view`. Scoped by the problem's own org unit.
+      required: [byStatus]
+      properties:
+        byStatus:
+          type: object
+          description: Zero-filled count of every `ProblemStatus` value.
+          required: [OPEN, IN_ANALYSIS, RESOLVED, CLOSED, CANCELLED]
+          properties:
+            OPEN:
+              type: integer
+            IN_ANALYSIS:
+              type: integer
+            RESOLVED:
+              type: integer
+            CLOSED:
+              type: integer
+            CANCELLED:
+              type: integer
+    DashboardSummaryControlsBreakdown:
+      type: object
+      description: >-
+        Requires `control:view`. Scoped by the control's own org unit. `ineffective` reuses the
+        SAME derived effectiveness computation the control catalog itself uses (CLAUDE.md §19.7) -
+        never a second effectiveness rule.
+      required: [total, active, ineffective]
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+          description: Controls whose status is ACTIVE.
+        ineffective:
+          type: integer
+          description: ACTIVE controls whose current derived effectiveness is INEFFECTIVE.
+    DashboardSummaryComplianceBreakdown:
+      type: object
+      description: >-
+        Requires `compliance:view`. Organization-wide (Requirement/FrameworkVersion carry no
+        organizational-unit column). Reuses the SAME single calculator
+        (`calculateRequirementComplianceState`) the organization-wide compliance percentage already
+        uses (CLAUDE.md §19.7) - never a second rule; `byState`'s values always sum to
+        `requirementCount`.
+      required: [requirementCount, byState]
+      properties:
+        requirementCount:
+          type: integer
+          description: Every requirement of a PUBLISHED FrameworkVersion.
+        byState:
+          type: object
+          description: Zero-filled count of every `RequirementComplianceState` value.
+          required: [NOT_APPLICABLE, NOT_MET, NOT_PROVEN, PARTIALLY_MET, COMPLIANT]
+          properties:
+            NOT_APPLICABLE:
+              type: integer
+            NOT_MET:
+              type: integer
+            NOT_PROVEN:
+              type: integer
+            PARTIALLY_MET:
+              type: integer
+            COMPLIANT:
+              type: integer
+    DashboardSummaryIndicatorsBreakdown:
+      type: object
+      description: Requires `indicator:view`. Organization-wide (definitions carry no org unit).
+      required: [monitored, breached]
+      properties:
+        monitored:
+          type: integer
+          description: IndicatorDefinition rows with isActive = true.
+        breached:
+          type: integer
+          description: >-
+            Of the monitored definitions, how many have their MOST RECENT measurement (by
+            metricKey, greatest computedAt) with breached = true. A definition with no measurement
+            yet never counts as breached.
+    DashboardSummaryMetric:
+      type: object
+      required: [metricKey, shape, scopeApplicability]
+      properties:
+        metricKey:
+          $ref: '#/components/schemas/DashboardSummaryMetricKey'
+        shape:
+          type: string
+          enum: [SINGLE_VALUE, BY_BUCKET]
+          description: Which of `value`/`valueByBucket` this metric populates.
+        scopeApplicability:
+          type: string
+          enum: [ORGANIZATIONAL_UNIT, ORGANIZATION_WIDE]
+        value:
+          type: number
+          description: >-
+            Present only for a `SINGLE_VALUE` metric. Absent - never `0` - when the source domain
+            has no data yet (spec.md's own "nunca 0 nem 100" edge case, `indicators.openapi.yaml`).
+        valueByBucket:
+          type: object
+          description: Present only for a `BY_BUCKET` metric.
+          additionalProperties:
+            type: integer
+    DashboardSummaryMetricKey:
+      type: string
+      description: >-
+        The same closed catalog `indicators.openapi.yaml`/`reports.openapi.yaml` each declare
+        (data-model.md §3) - duplicated here rather than referenced across documents, the same
+        self-contained-contract choice those two documents already made for this exact enum.
+      enum:
+        - RISK_TOTAL_BY_LEVEL
+        - RISK_TREATMENT_OVERDUE_COUNT
+        - CONTROL_INACTIVE_COUNT
+        - COMPLIANCE_PERCENTAGE
+        - AUDIT_ENGAGEMENT_OPEN_COUNT
+        - FINDING_OPEN_COUNT_BY_SEVERITY
+        - ASSET_INACTIVE_COUNT
+        - PROCESS_INACTIVE_COUNT
+        - ACTION_OVERDUE_COUNT
+        - INCIDENT_OPEN_COUNT_BY_SEVERITY
+        - PROBLEM_OPEN_COUNT_BY_SEVERITY
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+          description: |
+            No version, dependency name or configuration detail is exposed to an unauthenticated
+            caller (ADR-012).
+    RiskMethodologyVersion:
+      type: object
+      description: |
+        An immutable methodology version (FR-061, FR-068). Never updated; a change publishes a new
+        version, so historical assessments are never rescored.
+      required: [id, versionNumber, probabilityScale, impactScale, matrix, levelBands, effectiveFrom, isActive]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        methodologyName:
+          type: string
+          readOnly: true
+        versionNumber:
+          type: integer
+          readOnly: true
+        probabilityScale:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/ScalePoint'
+        impactScale:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/ScalePoint'
+        matrix:
+          type: array
+          readOnly: true
+          description: One cell per probability-impact combination, with the score and level it yields.
+          items:
+            $ref: '#/components/schemas/MatrixCell'
+        levelBands:
+          type: array
+          readOnly: true
+          description: Contiguous, non-overlapping score ranges mapped to risk levels.
+          items:
+            $ref: '#/components/schemas/LevelBand'
+        effectiveFrom:
+          type: string
+          format: date-time
+          readOnly: true
+        isActive:
+          type: boolean
+          readOnly: true
+        createdBy:
+          $ref: '#/components/schemas/UserRef'
+    ScalePoint:
+      type: object
+      required: [value, label]
+      properties:
+        value:
+          type: integer
+          minimum: 1
+        label:
+          type: string
+        description:
+          type: [string, 'null']
+    MatrixCell:
+      type: object
+      required: [probability, impact, score, level]
+      properties:
+        probability:
+          type: integer
+        impact:
+          type: integer
+        score:
+          type: integer
+        level:
+          $ref: '#/components/schemas/RiskLevel'
+    LevelBand:
+      type: object
+      required: [level, minScore, maxScore]
+      properties:
+        level:
+          $ref: '#/components/schemas/RiskLevel'
+        minScore:
+          type: integer
+        maxScore:
+          type: integer
+        colorToken:
+          type: string
+          description: |
+            Design-system token for the band. Presentation always pairs it with the level name, so
+            status is never conveyed by colour alone (SC-012).
+    CreateRiskMethodologyVersionRequest:
+      type: object
+      description: |
+        Publishes a new immutable version. The version number and `isActive` are server-owned
+        (FR-068).
+      required: [probabilityScale, impactScale, matrix, levelBands]
+      additionalProperties: false
+      properties:
+        probabilityScale:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/ScalePoint'
+        impactScale:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/ScalePoint'
+        matrix:
+          type: array
+          minItems: 4
+          items:
+            $ref: '#/components/schemas/MatrixCell'
+        levelBands:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/LevelBand'
+        effectiveFrom:
+          type: string
+          format: date-time
+          description: Defaults to the moment of publication. May not be in the past.
+    ReferenceDataItem:
+      type: object
+      description: A risk category, type or origin (ADR-008 reference tables).
+      required: [id, code, name, isActive]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: [string, 'null']
+          readOnly: true
+        sortOrder:
+          type: integer
+          readOnly: true
+        isActive:
+          type: boolean
+          readOnly: true
+  responses:
+    BadRequest:
+      description: |
+        The request is malformed, carries unknown properties, or omits a required parameter
+        (FR-106).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: No session cookie, or the session is expired or revoked (FR-015).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: |
+        The caller may see the parent record but lacks the permission for this action, or the
+        request failed the cross-site request forgery origin check (FR-026, ADR-002).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: |
+        No such resource, **or** the parent record lies outside the caller's authorized
+        organizational scope or may not be viewed by them. The two are deliberately
+        indistinguishable (FR-030, FR-098, US9 AS4).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: |
+        The request is well formed but violates a domain rule, such as a parent record that does not
+        participate in the capability or is closed to further additions.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

@@ -1,0 +1,8 @@
+export function VerticeSymbol({ className }: { className?: string }): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 100 100" className={className} aria-hidden="true" focusable="false">
+      <path d="M12 16 H33 L57 88 H43 Z" className="fill-(--brand-mark-ink)" />
+      <path d="M67 16 H88 L57 88 H43 Z" className="fill-(--brand-mark-signal)" />
+    </svg>
+  );
+}

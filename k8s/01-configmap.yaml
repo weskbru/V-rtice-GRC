@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: verticegrc-config
+  namespace: verticegrc
+  labels:
+    app.kubernetes.io/name: verticegrc
+data:
+  # DATABASE_URL fica em Secret externo; não há conexão operacional nesta distribuição.
+  # Substitua a origem fictícia pelo domínio HTTPS do seu ambiente.
+  # SEED_ADMIN_EMAIL é exigida no runtime e não cria uma conta automaticamente.
+  NODE_ENV: 'production'
+  API_PORT: '3001'
+  WEB_PORT: '3000'
+  API_INTERNAL_URL: 'http://verticegrc-api:3001'
+  APP_ORIGIN: 'https://grc.example.com'
+  REDIS_URL: 'redis://verticegrc-redis:6379'
+  SESSION_COOKIE_NAME: 'vgrc_session'
+  SESSION_COOKIE_SAMESITE: 'lax'
+  SESSION_IDLE_TIMEOUT_MINUTES: '30'
+  SESSION_ABSOLUTE_LIFETIME_HOURS: '12'
+  PASSWORD_MIN_LENGTH: '12'
+  PASSWORD_REQUIRE_COMPLEXITY: 'true'
+  ARGON2_MEMORY_COST: '19456'
+  ARGON2_TIME_COST: '2'
+  ARGON2_PARALLELISM: '1'
+  LOG_LEVEL: 'info'
+  THROTTLE_TTL_SECONDS: '60'
+  THROTTLE_LIMIT: '100'
+  AUTH_RATE_LIMIT_ACCOUNT_ATTEMPTS: '5'
+  AUTH_RATE_LIMIT_ORIGIN_ATTEMPTS: '50'
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: '300'
+  AUTH_LOCKOUT_MINUTES: '15'
+  ATTACHMENT_MAX_SIZE_BYTES: '26214400'
+  ATTACHMENT_ALLOWED_MIME_TYPES: 'application/pdf,image/png,image/jpeg,text/plain'
+  SESSION_COOKIE_SECURE: 'true'
+  LOG_PRETTY: 'false'
+  ATTACHMENT_STORAGE_DRIVER: 'local'
+  ATTACHMENT_STORAGE_PATH: '/app/storage/attachments'
+  SEED_DEV_FIXTURES: 'false'
+  SEED_ADMIN_EMAIL: 'admin@example.invalid'
